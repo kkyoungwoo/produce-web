@@ -1,0 +1,16 @@
+[00:00:01.581] Server  LOG     ✓ Ready in 1299ms
+[00:00:07.254] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:01:07.699] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:07.703] Server  ERROR   ⨯ "unhandledRejection:" Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:07.706] Server  ERROR   ⨯ "unhandledRejection: " Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:07.709] Server  LOG     ✓ Compiled in 2ms
+[00:01:07.989] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:07.991] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:07.996] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:07.998] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:08.007] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:08.008] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:08.013] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:08.015] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:08.019] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
+[00:01:08.020] Server  ERROR   Error: ENOENT: no such file or directory, scandir 'C:\Users\gorhr\Documents\GitHub\produce-web\app'
