@@ -10,7 +10,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "npx serve@latest out --listen 3000",
+    "preview": "npx serve@latest out --listen 3000",
     "lint": "next lint"
   },
   "devDependencies": {
