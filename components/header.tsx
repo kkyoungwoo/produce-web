@@ -1,7 +1,7 @@
 ﻿import Link from "next/link";
 
 import type { Locale } from "@/lib/i18n/config";
-import { content } from "@/lib/i18n/translations";
+import { getLocaleContent } from "@/lib/i18n/translations";
 
 import LanguageSwitcher from "./language-switcher";
 
@@ -10,7 +10,7 @@ type HeaderProps = {
 };
 
 export default function Header({ locale }: HeaderProps) {
-  const t = content[locale];
+  const t = getLocaleContent(locale);
 
   return (
     <header className="site-header">

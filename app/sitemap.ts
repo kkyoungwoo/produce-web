@@ -1,20 +1,20 @@
-export const dynamic = "force-static";
+﻿export const dynamic = "force-static";
 
 import type { MetadataRoute } from "next";
 
 import { locales } from "@/lib/i18n/config";
-
-const siteUrl = "https://gorhrod-codex.web.app";
+import { SITE_URL } from "@/lib/i18n/seo";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const routes = ["", "/about", "/services", "/contact"];
+  const now = new Date();
 
   return locales.flatMap((locale) =>
     routes.map((route) => ({
-      url: `${siteUrl}/${locale}${route}`,
-      lastModified: new Date(),
-      changeFrequency: "weekly" as const,
-      priority: route === "" ? 1 : 0.8,
+      url: `${SITE_URL}/${locale}${route}`,
+      lastModified: now,
+      changeFrequency: route === "" ? ("daily" as const) : ("weekly" as const),
+      priority: route === "" ? 1 : 0.82,
     })),
   );
 }

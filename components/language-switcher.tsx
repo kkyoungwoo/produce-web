@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 
 import type { Locale } from "@/lib/i18n/config";
 import { locales } from "@/lib/i18n/config";
-import { content } from "@/lib/i18n/translations";
+import { getLocaleContent } from "@/lib/i18n/translations";
 
 type LanguageSwitcherProps = {
   locale: Locale;
@@ -31,7 +31,7 @@ export default function LanguageSwitcher({ locale }: LanguageSwitcherProps) {
           className={lang === locale ? "active" : ""}
           onClick={() => onChange(lang)}
         >
-          {content[lang].localeName}
+          {getLocaleContent(lang).localeName}
         </button>
       ))}
     </div>
