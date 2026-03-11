@@ -1,7 +1,7 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 
 import type { Locale } from "@/lib/i18n/config";
-import { content } from "@/lib/i18n/translations";
+import { getLocaleContent } from "@/lib/i18n/translations";
 
 import LanguageSwitcher from "./language-switcher";
 
@@ -10,19 +10,16 @@ type HeaderProps = {
 };
 
 export default function Header({ locale }: HeaderProps) {
-  const t = content[locale];
+  const t = getLocaleContent(locale);
 
   return (
-    <header className="site-header">
-      <div className="container header-inner">
-        <Link href={`/${locale}`} className="brand">
+    <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur">
+      <div className="mx-auto flex min-h-[72px] w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+        <Link href={`/${locale}`} className="text-sm font-black tracking-[0.14em] text-slate-800">
           {t.brand}
         </Link>
-        <nav className="nav-links" aria-label="main navigation">
-          <Link href={`/${locale}`}>{t.nav.home}</Link>
-          <Link href={`/${locale}/about`}>{t.nav.about}</Link>
-          <Link href={`/${locale}/services`}>{t.nav.services}</Link>
-          <Link href={`/${locale}/contact`}>{t.nav.contact}</Link>
+        <nav className="flex items-center gap-4 text-sm text-slate-600" aria-label="main navigation">
+          <Link href={`/${locale}/services`} className="transition-colors hover:text-blue-600">{t.nav.services}</Link>
         </nav>
         <LanguageSwitcher locale={locale} />
       </div>
