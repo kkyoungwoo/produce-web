@@ -1,4 +1,4 @@
-﻿export const dynamic = "force-static";
+export const dynamic = "force-static";
 
 import type { MetadataRoute } from "next";
 

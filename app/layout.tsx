@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 
 import { siteBaseMetadata } from "@/lib/i18n/seo";
 

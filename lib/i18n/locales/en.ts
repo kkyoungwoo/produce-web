@@ -1,4 +1,4 @@
-﻿import type { DeepPartial, LocaleContent } from "../types";
+import type { DeepPartial, LocaleContent } from "../types";
 
 const en: DeepPartial<LocaleContent> = {
   localeName: "English",
