@@ -28,20 +28,20 @@ export function dateBeforeDays(days: number) {
 
 export function normalizeCountry(value: string | number | undefined) {
   const text = toText(value);
-  if (!text) return "援?? 誘몃텇瑜?;
-  return WORKNATIONAL_MAP[text] ?? (/^\d+$/.test(text) ? "援?? 誘몃텇瑜? : text);
+  if (!text) return "국가 미분류";
+  return WORKNATIONAL_MAP[text] ?? (/^\d+$/.test(text) ? "국가 미분류" : text);
 }
 
 export function homestayRegionName(value: string | number | undefined) {
   const code = toText(value);
-  if (!code) return "吏??誘몃텇瑜?;
-  return REGION_NAME_MAP[code] ?? "吏??誘몃텇瑜?;
+  if (!code) return "지역 미분류";
+  return REGION_NAME_MAP[code] ?? "지역 미분류";
 }
 
 export function eduRegionName(value: string | number | undefined) {
   const text = toText(value);
-  if (!text) return "吏??誘몃텇瑜?;
-  return text.split(/\s+/)[0] || "吏??誘몃텇瑜?;
+  if (!text) return "지역 미분류";
+  return text.split(/\s+/)[0] || "지역 미분류";
 }
 
 export function formatYmd(value: string | number | undefined) {
@@ -84,9 +84,11 @@ export function isInvalidServiceKeyError(data: CollectResponse, status: number) 
   if (status === 401 || status === 403) return true;
 
   return (
-    text.includes("?깅줉?섏? ?딆? ?몄쬆??) ||
+    text.includes("등록되지 않은 인증키") ||
     text.includes("invalid service key") ||
     text.includes("service key is not registered") ||
-    text.includes("?ㅻ쪟(-4)")
+    text.includes("오류(-4)") ||
+    text.includes("인증키(servicekey)가 없습니다") ||
+    text.includes("servicekey")
   );
 }
