@@ -1,42 +1,49 @@
-> 이 가이드는 `AGENTS.md`의 필수 규칙과 함께 항상 확인해야 합니다.`n`n# ?좉퇋 DB ?곹뭹 異붽? 媛?대뱶
+> 신규 작업 전에 `AGENTS.md`를 항상 먼저 확인해야 합니다.
 
-## 1) ?곹뭹 ?곗씠???뚯씪 異붽?
-- ?꾩튂: `content/db-products/products/`
-- ?뚯씪紐??덉떆: `api-15199999.ts`
-- ?꾩닔: `ProductItem` 援ъ“濡??묒꽦
+# 신규 DB 상품 추가 가이드
 
-## 2) ?곹뭹 紐⑸줉???깅줉
-- ?뚯씪: `content/db-products/products/index.ts`
-- `productCatalog` 諛곗뿴???좉퇋 ?곹뭹 import/異붽?
+## 1) 상품 데이터 파일 추가
+- 위치: `content/db-products/products/`
+- 파일명 예시: `api-15199999.ts`
+- 필수: `ProductItem` 타입 구조로 작성
 
-## 3) ?뚰겕踰ㅼ튂 ?숈옉 ?ㅼ젙(遺꾧린 ?놁씠 ?ㅼ젙?쇰줈 愿由?
-- ?뚯씪: `components/workbench/product-config.ts`
-- `getWorkbenchProductConfig`??slug蹂??ㅼ젙 異붽?
-- ?ㅼ젙 ??ぉ:
+## 2) 상품 목록 등록
+- 파일: `content/db-products/products/index.ts`
+- `productCatalog` 배열에 신규 상품 import 및 등록
+
+## 3) 워크벤치 동작 설정(설정 기반)
+- 파일: `components/workbench/product-config.ts`
+- `getWorkbenchProductConfig`에 slug별 설정 추가
+- 설정 항목 예시:
   - `inputMode`: `default` | `homestay`
   - `statMode`: `none` | `country:worknational` | `country:nationalName` | `region:homestay` | `region:addr`
-  - `hideInputKeys`: ?④만 ?낅젰 ??  - `forceDefaultDates`, `forceBaseDateToYesterday`
+  - `hideInputKeys`: 입력 UI에서 숨길 필드 키 목록
+  - `forceDefaultDates`, `forceBaseDateToYesterday`
 
-## 4) ?섑뵆 ?곗씠??異붽?
-- ?뚯씪: `components/workbench/samples.ts`
-- `getSampleRows(product)`??slug蹂??섑뵆 5嫄?異붽?
-- 洹쒖튃: ?ㅼ젣 異쒕젰 ?뚯씠釉붽낵 理쒕????숈씪?????뺤떇 ?좎?
+## 4) 샘플 데이터 추가
+- 파일: `components/workbench/samples.ts`
+- `getSampleRows(product)`에 slug별 샘플 5건 추가
+- 규칙: 실제 출력 테이블과 최대한 동일한 키/형식 유지
 
-## 5) 而щ읆 ?쇰꺼(?쒓?) 異붽?
-- ?뚯씪: `components/workbench/constants.ts`
-- `COLUMN_LABEL_KR`???좉퇋 ???쇰꺼 異붽?
+## 5) 컬럼 한글 라벨 추가
+- 파일: `components/workbench/constants.ts`
+- `COLUMN_LABEL_KR`에 신규 컬럼 키와 한글 라벨 추가
 
-## 6) ?뱀닔 ?щ㎎/留ㅽ븨???꾩슂?섎㈃
-- ?뚯씪: `components/workbench/helpers.ts`
-- `formatCellValue` ?먮뒗 援??/吏???뚯떛 ?⑥닔留?異붽?
+## 6) 특수 포맷/매핑이 필요한 경우
+- 파일: `components/workbench/helpers.ts`
+- `formatCellValue` 또는 국가/지역 매핑 함수만 최소 범위로 추가
 
 ---
 
-## ?뚰겕踰ㅼ튂 ?듭떖 而댄룷?뚰듃
-- 硫붿씤 UI + ?숈옉: `components/workbench-collector-client.tsx`
-- ??? `components/workbench/types.ts`
-- ?띿뒪?? `components/workbench/text.ts`
-- ?곸닔/?쇰꺼: `components/workbench/constants.ts`
-- ?щ㎎/寃利??좏떥: `components/workbench/helpers.ts`
-- ?곹뭹蹂??숈옉 ?ㅼ젙: `components/workbench/product-config.ts`
-- ?곹뭹蹂??섑뵆: `components/workbench/samples.ts`
+## 워크벤치 핵심 파일
+- 메인 UI + 동작: `components/workbench-collector-client.tsx`
+- 타입: `components/workbench/types.ts`
+- 텍스트: `components/workbench/text.ts`
+- 상수/라벨: `components/workbench/constants.ts`
+- 헬퍼/검증: `components/workbench/helpers.ts`
+- 상품별 동작 설정: `components/workbench/product-config.ts`
+- 상품별 샘플 데이터: `components/workbench/samples.ts`
+
+## 인코딩 규칙
+- 본 문서 및 코드 파일은 UTF-8(권장: BOM 없음)으로 저장합니다.
+- 한글 깨짐이 발생하면 먼저 인코딩을 확인하고 문자열을 복구합니다.
