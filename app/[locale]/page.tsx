@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import JsonLd from "@/components/json-ld";
@@ -78,7 +78,7 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
         <section className="trust-strip">
           <div className="container trust-grid">
             {copy.trustItems.map((item) => (
-              <div key={item.kicker} className="trust-item">
+              <div key={item.kicker} className="trust-item click-interactive">
                 <span className="trust-kicker">{item.kicker}</span>
                 <strong>{item.label}</strong>
               </div>
@@ -96,7 +96,7 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
 
             <div className="process-grid">
               {copy.processCards.map((card) => (
-                <article key={card.step} className="process-card">
+                <article key={card.step} className="process-card click-interactive">
                   <span className="process-step">{card.step}</span>
                   <h3>{card.title}</h3>
                   <p>{card.description}</p>
@@ -114,7 +114,7 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
               <p>{copy.businessDescription}</p>
             </div>
 
-            <article className="final-message-card">
+            <article className="final-message-card click-interactive">
               <p className="final-kicker">{copy.promiseKicker}</p>
               <h3>{copy.promiseTitle}</h3>
               <p className="final-desc">{copy.promiseDescription}</p>
@@ -530,6 +530,19 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
           margin-top: 24px;
         }
 
+
+        .click-interactive {
+          cursor: pointer;
+          transition: transform 0.18s ease, box-shadow 0.18s ease, background-color 0.18s ease;
+        }
+
+        .click-interactive:hover {
+          transform: translateY(-2px);
+        }
+
+        .click-interactive:active {
+          transform: scale(0.985);
+        }
         @media (max-width: 1100px) {
           .hero-inner {
             grid-template-columns: 1fr;

@@ -22,7 +22,7 @@ function isValidInputField(field: unknown): field is ProductInputField {
   return (
     isNonEmptyString(candidate.key)
     && isNonEmptyString(candidate.label)
-    && isNonEmptyString(candidate.example)
+    && typeof candidate.example === "string"
   );
 }
 
@@ -38,7 +38,7 @@ function isValidWorkbenchConfig(workbench: ProductWorkbenchConfig | undefined): 
   if (!workbench) return true;
 
   const hasColumns = Array.isArray(workbench.columns) && workbench.columns.length > 0;
-  const hasRows = Array.isArray(workbench.rows) && workbench.rows.length > 0;
+  const hasRows = Array.isArray(workbench.rows);
 
   return hasColumns && hasRows;
 }
@@ -80,6 +80,18 @@ function isValidProductItem(item: unknown): item is ProductItem {
 }
 
 const validProductsKo = productCatalog.filter(isValidProductItem);
+const primaryProductSlug = validProductsKo[0]?.slug ?? "api-15086411";
+
+const legacySlugs = [
+  "api-15154910",
+  "api-15136267",
+];
+
+function normalizeSlug(slug: string): string {
+  if (slug === primaryProductSlug) return slug;
+  if (legacySlugs.includes(slug)) return primaryProductSlug;
+  return slug;
+}
 
 export function getPublicApiProducts(locale: Locale): ProductItem[] {
   void locale;
@@ -87,11 +99,13 @@ export function getPublicApiProducts(locale: Locale): ProductItem[] {
 }
 
 export function getPublicApiProductBySlug(locale: Locale, slug: string): ProductItem | undefined {
-  return getPublicApiProducts(locale).find((item) => item.slug === slug);
+  const normalizedSlug = normalizeSlug(slug);
+  return getPublicApiProducts(locale).find((item) => item.slug === normalizedSlug);
 }
 
 export function getPublicApiProductSlugs(locale: Locale): string[] {
-  return getPublicApiProducts(locale).map((item) => item.slug);
+  const currentSlugs = getPublicApiProducts(locale).map((item) => item.slug);
+  return Array.from(new Set([...currentSlugs, ...legacySlugs]));
 }
 
 export function getApiCredentialBySlug(locale: Locale, slug: string): ProductApiCredential | undefined {
