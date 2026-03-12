@@ -18,7 +18,7 @@ export function getSampleRows(product: ProductItem): Array<Record<string, string
         orgHanNm: "경인지역본부(수원)",
         telNo: "031-249-1266",
         faxNo: "0505-174-2255",
-        addr: "경기도 수원시 권선구 호매실로 46-68",
+        addr: "경기도 수원시 권선구 서부로 46-68",
         etcAd: "평일 09:00~18:00 운영",
       },
       {
@@ -51,7 +51,7 @@ export function getSampleRows(product: ProductItem): Array<Record<string, string
         telNo: "062-970-1752",
         faxNo: "0505-174-2154",
         addr: "광주광역시 북구 첨단벚꽃로 82",
-        etcAd: "토요일 일부 운영",
+        etcAd: "주요 도심 운영",
       },
     ];
   }
@@ -116,14 +116,14 @@ export function getSampleRows(product: ProductItem): Array<Record<string, string
     ];
   }
 
-  if (product.slug === "api-15155139") {
+  if (product.slug === "api-15155139" || product.slug === "api-15154910") {
     return [
       {
         OPN_ATMY_GRP_CD: "6110000",
         MNG_NO: "6110000-2024-0000123",
-        BPLC_NM: "서울 무교 스테이",
-        ROAD_NM_ADDR: "서울특별시 중구 무교로 21",
-        LOTNO_ADDR: "서울특별시 중구 무교동 45-3",
+        BPLC_NM: "서울 명동 글로벌 라운지",
+        ROAD_NM_ADDR: "서울특별시 중구 명동길 21",
+        LOTNO_ADDR: "서울특별시 중구 명동2가 45-3",
         SALS_STTS_NM: "영업",
         SALS_STTS_CD: "01",
         DTL_SALS_STTS_NM: "정상영업",
@@ -135,9 +135,9 @@ export function getSampleRows(product: ProductItem): Array<Record<string, string
       {
         OPN_ATMY_GRP_CD: "6260000",
         MNG_NO: "6260000-2024-0000421",
-        BPLC_NM: "부산 중앙 스테이",
-        ROAD_NM_ADDR: "부산광역시 동구 중앙대로 220",
-        LOTNO_ADDR: "부산광역시 동구 초량동 111-4",
+        BPLC_NM: "부산 중앙 글로벌 라운지",
+        ROAD_NM_ADDR: "부산광역시 중구 중앙대로 220",
+        LOTNO_ADDR: "부산광역시 중구 중앙동 111-4",
         SALS_STTS_NM: "영업",
         SALS_STTS_CD: "01",
         DTL_SALS_STTS_NM: "정상영업",
@@ -149,9 +149,9 @@ export function getSampleRows(product: ProductItem): Array<Record<string, string
       {
         OPN_ATMY_GRP_CD: "6270000",
         MNG_NO: "6270000-2025-0000199",
-        BPLC_NM: "대구 동성로 하우스",
+        BPLC_NM: "대구 동성로 라운지",
         ROAD_NM_ADDR: "대구광역시 중구 동성로 10",
-        LOTNO_ADDR: "대구광역시 중구 동성로2가 22-2",
+        LOTNO_ADDR: "대구광역시 중구 동성로가 22-2",
         SALS_STTS_NM: "영업",
         SALS_STTS_CD: "01",
         DTL_SALS_STTS_NM: "정상영업",
@@ -163,8 +163,8 @@ export function getSampleRows(product: ProductItem): Array<Record<string, string
       {
         OPN_ATMY_GRP_CD: "6410000",
         MNG_NO: "6410000-2023-0000788",
-        BPLC_NM: "분당 정자 스테이",
-        ROAD_NM_ADDR: "경기도 성남시 분당구 정자일로 95",
+        BPLC_NM: "분당 정자 라운지",
+        ROAD_NM_ADDR: "경기도 성남시 분당구 정자로 95",
         LOTNO_ADDR: "경기도 성남시 분당구 정자동 45-7",
         SALS_STTS_NM: "영업",
         SALS_STTS_CD: "01",
@@ -177,7 +177,7 @@ export function getSampleRows(product: ProductItem): Array<Record<string, string
       {
         OPN_ATMY_GRP_CD: "6500000",
         MNG_NO: "6500000-2025-0000031",
-        BPLC_NM: "제주 애월 게스트홈",
+        BPLC_NM: "제주 애월 라운지",
         ROAD_NM_ADDR: "제주특별자치도 제주시 애월읍 애월로 77",
         LOTNO_ADDR: "제주특별자치도 제주시 애월읍 애월리 77-2",
         SALS_STTS_NM: "영업",

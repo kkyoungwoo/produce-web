@@ -1,6 +1,7 @@
 import {
   COLUMN_LABEL_KR,
   REGION_NAME_MAP,
+  SALS_STATUS_MAP,
   WORKNATIONAL_MAP,
 } from "@/components/workbench/constants";
 import type { CollectResponse } from "@/components/workbench/types";
@@ -66,7 +67,10 @@ export function formatCellValue(
   if (key === "OPN_ATMY_GRP_CD") return homestayRegionName(text);
   if (key === "LCPMT_YMD" || key === "LCPMT_RTRCN_YMD") return formatYmd(text);
   if (key === "LAST_MDFCN_PNT" || key === "DAT_UPDT_PNT") return formatYmdHms(text);
-  if (key === "SALS_STTS_CD" && row.SALS_STTS_NM) return toText(row.SALS_STTS_NM as string | number);
+  if (key === "SALS_STTS_CD") {
+    if (row.SALS_STTS_NM) return toText(row.SALS_STTS_NM as string | number);
+    return SALS_STATUS_MAP[text] ?? text;
+  }
   return text;
 }
 
@@ -77,5 +81,11 @@ export function getColumnLabel(key: string, custom: Record<string, string>) {
 export function isInvalidServiceKeyError(data: CollectResponse, status: number) {
   const text = `${data.message ?? ""} ${data.upstream ?? ""}`.toLowerCase();
   if (status === 400 || status === 401 || status === 403) return true;
-  return text.includes("servicekey") || text.includes("auth") || text.includes("invalid") || text.includes("인증");
+  return (
+    text.includes("servicekey") ||
+    text.includes("auth") ||
+    text.includes("invalid") ||
+    text.includes("인증") ||
+    text.includes("등록되지 않은 인증키")
+  );
 }
