@@ -83,7 +83,6 @@ const validProductsKo = productCatalog.filter(isValidProductItem);
 const primaryProductSlug = validProductsKo[0]?.slug ?? "api-15086411";
 
 const legacySlugs = [
-  "api-15154910",
   "api-15136267",
 ];
 

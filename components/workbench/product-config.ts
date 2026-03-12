@@ -5,6 +5,20 @@ const DEFAULT_CONFIG: WorkbenchProductConfig = {
   statMode: "none",
 };
 
+const HOMESTAY_STYLE_CONFIG: WorkbenchProductConfig = {
+  inputMode: "homestay",
+  statMode: "region:homestay",
+  hideInputKeys: [
+    "cond[BASE_DATE::EQ]",
+    "cond[SALS_STTS_CD::EQ]",
+    "cond[BPLC_NM::LIKE]",
+    "cond[ROAD_NM_ADDR::LIKE]",
+    "cond[LAST_MDFCN_PNT::GTE]",
+    "cond[LAST_MDFCN_PNT::LT]",
+  ],
+  forceDefaultDates: true,
+};
+
 const CONFIG_BY_SLUG: Record<string, WorkbenchProductConfig> = {
   "api-15086411": {
     inputMode: "default",
@@ -19,12 +33,10 @@ const CONFIG_BY_SLUG: Record<string, WorkbenchProductConfig> = {
     statMode: "region:addr",
   },
   "api-15155139": {
-    inputMode: "homestay",
-    statMode: "region:homestay",
-    hideInputKeys: ["cond[BASE_DATE::EQ]", "cond[SALS_STTS_CD::EQ]", "cond[BPLC_NM::LIKE]"],
-    forceDefaultDates: true,
+    ...HOMESTAY_STYLE_CONFIG,
     forceBaseDateToYesterday: true,
   },
+  "api-15154910": HOMESTAY_STYLE_CONFIG,
 };
 
 export function getWorkbenchProductConfig(slug: string): WorkbenchProductConfig {
