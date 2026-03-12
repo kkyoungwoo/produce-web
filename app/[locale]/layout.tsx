@@ -33,7 +33,7 @@ export default async function LocaleLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col" data-locale={locale}>
+    <div className="min-h-screen flex flex-col" data-locale={locale} suppressHydrationWarning>
       <Header locale={locale as Locale} />
       <PageFx />
       <main className="flex-1">{children}</main>

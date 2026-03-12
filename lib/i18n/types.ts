@@ -40,6 +40,14 @@ export type ProductApiCredential = {
   placeholder: string;
 };
 
+export type ProductApiRuntime = {
+  endpoint: string;
+  historyEndpoint?: string;
+  historySwitchParamKey?: string;
+  responsePathHint?: string;
+  forcedQuery?: Record<string, string>;
+};
+
 export type ProductWorkbenchColumn = {
   key: string;
   label: string;
@@ -74,6 +82,7 @@ export type ProductItem = {
   inputFields: ProductInputField[];
   sampleRequest: string;
   apiCredential?: ProductApiCredential;
+  apiRuntime?: ProductApiRuntime;
   workbench?: ProductWorkbenchConfig;
 };
 
@@ -175,6 +184,12 @@ export type LocaleContent = {
     expectedRowsLabel: string;
     statusLabel: string;
     statusReadyValue: string;
+    endpointLabel: string;
+    endpointHint: string;
+    queryResultLabel: string;
+    queryErrorLabel: string;
+    noDataLabel: string;
+    sourceUrlLabel: string;
   };
   contact: {
     title: string;

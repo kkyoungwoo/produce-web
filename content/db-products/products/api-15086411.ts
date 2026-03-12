@@ -2,43 +2,60 @@ import type { ProductItem } from "@/lib/i18n/types";
 
 import { ACCOUNT_GUIDE_URL, serviceKeyCredential } from "../shared";
 
+const DEFAULT_SERVICE_KEY =
+  process.env.NEXT_PUBLIC_DATA_GO_KR_SERVICE_KEY?.trim() ||
+  "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
+
 const product: ProductItem = {
   slug: "api-15086411",
   collectorKey: "range-batch",
-  title: "고용노동부 채용공고 API 수집기",
-  summary: "워크넷 채용공고 목록을 날짜/페이지 기준으로 수집",
-  description: "고용노동부 OpenAPI(15086411)를 활용해 채용공고 데이터를 안정적으로 적재합니다.",
-  stack: ["Node.js", "TypeScript", "REST API", "PostgreSQL"],
+  title: "외국인근로자 귀국지원 현지 채용공고 수집기",
+  summary:
+    "인증키만 입력하면 전체 페이지를 자동 순회하여 채용공고 데이터를 조회하고 엑셀로 내려받을 수 있습니다.",
+  description:
+    "data.go.kr 15086411 OpenAPI(getApiTblRecruit) 기반 실데이터 조회/엑셀 다운로드 상품입니다.",
+  stack: ["Node.js", "TypeScript", "REST API", "XML", "XLSX"],
   status: "판매 중",
   priceLabel: "390,000원",
   priceValue: 390000,
   delivery: "결제 후 3영업일 내 제공",
-  audience: "채용 데이터 서비스, HR 자동화",
-  features: ["채용공고 목록 수집", "페이지 기반 반복 수집", "DB 적재 예시 포함"],
+  audience: "해외 채용공고 데이터를 사용하는 영업/마케팅/리서치팀",
+  features: [
+    "사용자 입력: serviceKey(인증키)",
+    "코드 고정값: pageNo=1, numOfRows=100, method=getApiTblRecruit",
+    "전체 페이지 자동 수집 및 결과 테이블 출력",
+    "조회 결과 전체 컬럼 엑셀 다운로드",
+  ],
   portalDataId: "15086411",
   apiDocUrl: "https://www.data.go.kr/data/15086411/openapi.do",
   accountGuideUrl: ACCOUNT_GUIDE_URL,
-  collectFocus: "채용공고 데이터 수집",
+  collectFocus: "외국인근로자 귀국지원 관련 현지 채용공고",
   inputFields: [
-    { key: "pageNo", label: "페이지", example: "1", required: true },
-    { key: "numOfRows", label: "조회수", example: "20", required: true },
+    {
+      key: "serviceKey",
+      label: "인증키(serviceKey)",
+      example: DEFAULT_SERVICE_KEY,
+      required: true,
+    },
   ],
-  sampleRequest: "?serviceKey=YOUR_KEY&pageNo=1&numOfRows=20",
+  sampleRequest: `?serviceKey=${DEFAULT_SERVICE_KEY}&pageNo=1&numOfRows=100&method=getApiTblRecruit`,
   apiCredential: serviceKeyCredential("15086411"),
+  apiRuntime: {
+    endpoint: "http://apis.data.go.kr/B490007/tblRecruitInfo/getApiTblRecruit",
+    responsePathHint: "response.body.items.item",
+    forcedQuery: {
+      pageNo: "1",
+      numOfRows: "100",
+      method: "getApiTblRecruit",
+    },
+  },
   workbench: {
-    primaryDateKey: "baseDate",
     columns: [
-      { key: "id", label: "번호" },
-      { key: "noticeTitle", label: "공고명" },
-      { key: "region", label: "지역" },
-      { key: "status", label: "상태" },
-      { key: "baseDate", label: "기준일" },
+      { key: "worknational", label: "근무국가" },
+      { key: "localCompanyName", label: "현지업체명" },
+      { key: "recruitNum", label: "채용인원" },
     ],
-    rows: [
-      { id: 1, noticeTitle: "채용공고 A", region: "서울", status: "수집 완료", baseDate: "2026-03-11" },
-      { id: 2, noticeTitle: "채용공고 B", region: "경기", status: "검증 중", baseDate: "2026-03-11" },
-      { id: 3, noticeTitle: "채용공고 C", region: "부산", status: "적재 완료", baseDate: "2026-03-11" },
-    ],
+    rows: [],
   },
 };
 
