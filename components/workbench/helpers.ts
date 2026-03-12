@@ -80,12 +80,13 @@ export function getColumnLabel(key: string, custom: Record<string, string>) {
 
 export function isInvalidServiceKeyError(data: CollectResponse, status: number) {
   const text = `${data.message ?? ""} ${data.upstream ?? ""}`.toLowerCase();
-  if (status === 400 || status === 401 || status === 403) return true;
+
+  if (status === 401 || status === 403) return true;
+
   return (
-    text.includes("servicekey") ||
-    text.includes("auth") ||
-    text.includes("invalid") ||
-    text.includes("인증") ||
-    text.includes("등록되지 않은 인증키")
+    text.includes("등록되지 않은 인증키") ||
+    text.includes("invalid service key") ||
+    text.includes("service key is not registered") ||
+    text.includes("오류(-4)")
   );
 }

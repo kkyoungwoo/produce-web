@@ -232,7 +232,10 @@ export async function POST(request: Request) {
     const selectedEndpoint = useHistory && body.historyEndpoint ? body.historyEndpoint : body.endpoint;
 
     const requestedPageNo = Math.max(1, asInt(mergedParams.pageNo || "1", 1));
-    const endpointLimit = selectedEndpoint.includes("foreigner_city_homestays") ? 100 : 500;
+    const endpointLimit = (
+      selectedEndpoint.includes("foreigner_city_homestays")
+      || selectedEndpoint.includes("foreigners_entertainment_restaurants")
+    ) ? 100 : 500;
     const requestedNumOfRows = Math.min(Math.max(asInt(mergedParams.numOfRows || "50", 50), 1), endpointLimit);
 
     const regionKey = "cond[OPN_ATMY_GRP_CD::EQ]";
@@ -351,7 +354,7 @@ export async function POST(request: Request) {
     const normalizedRows = normalizeRows(dedupedRows);
 
     if (normalizedRows.length === 0) {
-      return NextResponse.json({ ok: false, message: "조회 결과가 없습니다. 인증키 또는 조건을 확인해 주세요.", sourceUrl: firstUrl }, { status: 404 });
+      return NextResponse.json({ ok: false, message: "조회 결과가 없습니다. 날짜/지역 조건을 확인해 주세요.", sourceUrl: firstUrl }, { status: 404 });
     }
 
     return NextResponse.json({
