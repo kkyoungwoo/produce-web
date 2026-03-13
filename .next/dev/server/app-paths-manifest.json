@@ -1,3 +1,4 @@
 {
-  "/page": "app/page.js"
+  "/[locale]/services/[slug]/page": "app/[locale]/services/[slug]/page.js",
+  "/api/public-data/archhub-regions/route": "app/api/public-data/archhub-regions/route.js"
 }
