@@ -11,7 +11,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next dev -p 3000",
+    "start": "node scripts/start-dev.mjs",
     "serve:out": "npx serve@latest out --listen 3000",
     "preview": "npx serve@latest out --listen 3000",
     "lint": "npm run check:encoding && eslint .",

@@ -19,7 +19,7 @@ function getLastModified(): Date {
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = getLastModified();
-  const localizedRoutes = ["", "/about", "/services", "/contact"];
+  const localizedRoutes = ["", "/about", "/services", "/db-cleanup", "/contact"];
 
   const rootEntry: MetadataRoute.Sitemap = [
     {

@@ -1,4 +1,4 @@
-﻿import type { ProductItem } from "@/lib/i18n/types";
+import type { ProductItem } from "@/lib/i18n/types";
 
 import { ACCOUNT_GUIDE_URL, serviceKeyCredential } from "../shared";
 
@@ -39,7 +39,7 @@ const product: ProductItem = {
     {
       key: "cond[OPN_ATMY_GRP_CD::EQ]",
       label: "개방자치단체코드(이력조회 시 필수)",
-      example: "6110000",
+      example: "3020000",
       required: false,
     },
     {
@@ -97,7 +97,7 @@ const product: ProductItem = {
       required: false,
     },
   ],
-  sampleRequest: `?serviceKey=${DEFAULT_SERVICE_KEY}&pageNo=1&numOfRows=100&returnType=json&cond[OPN_ATMY_GRP_CD::EQ]=6110000`,
+  sampleRequest: `?serviceKey=${DEFAULT_SERVICE_KEY}&pageNo=1&numOfRows=100&returnType=json&cond[OPN_ATMY_GRP_CD::EQ]=3020000`,
   apiCredential: serviceKeyCredential("15155139"),
   apiRuntime: {
     endpoint: "https://apis.data.go.kr/1741000/foreigner_city_homestays/info",
