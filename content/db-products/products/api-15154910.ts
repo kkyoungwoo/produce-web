@@ -3,27 +3,27 @@ import type { ProductItem } from "@/lib/i18n/types";
 import { ACCOUNT_GUIDE_URL, serviceKeyCredential } from "../shared";
 
 const DEFAULT_SERVICE_KEY =
-  process.env.NEXT_PUBLIC_DATA_GO_KR_SERVICE_KEY?.trim() ||
-  "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
+  process.env.NEXT_PUBLIC_DATA_GO_KR_SERVICE_KEY?.trim()
+  || "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
 
 const product: ProductItem = {
   slug: "api-15154910",
   collectorKey: "condition-paging",
   title: "식품_외국인전용유흥음식점업 조회 수집기",
-  summary: "인증키와 인허가 날짜만 선택하면 지역별 데이터 조회/필터/엑셀 다운로드를 지원합니다.",
+  summary: "인증키, 인허가일자, 지역만 선택해 실데이터를 조회하고 엑셀로 내려받을 수 있습니다.",
   description:
-    "행정안전부 OpenAPI(15154910) 기반으로 외국인전용유흥음식점업 인허가 데이터를 조회합니다. 기본 3일 범위로 과부하를 줄이고, 지역별 필터를 제공해 빠르게 확인할 수 있습니다.",
+    "행정안전부 OpenAPI(15154910) 기반으로 식품_외국인전용유흥음식점업 데이터를 조회하는 상품입니다. 테이블/엑셀 컬럼은 한국어 라벨로 표시됩니다.",
   stack: ["Node.js", "TypeScript", "REST API", "JSON", "XLSX"],
   status: "판매 중",
   priceLabel: "360,000원",
   priceValue: 360000,
   delivery: "결제 후 3영업일 내 세팅",
-  audience: "지역별 인허가 현황을 확인하는 운영·마케팅·리서치 팀",
+  audience: "식품 인허가/영업상태 데이터를 빠르게 확인해야 하는 운영·분석 팀",
   features: [
-    "사용자 입력: 인증키 + 인허가일자(시작/종료)",
-    "기본 설정: pageNo=1, numOfRows=50, returnType=json",
-    "과부하 방지: 3일 기본 범위 + 페이지 제한 수집",
-    "지역별 통계/필터 + 전체 컬럼 엑셀 다운로드",
+    "사용자 입력: 인증키 + 지역(복수 선택) + 인허가일자",
+    "실데이터 조회 후 지역별 통계/필터 제공",
+    "조회 결과 전체 컬럼을 한국어 라벨로 표시",
+    "엑셀 다운로드 시 컬럼명을 한국어로 저장",
   ],
   portalDataId: "15154910",
   apiDocUrl: "https://www.data.go.kr/data/15154910/openapi.do",
@@ -39,7 +39,7 @@ const product: ProductItem = {
     {
       key: "cond[OPN_ATMY_GRP_CD::EQ]",
       label: "개방자치단체코드",
-      example: "",
+      example: "3020000",
       required: false,
     },
     {
@@ -54,38 +54,8 @@ const product: ProductItem = {
       example: "",
       required: false,
     },
-    {
-      key: "cond[SALS_STTS_CD::EQ]",
-      label: "영업상태코드",
-      example: "",
-      required: false,
-    },
-    {
-      key: "cond[BPLC_NM::LIKE]",
-      label: "사업장명 포함",
-      example: "",
-      required: false,
-    },
-    {
-      key: "cond[ROAD_NM_ADDR::LIKE]",
-      label: "도로명주소 포함",
-      example: "",
-      required: false,
-    },
-    {
-      key: "cond[LAST_MDFCN_PNT::GTE]",
-      label: "최종수정시점 시작",
-      example: "",
-      required: false,
-    },
-    {
-      key: "cond[LAST_MDFCN_PNT::LT]",
-      label: "최종수정시점 종료",
-      example: "",
-      required: false,
-    },
   ],
-  sampleRequest: `?serviceKey=${DEFAULT_SERVICE_KEY}&pageNo=1&numOfRows=50&returnType=json&cond[LCPMT_YMD::GTE]=20260309&cond[LCPMT_YMD::LT]=20260312`,
+  sampleRequest: `?serviceKey=${DEFAULT_SERVICE_KEY}&pageNo=1&numOfRows=100&returnType=json&cond[OPN_ATMY_GRP_CD::EQ]=3020000`,
   apiCredential: serviceKeyCredential("15154910"),
   apiRuntime: {
     endpoint: "https://apis.data.go.kr/1741000/foreigners_entertainment_restaurants/info",
@@ -94,7 +64,7 @@ const product: ProductItem = {
     responsePathHint: "response.body.items.item",
     forcedQuery: {
       pageNo: "1",
-      numOfRows: "50",
+      numOfRows: "100",
       returnType: "json",
     },
   },

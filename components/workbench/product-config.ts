@@ -17,6 +17,16 @@ const HOMESTAY_STYLE_CONFIG: WorkbenchProductConfig = {
     "cond[LAST_MDFCN_PNT::LT]",
   ],
   forceDefaultDates: true,
+  permitDateDefaultDaysFrom: 3,
+  permitDateDefaultTo: "today",
+};
+
+const ARCHHUB_STYLE_CONFIG: WorkbenchProductConfig = {
+  inputMode: "archhub",
+  statMode: "region:arch",
+  forceDefaultDates: true,
+  permitDateDefaultDaysFrom: 7,
+  permitDateDefaultTo: "today",
 };
 
 const CONFIG_BY_SLUG: Record<string, WorkbenchProductConfig> = {
@@ -36,7 +46,14 @@ const CONFIG_BY_SLUG: Record<string, WorkbenchProductConfig> = {
     ...HOMESTAY_STYLE_CONFIG,
     forceBaseDateToYesterday: true,
   },
-  "api-15154910": HOMESTAY_STYLE_CONFIG,
+  "api-15154910": {
+    ...HOMESTAY_STYLE_CONFIG,
+    statMode: "region:food",
+    permitDateDefaultFrom: "20000101",
+  },
+  "api-15136560": {
+    ...ARCHHUB_STYLE_CONFIG,
+  },
 };
 
 export function getWorkbenchProductConfig(slug: string): WorkbenchProductConfig {

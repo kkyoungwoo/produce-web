@@ -19,7 +19,12 @@ export default function Header({ locale }: HeaderProps) {
           {t.brand}
         </Link>
         <nav className="flex items-center gap-4 text-sm text-slate-600" aria-label="main navigation">
-          <Link href={`/${locale}/services`} className="transition-colors hover:text-blue-600">{t.nav.services}</Link>
+          <Link href={`/${locale}/services`} className="transition-colors hover:text-blue-600">
+            {t.nav.services}
+          </Link>
+          <Link href={`/${locale}/db-cleanup`} className="transition-colors hover:text-blue-600">
+            {"DB \uC815\uB9AC"}
+          </Link>
         </nav>
         <LanguageSwitcher locale={locale} />
       </div>

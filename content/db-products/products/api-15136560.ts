@@ -1,0 +1,116 @@
+import type { ProductItem } from "@/lib/i18n/types";
+
+import { ACCOUNT_GUIDE_URL, serviceKeyCredential } from "../shared";
+
+const DEFAULT_SERVICE_KEY =
+  process.env.NEXT_PUBLIC_DATA_GO_KR_SERVICE_KEY?.trim()
+  || "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
+
+const product: ProductItem = {
+  slug: "api-15136560",
+  collectorKey: "condition-paging",
+  title: "건축HUB 주택 인허가 조회 수집기",
+  summary: "인허가일자와 지역을 선택해 건축HUB 주택 인허가 데이터를 조회하고 엑셀로 내려받을 수 있습니다.",
+  description:
+    "국토교통부 OpenAPI(15136560) 기반으로 건축HUB 주택 인허가 기본개요와 총괄개요 데이터를 통합 조회합니다. 시도와 시군구를 선택하고 결과를 웹 표와 엑셀로 확인할 수 있습니다.",
+  stack: ["Node.js", "TypeScript", "REST API", "JSON", "XLSX"],
+  status: "판매 중",
+  priceLabel: "390,000원",
+  priceValue: 390000,
+  delivery: "결제 후 3영업일 내 세팅",
+  audience: "건축 인허가 지역 동향을 빠르게 확인해야 하는 개발사, 시행사, 분양·입지 분석 담당자",
+  features: [
+    "입력값은 인증키, 조회 기간, 시도와 시군구 선택만 사용",
+    "건축HUB 기본개요와 총괄개요 데이터를 통합 조회",
+    "지역 필터, 승강기 조건 필터, 엑셀 다운로드 지원",
+    "공식 법정동 코드 기준으로 실제 조회 가능한 지역만 연결",
+  ],
+  portalDataId: "15136560",
+  apiDocUrl: "https://www.data.go.kr/data/15136560/openapi.do",
+  accountGuideUrl: ACCOUNT_GUIDE_URL,
+  collectFocus: "건축HUB 주택 인허가 기본개요와 총괄개요 데이터",
+  inputFields: [
+    {
+      key: "serviceKey",
+      label: "인증키(serviceKey)",
+      example: DEFAULT_SERVICE_KEY,
+      required: true,
+    },
+    {
+      key: "startDate",
+      label: "인허가일자 시작(YYYYMMDD)",
+      example: "",
+      required: false,
+    },
+    {
+      key: "endDate",
+      label: "인허가일자 종료(YYYYMMDD)",
+      example: "",
+      required: false,
+    },
+  ],
+  sampleRequest: `?serviceKey=${DEFAULT_SERVICE_KEY}&sigunguCd=11680&bjdongCd=10300&startDate=20260306&endDate=20260313&_type=json&pageNo=1&numOfRows=100`,
+  apiCredential: serviceKeyCredential("15136560"),
+  apiRuntime: {
+    endpoint: "https://apis.data.go.kr/1613000/HsPmsHubService/getHpDongOulnInfo",
+    responsePathHint: "response.body.items.item",
+    forcedQuery: {
+      pageNo: "1",
+      numOfRows: "100",
+      _type: "json",
+    },
+  },
+  workbench: {
+    columns: [
+      { key: "permitType", label: "인허가구분" },
+      { key: "permitNo", label: "인허가번호" },
+      { key: "permitReportDate", label: "인허가신고일" },
+      { key: "agency", label: "지역" },
+      { key: "buildType", label: "건축구분" },
+      { key: "siteLocation", label: "대지위치" },
+      { key: "landCategory", label: "지목" },
+      { key: "siteArea", label: "대지면적" },
+      { key: "buildingArea1", label: "건축면적" },
+      { key: "buildingCoverageRatio", label: "건폐율(%)" },
+      { key: "totalFloorArea1", label: "연면적" },
+      { key: "floorAreaForRatio1", label: "용적률산정면적" },
+      { key: "floorAreaRatio", label: "용적률(%)" },
+      { key: "buildingName", label: "건축물명" },
+      { key: "mainUsage1", label: "주용도" },
+      { key: "mainBuildingCount", label: "주건축물수" },
+      { key: "annexBuildingCount", label: "부속건축물수" },
+      { key: "parkingAutoIndoor", label: "주차장 자동차 실내" },
+      { key: "parkingAutoOutdoor", label: "주차장 자동차 실외" },
+      { key: "parkingAutoNearby", label: "주차장 자동차 부설외" },
+      { key: "parkingMachineIndoor", label: "주차장 기계식 실내" },
+      { key: "parkingMachineOutdoor", label: "주차장 기계식 실외" },
+      { key: "parkingMachineNearby", label: "주차장 기계식 부설외" },
+      { key: "parkingExempt", label: "주차장 면제" },
+      { key: "constructionType", label: "착공구분" },
+      { key: "constructionPlannedDate", label: "착공예정일" },
+      { key: "constructionActualDate", label: "실착공일" },
+      { key: "useApprovalType", label: "사용승인구분" },
+      { key: "useApprovalDate", label: "사용승인일" },
+      { key: "dongName", label: "동명칭" },
+      { key: "mainUsage2", label: "주용도(상세)" },
+      { key: "etcUsage", label: "기타용도" },
+      { key: "householdCount", label: "세대수" },
+      { key: "hoCount", label: "호수" },
+      { key: "familyCount", label: "가구수" },
+      { key: "structureMain", label: "주구조" },
+      { key: "structureEtc", label: "기타구조" },
+      { key: "roofStructure", label: "지붕구조" },
+      { key: "buildingArea2", label: "건축면적(상세)" },
+      { key: "totalFloorArea2", label: "연면적(상세)" },
+      { key: "floorAreaForRatio2", label: "용적률산정면적(상세)" },
+      { key: "undergroundFloors", label: "지하층수" },
+      { key: "groundFloors", label: "지상층수" },
+      { key: "heightM", label: "높이(m)" },
+      { key: "passengerElevators", label: "승용승강기수" },
+      { key: "emergencyElevators", label: "비상용승강기수" },
+    ],
+    rows: [],
+  },
+};
+
+export default product;

@@ -1,13 +1,14 @@
-export const WORKBENCH_TEXT = {
+﻿export const WORKBENCH_TEXT = {
   inputTitle: "입력 설정",
   serviceKeyLabel: "인증키(serviceKey) *",
   regionSelectLabel: "지역 선택(복수 선택)",
-  selectAllRegion: "전국 선택",
-  clearAllRegion: "전국 해제",
+  selectAllRegion: "전체 선택",
+  clearAllRegion: "전체 해제",
   permitFromLabel: "인허가일자 시작",
   permitToLabel: "인허가일자 종료",
   statRegion: "지역별 통계/필터",
   statCountry: "국가별 통계/필터",
+  allFilterLabel: "전체",
   totalPrefix: "총",
   currentPrefix: "현재",
   countSuffix: "건",

@@ -31,9 +31,12 @@ export type WorkbenchStatMode =
   | "country:worknational"
   | "country:nationalName"
   | "region:homestay"
-  | "region:addr";
+  | "region:food"
+  | "region:city"
+  | "region:addr"
+  | "region:arch";
 
-export type WorkbenchInputMode = "default" | "homestay";
+export type WorkbenchInputMode = "default" | "homestay" | "archhub";
 
 export type WorkbenchProductConfig = {
   inputMode: WorkbenchInputMode;
@@ -41,4 +44,7 @@ export type WorkbenchProductConfig = {
   hideInputKeys?: string[];
   forceDefaultDates?: boolean;
   forceBaseDateToYesterday?: boolean;
+  permitDateDefaultDaysFrom?: number;
+  permitDateDefaultFrom?: string;
+  permitDateDefaultTo?: "today" | string;
 };
