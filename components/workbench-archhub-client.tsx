@@ -12,7 +12,6 @@ import {
   toInputDate,
   toText,
 } from "@/components/workbench/helpers";
-import { WORKBENCH_TEXT } from "@/components/workbench/text";
 import type { CollectResponse, WorkbenchProps } from "@/components/workbench/types";
 
 type RegionOption = {
@@ -57,8 +56,47 @@ type ChunkRequest = {
   chunkOrder: number;
 };
 
-const ALL_FILTER = WORKBENCH_TEXT.allFilterLabel;
-const REGION_FILTER_TITLE = "지역별 보기";
+const UI = {
+  inputTitle: "입력 설정",
+  serviceKeyLabel: "인증키(serviceKey)",
+  serviceKeyPlaceholder: "실제 동작하는 인증키를 입력하면 전체 데이터를 조회합니다.",
+  serviceKeyHelp: "인증키를 입력하지 않거나 올바르지 않으면 실제 데이터 샘플 최대 5건만 조회됩니다.",
+  sidoLabel: "시도 선택",
+  sigunguLabel: "시군구 선택",
+  sigunguHint: "시도를 선택하면 시군구 목록이 표시됩니다.",
+  elevatorLabel: "승강기 조건 선택",
+  elevatorHint: "승강기 조건은 선택 사항입니다. 전체 해제 시 조건 없이 전체 데이터를 조회합니다.",
+  permitFromLabel: "인허가일자 시작",
+  permitToLabel: "인허가일자 종료",
+  resultBadge: "데이터 다운로드",
+  resultTitle: "입력 결과 테이블",
+  regionFilterTitle: "지역별 보기",
+  allFilter: "전체",
+  totalPrefix: "총",
+  currentPrefix: "현재",
+  countSuffix: "건",
+  groupedExcelLabel: "지역별 엑셀 다운로드",
+  allExcelLabel: "전체 엑셀 다운로드",
+  filteredExcelLabel: "현재 필터 엑셀 다운로드",
+  regionLoadFailed: "지역 정보를 불러오지 못했습니다.",
+  legalDongLoadFailed: "법정동 목록을 불러오지 못했습니다.",
+  noLegalDong: "선택한 지역에 해당하는 법정동 코드가 없습니다.",
+  sidoRequired: "시도를 선택해 주세요.",
+  sigunguRequired: "시군구를 1개 이상 선택해 주세요.",
+  regionUnclassified: "지역 미분류",
+  preparing: "조회 준비 중입니다.",
+  completed: "조회가 완료되었습니다.",
+  cancelled: "조회가 취소되었습니다.",
+  keepPage: "조회 중에는 이 페이지를 유지해 주세요. 시군구와 법정동 수에 따라 완료 시간이 달라질 수 있습니다.",
+  progressFallback: "요청 상태를 확인하는 중입니다.",
+  queryFailed: "조회에 실패했습니다.",
+  archhubError: "건축HUB 조회 중 오류가 발생했습니다.",
+  partialWarning: "일부 요청은 제외되었습니다.",
+  dateExpanded: "기간 자동 확장 적용",
+  endpointHs: "주택 API",
+  endpointArch: "건축 API",
+} as const;
+
 const ELEVATOR_OPTIONS = [
   { key: "passenger", label: "승용승강기만 있음" },
   { key: "emergency", label: "비상용 승강기만 있음" },
@@ -90,22 +128,10 @@ function matchesElevatorSelection(row: Record<string, string | number>, selected
   const hasPassenger = hasPositive(row.passengerElevators as string | number | undefined);
   const hasEmergency = hasPositive(row.emergencyElevators as string | number | undefined);
 
-  if (active.length === 0) {
-    return true;
-  }
-
-  if (active.length === ALL_ELEVATOR_KEYS.length) {
-    return hasPassenger || hasEmergency;
-  }
-
-  if (active.includes("passenger")) {
-    return hasPassenger && !hasEmergency;
-  }
-
-  if (active.includes("emergency")) {
-    return !hasPassenger && hasEmergency;
-  }
-
+  if (active.length === 0) return true;
+  if (active.length === ALL_ELEVATOR_KEYS.length) return hasPassenger || hasEmergency;
+  if (active.includes("passenger")) return hasPassenger && !hasEmergency;
+  if (active.includes("emergency")) return !hasPassenger && hasEmergency;
   return true;
 }
 
@@ -123,7 +149,7 @@ async function fetchRegionOptions(
   const data = (await response.json()) as RegionOptionsResponse;
 
   if (!response.ok || !data.ok) {
-    throw new Error(data.message ?? "지역 정보를 불러오지 못했습니다.");
+    throw new Error(data.message ?? UI.regionLoadFailed);
   }
 
   return data.options ?? [];
@@ -156,6 +182,20 @@ function createChunkRequests(options: LegalDongOption[], selectedSigunguCodes: s
   return requests;
 }
 
+function mergeRows(targets: Array<Record<string, string | number>>) {
+  const map = new Map<string, Record<string, string | number>>();
+  for (const row of targets) {
+    const key = [
+      String(toText(row.permitNo as string | number | undefined)),
+      String(toText(row.siteLocation as string | number | undefined)),
+      String(toText(row.dongName as string | number | undefined)),
+      String(toText(row.buildingName as string | number | undefined)),
+    ].join("|");
+    if (!map.has(key)) map.set(key, row);
+  }
+  return Array.from(map.values());
+}
+
 export default function WorkbenchArchhubClient({ product, labels }: WorkbenchProps) {
   const [serviceKey, setServiceKey] = useState("");
   const [startDate, setStartDate] = useState(dateBeforeDays(DEFAULT_START_DAYS));
@@ -173,7 +213,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
   const [progressTitle, setProgressTitle] = useState("");
   const [progressDetail, setProgressDetail] = useState("");
   const [hasQueried, setHasQueried] = useState(false);
-  const [regionFilter, setRegionFilter] = useState<string>(ALL_FILTER);
+  const [regionFilter, setRegionFilter] = useState<string>(UI.allFilter);
   const [visibleCount, setVisibleCount] = useState(CHUNK_SIZE);
 
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
@@ -197,7 +237,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
         if (!cancelled) setSidoOptions(options as RegionOption[]);
       } catch (error) {
         if (cancelled) return;
-        setMessage(`${labels.errorLabel}: ${error instanceof Error ? error.message : "지역 정보를 불러오지 못했습니다."}`);
+        setMessage(`${labels.errorLabel}: ${error instanceof Error ? error.message : UI.regionLoadFailed}`);
         setIsError(true);
       }
     })();
@@ -224,7 +264,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
         setSelectedSigunguCodes([]);
       } catch (error) {
         if (cancelled) return;
-        setMessage(`${labels.errorLabel}: ${error instanceof Error ? error.message : "법정동 목록을 불러오지 못했습니다."}`);
+        setMessage(`${labels.errorLabel}: ${error instanceof Error ? error.message : UI.regionLoadFailed}`);
         setIsError(true);
       }
     })();
@@ -249,27 +289,27 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
   const regionBuckets = useMemo(() => {
     const groups = new Map<string, Array<Record<string, string | number>>>();
     for (const row of rows) {
-      const name = toText(row.agency as string | number | undefined) || "지역 미분류";
+      const name = toText(row.agency as string | number | undefined) || UI.regionUnclassified;
       groups.set(name, [...(groups.get(name) ?? []), row]);
     }
     return Array.from(groups.entries()).map(([name, bucketRows]) => ({ name, rows: bucketRows }));
   }, [rows]);
 
-  const regionStats = useMemo(() => {
-    return [{ name: ALL_FILTER, count: rows.length }, ...regionBuckets.map((item) => ({ name: item.name, count: item.rows.length }))];
-  }, [regionBuckets, rows.length]);
+  const regionStats = useMemo(() => ([
+    { name: UI.allFilter, count: rows.length },
+    ...regionBuckets.map((item) => ({ name: item.name, count: item.rows.length })),
+  ]), [regionBuckets, rows.length]);
 
   const activeElevatorModes = normalizeElevatorSelection(selectedElevatorModes);
 
   const filteredRows = useMemo(() => {
     let output = rows;
 
-    if (regionFilter !== ALL_FILTER) {
+    if (regionFilter !== UI.allFilter) {
       output = output.filter((row) => toText(row.agency as string | number | undefined) === regionFilter);
     }
 
-    output = output.filter((row) => matchesElevatorSelection(row, activeElevatorModes));
-    return output;
+    return output.filter((row) => matchesElevatorSelection(row, activeElevatorModes));
   }, [activeElevatorModes, regionFilter, rows]);
 
   const visibleRows = filteredRows.slice(0, visibleCount);
@@ -315,34 +355,20 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
     setTimeout(() => setProgress(0), 400);
   };
 
-  const mergeRows = (targets: Array<Record<string, string | number>>) => {
-    const map = new Map<string, Record<string, string | number>>();
-    for (const row of targets) {
-      const key = [
-        toText(row.permitNo as string | number | undefined),
-        toText(row.siteLocation as string | number | undefined),
-        toText(row.dongName as string | number | undefined),
-        toText(row.buildingName as string | number | undefined),
-      ].join("|");
-      if (!map.has(key)) map.set(key, row);
-    }
-    return Array.from(map.values());
-  };
-
   const onRun = async () => {
     setHasQueried(true);
 
     if (!selectedSidoCode) {
       setRows([]);
       setIsError(true);
-      setMessage(`${labels.errorLabel}: 시도를 선택해주세요.`);
+      setMessage(`${labels.errorLabel}: ${UI.sidoRequired}`);
       return;
     }
 
     if (selectedSigunguCodes.length === 0) {
       setRows([]);
       setIsError(true);
-      setMessage(`${labels.errorLabel}: 시군구를 1개 이상 선택해주세요.`);
+      setMessage(`${labels.errorLabel}: ${UI.sigunguRequired}`);
       return;
     }
 
@@ -354,7 +380,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
     setIsError(false);
     setMessage("");
     setRows([]);
-    setRegionFilter(ALL_FILTER);
+    setRegionFilter(UI.allFilter);
     setVisibleCount(CHUNK_SIZE);
 
     try {
@@ -365,7 +391,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
 
       if (legalDongOptions.length === 0) {
         setIsError(true);
-        setMessage(`${labels.errorLabel}: 법정동 목록을 불러오지 못했습니다.`);
+        setMessage(`${labels.errorLabel}: ${UI.noLegalDong}`);
         return;
       }
 
@@ -382,8 +408,8 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
       let infoMessage = "";
       let previewLimited = false;
 
-      setProgressTitle("조회 준비 중입니다.");
-      setProgressDetail(`시군구 ${totalSigunguCount}개 · 법정동 ${totalTargetCount}개 · 요청 ${totalChunkCount}묶음을 순차 조회합니다.`);
+      setProgressTitle(UI.preparing);
+      setProgressDetail(`시군구 ${totalSigunguCount}/${totalSigunguCount} · 요청 묶음 0/${totalChunkCount} · 완료 0/${totalTargetCount}`);
       setProgress(2);
 
       for (let index = 0; index < chunkRequests.length; index += 1) {
@@ -411,7 +437,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
         const data = (await response.json()) as ArchhubCollectResponse;
 
         if (!response.ok || !data.ok) {
-          if (!firstError) firstError = data.message ?? WORKBENCH_TEXT.queryFailed;
+          if (!firstError) firstError = data.message ?? UI.queryFailed;
         } else {
           if (data.message) infoMessage = data.message;
           if (data.previewLimited) previewLimited = true;
@@ -438,31 +464,32 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
           setMessage(infoMessage);
           return;
         }
+
         setRows([]);
         setIsError(true);
-        setMessage(`${labels.errorLabel}: ${firstError || WORKBENCH_TEXT.queryFailed}`);
+        setMessage(`${labels.errorLabel}: ${firstError || UI.queryFailed}`);
         return;
       }
 
       setRows(uniqueRows);
       setIsError(false);
-      const successMessage = infoMessage || `${labels.successLabel}: ${WORKBENCH_TEXT.totalPrefix} ${uniqueRows.length}${WORKBENCH_TEXT.countSuffix}`;
-      setMessage(
-        successMessage
-        + `${usedFallback ? " (?? ?? ?? ??)" : ""}`
-        + `${firstError ? " / ?? ??? ???????." : ""}`
-        + `${endpointFamily ? ` / ${endpointFamily === "hs" ? "?? API" : "?? API"}` : ""}`,
-      );
 
-      setProgressTitle("조회가 완료되었습니다.");
-      setProgressDetail(`시군구 ${totalSigunguCount}개 · 법정동 ${completedTargetCount}/${totalTargetCount}개 조회 완료`);
+      const summaryParts = [infoMessage || `${labels.successLabel}: ${UI.totalPrefix} ${uniqueRows.length}${UI.countSuffix}`];
+      if (usedFallback) summaryParts.push(UI.dateExpanded);
+      if (firstError) summaryParts.push(UI.partialWarning);
+      if (endpointFamily === "hs") summaryParts.push(UI.endpointHs);
+      if (endpointFamily === "arch") summaryParts.push(UI.endpointArch);
+      setMessage(summaryParts.join(" / "));
+
+      setProgressTitle(UI.completed);
+      setProgressDetail(`시군구 ${totalSigunguCount}/${totalSigunguCount} · 요청 묶음 ${Math.min(chunkRequests.length, totalChunkCount)}/${totalChunkCount} · 완료 ${completedTargetCount}/${totalTargetCount}`);
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
-        setMessage(`${labels.errorLabel}: 조회가 완료되었습니다.`);
+        setMessage(`${labels.errorLabel}: ${UI.cancelled}`);
       } else {
         setRows([]);
         setIsError(true);
-        setMessage(`${labels.errorLabel}: ${error instanceof Error ? error.message : "건축HUB 조회 중 오류가 발생했습니다."}`);
+        setMessage(`${labels.errorLabel}: ${error instanceof Error ? error.message : UI.archhubError}`);
       }
     } finally {
       stopProgress();
@@ -486,7 +513,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
     setProgressTitle("");
     setProgressDetail("");
     setHasQueried(false);
-    setRegionFilter(ALL_FILTER);
+    setRegionFilter(UI.allFilter);
     setVisibleCount(CHUNK_SIZE);
     setIsLoading(false);
   };
@@ -536,20 +563,24 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
     <>
       <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-stretch">
         <article className={`rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_16px_36px_rgba(44,86,150,0.12)] transition-[width,transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${hasQueried ? "w-full lg:w-1/2" : "w-full lg:w-full"}`}>
-          <p className="text-xs font-extrabold tracking-[0.14em] text-blue-600">{WORKBENCH_TEXT.inputTitle}</p>
+          <p className="text-xs font-extrabold tracking-[0.14em] text-blue-600">{UI.inputTitle}</p>
 
           <div className="mt-3 grid max-h-[60vh] gap-3 overflow-y-auto pr-1">
             <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
-              <strong className="text-base font-bold text-slate-900">{WORKBENCH_TEXT.serviceKeyLabel}</strong>
+              <strong className="text-base font-bold text-slate-900">{UI.serviceKeyLabel}</strong>
               <input
                 className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
                 value={serviceKey}
+                placeholder={UI.serviceKeyPlaceholder}
                 onChange={(event) => setServiceKey(event.target.value)}
               />
+              <p className="rounded-lg border-l-4 border-blue-500 bg-blue-50 px-3 py-2 text-xs leading-6 text-blue-700">
+                {UI.serviceKeyHelp}
+              </p>
             </label>
 
             <div className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
-              <strong className="text-base font-bold text-slate-900">시도 선택</strong>
+              <strong className="text-base font-bold text-slate-900">{UI.sidoLabel}</strong>
               <div className="flex flex-wrap gap-2">
                 {sidoOptions.map((item) => {
                   const active = selectedSidoCode === item.code;
@@ -574,19 +605,19 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
 
             <div className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
               <div className="flex items-center justify-between gap-3">
-                <strong className="text-base font-bold text-slate-900">시군구 선택</strong>
+                <strong className="text-base font-bold text-slate-900">{UI.sigunguLabel}</strong>
                 {sigunguOptions.length > 0 ? (
                   <button
                     type="button"
                     onClick={() => setSelectedSigunguCodes((prev) => (prev.length === sigunguOptions.length ? [] : sigunguOptions.map((item) => item.code)))}
                     className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"
                   >
-                    {selectedSigunguCodes.length === sigunguOptions.length ? WORKBENCH_TEXT.clearAllLabel : WORKBENCH_TEXT.selectAllLabel}
+                    {selectedSigunguCodes.length === sigunguOptions.length ? "전체 해제" : "전체 선택"}
                   </button>
                 ) : null}
               </div>
               <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto pr-1">
-                {sigunguOptions.length === 0 ? <p className="text-xs text-slate-500">시도를 선택하면 시군구 목록이 표시됩니다.</p> : null}
+                {sigunguOptions.length === 0 ? <p className="text-xs text-slate-500">{UI.sigunguHint}</p> : null}
                 {sigunguOptions.map((item) => {
                   const active = selectedSigunguCodes.includes(item.code);
                   return (
@@ -605,16 +636,14 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
 
             <div className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
               <div className="flex items-center justify-between gap-3">
-                <strong className="text-base font-bold text-slate-900">승강기 조건 선택</strong>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedElevatorModes((prev) => (prev.length === ALL_ELEVATOR_KEYS.length ? [] : [...ALL_ELEVATOR_KEYS]))}
-                    className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"
-                  >
-                    {activeElevatorModes.length === ALL_ELEVATOR_KEYS.length ? WORKBENCH_TEXT.clearAllLabel : WORKBENCH_TEXT.selectAllLabel}
-                  </button>
-                </div>
+                <strong className="text-base font-bold text-slate-900">{UI.elevatorLabel}</strong>
+                <button
+                  type="button"
+                  onClick={() => setSelectedElevatorModes((prev) => (prev.length === ALL_ELEVATOR_KEYS.length ? [] : [...ALL_ELEVATOR_KEYS]))}
+                  className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"
+                >
+                  {activeElevatorModes.length === ALL_ELEVATOR_KEYS.length ? "전체 해제" : "전체 선택"}
+                </button>
               </div>
               <div className="flex flex-wrap gap-2">
                 {ELEVATOR_OPTIONS.map((item) => {
@@ -631,14 +660,12 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                   );
                 })}
               </div>
-              <p className="text-xs leading-6 text-slate-500">
-                승강기 조건은 선택 사항입니다. 전체해제를 하면 승강기 조건 없이 전체 데이터를 조회합니다.
-              </p>
+              <p className="text-xs leading-6 text-slate-500">{UI.elevatorHint}</p>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
               <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <strong className="text-base font-bold text-slate-900">{WORKBENCH_TEXT.permitFromLabel}</strong>
+                <strong className="text-base font-bold text-slate-900">{UI.permitFromLabel}</strong>
                 <input
                   type="date"
                   className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
@@ -647,7 +674,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                 />
               </label>
               <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <strong className="text-base font-bold text-slate-900">{WORKBENCH_TEXT.permitToLabel}</strong>
+                <strong className="text-base font-bold text-slate-900">{UI.permitToLabel}</strong>
                 <input
                   type="date"
                   className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
@@ -675,25 +702,11 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
               {labels.resetLabel}
             </button>
           </div>
-
-          {isLoading ? (
-            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
-              <div className="flex items-center justify-between gap-3 text-sm font-bold text-blue-700">
-                <span>{progressTitle || "조회 준비 중"}</span>
-                <span>{progress}%</span>
-              </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-blue-100">
-                <div className="h-full rounded-full bg-blue-600 transition-[width] duration-300" style={{ width: `${progress}%` }} />
-              </div>
-              <p className="mt-3 text-xs leading-6 text-slate-600">{progressDetail || "법정동 단위로 순차 조회하고 있습니다."}</p>
-              <p className="mt-1 text-xs leading-6 text-slate-500">조회 중에는 이 페이지를 유지해 주세요. 시군구와 법정동 수에 따라 완료 시간이 달라질 수 있습니다.</p>
-            </div>
-          ) : null}
         </article>
 
         <article aria-hidden={!hasQueried} className={`overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-[0_16px_36px_rgba(44,86,150,0.12)] transition-[width,opacity,padding,margin,border-color,box-shadow,background-color,height,max-height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${hasQueried ? "h-auto w-full p-4 opacity-100 lg:w-1/2" : "pointer-events-none h-0 max-h-0 w-0 border-0 bg-transparent p-0 opacity-0 shadow-none lg:w-0"}`}>
-          <p className="text-xs font-extrabold tracking-[0.14em] text-blue-600">{labels.resultBadge}</p>
-          <h2 className="mt-1 text-xl font-bold text-slate-800">{labels.resultTitle}</h2>
+          <p className="text-xs font-extrabold tracking-[0.14em] text-blue-600">{UI.resultBadge}</p>
+          <h2 className="mt-1 text-xl font-bold text-slate-800">{UI.resultTitle}</h2>
           <div className="mt-4 flex w-full max-w-sm flex-col gap-2">
             {hasRegionDownload ? (
               <button
@@ -702,7 +715,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                 disabled={rows.length === 0}
                 className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-blue-500 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
-                지역별 엑셀 다운로드
+                {UI.groupedExcelLabel}
               </button>
             ) : null}
             <button
@@ -711,7 +724,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
               disabled={rows.length === 0}
               className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-emerald-500 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
             >
-              전체 엑셀 다운로드
+              {UI.allExcelLabel}
             </button>
             {hasFilteredDownload ? (
               <button
@@ -720,10 +733,24 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                 disabled={filteredRows.length === 0}
                 className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-amber-500 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
               >
-                현재 필터 엑셀 다운로드
+                {UI.filteredExcelLabel}
               </button>
             ) : null}
           </div>
+
+          {isLoading ? (
+            <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <div className="flex items-center justify-between gap-3 text-sm font-bold text-blue-700">
+                <span>{progressTitle || UI.preparing}</span>
+                <span>{progress}%</span>
+              </div>
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-blue-100">
+                <div className="h-full rounded-full bg-blue-600 transition-[width] duration-300" style={{ width: `${progress}%` }} />
+              </div>
+              <p className="mt-3 text-xs leading-6 text-slate-600">{progressDetail || UI.progressFallback}</p>
+              <p className="mt-1 text-xs leading-6 text-slate-500">{UI.keepPage}</p>
+            </div>
+          ) : null}
         </article>
       </div>
 
@@ -732,8 +759,8 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
       {rows.length > 0 ? (
         <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-bold text-blue-700">{REGION_FILTER_TITLE}</p>
-            <p className="text-xs font-semibold text-slate-600">{WORKBENCH_TEXT.totalPrefix} {rows.length}{WORKBENCH_TEXT.countSuffix} | {WORKBENCH_TEXT.currentPrefix} {filteredRows.length}{WORKBENCH_TEXT.countSuffix}</p>
+            <p className="text-xs font-bold text-blue-700">{UI.regionFilterTitle}</p>
+            <p className="text-xs font-semibold text-slate-600">{UI.totalPrefix} {rows.length}{UI.countSuffix} | {UI.currentPrefix} {filteredRows.length}{UI.countSuffix}</p>
           </div>
           <div className="mt-2 flex flex-wrap gap-2">
             {regionStats.map((item) => {

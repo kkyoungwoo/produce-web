@@ -280,11 +280,10 @@ async function fetchAllRows(endpoint: string, params: Record<string, string>): P
 
   for (let page = 1; page <= MAX_PAGE_FETCH; page += 1) {
     const response = await requestUpstream(endpoint, {
-      ...params,
-      _type: "json",
-      pageNo: String(page),
-      numOfRows: String(PAGE_SIZE),
-    });
+  ...params,
+  pageNo: String(page),
+  numOfRows: String(PAGE_SIZE),
+});
 
     sourceUrl = response.sourceUrl;
 
@@ -327,12 +326,13 @@ async function fetchAllRows(endpoint: string, params: Record<string, string>): P
 }
 
 async function probeServiceFamily(family: ServiceFamily, params: Record<string, string>): Promise<UpstreamRequestResult> {
-  const response = await requestUpstream(family.dongEndpoint, {
-    ...params,
-    _type: "json",
-    pageNo: "1",
-    numOfRows: "1",
-  });
+
+const response = await requestUpstream(family.dongEndpoint, {
+  ...params,
+  pageNo: "1",
+  numOfRows: "1",
+});
+;
 
   if (!response.ok) {
     return response;
@@ -396,7 +396,7 @@ function hasPositive(value: unknown) {
 }
 
 function mapArchhubRow(row: Record<string, unknown>, fallbackAgency: string) {
-  const permitNo = toText(row.mgmPmsrgstPk) || toText(row.mgmHsrgstPk);
+  const permitNo = String(toText(row.mgmPmsrgstPk) || toText(row.mgmHsrgstPk));
   const mainPurps = toText(row.mainPurpsCdNm) || toText(row.purpsCdNm);
   const archArea = toText(row.archArea) || toText(row.archGbCdNm);
   const totArea = toText(row.totArea);
@@ -406,7 +406,7 @@ function mapArchhubRow(row: Record<string, unknown>, fallbackAgency: string) {
 
   return {
     permitType: toText(row.pmsGbCdNm) || toText(row.archGbCdNm) || "건축허가",
-    permitNo,
+    permitNo: String(permitNo),
     permitReportDate: toText(row.apprvDay) || toText(row.crtnDay),
     agency,
     buildType: toText(row.mainAtchGbCdNm) || "주건축물",
@@ -523,7 +523,7 @@ export async function collectArchhubRows(input: CollectArchhubRowsInput): Promis
   const { serviceKey, startDate, endDate, targets, maxRows } = input;
 
   if (targets.length === 0) {
-    throw new Error("??? ??? ??? ????.");
+    throw new Error("오류가 발생했습니다.");
   }
 
   const limit = typeof maxRows === "number" && maxRows > 0 ? maxRows : Number.POSITIVE_INFINITY;
@@ -536,10 +536,10 @@ export async function collectArchhubRows(input: CollectArchhubRowsInput): Promis
   const appendRows = (rows: Array<Record<string, string | number>>) => {
     for (const row of rows) {
       const key = [
-        toText(row.permitNo),
-        toText(row.siteLocation),
-        toText(row.dongName),
-        toText(row.buildingName),
+        String(toText(row.permitNo)),
+        String(toText(row.siteLocation)),
+        String(toText(row.dongName)),
+        String(toText(row.buildingName)),
       ].join("|");
       if (!deduped.has(key)) deduped.set(key, row);
       if (deduped.size >= limit) break;

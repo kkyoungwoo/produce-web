@@ -35,15 +35,28 @@ type HeaderPanelAccent = "emerald" | "rose";
 type DbCleanupLabels = LocaleContent["dbCleanup"];
 type ProcessMode = "single" | "compare";
 
+type LoadingStage =
+  | "idle"
+  | "reading-new"
+  | "reading-existing"
+  | "single-step1"
+  | "compare-existing-clean"
+  | "compare-new-step1"
+  | "compare-new-step2"
+  | "compare-cross-check"
+  | "compare-merge"
+  | "done";
+
 type ProcessResult = {
   mode: ProcessMode;
   processedAt: string;
   selectedNewDuplicateHeaders: string[];
   selectedExistingDuplicateHeaders: string[];
-  finalNewRows: ParsedSpreadsheet["rows"];
+  downloadableStep1Rows: ParsedSpreadsheet["rows"];
+  cleanedExistingRows: ParsedSpreadsheet["rows"];
   finalMergedRows: ParsedSpreadsheet["rows"];
   mergedHeaders: string[];
-  finalNewFileName: string;
+  downloadableStep1FileName: string;
   finalMergedFileName: string;
   stats: {
     newOriginalCount: number;
@@ -52,6 +65,7 @@ type ProcessResult = {
     newRemovedAgainstExistingCount: number;
     finalNewCount: number;
     existingOriginalCount: number;
+    existingCleanedCount: number;
     mergedFinalCount: number;
   };
 };
@@ -69,7 +83,6 @@ type UploadCardProps = {
   onDragLeave: (event: DragEvent<HTMLDivElement>) => void;
   onDrop: (event: DragEvent<HTMLDivElement>) => Promise<void> | void;
   onRemove: () => void;
-  error: string;
   labels: DbCleanupLabels["upload"];
   countSuffix: string;
 };
@@ -94,7 +107,17 @@ type DbCleanupClientProps = {
   labels: DbCleanupLabels;
 };
 
-function MetricCard({ label, value, sub, tone = "neutral" }: { label: string; value: string; sub?: string; tone?: MetricTone }) {
+function MetricCard({
+  label,
+  value,
+  sub,
+  tone = "neutral",
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: MetricTone;
+}) {
   return (
     <div className={styles.metricCard} data-tone={tone}>
       <div className={styles.metricLabel}>{label}</div>
@@ -134,12 +157,11 @@ function UploadCard({
   onDragLeave,
   onDrop,
   onRemove,
-  error,
   labels,
   countSuffix,
 }: UploadCardProps) {
   return (
-    <section className={styles.uploadCardWrap} data-drag={isDragOver} data-error={Boolean(error)}>
+    <section className={styles.uploadCardWrap} data-drag={isDragOver}>
       <input
         id={id}
         ref={inputRef}
@@ -184,16 +206,22 @@ function UploadCard({
           <>
             <div className={styles.uploadTitleGroup}>
               <span className={`${styles.uploadLabel} ${styles.uploadLabelSuccess}`}>{labels.uploadedLabel}</span>
-              <h3 className={styles.uploadTitle} title={fileInfo.fileName}>{fileInfo.fileName}</h3>
+              <h3 className={styles.uploadTitle} title={fileInfo.fileName}>
+                {fileInfo.fileName}
+              </h3>
               <p className={styles.uploadDescription}>
-                {humanFileSize(fileInfo.fileSize)} · {fileInfo.totalRows.toLocaleString()}{labels.rowsLoadedSuffix}
+                {humanFileSize(fileInfo.fileSize)} · {fileInfo.totalRows.toLocaleString()}
+                {labels.rowsLoadedSuffix}
               </p>
             </div>
 
             <div className={styles.uploadedMeta}>
               <div className={styles.uploadedMetaItem}>
                 <span>{labels.columnsLabel}</span>
-                <strong>{fileInfo.headers.length.toLocaleString()}{countSuffix}</strong>
+                <strong>
+                  {fileInfo.headers.length.toLocaleString()}
+                  {countSuffix}
+                </strong>
               </div>
               <div className={styles.uploadedMetaItem}>
                 <span>{labels.loadedAtLabel}</span>
@@ -202,10 +230,18 @@ function UploadCard({
             </div>
 
             <div className={styles.uploadActionRow} onClick={(event) => event.stopPropagation()}>
-              <button type="button" className={`${styles.inlineButton} ${styles.inlineButtonLight}`} onClick={() => inputRef.current?.click()}>
+              <button
+                type="button"
+                className={`${styles.inlineButton} ${styles.inlineButtonLight}`}
+                onClick={() => inputRef.current?.click()}
+              >
                 {labels.changeFileLabel}
               </button>
-              <button type="button" className={`${styles.inlineButton} ${styles.inlineButtonDanger}`} onClick={onRemove}>
+              <button
+                type="button"
+                className={`${styles.inlineButton} ${styles.inlineButtonDanger}`}
+                onClick={onRemove}
+              >
                 {labels.removeLabel}
               </button>
             </div>
@@ -242,13 +278,20 @@ function HeaderSelectPanel({
 
         <div className={styles.pickedCounter}>
           <span>{pickedLabel}</span>
-          <strong>{selectedHeaders.length.toLocaleString()}{countSuffix}</strong>
+          <strong>
+            {selectedHeaders.length.toLocaleString()}
+            {countSuffix}
+          </strong>
         </div>
       </div>
 
       <div className={styles.selectionToolbar}>
-        <button type="button" className={styles.toolbarButton} onClick={onSelectAll}>{selectAllLabel}</button>
-        <button type="button" className={styles.toolbarButton} onClick={onClearAll}>{clearAllLabel}</button>
+        <button type="button" className={styles.toolbarButton} onClick={onSelectAll}>
+          {selectAllLabel}
+        </button>
+        <button type="button" className={styles.toolbarButton} onClick={onClearAll}>
+          {clearAllLabel}
+        </button>
       </div>
 
       <div className={styles.tokenGrid}>
@@ -267,6 +310,60 @@ function HeaderSelectPanel({
   );
 }
 
+function getLoadingText(labels: DbCleanupLabels, stage: LoadingStage) {
+  switch (stage) {
+    case "reading-new":
+      return {
+        title: "신규 파일 불러오는 중",
+        description: "신규 파일의 시트와 컬럼 구조를 읽고 있습니다.",
+      };
+    case "reading-existing":
+      return {
+        title: "기존 파일 불러오는 중",
+        description: "기존 관리 파일의 시트와 컬럼 구조를 읽고 있습니다.",
+      };
+    case "single-step1":
+      return {
+        title: labels.loading.title,
+        description: "신규 파일 기준 컬럼의 빈값 제거와 내부 중복 제거를 진행 중입니다.",
+      };
+    case "compare-existing-clean":
+      return {
+        title: labels.loading.title,
+        description: "기존 파일을 먼저 2차 비교 컬럼 기준으로 정리하고 있습니다.",
+      };
+    case "compare-new-step1":
+      return {
+        title: labels.loading.title,
+        description: "신규 파일을 1차 선택 컬럼 기준으로 빈값 제거와 내부 중복 제거 중입니다.",
+      };
+    case "compare-new-step2":
+      return {
+        title: labels.loading.title,
+        description: "신규 파일을 2차 비교 컬럼 기준으로 다시 정리 중입니다.",
+      };
+    case "compare-cross-check":
+      return {
+        title: labels.loading.title,
+        description: "2차 비교에 실제로 추가되는 신규 데이터만 남기고 있습니다.",
+      };
+    case "compare-merge":
+      return {
+        title: labels.loading.title,
+        description: "기존 정리본과 최종 신규 추가분을 합쳐 누적본을 만들고 있습니다.",
+      };
+    case "done":
+      return {
+        title: "정리 완료",
+        description: "결과 파일이 준비되었습니다.",
+      };
+    default:
+      return {
+        title: labels.loading.title,
+        description: labels.loading.description,
+      };
+  }
+}
 
 export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
   const newFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -281,30 +378,42 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
   const [newFileError, setNewFileError] = useState("");
   const [existingFileError, setExistingFileError] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<LoadingStage>("idle");
   const [dragTarget, setDragTarget] = useState<DragTarget>("");
 
   const compareMode = Boolean(newFileInfo && existingFileInfo);
   const singleMode = Boolean(newFileInfo && !existingFileInfo);
+
   const sharedHeaders = useMemo(() => {
     if (!newFileInfo || !existingFileInfo) return [] as string[];
     const existingHeaderSet = new Set(existingFileInfo.headers);
     return newFileInfo.headers.filter((header) => existingHeaderSet.has(header));
   }, [existingFileInfo, newFileInfo]);
+
   const comparableExistingHeaders = useMemo(
     () => existingDuplicateHeaders.filter((header) => sharedHeaders.includes(header)),
     [existingDuplicateHeaders, sharedHeaders],
   );
+
   const compareCompatibilityError = useMemo(() => {
     if (!compareMode) return "";
     if (sharedHeaders.length === 0) return labels.errors.headersMustMatch;
     return "";
   }, [compareMode, labels.errors.headersMustMatch, sharedHeaders.length]);
+
   const canProcess = Boolean(
-    newFileInfo
-      && newDuplicateHeaders.length > 0
-      && !isProcessing
-      && (!existingFileInfo || (sharedHeaders.length > 0 && comparableExistingHeaders.length > 0)),
+    newFileInfo &&
+      newDuplicateHeaders.length > 0 &&
+      !isProcessing &&
+      (!existingFileInfo || (sharedHeaders.length > 0 && comparableExistingHeaders.length > 0)),
   );
+
+  const loadingCopy = getLoadingText(labels, loadingStage);
+
+  const tick = async (stage: LoadingStage) => {
+    setLoadingStage(stage);
+    await new Promise((resolve) => window.setTimeout(resolve, 40));
+  };
 
   const resetResult = () => setResult(null);
 
@@ -336,6 +445,7 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
     setNewFileError("");
     setExistingFileError("");
     setIsProcessing(false);
+    setLoadingStage("idle");
     setDragTarget("");
 
     if (newFileInputRef.current) newFileInputRef.current.value = "";
@@ -348,13 +458,18 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
     resetResult();
     if (!file) return;
 
+    setIsProcessing(true);
     try {
+      await tick("reading-new");
       const parsed = await parseSpreadsheet(file);
       setNewFileInfo(parsed);
       setNewDuplicateHeaders([]);
     } catch (error) {
       setNewFileInfo(null);
       setNewFileError(error instanceof Error ? error.message : labels.errors.newFileReadFailed);
+    } finally {
+      setIsProcessing(false);
+      setLoadingStage("idle");
     }
   };
 
@@ -364,13 +479,18 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
     resetResult();
     if (!file) return;
 
+    setIsProcessing(true);
     try {
+      await tick("reading-existing");
       const parsed = await parseSpreadsheet(file);
       setExistingFileInfo(parsed);
       setExistingDuplicateHeaders([]);
     } catch (error) {
       setExistingFileInfo(null);
       setExistingFileError(error instanceof Error ? error.message : labels.errors.existingFileReadFailed);
+    } finally {
+      setIsProcessing(false);
+      setLoadingStage("idle");
     }
   };
 
@@ -469,71 +589,97 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
     setIsProcessing(true);
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 140));
-
-      const stepRemoveBlank = removeRowsWithBlankDuplicateKey(newFileInfo.rows, newDuplicateHeaders);
-      const stepNewDedup = dedupeWithinRowsKeepLast(stepRemoveBlank.rows, newDuplicateHeaders);
-
       if (!existingFileInfo) {
-        const finalNewRows = stepNewDedup.rows;
+        await tick("single-step1");
+
+        const step1NewBlank = removeRowsWithBlankDuplicateKey(newFileInfo.rows, newDuplicateHeaders);
+        const step1NewDedup = dedupeWithinRowsKeepLast(step1NewBlank.rows, newDuplicateHeaders);
+
+        const downloadableStep1Rows = step1NewDedup.rows;
         const fileNameBase = newFileInfo.fileName;
+
+        await tick("done");
 
         setResult({
           mode: "single",
           processedAt: formatDateTime(),
           selectedNewDuplicateHeaders: [...newDuplicateHeaders],
           selectedExistingDuplicateHeaders: [],
-          finalNewRows,
-          finalMergedRows: finalNewRows,
+          downloadableStep1Rows,
+          cleanedExistingRows: [],
+          finalMergedRows: downloadableStep1Rows,
           mergedHeaders: newFileInfo.headers,
-          finalNewFileName: buildUpdatedFileName(fileNameBase, labels.result.fileSuffixes.first),
+          downloadableStep1FileName: buildUpdatedFileName(fileNameBase, labels.result.fileSuffixes.first),
           finalMergedFileName: buildUpdatedFileName(fileNameBase, labels.result.fileSuffixes.second),
           stats: {
             newOriginalCount: newFileInfo.rows.length,
-            newInternalRemovedCount: stepRemoveBlank.removedCount + stepNewDedup.removedCount,
-            newAfterInternalCount: stepNewDedup.finalCount,
+            newInternalRemovedCount: step1NewBlank.removedCount + step1NewDedup.removedCount,
+            newAfterInternalCount: step1NewDedup.finalCount,
             newRemovedAgainstExistingCount: 0,
-            finalNewCount: finalNewRows.length,
+            finalNewCount: downloadableStep1Rows.length,
             existingOriginalCount: 0,
-            mergedFinalCount: finalNewRows.length,
+            existingCleanedCount: 0,
+            mergedFinalCount: downloadableStep1Rows.length,
           },
         });
         return;
       }
 
-      const stepCompareBlank = removeRowsWithBlankDuplicateKey(stepNewDedup.rows, comparableExistingHeaders);
-      const stepCompareDedup = dedupeWithinRowsKeepLast(stepCompareBlank.rows, comparableExistingHeaders);
-      const stepExistingBlank = removeRowsWithBlankDuplicateKey(existingFileInfo.rows, comparableExistingHeaders);
-      const stepExistingDedup = dedupeWithinRowsKeepLast(stepExistingBlank.rows, comparableExistingHeaders);
+      await tick("compare-existing-clean");
+      const step1ExistingBlank = removeRowsWithBlankDuplicateKey(existingFileInfo.rows, comparableExistingHeaders);
+      const step1ExistingDedup = dedupeWithinRowsKeepLast(step1ExistingBlank.rows, comparableExistingHeaders);
+      const cleanedExistingRows = step1ExistingDedup.rows;
+
+      await tick("compare-new-step1");
+      const step1NewBlank = removeRowsWithBlankDuplicateKey(newFileInfo.rows, newDuplicateHeaders);
+      const step1NewDedup = dedupeWithinRowsKeepLast(step1NewBlank.rows, newDuplicateHeaders);
+
+      await tick("compare-new-step2");
+      const step2NewBlank = removeRowsWithBlankDuplicateKey(step1NewDedup.rows, comparableExistingHeaders);
+      const step2NewDedup = dedupeWithinRowsKeepLast(step2NewBlank.rows, comparableExistingHeaders);
+
+      await tick("compare-cross-check");
       const stepAgainstExisting = removeRowsDuplicatedAgainstExistingFlexible(
-        stepCompareDedup.rows,
-        stepExistingDedup.rows,
+        step2NewDedup.rows,
+        cleanedExistingRows,
         comparableExistingHeaders,
         comparableExistingHeaders,
       );
 
-      const finalNewRows = stepAgainstExisting.rows;
+      // 비교 모드에서 1차 다운로드 파일은
+      // "2차 데이터에 실제로 추가되는 신규 데이터만" 내려가야 함
+      const downloadableStep1Rows = stepAgainstExisting.rows;
+
+      await tick("compare-merge");
       const mergedHeaders = mergeHeaders(existingFileInfo.headers, newFileInfo.headers);
-      const finalMergedRows = [...existingFileInfo.rows, ...finalNewRows];
+      const finalMergedRows = [...cleanedExistingRows, ...downloadableStep1Rows];
       const fileNameBase = existingFileInfo.fileName || newFileInfo.fileName;
+
+      await tick("done");
 
       setResult({
         mode: "compare",
         processedAt: formatDateTime(),
         selectedNewDuplicateHeaders: [...newDuplicateHeaders],
         selectedExistingDuplicateHeaders: [...comparableExistingHeaders],
-        finalNewRows,
+        downloadableStep1Rows,
+        cleanedExistingRows,
         finalMergedRows,
         mergedHeaders,
-        finalNewFileName: buildUpdatedFileName(fileNameBase, labels.result.fileSuffixes.first),
+        downloadableStep1FileName: buildUpdatedFileName(fileNameBase, labels.result.fileSuffixes.first),
         finalMergedFileName: buildUpdatedFileName(fileNameBase, labels.result.fileSuffixes.second),
         stats: {
           newOriginalCount: newFileInfo.rows.length,
-          newInternalRemovedCount: stepRemoveBlank.removedCount + stepNewDedup.removedCount,
-          newAfterInternalCount: stepNewDedup.finalCount,
-          newRemovedAgainstExistingCount: stepCompareBlank.removedCount + stepCompareDedup.removedCount + stepAgainstExisting.removedCount,
-          finalNewCount: finalNewRows.length,
+          newInternalRemovedCount:
+            step1NewBlank.removedCount +
+            step1NewDedup.removedCount +
+            step2NewBlank.removedCount +
+            step2NewDedup.removedCount,
+          newAfterInternalCount: step2NewDedup.finalCount,
+          newRemovedAgainstExistingCount: stepAgainstExisting.removedCount,
+          finalNewCount: downloadableStep1Rows.length,
           existingOriginalCount: existingFileInfo.rows.length,
+          existingCleanedCount: cleanedExistingRows.length,
           mergedFinalCount: finalMergedRows.length,
         },
       });
@@ -541,17 +687,18 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
       setGlobalError(error instanceof Error ? error.message : labels.errors.processFailed);
     } finally {
       setIsProcessing(false);
+      setLoadingStage("idle");
     }
   };
 
-  const downloadFinalNewFile = () => {
+  const downloadStep1File = () => {
     if (!result || !newFileInfo?.headers.length) return;
 
     saveWorkbook(
       newFileInfo.headers,
-      result.finalNewRows,
-      result.finalNewFileName,
-      safeSheetName(removeExtension(result.finalNewFileName)),
+      result.downloadableStep1Rows,
+      result.downloadableStep1FileName,
+      safeSheetName(removeExtension(result.downloadableStep1FileName)),
     );
   };
 
@@ -568,19 +715,31 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
 
   const downloadBothFiles = () => {
     if (!result || result.mode !== "compare") return;
-    downloadFinalNewFile();
+    downloadStep1File();
     window.setTimeout(downloadFinalMergedFile, 220);
   };
 
   const progressText = useMemo(() => {
-    if (isProcessing) return labels.progress.processing;
+    if (isProcessing) return loadingCopy.description;
     if (!newFileInfo && !existingFileInfo) return labels.progress.idle;
     if (!newFileInfo && existingFileInfo) return labels.progress.existingOnly;
     if (newFileInfo && !existingFileInfo) return labels.singleMode.progress;
     if (compareCompatibilityError) return compareCompatibilityError;
     if (canProcess) return labels.progress.ready;
     return labels.progress.selecting;
-  }, [canProcess, compareCompatibilityError, existingFileInfo, isProcessing, labels.progress, labels.singleMode.progress, newFileInfo]);
+  }, [
+    canProcess,
+    compareCompatibilityError,
+    existingFileInfo,
+    isProcessing,
+    labels.progress.existingOnly,
+    labels.progress.idle,
+    labels.progress.ready,
+    labels.progress.selecting,
+    labels.singleMode.progress,
+    loadingCopy.description,
+    newFileInfo,
+  ]);
 
   const infoLines = compareMode ? labels.messages.infoLines : singleMode ? labels.singleMode.infoLines : [];
   const actionDescription = compareMode ? labels.actionBar.description : labels.actionBar.singleDescription;
@@ -591,8 +750,8 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
         <div className={styles.loadingOverlay}>
           <div className={styles.loadingModal}>
             <div className={styles.spinner} />
-            <h3>{labels.loading.title}</h3>
-            <p>{labels.loading.description}</p>
+            <h3>{loadingCopy.title}</h3>
+            <p>{loadingCopy.description}</p>
           </div>
         </div>
       ) : null}
@@ -635,13 +794,21 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
             <MetricCard
               label={labels.statusMetrics.existingFile}
               value={existingFileInfo ? labels.statusMetrics.ready : labels.statusMetrics.waiting}
-              sub={existingFileInfo ? `${existingFileInfo.totalRows.toLocaleString()}${labels.statusMetrics.rowsSuffix}` : labels.statusMetrics.uploadNeeded}
+              sub={
+                existingFileInfo
+                  ? `${existingFileInfo.totalRows.toLocaleString()}${labels.statusMetrics.rowsSuffix}`
+                  : labels.statusMetrics.uploadNeeded
+              }
               tone={existingFileInfo ? "good" : "neutral"}
             />
             <MetricCard
               label={labels.statusMetrics.newFile}
               value={newFileInfo ? labels.statusMetrics.ready : labels.statusMetrics.waiting}
-              sub={newFileInfo ? `${newFileInfo.totalRows.toLocaleString()}${labels.statusMetrics.rowsSuffix}` : labels.statusMetrics.uploadNeeded}
+              sub={
+                newFileInfo
+                  ? `${newFileInfo.totalRows.toLocaleString()}${labels.statusMetrics.rowsSuffix}`
+                  : labels.statusMetrics.uploadNeeded
+              }
               tone={newFileInfo ? "good" : "neutral"}
             />
           </div>
@@ -671,7 +838,6 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
           onDragLeave={existingDragHandlers.onDragLeave}
           onDrop={existingDragHandlers.onDrop}
           onRemove={clearExistingFile}
-          error={existingFileError}
           labels={labels.upload}
           countSuffix={labels.statusMetrics.countSuffix}
         />
@@ -689,7 +855,6 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
           onDragLeave={newDragHandlers.onDragLeave}
           onDrop={newDragHandlers.onDrop}
           onRemove={clearNewFile}
-          error={newFileError}
           labels={labels.upload}
           countSuffix={labels.statusMetrics.countSuffix}
         />
@@ -714,7 +879,9 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
         <section className={`${styles.messageCard} ${styles.messageCardInfo} ${styles.interactiveSurface}`}>
           <div className={styles.messageTitle}>{labels.messages.infoTitle}</div>
           {infoLines.map((line) => (
-            <div key={line} className={styles.messageLine}>- {line}</div>
+            <div key={line} className={styles.messageLine}>
+              - {line}
+            </div>
           ))}
         </section>
       ) : null}
@@ -810,22 +977,56 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
           </div>
 
           <div className={styles.resultStatsGrid}>
-            <MetricCard label={labels.result.stats.newOriginal} value={result.stats.newOriginalCount.toLocaleString()} tone="neutral" />
-            <MetricCard label={labels.result.stats.newRemoved} value={`- ${result.stats.newInternalRemovedCount.toLocaleString()}`} tone="minus" />
-            <MetricCard label={labels.result.stats.newAfterFirstPass} value={result.stats.newAfterInternalCount.toLocaleString()} tone="soft" />
-            {result.mode === "compare" ? <MetricCard label={labels.result.stats.existingRemoved} value={`- ${result.stats.newRemovedAgainstExistingCount.toLocaleString()}`} tone="minus" /> : null}
-            <MetricCard label={labels.result.stats.finalNew} value={`+ ${result.stats.finalNewCount.toLocaleString()}`} tone="plus" />
-            <MetricCard label={labels.result.stats.mergedTotal} value={result.stats.mergedFinalCount.toLocaleString()} tone="final" />
+            <MetricCard
+              label={labels.result.stats.newOriginal}
+              value={result.stats.newOriginalCount.toLocaleString()}
+              tone="neutral"
+            />
+            <MetricCard
+              label={labels.result.stats.newRemoved}
+              value={`- ${result.stats.newInternalRemovedCount.toLocaleString()}`}
+              tone="minus"
+            />
+            <MetricCard
+              label={labels.result.stats.newAfterFirstPass}
+              value={result.stats.newAfterInternalCount.toLocaleString()}
+              tone="soft"
+            />
+            {result.mode === "compare" ? (
+              <MetricCard
+                label={labels.result.stats.existingRemoved}
+                value={`- ${result.stats.newRemovedAgainstExistingCount.toLocaleString()}`}
+                tone="minus"
+              />
+            ) : null}
+            <MetricCard
+              label={labels.result.stats.finalNew}
+              value={`+ ${result.stats.finalNewCount.toLocaleString()}`}
+              tone="plus"
+            />
+            <MetricCard
+              label={labels.result.stats.mergedTotal}
+              value={
+                result.mode === "compare"
+                  ? `${result.stats.existingCleanedCount.toLocaleString()} + ${result.stats.finalNewCount.toLocaleString()} = ${result.stats.mergedFinalCount.toLocaleString()}`
+                  : result.stats.mergedFinalCount.toLocaleString()
+              }
+              tone="final"
+            />
           </div>
 
           <div className={styles.resultDownloadPanel}>
             <div className={styles.resultDownloadCard}>
               <div className={styles.resultDownloadText}>
                 <span className={styles.resultDownloadEyebrow}>{labels.result.cards.firstEyebrow}</span>
-                <strong>{result.finalNewFileName}</strong>
+                <strong>{result.downloadableStep1FileName}</strong>
                 <p>{labels.result.cards.firstDescription}</p>
               </div>
-              <button type="button" className={`${styles.downloadButton} ${styles.downloadButtonDark}`} onClick={downloadFinalNewFile}>
+              <button
+                type="button"
+                className={`${styles.downloadButton} ${styles.downloadButtonDark}`}
+                onClick={downloadStep1File}
+              >
                 {labels.result.cards.firstButton}
               </button>
             </div>
@@ -837,7 +1038,11 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
                   <strong>{result.finalMergedFileName}</strong>
                   <p>{labels.result.cards.secondDescription}</p>
                 </div>
-                <button type="button" className={`${styles.downloadButton} ${styles.downloadButtonLight}`} onClick={downloadFinalMergedFile}>
+                <button
+                  type="button"
+                  className={`${styles.downloadButton} ${styles.downloadButtonLight}`}
+                  onClick={downloadFinalMergedFile}
+                >
                   {labels.result.cards.secondButton}
                 </button>
               </div>
