@@ -2,7 +2,10 @@ import * as XLSX from "xlsx";
 
 export const ACCEPT = ".xlsx,.xls,.csv";
 const CSV_ENCODINGS = ["utf-8", "euc-kr", "cp949"] as const;
-const DUPLICATE_KEY_SEPARATOR = "||__DB_DUPLICATE_KEY__||";
+
+const FILE_READ_ERROR = "파일을 읽는 중 오류가 발생했습니다.";
+const INVALID_FILE_ERROR = "헤더가 포함된 올바른 파일을 업로드해 주세요.";
+const HEADER_ROW_GUIDE = "첫 행에는 빈 칸이나 중복 없이 컬럼명을 넣어주세요.";
 
 type SpreadsheetCell = string | number | boolean | Date | null | undefined;
 export type SpreadsheetRow = Record<string, SpreadsheetCell>;
@@ -74,7 +77,7 @@ export function normalizeForDuplicate(value: SpreadsheetCell) {
     .replace(/\r?\n|\r|\t/g, "")
     .replace(/\s+/g, "")
     .replace(/[\-_~\u2010-\u2015]/g, "")
-    .replace(/[()[\]{}<>【】「」『』〈〉《》]/g, "")
+    .replace(/[()[\]{}<>\u3010\u3011\u300C\u300D\u300E\u300F\u3008\u3009\u300A\u300B]/g, "")
     .replace(/[.,/\\|'"`~!@#$%^&*+=?:;]+/g, "")
     .replace(/[^0-9a-z\u3131-\u318E\uAC00-\uD7A3]/g, "");
 }
@@ -93,7 +96,7 @@ export function removeExtension(fileName = "") {
   return String(fileName).replace(/\.[^.]+$/, "");
 }
 
-export function buildUpdatedFileName(fileName = "파일.xlsx", suffix = "수정됨") {
+export function buildUpdatedFileName(fileName = "파일.xlsx", suffix = "수정본") {
   const base = removeExtension(fileName);
   return `${base}_${suffix}.xlsx`;
 }
@@ -131,7 +134,7 @@ async function readTextWithEncoding(file: File, encoding: string) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (event) => resolve(String(event.target?.result ?? ""));
-    reader.onerror = () => reject(reader.error ?? new Error("파일을 읽는 중 오류가 발생했습니다."));
+    reader.onerror = () => reject(reader.error ?? new Error(FILE_READ_ERROR));
     reader.readAsText(file, encoding);
   });
 }
@@ -172,17 +175,17 @@ export async function parseSpreadsheet(file: File): Promise<ParsedSpreadsheet> {
       cellDates: true,
     });
   } else {
-    throw new Error("지원하지 않는 파일 형식입니다. xlsx, xls, csv 파일만 업로드해주세요.");
+    throw new Error("지원하지 않는 파일 형식입니다. xlsx, xls, csv 파일만 업로드해 주세요.");
   }
 
   const firstSheetName = workbook.SheetNames?.[0];
   if (!firstSheetName) {
-    throw new Error("헤더가 포함된 올바른 파일을 업로드해주세요.");
+    throw new Error(INVALID_FILE_ERROR);
   }
 
   const worksheet = workbook.Sheets[firstSheetName];
   if (!worksheet) {
-    throw new Error("헤더가 포함된 올바른 파일을 업로드해주세요.");
+    throw new Error(INVALID_FILE_ERROR);
   }
 
   const aoa = XLSX.utils.sheet_to_json<SpreadsheetCell[]>(worksheet, {
@@ -193,22 +196,22 @@ export async function parseSpreadsheet(file: File): Promise<ParsedSpreadsheet> {
   });
 
   if (!Array.isArray(aoa) || aoa.length === 0) {
-    throw new Error("헤더가 포함된 올바른 파일을 업로드해주세요.");
+    throw new Error(INVALID_FILE_ERROR);
   }
 
   const headers = (aoa[0] ?? []).map(normalizeHeader);
 
   if (!headers.length || headers.every((value) => value === "")) {
-    throw new Error("헤더가 포함된 올바른 파일을 업로드해주세요.");
+    throw new Error(`${INVALID_FILE_ERROR} ${HEADER_ROW_GUIDE}`);
   }
 
   if (headers.some((value) => value === "")) {
-    throw new Error("빈 헤더명이 있습니다. 첫 번째 행의 컬럼명을 확인해주세요.");
+    throw new Error(`빈 헤더명이 있습니다. ${HEADER_ROW_GUIDE}`);
   }
 
   const headerSet = new Set(headers);
   if (headerSet.size !== headers.length) {
-    throw new Error("헤더명에 중복이 있습니다. 같은 이름의 컬럼이 없는 파일을 업로드해주세요.");
+    throw new Error(`헤더명에 중복이 있습니다. ${HEADER_ROW_GUIDE}`);
   }
 
   const rows = aoa
@@ -244,14 +247,21 @@ export function saveWorkbook(headers: string[], rows: SpreadsheetRow[], fileName
   XLSX.writeFile(workbook, fileName, { compression: true });
 }
 
-export function createStableKeyFromHeaders(row: SpreadsheetRow, selectedHeaders: string[]) {
-  const normalizedParts = [...selectedHeaders].map((header) => normalizeForDuplicate(row?.[header]));
+function createStableKeysFromHeaders(row: SpreadsheetRow, selectedHeaders: string[]) {
+  const keys: string[] = [];
 
-  if (normalizedParts.length === 0 || normalizedParts.some((value) => value === "")) {
-    return "";
+  for (const header of selectedHeaders) {
+    const normalized = normalizeForDuplicate(row?.[header]);
+    if (!normalized) return [];
+    keys.push(`${header}::${normalized}`);
   }
 
-  return [...normalizedParts].sort().join(DUPLICATE_KEY_SEPARATOR);
+  return keys;
+}
+
+export function createStableKeyFromHeaders(row: SpreadsheetRow, selectedHeaders: string[]) {
+  const keys = createStableKeysFromHeaders(row, selectedHeaders);
+  return keys.length === selectedHeaders.length ? keys.join("||") : "";
 }
 
 export function removeRowsWithBlankDuplicateKey(rows: SpreadsheetRow[], selectedHeaders: string[]): BlankRemovedRowsResult {
@@ -259,8 +269,8 @@ export function removeRowsWithBlankDuplicateKey(rows: SpreadsheetRow[], selected
   let removedCount = 0;
 
   for (const row of rows) {
-    const key = createStableKeyFromHeaders(row, selectedHeaders);
-    if (!key) {
+    const keys = createStableKeysFromHeaders(row, selectedHeaders);
+    if (keys.length !== selectedHeaders.length) {
       removedCount += 1;
       continue;
     }
@@ -279,9 +289,10 @@ export function dedupeWithinRowsKeepLast(rows: SpreadsheetRow[], selectedHeaders
   const lastIndexMap = new Map<string, number>();
 
   for (let index = 0; index < rows.length; index += 1) {
-    const key = createStableKeyFromHeaders(rows[index], selectedHeaders);
-    if (!key) continue;
-    lastIndexMap.set(key, index);
+    const keys = createStableKeysFromHeaders(rows[index], selectedHeaders);
+    for (const key of keys) {
+      lastIndexMap.set(key, index);
+    }
   }
 
   const keptRows: SpreadsheetRow[] = [];
@@ -289,14 +300,15 @@ export function dedupeWithinRowsKeepLast(rows: SpreadsheetRow[], selectedHeaders
 
   for (let index = 0; index < rows.length; index += 1) {
     const row = rows[index];
-    const key = createStableKeyFromHeaders(row, selectedHeaders);
+    const keys = createStableKeysFromHeaders(row, selectedHeaders);
 
-    if (!key) {
+    if (keys.length !== selectedHeaders.length) {
       removedCount += 1;
       continue;
     }
 
-    if (lastIndexMap.get(key) === index) {
+    const shouldKeep = keys.every((key) => lastIndexMap.get(key) === index);
+    if (shouldKeep) {
       keptRows.push(row);
     } else {
       removedCount += 1;
@@ -320,23 +332,25 @@ export function removeRowsDuplicatedAgainstExistingFlexible(
   const existingKeySet = new Set<string>();
 
   for (const row of existingRows) {
-    const key = createStableKeyFromHeaders(row, existingHeaders);
-    if (!key) continue;
-    existingKeySet.add(key);
+    const keys = createStableKeysFromHeaders(row, existingHeaders);
+    for (const key of keys) {
+      existingKeySet.add(key);
+    }
   }
 
   const keptRows: SpreadsheetRow[] = [];
   let removedCount = 0;
 
   for (const row of sourceRows) {
-    const key = createStableKeyFromHeaders(row, sourceHeaders);
+    const keys = createStableKeysFromHeaders(row, sourceHeaders);
 
-    if (!key) {
+    if (keys.length !== sourceHeaders.length) {
       removedCount += 1;
       continue;
     }
 
-    if (existingKeySet.has(key)) {
+    const hasDuplicate = keys.some((key) => existingKeySet.has(key));
+    if (hasDuplicate) {
       removedCount += 1;
       continue;
     }

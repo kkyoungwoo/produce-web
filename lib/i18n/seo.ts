@@ -12,18 +12,18 @@ export const SITE_URL = "https://gorhrod-codex.web.app";
 export type PageKey = "home" | "about" | "services" | "contact";
 
 const CORE_SEO_KEYWORDS = [
-  "사업자DB",
-  "사업자 DB 판매",
-  "사업자 주소록",
-  "DB 수집 프로그램",
-  "DB 제작 솔루션",
-  "공공데이터 API",
+  "공공 API",
   "data.go.kr",
-  "영업DB",
-  "잠재고객 DB",
-  "B2B DB",
-  "DB 자동수집",
-  "DB 맞춤제작",
+  "데이터 분석",
+  "조건 조회",
+  "엑셀 다운로드",
+  "지역 필터",
+  "실무 데이터 활용",
+  "API 조회 화면",
+  "데이터 탐색",
+  "운영 분석",
+  "시장 조사",
+  "사업 활용 데이터",
 ];
 
 function getPathByPage(page: PageKey): string {
@@ -51,14 +51,13 @@ function buildProductKeywords(product: ProductItem): string[] {
     CORE_SEO_KEYWORDS,
     [
       product.title,
-      product.summary,
+      product.collectFocus,
       product.portalDataId,
-      "API 수집기",
-      "DB 판매",
-      "사업자 DB 솔루션",
-      "데이터 수집",
-      "ETL",
-      "공공 API",
+      "공공 API 데이터",
+      "데이터 조회",
+      "데이터 분석 화면",
+      "필터 조회",
+      "엑셀 정리",
     ],
   );
 }
@@ -69,29 +68,20 @@ function buildProductCatalog(locale: Locale) {
 
   return {
     "@context": "https://schema.org",
-    "@type": "OfferCatalog",
-    name: `${t.brand} 사업자 DB 수집 상품 카탈로그`,
+    "@type": "CollectionPage",
+    name: `${t.brand} 데이터 페이지 모음`,
     url: `${SITE_URL}/${locale}/services`,
-    numberOfItems: products.length,
-    itemListElement: products.map((item, index) => ({
-      "@type": "Offer",
-      position: index + 1,
-      priceCurrency: "KRW",
-      price: item.priceValue,
-      availability: "https://schema.org/InStock",
-      url: `${SITE_URL}/${locale}/services/${item.slug}`,
-      itemOffered: {
-        "@type": "Product",
+    mainEntity: {
+      "@type": "ItemList",
+      numberOfItems: products.length,
+      itemListElement: products.map((item, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        url: `${SITE_URL}/${locale}/services/${item.slug}`,
         name: item.title,
-        description: item.description,
-        sku: item.slug,
-        category: "사업자 DB 수집 프로그램",
-        audience: {
-          "@type": "Audience",
-          audienceType: item.audience,
-        },
-      },
-    })),
+        description: item.summary,
+      })),
+    },
   };
 }
 
@@ -102,7 +92,6 @@ export function createPageMetadata(locale: Locale, page: PageKey): Metadata {
   const canonical = `${SITE_URL}/${locale}${pagePath}`;
 
   const languageAlternates = Object.fromEntries(locales.map((lang) => [lang, `${SITE_URL}/${lang}${pagePath}`]));
-
   const keywords = uniqueKeywords(pageSeo.keywords, CORE_SEO_KEYWORDS);
 
   return {
@@ -211,7 +200,7 @@ export function siteBaseMetadata(): Metadata {
     description: t.seo.home.description,
     applicationName: t.brand,
     category: "software",
-    classification: "사업자 DB 판매 및 수집 솔루션",
+    classification: "공공 API 데이터 조회 및 분석 도구",
     creator: "GORHROD",
     publisher: "GORHROD",
     formatDetection: {
@@ -270,7 +259,7 @@ export function buildJsonLd(locale: Locale, page: PageKey) {
     sameAs: ["https://github.com/gorhr"],
     contactPoint: {
       "@type": "ContactPoint",
-      contactType: "sales",
+      contactType: "customer support",
       email: t.contact.emailValue,
       availableLanguage: ["ko", "en", "ja", "zh"],
     },
@@ -295,26 +284,26 @@ export function buildJsonLd(locale: Locale, page: PageKey) {
     mainEntity: [
       {
         "@type": "Question",
-        name: "사업자 DB는 어떻게 구매하나요?",
+        name: "이 사이트에서는 무엇을 할 수 있나요?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "서비스 페이지에서 상품을 선택한 뒤 상담을 통해 바로 구매할 수 있습니다.",
+          text: "공공 API 데이터를 날짜와 조건 기준으로 조회하고 결과를 표와 엑셀로 확인할 수 있습니다.",
         },
       },
       {
         "@type": "Question",
-        name: "DB 수집 조건은 커스터마이징 가능한가요?",
+        name: "데이터를 사업에 어떻게 활용할 수 있나요?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "날짜, 지역, 키워드 등 입력 조건을 상품별로 커스터마이징해 수집할 수 있습니다.",
+          text: "지역 비교, 시장 조사, 운영 점검, 신규 대상 탐색처럼 빠른 판단이 필요한 업무에 바로 활용할 수 있습니다.",
         },
       },
       {
         "@type": "Question",
-        name: "공공데이터 API 기반 수집도 가능한가요?",
+        name: "공공데이터 API 문서도 함께 확인할 수 있나요?",
         acceptedAnswer: {
           "@type": "Answer",
-          text: "data.go.kr API를 기반으로 DB 수집/가공/출력까지 연결되는 구조로 제공합니다.",
+          text: "각 데이터 상세 페이지에서 data.go.kr 문서와 계정 신청 링크를 함께 제공합니다.",
         },
       },
     ],
@@ -332,8 +321,8 @@ export function buildJsonLd(locale: Locale, page: PageKey) {
         "@context": "https://schema.org",
         "@type": "Person",
         name: "GORHROD",
-        jobTitle: "Public API Collection Developer",
-        knowsAbout: ["Public API", "Database Automation", "Next.js", "Data Pipeline"],
+        jobTitle: "Public API Data Workflow Developer",
+        knowsAbout: ["Public API", "Data Exploration", "Next.js", "Data Pipeline"],
         url: `${SITE_URL}/ko/about`,
       },
     ];
@@ -353,32 +342,27 @@ export function buildJsonLd(locale: Locale, page: PageKey) {
 export function buildProductJsonLd(locale: Locale, product: ProductItem) {
   return {
     "@context": "https://schema.org",
-    "@type": "Product",
+    "@type": "Dataset",
     name: product.title,
     description: product.description,
-    sku: product.slug,
-    category: "사업자 DB 수집 프로그램",
-    brand: {
-      "@type": "Brand",
+    identifier: product.portalDataId,
+    url: `${SITE_URL}/${locale}/services/${product.slug}`,
+    creator: {
+      "@type": "Organization",
       name: "GORHROD LAB",
     },
-    url: `${SITE_URL}/${locale}/services/${product.slug}`,
-    offers: {
-      "@type": "Offer",
-      priceCurrency: "KRW",
-      price: product.priceValue,
-      availability: "https://schema.org/InStock",
-      itemCondition: "https://schema.org/NewCondition",
-      seller: {
-        "@type": "Organization",
-        name: "GORHROD LAB",
-      },
+    includedInDataCatalog: {
+      "@type": "DataCatalog",
+      name: "WORKVISA DATA LAB",
+      url: `${SITE_URL}/${locale}/services`,
     },
+    keywords: buildProductKeywords(product),
+    variableMeasured: [product.collectFocus, product.portalDataId],
     additionalProperty: [
       { "@type": "PropertyValue", name: "Portal Data ID", value: product.portalDataId },
       { "@type": "PropertyValue", name: "Collect Focus", value: product.collectFocus },
-      { "@type": "PropertyValue", name: "Delivery", value: product.delivery },
-      { "@type": "PropertyValue", name: "Audience", value: product.audience },
+      { "@type": "PropertyValue", name: "Query Mode", value: product.delivery },
+      { "@type": "PropertyValue", name: "Use Case", value: product.audience },
     ],
   };
 }

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { getPreviewServiceKeys } from "@/lib/public-data/preview-key";
+
 type CollectBody = {
   endpoint?: string;
   historyEndpoint?: string;
@@ -19,18 +21,40 @@ type ParsedUpstreamResult = {
   rows: Record<string, unknown>[];
 };
 
+type CollectAttemptSuccess = {
+  ok: true;
+  rows: Array<Record<string, string | number>>;
+  totalCount: number;
+  sourceUrl: string;
+};
+
+type CollectAttemptFailure = {
+  ok: false;
+  status: number;
+  message: string;
+  sourceUrl: string;
+  upstream?: string;
+  invalidKey: boolean;
+};
+
+type CollectAttemptResult = CollectAttemptSuccess | CollectAttemptFailure;
+
 const MIN_INTERVAL_MS = 250;
 const FETCH_TIMEOUT_MS = 15000;
 const MAX_PAGE_FETCH = 400;
 const MAX_TOTAL_ROWS = 200_000;
+const PREVIEW_LIMIT = 5;
 
 const lastRequestMap = new Map<string, number>();
 
-const MSG_TOO_FAST = "\uC694\uCCAD \uAC04\uACA9\uC774 \uB108\uBB34 \uC9E7\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.";
-const MSG_NO_ENDPOINT = "\uC11C\uBC84 \uC124\uC815 \uC624\uB958: \uC5D4\uB4DC\uD3EC\uC778\uD2B8\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.";
-const MSG_NO_SERVICE_KEY = "\uC778\uC99D\uD0A4(serviceKey)\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uC778\uC99D\uD0A4\uB97C \uC785\uB825\uD574 \uC8FC\uC138\uC694.";
-const MSG_UPSTREAM_CONNECT_FAIL = "\uACF5\uACF5 API \uC11C\uBC84 \uC5F0\uACB0\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. \uC7A0\uC2DC \uD6C4 \uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.";
-const MSG_NO_RESULT = "\uC870\uD68C \uACB0\uACFC\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4. \uB0A0\uC9DC/\uC9C0\uC5ED \uC870\uAC74\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.";
+const MSG_TOO_FAST = "요청 간격이 너무 짧습니다. 잠시 후 다시 시도해 주세요.";
+const MSG_NO_ENDPOINT = "서버 설정 오류: 엔드포인트가 없습니다.";
+const MSG_UPSTREAM_CONNECT_FAIL = "공공 API 서버 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.";
+const MSG_NO_RESULT = "조회 결과가 없습니다. 날짜/지역 조건을 확인해 주세요.";
+const MSG_DEFAULT_PREVIEW = "인증키를 입력하지 않아 기본 인증키로 실제 데이터 미리보기 5건을 보여드립니다.";
+const MSG_FALLBACK_PREVIEW = "입력한 인증키를 확인하지 못해 기본 인증키로 실제 데이터 미리보기 5건을 보여드립니다.";
+const MSG_NO_DEFAULT_KEY = "인증키를 입력하면 전체 데이터를 조회할 수 있습니다. 현재 기본 인증키가 설정되어 있지 않습니다.";
+const MSG_INVALID_KEY_NO_DEFAULT = "입력한 인증키를 확인하지 못했습니다. 올바른 인증키를 입력해 주세요.";
 
 function buildUrl(endpoint: string, query: Record<string, string>) {
   const url = new URL(endpoint);
@@ -155,6 +179,22 @@ function getClientKey(request: Request) {
   return forwarded.split(",")[0].trim();
 }
 
+function isCredentialErrorMessage(text: string, status?: number) {
+  const normalized = text.toLowerCase();
+  if (status === 401 || status === 403) return true;
+
+  return (
+    normalized.includes("service key")
+    || normalized.includes("servicekey")
+    || normalized.includes("service key is not registered")
+    || normalized.includes("invalid service key")
+    || normalized.includes("forbidden")
+    || normalized.includes("인증키")
+    || normalized.includes("오류(-4)")
+    || normalized.includes("error code(-4)")
+  );
+}
+
 async function requestUpstream(url: URL) {
   const abortController = new AbortController();
   const timeout = setTimeout(() => abortController.abort(), FETCH_TIMEOUT_MS);
@@ -174,6 +214,161 @@ async function requestUpstream(url: URL) {
   }
 }
 
+function dedupeRows(rows: Record<string, unknown>[]) {
+  return Array.from(
+    new Map(
+      rows.map((row) => {
+        const keyParts = [
+          String((row as Record<string, unknown>).MNG_NO ?? ""),
+          String((row as Record<string, unknown>).BPLC_NM ?? ""),
+          String((row as Record<string, unknown>).LCPMT_YMD ?? ""),
+          String((row as Record<string, unknown>).ROAD_NM_ADDR ?? ""),
+        ];
+        const key = keyParts.some(Boolean) ? keyParts.join("|") : JSON.stringify(row);
+        return [key, row] as const;
+      }),
+    ).values(),
+  );
+}
+
+async function collectWithKey(options: {
+  endpoint: string;
+  historyEndpoint?: string;
+  historySwitchParamKey?: string;
+  params: Record<string, string>;
+  previewLimited: boolean;
+}): Promise<CollectAttemptResult> {
+  const { endpoint, historyEndpoint, historySwitchParamKey, params, previewLimited } = options;
+  const historyKey = historySwitchParamKey?.trim();
+  const hasBaseDate = Boolean(historyKey && params[historyKey]);
+  const hasRegionForHistory = Boolean(String(params["cond[OPN_ATMY_GRP_CD::EQ]"] ?? "").trim());
+  const useHistory = Boolean(
+    hasBaseDate && (!historyKey || historyKey !== "cond[BASE_DATE::EQ]" || hasRegionForHistory),
+  );
+  const selectedEndpoint = useHistory && historyEndpoint ? historyEndpoint : endpoint;
+
+  const requestedPageNo = previewLimited ? 1 : Math.max(1, asInt(params.pageNo || "1", 1));
+  const endpointLimit = (
+    selectedEndpoint.includes("foreigner_city_homestays")
+    || selectedEndpoint.includes("foreigners_entertainment_restaurants")
+  )
+    ? 100
+    : 500;
+  const requestedNumOfRows = previewLimited
+    ? Math.min(PREVIEW_LIMIT, endpointLimit)
+    : Math.min(Math.max(asInt(params.numOfRows || "50", 50), 1), endpointLimit);
+
+  const regionKey = "cond[OPN_ATMY_GRP_CD::EQ]";
+  const regionTokens = String(params[regionKey] ?? "")
+    .split(",")
+    .map((token) => token.trim())
+    .filter(Boolean);
+  const targetRegions = regionTokens.length > 0 ? Array.from(new Set(regionTokens)) : [""];
+
+  let totalCount = 0;
+  const allRows: Record<string, unknown>[] = [];
+  let firstUrl = "";
+
+  for (const regionCode of targetRegions) {
+    let currentPage = requestedPageNo;
+    let perRegionCount = 0;
+
+    for (let pageIndex = 0; pageIndex < (previewLimited ? 1 : MAX_PAGE_FETCH); pageIndex += 1) {
+      const baseParams = { ...params };
+      if (!useHistory && historyKey) delete baseParams[historyKey];
+      if (regionCode) baseParams[regionKey] = regionCode;
+
+      const pageParams = {
+        ...baseParams,
+        pageNo: String(currentPage),
+        numOfRows: String(requestedNumOfRows),
+      };
+      const targetUrl = buildUrl(selectedEndpoint, pageParams);
+      if (!firstUrl) firstUrl = targetUrl.toString();
+
+      let upstream;
+      try {
+        upstream = await requestUpstream(targetUrl);
+      } catch {
+        return {
+          ok: false,
+          status: 502,
+          message: MSG_UPSTREAM_CONNECT_FAIL,
+          sourceUrl: targetUrl.toString(),
+          invalidKey: false,
+        };
+      }
+
+      if (!upstream.ok) {
+        const invalidKey = isCredentialErrorMessage(upstream.text, upstream.status);
+        return {
+          ok: false,
+          status: invalidKey ? 401 : 502,
+          message: invalidKey
+            ? "인증키를 확인하지 못했습니다."
+            : `공공 API 호출에 실패했습니다. (HTTP ${upstream.status})`,
+          sourceUrl: targetUrl.toString(),
+          upstream: upstream.text.slice(0, 1000),
+          invalidKey,
+        };
+      }
+
+      const parsed = parseUpstream(upstream.text);
+      const successCodes = new Set(["", "0", "00"]);
+      if (!successCodes.has(parsed.resultCode)) {
+        const detail = `${parsed.resultCode} ${parsed.resultMsg || ""}`;
+        const invalidKey = isCredentialErrorMessage(detail);
+        return {
+          ok: false,
+          status: invalidKey ? 401 : 502,
+          message: invalidKey
+            ? "인증키를 확인하지 못했습니다."
+            : `공공 API 오류(${parsed.resultCode}): ${parsed.resultMsg || "알 수 없는 오류"}`,
+          sourceUrl: targetUrl.toString(),
+          invalidKey,
+        };
+      }
+
+      if (parsed.totalCount > 0) perRegionCount = parsed.totalCount;
+      if (parsed.rows.length === 0) break;
+
+      allRows.push(...parsed.rows);
+      if (allRows.length >= (previewLimited ? PREVIEW_LIMIT : MAX_TOTAL_ROWS)) break;
+
+      if (previewLimited) {
+        break;
+      }
+
+      if (perRegionCount > 0 && (currentPage - requestedPageNo + 1) * requestedNumOfRows >= perRegionCount) {
+        break;
+      }
+
+      currentPage += 1;
+    }
+
+    totalCount += perRegionCount;
+    if (allRows.length >= (previewLimited ? PREVIEW_LIMIT : MAX_TOTAL_ROWS)) break;
+  }
+
+  const normalizedRows = normalizeRows(dedupeRows(allRows)).slice(0, previewLimited ? PREVIEW_LIMIT : MAX_TOTAL_ROWS);
+  if (normalizedRows.length === 0) {
+    return {
+      ok: false,
+      status: 404,
+      message: MSG_NO_RESULT,
+      sourceUrl: firstUrl,
+      invalidKey: false,
+    };
+  }
+
+  return {
+    ok: true,
+    rows: normalizedRows,
+    totalCount: previewLimited ? normalizedRows.length : (totalCount || normalizedRows.length),
+    sourceUrl: firstUrl,
+  };
+}
+
 export async function POST(request: Request) {
   try {
     const clientKey = getClientKey(request);
@@ -190,149 +385,180 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, message: MSG_NO_ENDPOINT }, { status: 400 });
     }
 
-    const mergedParams: Record<string, string> = { ...(body.params ?? {}), ...(body.forcedQuery ?? {}) };
-
+    const params: Record<string, string> = { ...(body.params ?? {}), ...(body.forcedQuery ?? {}) };
     const serviceKeyQueryKey = body.serviceKeyQueryKey || "serviceKey";
-    if (!mergedParams[serviceKeyQueryKey] && body.serviceKeyEnvVar) {
-      const envKey = process.env[body.serviceKeyEnvVar];
-      if (envKey) mergedParams[serviceKeyQueryKey] = envKey;
-    }
+    const userServiceKey = String(params[serviceKeyQueryKey] ?? "").trim();
+    const envServiceKey = body.serviceKeyEnvVar ? String(process.env[body.serviceKeyEnvVar] ?? "").trim() : "";
+    const previewServiceKeys = getPreviewServiceKeys(envServiceKey);
 
-    if (!mergedParams[serviceKeyQueryKey]) {
-      return NextResponse.json({ ok: false, message: MSG_NO_SERVICE_KEY }, { status: 400 });
-    }
+    const runCollect = async (serviceKey: string, previewLimited: boolean) => collectWithKey({
+      endpoint: body.endpoint!,
+      historyEndpoint: body.historyEndpoint,
+      historySwitchParamKey: body.historySwitchParamKey,
+      params: {
+        ...params,
+        [serviceKeyQueryKey]: serviceKey,
+      },
+      previewLimited,
+    });
 
-    const historyKey = body.historySwitchParamKey?.trim();
-    const hasBaseDate = Boolean(historyKey && mergedParams[historyKey]);
-    const hasRegionForHistory = Boolean(String(mergedParams["cond[OPN_ATMY_GRP_CD::EQ]"] ?? "").trim());
-    const useHistory = Boolean(
-      hasBaseDate
-      && (!historyKey || historyKey !== "cond[BASE_DATE::EQ]" || hasRegionForHistory),
-    );
-    const selectedEndpoint = useHistory && body.historyEndpoint ? body.historyEndpoint : body.endpoint;
-
-    const requestedPageNo = Math.max(1, asInt(mergedParams.pageNo || "1", 1));
-    const endpointLimit = (
-      selectedEndpoint.includes("foreigner_city_homestays")
-      || selectedEndpoint.includes("foreigners_entertainment_restaurants")
-    )
-      ? 100
-      : 500;
-    const requestedNumOfRows = Math.min(
-      Math.max(asInt(mergedParams.numOfRows || "50", 50), 1),
-      endpointLimit,
-    );
-
-    const regionKey = "cond[OPN_ATMY_GRP_CD::EQ]";
-    const regionTokens = String(mergedParams[regionKey] ?? "")
-      .split(",")
-      .map((token) => token.trim())
-      .filter(Boolean);
-    const targetRegions = regionTokens.length > 0 ? Array.from(new Set(regionTokens)) : [""];
-
-    let totalCount = 0;
-    const allRows: Record<string, unknown>[] = [];
-    let firstUrl = "";
-
-    for (const regionCode of targetRegions) {
-      let currentPage = requestedPageNo;
-      let perRegionCount = 0;
-
-      for (let pageIndex = 0; pageIndex < MAX_PAGE_FETCH; pageIndex += 1) {
-        const baseParams = { ...mergedParams };
-        if (!useHistory && historyKey) delete baseParams[historyKey];
-        if (regionCode) baseParams[regionKey] = regionCode;
-
-        const pageParams = {
-          ...baseParams,
-          pageNo: String(currentPage),
-          numOfRows: String(requestedNumOfRows),
-        };
-        const targetUrl = buildUrl(selectedEndpoint, pageParams);
-        if (!firstUrl) firstUrl = targetUrl.toString();
-
-        let upstream;
-        try {
-          upstream = await requestUpstream(targetUrl);
-        } catch {
-          return NextResponse.json(
-            { ok: false, message: MSG_UPSTREAM_CONNECT_FAIL, sourceUrl: targetUrl.toString() },
-            { status: 502 },
-          );
+    const runPreviewCollect = async () => {
+      for (const previewServiceKey of previewServiceKeys) {
+        const attempt = await runCollect(previewServiceKey, true);
+        if (attempt.ok) {
+          return { kind: "ok" as const, attempt };
         }
-
-        if (!upstream.ok) {
-          return NextResponse.json(
-            {
-              ok: false,
-              message: `\uACF5\uACF5 API \uD638\uCD9C\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. (HTTP ${upstream.status})`,
-              sourceUrl: targetUrl.toString(),
-              upstream: upstream.text.slice(0, 1000),
-            },
-            { status: 502 },
-          );
+        if (attempt.status === 404) {
+          return { kind: "empty" as const, attempt };
         }
-
-        const parsed = parseUpstream(upstream.text);
-        const successCodes = new Set(["", "0", "00"]);
-        if (!successCodes.has(parsed.resultCode)) {
-          return NextResponse.json(
-            {
-              ok: false,
-              message: `\uACF5\uACF5 API \uC624\uB958(${parsed.resultCode}): ${parsed.resultMsg || "\uC54C \uC218 \uC5C6\uB294 \uC624\uB958"}`,
-              sourceUrl: targetUrl.toString(),
-            },
-            { status: 502 },
-          );
+        if (attempt.invalidKey) {
+          continue;
         }
-
-        if (parsed.totalCount > 0) perRegionCount = parsed.totalCount;
-        if (parsed.rows.length === 0) break;
-
-        allRows.push(...parsed.rows);
-        if (allRows.length >= MAX_TOTAL_ROWS) break;
-
-        if (perRegionCount > 0 && (currentPage - requestedPageNo + 1) * requestedNumOfRows >= perRegionCount) {
-          break;
-        }
-
-        currentPage += 1;
+        return { kind: "error" as const, attempt };
       }
 
-      totalCount += perRegionCount;
-      if (allRows.length >= MAX_TOTAL_ROWS) break;
+      return null;
+    };
+
+    if (userServiceKey) {
+      const userAttempt = await runCollect(userServiceKey, false);
+      if (userAttempt.ok) {
+        return NextResponse.json({
+          ok: true,
+          rows: userAttempt.rows,
+          totalCount: userAttempt.totalCount,
+          sourceUrl: userAttempt.sourceUrl,
+          previewLimited: false,
+          authStatus: "full",
+        });
+      }
+
+      if (!userAttempt.invalidKey) {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: userAttempt.message,
+            sourceUrl: userAttempt.sourceUrl,
+            upstream: userAttempt.upstream,
+          },
+          { status: userAttempt.status },
+        );
+      }
+
+      const previewResult = await runPreviewCollect();
+      if (previewResult?.kind === "ok") {
+        return NextResponse.json({
+          ok: true,
+          rows: previewResult.attempt.rows,
+          totalCount: previewResult.attempt.totalCount,
+          sourceUrl: previewResult.attempt.sourceUrl,
+          previewLimited: true,
+          previewCount: PREVIEW_LIMIT,
+          authStatus: "fallback-preview",
+          message: MSG_FALLBACK_PREVIEW,
+        });
+      }
+
+      if (previewResult?.kind === "empty") {
+        return NextResponse.json({
+          ok: true,
+          rows: [],
+          totalCount: 0,
+          sourceUrl: previewResult.attempt.sourceUrl,
+          previewLimited: true,
+          previewCount: PREVIEW_LIMIT,
+          authStatus: "fallback-preview",
+          message: `${MSG_FALLBACK_PREVIEW} ${MSG_NO_RESULT}`,
+        });
+      }
+
+      if (previewResult?.kind === "error") {
+        return NextResponse.json(
+          {
+            ok: false,
+            message: previewResult.attempt.message,
+            sourceUrl: previewResult.attempt.sourceUrl,
+            upstream: previewResult.attempt.upstream,
+          },
+          { status: previewResult.attempt.status },
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        rows: [],
+        totalCount: 0,
+        previewLimited: true,
+        previewCount: PREVIEW_LIMIT,
+        authStatus: "missing-preview",
+        message: MSG_INVALID_KEY_NO_DEFAULT,
+      });
     }
 
-    const dedupedRows = Array.from(
-      new Map(
-        allRows.map((row) => {
-          const keyParts = [
-            String((row as Record<string, unknown>).MNG_NO ?? ""),
-            String((row as Record<string, unknown>).BPLC_NM ?? ""),
-            String((row as Record<string, unknown>).LCPMT_YMD ?? ""),
-            String((row as Record<string, unknown>).ROAD_NM_ADDR ?? ""),
-          ];
-          const key = keyParts.some(Boolean) ? keyParts.join("|") : JSON.stringify(row);
-          return [key, row] as const;
-        }),
-      ).values(),
-    );
+    if (previewServiceKeys.length === 0) {
+      return NextResponse.json({
+        ok: true,
+        rows: [],
+        totalCount: 0,
+        previewLimited: true,
+        previewCount: PREVIEW_LIMIT,
+        authStatus: "missing-preview",
+        message: MSG_NO_DEFAULT_KEY,
+      });
+    }
 
-    const normalizedRows = normalizeRows(dedupedRows);
-    if (normalizedRows.length === 0) {
-      return NextResponse.json({ ok: false, message: MSG_NO_RESULT, sourceUrl: firstUrl }, { status: 404 });
+    const previewResult = await runPreviewCollect();
+    if (previewResult?.kind === "ok") {
+      return NextResponse.json({
+        ok: true,
+        rows: previewResult.attempt.rows,
+        totalCount: previewResult.attempt.totalCount,
+        sourceUrl: previewResult.attempt.sourceUrl,
+        previewLimited: true,
+        previewCount: PREVIEW_LIMIT,
+        authStatus: "default-preview",
+        message: MSG_DEFAULT_PREVIEW,
+      });
+    }
+
+    if (previewResult?.kind === "empty") {
+      return NextResponse.json({
+        ok: true,
+        rows: [],
+        totalCount: 0,
+        sourceUrl: previewResult.attempt.sourceUrl,
+        previewLimited: true,
+        previewCount: PREVIEW_LIMIT,
+        authStatus: "default-preview",
+        message: `${MSG_DEFAULT_PREVIEW} ${MSG_NO_RESULT}`,
+      });
+    }
+
+    if (previewResult?.kind === "error") {
+      return NextResponse.json(
+        {
+          ok: false,
+          message: previewResult.attempt.message,
+          sourceUrl: previewResult.attempt.sourceUrl,
+          upstream: previewResult.attempt.upstream,
+        },
+        { status: previewResult.attempt.status },
+      );
     }
 
     return NextResponse.json({
       ok: true,
-      rows: normalizedRows,
-      totalCount: totalCount || normalizedRows.length,
-      sourceUrl: firstUrl,
+      rows: [],
+      totalCount: 0,
+      previewLimited: true,
+      previewCount: PREVIEW_LIMIT,
+      authStatus: "missing-preview",
+      message: MSG_NO_DEFAULT_KEY,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(
-      { ok: false, message: `\uC11C\uBC84 \uCC98\uB9AC \uC911 \uC624\uB958\uAC00 \uBC1C\uC0DD\uD588\uC2B5\uB2C8\uB2E4: ${message}` },
+      { ok: false, message: `서버 처리 중 오류가 발생했습니다: ${message}` },
       { status: 500 },
     );
   }

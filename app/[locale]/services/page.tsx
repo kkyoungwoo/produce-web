@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+﻿import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -42,7 +42,7 @@ export default async function ServicesPage({ params }: { params: Promise<Params>
 
           <div className="grid grid-cols-2 gap-2 max-[520px]:grid-cols-1">
             <div className="cursor-pointer rounded-xl border border-blue-200 bg-gradient-to-b from-white to-blue-50 p-3 transition active:scale-[0.99]" data-clickable="true">
-              <strong className="block text-2xl font-black text-slate-800">{products.length}개</strong>
+              <strong className="block text-2xl font-black text-slate-800">{products.length}</strong>
               <span className="text-sm text-slate-600">{t.services.registeredLabel}</span>
             </div>
             <div className="cursor-pointer rounded-xl border border-blue-200 bg-gradient-to-b from-white to-blue-50 p-3 transition active:scale-[0.99]" data-clickable="true">
@@ -63,13 +63,13 @@ export default async function ServicesPage({ params }: { params: Promise<Params>
               data-delay="1"
             >
               <div className="flex items-center justify-between gap-2">
-                <span className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-bold text-white">{item.status}</span>
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">{item.priceLabel}</span>
+                <span className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-bold text-white">{t.services.listStatusLabel}</span>
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">Data ID {item.portalDataId}</span>
               </div>
 
               <h2 className="text-lg font-bold leading-snug text-slate-900">{item.title}</h2>
               <p className="text-sm leading-7 text-slate-600">{item.summary}</p>
-              <p className="text-xs text-slate-500">#{String(index + 1).padStart(2, "0")} · Data ID {item.portalDataId}</p>
+              <p className="text-xs text-slate-500">#{String(index + 1).padStart(2, "0")} · API Data Page</p>
 
               <div className="grid gap-1 text-xs text-slate-600">
                 <span>{t.store.deliveryLabel}: {item.delivery}</span>

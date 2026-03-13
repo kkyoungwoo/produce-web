@@ -1,13 +1,13 @@
 "use client";
 
 import {
+  Fragment,
   useMemo,
   useRef,
   useState,
   type ChangeEvent,
   type DragEvent,
   type KeyboardEvent,
-  type ReactNode,
   type RefObject,
 } from "react";
 
@@ -16,6 +16,7 @@ import {
   ACCEPT,
   buildUpdatedFileName,
   dedupeWithinRowsKeepLast,
+  formatDateTime,
   humanFileSize,
   mergeHeaders,
   parseSpreadsheet,
@@ -26,13 +27,16 @@ import {
   saveWorkbook,
   type ParsedSpreadsheet,
 } from "@/lib/db-cleanup/duplicate-remover";
+import type { LocaleContent } from "@/lib/i18n/types";
 
 type DragTarget = "" | "new" | "existing";
 type MetricTone = "neutral" | "good" | "minus" | "soft" | "plus" | "final";
-type ChipTone = "neutral" | "success" | "dark";
 type HeaderPanelAccent = "emerald" | "rose";
+type DbCleanupLabels = LocaleContent["dbCleanup"];
+type ProcessMode = "single" | "compare";
 
 type ProcessResult = {
+  mode: ProcessMode;
   processedAt: string;
   selectedNewDuplicateHeaders: string[];
   selectedExistingDuplicateHeaders: string[];
@@ -66,6 +70,8 @@ type UploadCardProps = {
   onDrop: (event: DragEvent<HTMLDivElement>) => Promise<void> | void;
   onRemove: () => void;
   error: string;
+  labels: DbCleanupLabels["upload"];
+  countSuffix: string;
 };
 
 type HeaderSelectPanelProps = {
@@ -74,33 +80,19 @@ type HeaderSelectPanelProps = {
   headers: string[];
   selectedHeaders: string[];
   accent: HeaderPanelAccent;
+  stepLabel: string;
+  pickedLabel: string;
+  selectAllLabel: string;
+  clearAllLabel: string;
+  countSuffix: string;
   onToggle: (header: string) => void;
   onSelectAll: () => void;
   onClearAll: () => void;
 };
 
-const FLOW_STEPS = [
-  { title: "신규 업로드", description: "새로 확보한 DB" },
-  { title: "1차 정리", description: "빈값 및 내부 중복 제거" },
-  { title: "2차 비교", description: "기존 DB 중복 검증" },
-  { title: "최종 저장", description: "신규 정리본 + 누적 DB" },
-] as const;
-
-const INFO_ITEMS = [
-  { label: "비교 정규화", value: "공백 · 하이픈 · 괄호 · 특수문자 제거" },
-  { label: "신규 내부 정리", value: "빈값 행 삭제 + 마지막 값 1개 유지" },
-  { label: "누적 저장", value: "남은 신규 데이터만 기존 DB에 추가" },
-] as const;
-
-function formatDateTime(date = new Date()) {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  const hh = String(date.getHours()).padStart(2, "0");
-  const mi = String(date.getMinutes()).padStart(2, "0");
-  const ss = String(date.getSeconds()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
-}
+type DbCleanupClientProps = {
+  labels: DbCleanupLabels;
+};
 
 function MetricCard({ label, value, sub, tone = "neutral" }: { label: string; value: string; sub?: string; tone?: MetricTone }) {
   return (
@@ -109,14 +101,6 @@ function MetricCard({ label, value, sub, tone = "neutral" }: { label: string; va
       <div className={styles.metricValue}>{value}</div>
       {sub ? <div className={styles.metricSub}>{sub}</div> : null}
     </div>
-  );
-}
-
-function StatusChip({ tone = "neutral", children }: { tone?: ChipTone; children: ReactNode }) {
-  return (
-    <span className={styles.statusChip} data-tone={tone}>
-      {children}
-    </span>
   );
 }
 
@@ -151,6 +135,8 @@ function UploadCard({
   onDrop,
   onRemove,
   error,
+  labels,
+  countSuffix,
 }: UploadCardProps) {
   return (
     <section className={styles.uploadCardWrap} data-drag={isDragOver} data-error={Boolean(error)}>
@@ -164,7 +150,7 @@ function UploadCard({
       />
 
       <div
-        className={styles.uploadDropArea}
+        className={`${styles.uploadDropArea} ${styles.interactiveSurface}`}
         role="button"
         tabIndex={0}
         onClick={() => inputRef.current?.click()}
@@ -190,37 +176,37 @@ function UploadCard({
             </div>
 
             <div className={styles.uploadHintBox}>
-              <strong>파일을 드래그하거나 클릭해서 업로드</strong>
-              <span>지원 형식: xlsx / xls / csv</span>
+              <strong>{labels.dropHintTitle}</strong>
+              <span>{labels.dropHintDescription}</span>
             </div>
           </>
         ) : (
           <>
             <div className={styles.uploadTitleGroup}>
-              <span className={`${styles.uploadLabel} ${styles.uploadLabelSuccess}`}>업로드 완료</span>
+              <span className={`${styles.uploadLabel} ${styles.uploadLabelSuccess}`}>{labels.uploadedLabel}</span>
               <h3 className={styles.uploadTitle} title={fileInfo.fileName}>{fileInfo.fileName}</h3>
               <p className={styles.uploadDescription}>
-                {humanFileSize(fileInfo.fileSize)} · {fileInfo.totalRows.toLocaleString()}행 로드 완료
+                {humanFileSize(fileInfo.fileSize)} · {fileInfo.totalRows.toLocaleString()}{labels.rowsLoadedSuffix}
               </p>
             </div>
 
             <div className={styles.uploadedMeta}>
               <div className={styles.uploadedMetaItem}>
-                <span>컬럼 수</span>
-                <strong>{fileInfo.headers.length}개</strong>
+                <span>{labels.columnsLabel}</span>
+                <strong>{fileInfo.headers.length.toLocaleString()}{countSuffix}</strong>
               </div>
               <div className={styles.uploadedMetaItem}>
-                <span>불러온 시각</span>
+                <span>{labels.loadedAtLabel}</span>
                 <strong>{fileInfo.loadedAt}</strong>
               </div>
             </div>
 
             <div className={styles.uploadActionRow} onClick={(event) => event.stopPropagation()}>
               <button type="button" className={`${styles.inlineButton} ${styles.inlineButtonLight}`} onClick={() => inputRef.current?.click()}>
-                파일 변경
+                {labels.changeFileLabel}
               </button>
               <button type="button" className={`${styles.inlineButton} ${styles.inlineButtonDanger}`} onClick={onRemove}>
-                제거
+                {labels.removeLabel}
               </button>
             </div>
           </>
@@ -236,28 +222,33 @@ function HeaderSelectPanel({
   headers,
   selectedHeaders,
   accent,
+  stepLabel,
+  pickedLabel,
+  selectAllLabel,
+  clearAllLabel,
+  countSuffix,
   onToggle,
   onSelectAll,
   onClearAll,
 }: HeaderSelectPanelProps) {
   return (
-    <section className={styles.selectPanel} data-accent={accent}>
+    <section className={`${styles.selectPanel} ${styles.interactiveSurface}`} data-accent={accent}>
       <div className={styles.sectionCardHead}>
         <div>
-          <div className={styles.sectionEyebrow}>{accent === "emerald" ? "STEP 1" : "STEP 2"}</div>
+          <div className={styles.sectionEyebrow}>{stepLabel}</div>
           <h3 className={styles.sectionTitle}>{title}</h3>
           <p className={styles.sectionDescription}>{description}</p>
         </div>
 
         <div className={styles.pickedCounter}>
-          <span>선택됨</span>
-          <strong>{selectedHeaders.length}개</strong>
+          <span>{pickedLabel}</span>
+          <strong>{selectedHeaders.length.toLocaleString()}{countSuffix}</strong>
         </div>
       </div>
 
       <div className={styles.selectionToolbar}>
-        <button type="button" className={styles.toolbarButton} onClick={onSelectAll}>전체 선택</button>
-        <button type="button" className={styles.toolbarButton} onClick={onClearAll}>전체 해제</button>
+        <button type="button" className={styles.toolbarButton} onClick={onSelectAll}>{selectAllLabel}</button>
+        <button type="button" className={styles.toolbarButton} onClick={onClearAll}>{clearAllLabel}</button>
       </div>
 
       <div className={styles.tokenGrid}>
@@ -276,7 +267,8 @@ function HeaderSelectPanel({
   );
 }
 
-export default function DbCleanupClient() {
+
+export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
   const newFileInputRef = useRef<HTMLInputElement | null>(null);
   const existingFileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -291,8 +283,28 @@ export default function DbCleanupClient() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragTarget, setDragTarget] = useState<DragTarget>("");
 
-  const bothFilesReady = Boolean(newFileInfo && existingFileInfo);
-  const canProcess = bothFilesReady && newDuplicateHeaders.length > 0 && existingDuplicateHeaders.length > 0 && !isProcessing;
+  const compareMode = Boolean(newFileInfo && existingFileInfo);
+  const singleMode = Boolean(newFileInfo && !existingFileInfo);
+  const sharedHeaders = useMemo(() => {
+    if (!newFileInfo || !existingFileInfo) return [] as string[];
+    const existingHeaderSet = new Set(existingFileInfo.headers);
+    return newFileInfo.headers.filter((header) => existingHeaderSet.has(header));
+  }, [existingFileInfo, newFileInfo]);
+  const comparableExistingHeaders = useMemo(
+    () => existingDuplicateHeaders.filter((header) => sharedHeaders.includes(header)),
+    [existingDuplicateHeaders, sharedHeaders],
+  );
+  const compareCompatibilityError = useMemo(() => {
+    if (!compareMode) return "";
+    if (sharedHeaders.length === 0) return labels.errors.headersMustMatch;
+    return "";
+  }, [compareMode, labels.errors.headersMustMatch, sharedHeaders.length]);
+  const canProcess = Boolean(
+    newFileInfo
+      && newDuplicateHeaders.length > 0
+      && !isProcessing
+      && (!existingFileInfo || (sharedHeaders.length > 0 && comparableExistingHeaders.length > 0)),
+  );
 
   const resetResult = () => setResult(null);
 
@@ -342,7 +354,7 @@ export default function DbCleanupClient() {
       setNewDuplicateHeaders([]);
     } catch (error) {
       setNewFileInfo(null);
-      setNewFileError(error instanceof Error ? error.message : "신규 데이터 파일을 읽는 중 오류가 발생했습니다.");
+      setNewFileError(error instanceof Error ? error.message : labels.errors.newFileReadFailed);
     }
   };
 
@@ -358,7 +370,7 @@ export default function DbCleanupClient() {
       setExistingDuplicateHeaders([]);
     } catch (error) {
       setExistingFileInfo(null);
-      setExistingFileError(error instanceof Error ? error.message : "기존 관리 파일을 읽는 중 오류가 발생했습니다.");
+      setExistingFileError(error instanceof Error ? error.message : labels.errors.existingFileReadFailed);
     }
   };
 
@@ -416,23 +428,32 @@ export default function DbCleanupClient() {
 
   const toggleExistingDuplicateHeader = (header: string) => {
     setGlobalError("");
-
+    resetResult();
     setExistingDuplicateHeaders((prev) => (prev.includes(header) ? prev.filter((item) => item !== header) : [...prev, header]));
   };
 
   const validateSelections = () => {
-    if (!newFileInfo || !existingFileInfo) {
-      setGlobalError("신규 데이터 파일과 기존 관리 파일을 모두 등록해주세요.");
+    if (!newFileInfo) {
+      setGlobalError(labels.errors.newFileRequired);
       return false;
     }
 
     if (newDuplicateHeaders.length === 0) {
-      setGlobalError("신규 데이터 중복 제거 기준 컬럼을 1개 이상 선택해주세요.");
+      setGlobalError(labels.errors.newHeadersRequired);
       return false;
     }
 
-    if (existingDuplicateHeaders.length === 0) {
-      setGlobalError("기존 데이터 비교 기준 컬럼을 1개 이상 선택해주세요.");
+    if (!existingFileInfo) {
+      return true;
+    }
+
+    if (sharedHeaders.length === 0) {
+      setGlobalError(labels.errors.headersMustMatch);
+      return false;
+    }
+
+    if (comparableExistingHeaders.length === 0) {
+      setGlobalError(labels.errors.existingHeadersRequired);
       return false;
     }
 
@@ -443,7 +464,7 @@ export default function DbCleanupClient() {
     setGlobalError("");
     setResult(null);
 
-    if (!validateSelections() || !newFileInfo || !existingFileInfo) return;
+    if (!validateSelections() || !newFileInfo) return;
 
     setIsProcessing(true);
 
@@ -452,40 +473,72 @@ export default function DbCleanupClient() {
 
       const stepRemoveBlank = removeRowsWithBlankDuplicateKey(newFileInfo.rows, newDuplicateHeaders);
       const stepNewDedup = dedupeWithinRowsKeepLast(stepRemoveBlank.rows, newDuplicateHeaders);
-      const stepExistingBlank = removeRowsWithBlankDuplicateKey(existingFileInfo.rows, existingDuplicateHeaders);
-      const stepExistingDedup = dedupeWithinRowsKeepLast(stepExistingBlank.rows, existingDuplicateHeaders);
+
+      if (!existingFileInfo) {
+        const finalNewRows = stepNewDedup.rows;
+        const fileNameBase = newFileInfo.fileName;
+
+        setResult({
+          mode: "single",
+          processedAt: formatDateTime(),
+          selectedNewDuplicateHeaders: [...newDuplicateHeaders],
+          selectedExistingDuplicateHeaders: [],
+          finalNewRows,
+          finalMergedRows: finalNewRows,
+          mergedHeaders: newFileInfo.headers,
+          finalNewFileName: buildUpdatedFileName(fileNameBase, labels.result.fileSuffixes.first),
+          finalMergedFileName: buildUpdatedFileName(fileNameBase, labels.result.fileSuffixes.second),
+          stats: {
+            newOriginalCount: newFileInfo.rows.length,
+            newInternalRemovedCount: stepRemoveBlank.removedCount + stepNewDedup.removedCount,
+            newAfterInternalCount: stepNewDedup.finalCount,
+            newRemovedAgainstExistingCount: 0,
+            finalNewCount: finalNewRows.length,
+            existingOriginalCount: 0,
+            mergedFinalCount: finalNewRows.length,
+          },
+        });
+        return;
+      }
+
+      const stepCompareBlank = removeRowsWithBlankDuplicateKey(stepNewDedup.rows, comparableExistingHeaders);
+      const stepCompareDedup = dedupeWithinRowsKeepLast(stepCompareBlank.rows, comparableExistingHeaders);
+      const stepExistingBlank = removeRowsWithBlankDuplicateKey(existingFileInfo.rows, comparableExistingHeaders);
+      const stepExistingDedup = dedupeWithinRowsKeepLast(stepExistingBlank.rows, comparableExistingHeaders);
       const stepAgainstExisting = removeRowsDuplicatedAgainstExistingFlexible(
-        stepNewDedup.rows,
+        stepCompareDedup.rows,
         stepExistingDedup.rows,
-        newDuplicateHeaders,
-        existingDuplicateHeaders,
+        comparableExistingHeaders,
+        comparableExistingHeaders,
       );
 
       const finalNewRows = stepAgainstExisting.rows;
       const mergedHeaders = mergeHeaders(existingFileInfo.headers, newFileInfo.headers);
       const finalMergedRows = [...existingFileInfo.rows, ...finalNewRows];
+      const fileNameBase = existingFileInfo.fileName || newFileInfo.fileName;
 
       setResult({
+        mode: "compare",
         processedAt: formatDateTime(),
         selectedNewDuplicateHeaders: [...newDuplicateHeaders],
-        selectedExistingDuplicateHeaders: [...existingDuplicateHeaders],
+        selectedExistingDuplicateHeaders: [...comparableExistingHeaders],
         finalNewRows,
         finalMergedRows,
         mergedHeaders,
-        finalNewFileName: buildUpdatedFileName(newFileInfo.fileName, "신규정리"),
-        finalMergedFileName: buildUpdatedFileName(existingFileInfo.fileName, "누적DB"),
+        finalNewFileName: buildUpdatedFileName(fileNameBase, labels.result.fileSuffixes.first),
+        finalMergedFileName: buildUpdatedFileName(fileNameBase, labels.result.fileSuffixes.second),
         stats: {
           newOriginalCount: newFileInfo.rows.length,
           newInternalRemovedCount: stepRemoveBlank.removedCount + stepNewDedup.removedCount,
           newAfterInternalCount: stepNewDedup.finalCount,
-          newRemovedAgainstExistingCount: stepAgainstExisting.removedCount,
+          newRemovedAgainstExistingCount: stepCompareBlank.removedCount + stepCompareDedup.removedCount + stepAgainstExisting.removedCount,
           finalNewCount: finalNewRows.length,
           existingOriginalCount: existingFileInfo.rows.length,
           mergedFinalCount: finalMergedRows.length,
         },
       });
     } catch (error) {
-      setGlobalError(error instanceof Error ? error.message : "처리 중 오류가 발생했습니다.");
+      setGlobalError(error instanceof Error ? error.message : labels.errors.processFailed);
     } finally {
       setIsProcessing(false);
     }
@@ -503,7 +556,7 @@ export default function DbCleanupClient() {
   };
 
   const downloadFinalMergedFile = () => {
-    if (!result || !result.mergedHeaders.length) return;
+    if (!result || result.mode !== "compare" || !result.mergedHeaders.length) return;
 
     saveWorkbook(
       result.mergedHeaders,
@@ -514,19 +567,23 @@ export default function DbCleanupClient() {
   };
 
   const downloadBothFiles = () => {
-    if (!result) return;
+    if (!result || result.mode !== "compare") return;
     downloadFinalNewFile();
     window.setTimeout(downloadFinalMergedFile, 220);
   };
 
   const progressText = useMemo(() => {
-    if (isProcessing) return "신규 내부 중복과 빈값을 정리한 뒤 기존 DB와 비교 중입니다.";
-    if (!newFileInfo && !existingFileInfo) return "신규 파일과 기존 관리 파일을 등록하면 바로 작업할 수 있습니다.";
-    if (newFileInfo && !existingFileInfo) return "이제 기존 관리 파일만 등록하면 됩니다.";
-    if (!newFileInfo && existingFileInfo) return "이제 신규 데이터 파일만 등록하면 됩니다.";
-    if (canProcess) return "기준 컬럼 선택 완료. 최종 정리 실행 버튼을 누르세요.";
-    return "신규 기준 컬럼과 기존 비교 컬럼을 각각 선택해주세요.";
-  }, [isProcessing, newFileInfo, existingFileInfo, canProcess]);
+    if (isProcessing) return labels.progress.processing;
+    if (!newFileInfo && !existingFileInfo) return labels.progress.idle;
+    if (!newFileInfo && existingFileInfo) return labels.progress.existingOnly;
+    if (newFileInfo && !existingFileInfo) return labels.singleMode.progress;
+    if (compareCompatibilityError) return compareCompatibilityError;
+    if (canProcess) return labels.progress.ready;
+    return labels.progress.selecting;
+  }, [canProcess, compareCompatibilityError, existingFileInfo, isProcessing, labels.progress, labels.singleMode.progress, newFileInfo]);
+
+  const infoLines = compareMode ? labels.messages.infoLines : singleMode ? labels.singleMode.infoLines : [];
+  const actionDescription = compareMode ? labels.actionBar.description : labels.actionBar.singleDescription;
 
   return (
     <div className={styles.root}>
@@ -534,65 +591,63 @@ export default function DbCleanupClient() {
         <div className={styles.loadingOverlay}>
           <div className={styles.loadingModal}>
             <div className={styles.spinner} />
-            <h3>최종 정리 실행 중</h3>
-            <p>빈값 제거 → 신규 내부 중복 제거 → 기존 DB 비교 → 누적 DB 생성</p>
+            <h3>{labels.loading.title}</h3>
+            <p>{labels.loading.description}</p>
           </div>
         </div>
       ) : null}
 
       <section className={styles.heroSection}>
-        <article className={`${styles.heroCard} ${styles.heroMain}`}>
-          <div className={styles.eyebrow}>DB DUPLICATE REMOVER</div>
+        <article className={`${styles.heroCard} ${styles.heroMain} ${styles.interactiveSurface}`}>
+          <div className={styles.eyebrow}>{labels.eyebrow}</div>
           <h1 className={styles.heroTitle}>
-            중복은 걷어내고
-            <br />
-            쓸 수 있는 데이터만 남기는
-            <br />
-            누적형 DB 정리 도구
+            {labels.heroTitleLines.map((line, index) => (
+              <Fragment key={`${line}-${index}`}>
+                {line}
+                {index < labels.heroTitleLines.length - 1 ? <br /> : null}
+              </Fragment>
+            ))}
           </h1>
-          <p className={styles.heroDescription}>
-            신규 데이터 안에서 먼저 빈값과 중복을 정리하고, 기존 DB에 이미 있는 값은 한 번 더 걸러냅니다.
-            최종적으로 살아남은 신규 데이터만 따로 저장하고, 그 데이터만 기존 DB에 누적합니다.
-          </p>
+          <p className={styles.heroDescription}>{labels.heroDescription}</p>
 
           <div className={styles.flowRail}>
-            {FLOW_STEPS.map((step, index) => (
-              <div key={step.title} className={styles.flowRailItem}>
-                <div className={styles.flowStep} data-final={index === FLOW_STEPS.length - 1}>
+            {labels.flowSteps.map((step, index) => (
+              <div key={`${step.title}-${index}`} className={styles.flowRailItem}>
+                <div className={styles.flowStep} data-final={index === labels.flowSteps.length - 1}>
                   <b>{step.title}</b>
                   <span>{step.description}</span>
                 </div>
-                {index < FLOW_STEPS.length - 1 ? <i className={styles.flowConnector} /> : null}
+                {index < labels.flowSteps.length - 1 ? <i className={styles.flowConnector} /> : null}
               </div>
             ))}
           </div>
         </article>
 
-        <aside className={`${styles.heroCard} ${styles.heroStatus}`}>
+        <aside className={`${styles.heroCard} ${styles.heroStatus} ${styles.interactiveSurface}`}>
           <div className={styles.heroStatusTop}>
             <div className={styles.liveDot} />
-            <strong>현재 상태</strong>
+            <strong>{labels.currentStatusTitle}</strong>
           </div>
 
           <p className={styles.heroStatusText}>{progressText}</p>
 
           <div className={styles.statusMetricGrid}>
             <MetricCard
-              label="신규 파일"
-              value={newFileInfo ? "등록됨" : "대기"}
-              sub={newFileInfo ? `${newFileInfo.totalRows.toLocaleString()}행` : "업로드 필요"}
-              tone={newFileInfo ? "good" : "neutral"}
+              label={labels.statusMetrics.existingFile}
+              value={existingFileInfo ? labels.statusMetrics.ready : labels.statusMetrics.waiting}
+              sub={existingFileInfo ? `${existingFileInfo.totalRows.toLocaleString()}${labels.statusMetrics.rowsSuffix}` : labels.statusMetrics.uploadNeeded}
+              tone={existingFileInfo ? "good" : "neutral"}
             />
             <MetricCard
-              label="기존 파일"
-              value={existingFileInfo ? "등록됨" : "대기"}
-              sub={existingFileInfo ? `${existingFileInfo.totalRows.toLocaleString()}행` : "업로드 필요"}
-              tone={existingFileInfo ? "good" : "neutral"}
+              label={labels.statusMetrics.newFile}
+              value={newFileInfo ? labels.statusMetrics.ready : labels.statusMetrics.waiting}
+              sub={newFileInfo ? `${newFileInfo.totalRows.toLocaleString()}${labels.statusMetrics.rowsSuffix}` : labels.statusMetrics.uploadNeeded}
+              tone={newFileInfo ? "good" : "neutral"}
             />
           </div>
 
           <div className={styles.infoList}>
-            {INFO_ITEMS.map((item) => (
+            {labels.infoItems.map((item) => (
               <div key={item.label} className={styles.infoItem}>
                 <span>{item.label}</span>
                 <strong>{item.value}</strong>
@@ -605,8 +660,8 @@ export default function DbCleanupClient() {
       <section className={styles.uploadGrid}>
         <UploadCard
           id="existing-db-file"
-          title="기존 관리 파일"
-          description="중복 검증 기준이 되는 누적 DB 파일을 먼저 등록할 수 있습니다."
+          title={labels.upload.existingTitle}
+          description={labels.upload.existingDescription}
           fileInfo={existingFileInfo}
           inputRef={existingFileInputRef}
           onFileChange={handleExistingFileChange}
@@ -617,12 +672,14 @@ export default function DbCleanupClient() {
           onDrop={existingDragHandlers.onDrop}
           onRemove={clearExistingFile}
           error={existingFileError}
+          labels={labels.upload}
+          countSuffix={labels.statusMetrics.countSuffix}
         />
 
         <UploadCard
           id="new-data-file"
-          title="신규 데이터 파일"
-          description="새로 확보한 DB 파일을 등록하세요. 첫 번째 시트 기준으로 불러옵니다."
+          title={labels.upload.newTitle}
+          description={labels.upload.newDescription}
           fileInfo={newFileInfo}
           inputRef={newFileInputRef}
           onFileChange={handleNewFileChange}
@@ -633,155 +690,160 @@ export default function DbCleanupClient() {
           onDrop={newDragHandlers.onDrop}
           onRemove={clearNewFile}
           error={newFileError}
+          labels={labels.upload}
+          countSuffix={labels.statusMetrics.countSuffix}
         />
       </section>
 
       {newFileError || existingFileError ? (
         <section className={`${styles.messageCard} ${styles.messageCardError}`}>
-          <div className={styles.messageTitle}>오류 안내</div>
-          {newFileError ? <div className={styles.messageLine}>• {newFileError}</div> : null}
-          {existingFileError ? <div className={styles.messageLine}>• {existingFileError}</div> : null}
-          
+          <div className={styles.messageTitle}>{labels.messages.errorTitle}</div>
+          {existingFileError ? <div className={styles.messageLine}>- {existingFileError}</div> : null}
+          {newFileError ? <div className={styles.messageLine}>- {newFileError}</div> : null}
         </section>
       ) : null}
 
-      {bothFilesReady ? (
-        <section className={`${styles.messageCard} ${styles.messageCardInfo}`}>
-          <div className={styles.messageTitle}>작동 방식</div>
-          <div className={styles.messageLine}>• 신규 기준 컬럼은 빈값 행 제거와 신규 데이터 내부 중복 제거에 사용됩니다.</div>
-          <div className={styles.messageLine}>• 기존 기준 컬럼은 기존 DB에 이미 존재하는지 비교하는 검증용입니다.</div>
-          <div className={styles.messageLine}>• 신규 파일과 기존 파일의 컬럼 구조가 달라도 각각 따로 선택해서 비교할 수 있습니다.</div>
-          <div className={styles.messageLine}>• 선택한 기준 컬럼 중 하나라도 비어 있으면 해당 행은 자동으로 제외됩니다.</div>
+      {compareCompatibilityError ? (
+        <section className={`${styles.messageCard} ${styles.messageCardError}`}>
+          <div className={styles.messageTitle}>{labels.messages.errorTitle}</div>
+          <div className={styles.messageLine}>- {compareCompatibilityError}</div>
         </section>
       ) : null}
 
-      {bothFilesReady ? (
+      {infoLines.length > 0 ? (
+        <section className={`${styles.messageCard} ${styles.messageCardInfo} ${styles.interactiveSurface}`}>
+          <div className={styles.messageTitle}>{labels.messages.infoTitle}</div>
+          {infoLines.map((line) => (
+            <div key={line} className={styles.messageLine}>- {line}</div>
+          ))}
+        </section>
+      ) : null}
+
+      {newFileInfo ? (
         <section className={styles.selectionStack}>
           <HeaderSelectPanel
-            title="1차 신규 데이터 기준 컬럼"
-            description="신규 데이터 내부에서 빈값과 중복을 먼저 정리할 컬럼입니다."
-            headers={newFileInfo?.headers ?? []}
+            title={labels.selection.newTitle}
+            description={labels.selection.newDescription}
+            headers={newFileInfo.headers}
             selectedHeaders={newDuplicateHeaders}
             accent="emerald"
+            stepLabel={labels.selection.step1}
+            pickedLabel={labels.selection.pickedLabel}
+            selectAllLabel={labels.selection.selectAllLabel}
+            clearAllLabel={labels.selection.clearAllLabel}
+            countSuffix={labels.statusMetrics.countSuffix}
             onToggle={toggleNewDuplicateHeader}
-            onSelectAll={() => setNewDuplicateHeaders([...(newFileInfo?.headers ?? [])])}
+            onSelectAll={() => setNewDuplicateHeaders([...newFileInfo.headers])}
             onClearAll={() => setNewDuplicateHeaders([])}
           />
 
-          <HeaderSelectPanel
-            title="2차 기존 데이터 비교 기준 컬럼"
-            description="정리된 신규 데이터가 기존 DB에 이미 있는지 비교할 컬럼입니다."
-            headers={existingFileInfo?.headers ?? []}
-            selectedHeaders={existingDuplicateHeaders}
-            accent="rose"
-            onToggle={toggleExistingDuplicateHeader}
-            onSelectAll={() => setExistingDuplicateHeaders([...(existingFileInfo?.headers ?? [])])}
-            onClearAll={() => setExistingDuplicateHeaders([])}
-          />
+          {existingFileInfo ? (
+            <HeaderSelectPanel
+              title={labels.selection.existingTitle}
+              description={labels.selection.existingDescription}
+              headers={sharedHeaders}
+              selectedHeaders={comparableExistingHeaders}
+              accent="rose"
+              stepLabel={labels.selection.step2}
+              pickedLabel={labels.selection.pickedLabel}
+              selectAllLabel={labels.selection.selectAllLabel}
+              clearAllLabel={labels.selection.clearAllLabel}
+              countSuffix={labels.statusMetrics.countSuffix}
+              onToggle={toggleExistingDuplicateHeader}
+              onSelectAll={() => setExistingDuplicateHeaders([...sharedHeaders])}
+              onClearAll={() => setExistingDuplicateHeaders([])}
+            />
+          ) : null}
 
-          <div className={styles.actionBar}>
+          <div className={`${styles.actionBar} ${styles.interactiveSurface}`}>
             <div className={styles.actionBarText}>
-              <strong>최종 정리 준비</strong>
-              <span>선택한 기준으로 신규 정리본과 누적 DB를 생성합니다.</span>
+              <strong>{labels.actionBar.title}</strong>
+              <span>{actionDescription}</span>
             </div>
 
             <div className={styles.actionBarButtons}>
               <button type="button" className={styles.mainButton} onClick={handleProcess} disabled={!canProcess}>
-                {isProcessing ? "처리 중..." : "최종 정리 실행"}
+                {isProcessing ? labels.actionBar.runningLabel : labels.actionBar.runLabel}
               </button>
               <button type="button" className={styles.secondaryButton} onClick={resetAll}>
-                전체 초기화
+                {labels.actionBar.resetLabel}
               </button>
             </div>
           </div>
 
           {globalError ? (
             <section className={`${styles.messageCard} ${styles.messageCardError}`}>
-              <div className={styles.messageTitle}>오류 안내</div>
-              <div className={styles.messageLine}>• {globalError}</div>
+              <div className={styles.messageTitle}>{labels.messages.errorTitle}</div>
+              <div className={styles.messageLine}>- {globalError}</div>
             </section>
           ) : null}
         </section>
       ) : null}
 
       {result ? (
-        <>
-          <section className={styles.resultSection}>
-            <div className={styles.resultTop}>
-              <div>
-                <div className={`${styles.eyebrow} ${styles.eyebrowBlue}`}>FINAL RESULT</div>
-                <h2 className={styles.resultTitle}>최종 정리 결과</h2>
-                <p className={styles.resultTime}>{result.processedAt}</p>
-              </div>
-
-              <button type="button" className={styles.downloadAllButton} onClick={downloadBothFiles}>
-                결과 파일 2개 모두 다운로드
-              </button>
+        <section className={`${styles.resultSection} ${styles.interactiveSurface}`}>
+          <div className={styles.resultTop}>
+            <div>
+              <div className={`${styles.eyebrow} ${styles.eyebrowBlue}`}>{labels.result.eyebrow}</div>
+              <h2 className={styles.resultTitle}>{labels.result.title}</h2>
+              <p className={styles.resultTime}>{result.processedAt}</p>
             </div>
 
-            <div className={styles.criteriaWrap}>
+            {result.mode === "compare" ? (
+              <button type="button" className={styles.downloadAllButton} onClick={downloadBothFiles}>
+                {labels.result.downloadAllLabel}
+              </button>
+            ) : null}
+          </div>
+
+          <div className={styles.criteriaWrap}>
+            <div className={styles.criteriaCard}>
+              <span>{labels.result.newCriteriaLabel}</span>
+              <strong>{result.selectedNewDuplicateHeaders.join(" + ")}</strong>
+            </div>
+            {result.mode === "compare" ? (
               <div className={styles.criteriaCard}>
-                <span>신규 기준 컬럼</span>
-                <strong>{result.selectedNewDuplicateHeaders.join(" + ")}</strong>
-              </div>
-              <div className={styles.criteriaCard}>
-                <span>기존 비교 기준 컬럼</span>
+                <span>{labels.result.existingCriteriaLabel}</span>
                 <strong>{result.selectedExistingDuplicateHeaders.join(" + ")}</strong>
               </div>
-            </div>
+            ) : null}
+          </div>
 
-            <div className={styles.resultStatsGrid}>
-              <MetricCard label="신규 원본 데이터" value={result.stats.newOriginalCount.toLocaleString()} tone="neutral" />
-              <MetricCard label="신규 내부 정리 제거" value={`- ${result.stats.newInternalRemovedCount.toLocaleString()}`} tone="minus" />
-              <MetricCard label="1차 정리 후 신규" value={result.stats.newAfterInternalCount.toLocaleString()} tone="soft" />
-              <MetricCard label="기존 DB 중복 제거" value={`- ${result.stats.newRemovedAgainstExistingCount.toLocaleString()}`} tone="minus" />
-              <MetricCard label="최종 신규 데이터" value={`+ ${result.stats.finalNewCount.toLocaleString()}`} tone="plus" />
-              <MetricCard label="업데이트된 전체 DB" value={result.stats.mergedFinalCount.toLocaleString()} tone="final" />
-            </div>
-          </section>
+          <div className={styles.resultStatsGrid}>
+            <MetricCard label={labels.result.stats.newOriginal} value={result.stats.newOriginalCount.toLocaleString()} tone="neutral" />
+            <MetricCard label={labels.result.stats.newRemoved} value={`- ${result.stats.newInternalRemovedCount.toLocaleString()}`} tone="minus" />
+            <MetricCard label={labels.result.stats.newAfterFirstPass} value={result.stats.newAfterInternalCount.toLocaleString()} tone="soft" />
+            {result.mode === "compare" ? <MetricCard label={labels.result.stats.existingRemoved} value={`- ${result.stats.newRemovedAgainstExistingCount.toLocaleString()}`} tone="minus" /> : null}
+            <MetricCard label={labels.result.stats.finalNew} value={`+ ${result.stats.finalNewCount.toLocaleString()}`} tone="plus" />
+            <MetricCard label={labels.result.stats.mergedTotal} value={result.stats.mergedFinalCount.toLocaleString()} tone="final" />
+          </div>
 
-          <section className={styles.downloadGrid}>
-            <div className={`${styles.downloadCard} ${styles.downloadCardBright}`}>
-              <div className={styles.downloadTopRow}>
-                <span className={`${styles.downloadPill} ${styles.downloadPillBright}`}>결과 파일 1</span>
-                <StatusChip tone="success">영업용 신규 정리본</StatusChip>
+          <div className={styles.resultDownloadPanel}>
+            <div className={styles.resultDownloadCard}>
+              <div className={styles.resultDownloadText}>
+                <span className={styles.resultDownloadEyebrow}>{labels.result.cards.firstEyebrow}</span>
+                <strong>{result.finalNewFileName}</strong>
+                <p>{labels.result.cards.firstDescription}</p>
               </div>
-
-              <h3 className={styles.downloadTitle}>{result.finalNewFileName}</h3>
-
-              <div className={styles.downloadDescList}>
-                <div>선택한 기준 컬럼의 빈값 행 제거 완료</div>
-                <div>신규 데이터 내부 중복 제거 완료</div>
-                <div>기존 DB에 이미 있는 데이터 제거 완료</div>
-                <div>실제로 활용 가능한 신규 데이터만 포함</div>
-              </div>
-
               <button type="button" className={`${styles.downloadButton} ${styles.downloadButtonDark}`} onClick={downloadFinalNewFile}>
-                신규 데이터 정리본 다운로드
+                {labels.result.cards.firstButton}
               </button>
             </div>
 
-            <div className={`${styles.downloadCard} ${styles.downloadCardDark}`}>
-              <div className={styles.downloadTopRow}>
-                <span className={`${styles.downloadPill} ${styles.downloadPillDark}`}>결과 파일 2</span>
-                <StatusChip tone="dark">누적 관리 DB</StatusChip>
+            {result.mode === "compare" ? (
+              <div className={styles.resultDownloadCard}>
+                <div className={styles.resultDownloadText}>
+                  <span className={styles.resultDownloadEyebrow}>{labels.result.cards.secondEyebrow}</span>
+                  <strong>{result.finalMergedFileName}</strong>
+                  <p>{labels.result.cards.secondDescription}</p>
+                </div>
+                <button type="button" className={`${styles.downloadButton} ${styles.downloadButtonLight}`} onClick={downloadFinalMergedFile}>
+                  {labels.result.cards.secondButton}
+                </button>
               </div>
-
-              <h3 className={styles.downloadTitle}>{result.finalMergedFileName}</h3>
-
-              <div className={`${styles.downloadDescList} ${styles.downloadDescListDark}`}>
-                <div>기존 데이터는 유지</div>
-                <div>남은 신규 데이터만 누적 추가</div>
-                <div>기존 헤더 + 신규 헤더 통합 저장</div>
-                <div>다음 작업용 기준 DB로 재사용 가능</div>
-              </div>
-
-              <button type="button" className={`${styles.downloadButton} ${styles.downloadButtonLight}`} onClick={downloadFinalMergedFile}>
-                누적 DB 다운로드
-              </button>
-            </div>
-          </section>
-        </>
+            ) : null}
+          </div>
+        </section>
       ) : null}
     </div>
   );

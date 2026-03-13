@@ -1,19 +1,3 @@
-﻿export const WORKBENCH_TEXT = {
-  inputTitle: "입력 설정",
-  serviceKeyLabel: "인증키(serviceKey) *",
-  regionSelectLabel: "지역 선택(복수 선택)",
-  selectAllRegion: "전체 선택",
-  clearAllRegion: "전체 해제",
-  permitFromLabel: "인허가일자 시작",
-  permitToLabel: "인허가일자 종료",
-  statRegion: "지역별 통계/필터",
-  statCountry: "국가별 통계/필터",
-  allFilterLabel: "전체",
-  totalPrefix: "총",
-  currentPrefix: "현재",
-  countSuffix: "건",
-  sampleError: "인증키 확인에 실패했습니다. 샘플 5건을 보여드립니다.",
-  endpointMissing: "엔드포인트가 없습니다.",
-  queryFailed: "조회에 실패했습니다.",
-  networkFailed: "서버 연결에 실패했습니다.",
-} as const;
+import { getLocaleContent } from "@/lib/i18n/translations";
+
+export const WORKBENCH_TEXT = getLocaleContent("ko").workbench.ui;

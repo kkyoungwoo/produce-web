@@ -1,39 +1,36 @@
-import type { ProductItem } from "@/lib/i18n/types";
+﻿import type { ProductItem } from "@/lib/i18n/types";
 
 import { ACCOUNT_GUIDE_URL, serviceKeyCredential } from "../shared";
 
-const DEFAULT_SERVICE_KEY =
-  process.env.NEXT_PUBLIC_DATA_GO_KR_SERVICE_KEY?.trim()
-  || "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
+const SERVICE_KEY_SAMPLE = "YOUR_DATA_GO_KR_SERVICE_KEY";
 
 const product: ProductItem = {
   slug: "api-15136560",
   collectorKey: "condition-paging",
-  title: "건축HUB 주택 인허가 조회 수집기",
-  summary: "인허가일자와 지역을 선택해 건축HUB 주택 인허가 데이터를 조회하고 엑셀로 내려받을 수 있습니다.",
-  description:
-    "국토교통부 OpenAPI(15136560) 기반으로 건축HUB 주택 인허가 기본개요와 총괄개요 데이터를 통합 조회합니다. 시도와 시군구를 선택하고 결과를 웹 표와 엑셀로 확인할 수 있습니다.",
+  title: "건축HUB 주택 인허가 조회",
+  summary: "시도와 시군구를 선택해 건축HUB 주택 인허가 데이터를 조회하고 내려받을 수 있습니다.",
+  description: "공공데이터포털 Data ID 15136560 API를 바탕으로 건축HUB 주택 인허가 기본개요와 총괄개요 데이터를 통합 조회하는 분석 페이지입니다.",
   stack: ["Node.js", "TypeScript", "REST API", "JSON", "XLSX"],
-  status: "판매 중",
-  priceLabel: "390,000원",
+  status: "분석 가능",
+  priceLabel: "Data ID 15136560",
   priceValue: 390000,
-  delivery: "결제 후 3영업일 내 세팅",
-  audience: "건축 인허가 지역 동향을 빠르게 확인해야 하는 개발사, 시행사, 분양·입지 분석 담당자",
+  delivery: "조건 입력 후 바로 조회",
+  audience: "지역별 인허가 흐름과 건축 규모를 빠르게 확인해야 하는 사용자",
   features: [
-    "입력값은 인증키, 조회 기간, 시도와 시군구 선택만 사용",
-    "건축HUB 기본개요와 총괄개요 데이터를 통합 조회",
-    "지역 필터, 승강기 조건 필터, 엑셀 다운로드 지원",
-    "공식 법정동 코드 기준으로 실제 조회 가능한 지역만 연결",
+    "시도와 시군구만 선택하면 법정동 전체를 자동으로 조회합니다.",
+    "승강기 조건과 지역 필터를 함께 적용할 수 있습니다.",
+    "결과는 지역별 엑셀, 전체 엑셀, 필터 엑셀로 저장할 수 있습니다.",
+    "인증키가 없으면 실제 데이터 미리보기 5건만 표시됩니다.",
   ],
   portalDataId: "15136560",
   apiDocUrl: "https://www.data.go.kr/data/15136560/openapi.do",
   accountGuideUrl: ACCOUNT_GUIDE_URL,
-  collectFocus: "건축HUB 주택 인허가 기본개요와 총괄개요 데이터",
+  collectFocus: "건축HUB 주택 인허가 기본개요 및 총괄개요 데이터",
   inputFields: [
     {
       key: "serviceKey",
       label: "인증키(serviceKey)",
-      example: DEFAULT_SERVICE_KEY,
+      example: "",
       required: true,
     },
     {
@@ -49,7 +46,7 @@ const product: ProductItem = {
       required: false,
     },
   ],
-  sampleRequest: `?serviceKey=${DEFAULT_SERVICE_KEY}&sigunguCd=11680&bjdongCd=10300&startDate=20260306&endDate=20260313&_type=json&pageNo=1&numOfRows=100`,
+  sampleRequest: `?serviceKey=${SERVICE_KEY_SAMPLE}&sigunguCd=11680&bjdongCd=10300&startDate=20260306&endDate=20260313&_type=json&pageNo=1&numOfRows=100`,
   apiCredential: serviceKeyCredential("15136560"),
   apiRuntime: {
     endpoint: "https://apis.data.go.kr/1613000/HsPmsHubService/getHpDongOulnInfo",
@@ -66,7 +63,7 @@ const product: ProductItem = {
       { key: "permitNo", label: "인허가번호" },
       { key: "permitReportDate", label: "인허가신고일" },
       { key: "agency", label: "지역" },
-      { key: "buildType", label: "건축구분" },
+      { key: "buildType", label: "건축물구분" },
       { key: "siteLocation", label: "대지위치" },
       { key: "landCategory", label: "지목" },
       { key: "siteArea", label: "대지면적" },
@@ -79,13 +76,13 @@ const product: ProductItem = {
       { key: "mainUsage1", label: "주용도" },
       { key: "mainBuildingCount", label: "주건축물수" },
       { key: "annexBuildingCount", label: "부속건축물수" },
-      { key: "parkingAutoIndoor", label: "주차장 자동차 실내" },
-      { key: "parkingAutoOutdoor", label: "주차장 자동차 실외" },
-      { key: "parkingAutoNearby", label: "주차장 자동차 부설외" },
-      { key: "parkingMachineIndoor", label: "주차장 기계식 실내" },
-      { key: "parkingMachineOutdoor", label: "주차장 기계식 실외" },
-      { key: "parkingMachineNearby", label: "주차장 기계식 부설외" },
-      { key: "parkingExempt", label: "주차장 면제" },
+      { key: "parkingAutoIndoor", label: "주차대수 자동차 실내" },
+      { key: "parkingAutoOutdoor", label: "주차대수 자동차 실외" },
+      { key: "parkingAutoNearby", label: "주차대수 자동차 부설외" },
+      { key: "parkingMachineIndoor", label: "주차대수 기계식 실내" },
+      { key: "parkingMachineOutdoor", label: "주차대수 기계식 실외" },
+      { key: "parkingMachineNearby", label: "주차대수 기계식 부설외" },
+      { key: "parkingExempt", label: "주차대수 면제" },
       { key: "constructionType", label: "착공구분" },
       { key: "constructionPlannedDate", label: "착공예정일" },
       { key: "constructionActualDate", label: "실착공일" },

@@ -1,8 +1,7 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import JsonLd from "@/components/json-ld";
-import { landingCopyByLocale } from "@/content/ui-text/home-landing";
 import { isLocale } from "@/lib/i18n/config";
 import { buildJsonLd, createPageMetadata } from "@/lib/i18n/seo";
 import { getLocaleContent } from "@/lib/i18n/translations";
@@ -23,7 +22,7 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
   }
 
   const t = getLocaleContent(locale);
-  const copy = landingCopyByLocale[locale];
+  const copy = t.landing;
 
   return (
     <>
@@ -146,16 +145,16 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
           position: relative;
           overflow: hidden;
           padding: 96px 0 84px;
-          background: linear-gradient(180deg, #08111f 0%, #0c1729 100%);
-          color: #f8fbff;
+          background: linear-gradient(180deg, #ecf8ff 0%, #f7fbff 48%, #ffffff 100%);
+          color: #0f172a;
         }
 
         .hero-bg-overlay {
           position: absolute;
           inset: 0;
           background:
-            radial-gradient(circle at 20% 20%, rgba(56, 189, 248, 0.12), transparent 24%),
-            radial-gradient(circle at 85% 25%, rgba(96, 165, 250, 0.1), transparent 20%);
+            radial-gradient(circle at 18% 18%, rgba(14, 165, 233, 0.16), transparent 26%),
+            radial-gradient(circle at 82% 22%, rgba(16, 185, 129, 0.1), transparent 24%);
           pointer-events: none;
         }
 
@@ -185,12 +184,12 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
           line-height: 1.08;
           letter-spacing: -0.045em;
           font-weight: 900;
-          color: #ffffff;
+          color: #0f172a;
           word-break: keep-all;
         }
 
         .hero-title span {
-          color: #9be9ff;
+          color: #0284c7;
         }
 
         .hero-desc {
@@ -198,7 +197,7 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
           margin: 24px 0 0;
           font-size: 1.08rem;
           line-height: 1.9;
-          color: rgba(255, 255, 255, 0.9);
+          color: #334155;
           word-break: keep-all;
         }
 
@@ -222,11 +221,11 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
           min-height: 38px;
           padding: 0 14px;
           border-radius: 999px;
-          background: rgba(255, 255, 255, 0.1);
-          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: rgba(255, 255, 255, 0.82);
+          border: 1px solid rgba(148, 163, 184, 0.18);
           font-size: 0.92rem;
           font-weight: 700;
-          color: rgba(255, 255, 255, 0.95);
+          color: #0f172a;
         }
 
         .btn-primary,
@@ -243,15 +242,15 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
         }
 
         .btn-primary {
-          color: #06111f;
-          background: #9be9ff;
-          box-shadow: 0 16px 36px rgba(0, 190, 255, 0.18);
+          color: #ffffff;
+          background: linear-gradient(180deg, #38bdf8, #0ea5e9);
+          box-shadow: 0 16px 36px rgba(14, 165, 233, 0.2);
         }
 
         .btn-secondary {
-          color: #ffffff;
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.18);
+          color: #0f172a;
+          background: rgba(255, 255, 255, 0.78);
+          border: 1px solid rgba(148, 163, 184, 0.18);
         }
 
         .btn-secondary.dark {
@@ -275,9 +274,9 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
           position: relative;
           padding: 30px;
           border-radius: 28px;
-          background: rgba(10, 18, 33, 0.88);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+          background: rgba(255, 255, 255, 0.86);
+          border: 1px solid rgba(148, 163, 184, 0.18);
+          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.1);
         }
 
         .panel-top {
@@ -297,7 +296,7 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
 
         .status-text {
           font-size: 0.92rem;
-          color: #e8fff2;
+          color: #047857;
           font-weight: 800;
         }
 
@@ -305,13 +304,13 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
           margin: 0;
           font-size: 1.82rem;
           line-height: 1.25;
-          color: #ffffff;
+          color: #0f172a;
           word-break: keep-all;
         }
 
         .panel-desc {
           margin: 14px 0 0;
-          color: rgba(255, 255, 255, 0.84);
+          color: #334155;
           line-height: 1.8;
           font-size: 1rem;
         }
@@ -326,20 +325,20 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
         .metric-card {
           padding: 17px 16px;
           border-radius: 18px;
-          background: rgba(255, 255, 255, 0.06);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.72);
+          border: 1px solid rgba(148, 163, 184, 0.16);
         }
 
         .metric-card strong {
           display: block;
           font-size: 1.2rem;
-          color: #9be9ff;
+          color: #0284c7;
         }
 
         .metric-card span {
           display: block;
           margin-top: 6px;
-          color: rgba(255, 255, 255, 0.92);
+          color: #0f172a;
           font-size: 0.96rem;
           font-weight: 700;
         }
@@ -432,22 +431,22 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
         }
 
         .dark-flow {
-          background: #0f172a;
-          color: #f8fbff;
+          background: linear-gradient(180deg, #eaf6ff 0%, #f8fbff 100%);
+          color: #0f172a;
         }
 
         .dark-flow .section-head h2,
         .dark-flow .section-head p {
-          color: #ffffff;
+          color: #0f172a;
         }
 
         .dark-flow .section-head p {
-          opacity: 0.88;
+          opacity: 1;
         }
 
         .dark-flow .section-tag {
-          background: rgba(134, 231, 255, 0.14);
-          color: #9be9ff;
+          background: rgba(37, 99, 235, 0.08);
+          color: #0369a1;
         }
 
         .process-grid {
@@ -460,14 +459,14 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
         .process-card {
           padding: 26px 24px;
           border-radius: 22px;
-          background: rgba(255, 255, 255, 0.08);
-          border: 1px solid rgba(255, 255, 255, 0.1);
+          background: rgba(255, 255, 255, 0.84);
+          border: 1px solid rgba(148, 163, 184, 0.16);
         }
 
         .process-step {
           display: inline-flex;
           margin-bottom: 12px;
-          color: #9be9ff;
+          color: #0284c7;
           font-size: 0.82rem;
           font-weight: 900;
           letter-spacing: 0.08em;
@@ -476,14 +475,14 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
         .process-card h3 {
           margin: 0 0 10px;
           font-size: 1.16rem;
-          color: #ffffff;
+          color: #0f172a;
           word-break: keep-all;
         }
 
         .process-card p {
           margin: 0;
           line-height: 1.8;
-          color: rgba(255, 255, 255, 0.84);
+          color: #334155;
           font-size: 0.98rem;
           word-break: keep-all;
         }
@@ -492,10 +491,10 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
           margin-top: 18px;
           padding: 38px 28px;
           border-radius: 30px;
-          background: #0f172a;
-          color: #f8fbff;
+          background: linear-gradient(180deg, #ffffff, #edf6ff);
+          color: #0f172a;
           text-align: center;
-          box-shadow: 0 24px 60px rgba(15, 23, 42, 0.16);
+          box-shadow: 0 24px 60px rgba(37, 78, 145, 0.12);
         }
 
         .final-kicker {
@@ -503,7 +502,7 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
           font-size: 0.8rem;
           font-weight: 900;
           letter-spacing: 0.1em;
-          color: #9be9ff;
+          color: #0284c7;
         }
 
         .final-message-card h3 {
@@ -516,7 +515,7 @@ export default async function LocaleHomePage({ params }: { params: Promise<Param
         .final-desc {
           max-width: 680px;
           margin: 14px auto 0;
-          color: rgba(255, 255, 255, 0.82);
+          color: #334155;
           line-height: 1.8;
           font-size: 1rem;
           word-break: keep-all;

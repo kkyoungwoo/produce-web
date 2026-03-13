@@ -1,45 +1,42 @@
-import type { ProductItem } from "@/lib/i18n/types";
+﻿import type { ProductItem } from "@/lib/i18n/types";
 
 import { ACCOUNT_GUIDE_URL, serviceKeyCredential } from "../shared";
 
-const DEFAULT_SERVICE_KEY =
-  process.env.NEXT_PUBLIC_DATA_GO_KR_SERVICE_KEY?.trim()
-  || "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
+const SERVICE_KEY_SAMPLE = "YOUR_DATA_GO_KR_SERVICE_KEY";
 
 const product: ProductItem = {
   slug: "api-15154910",
   collectorKey: "condition-paging",
-  title: "식품_외국인전용유흥음식점업 조회 수집기",
-  summary: "인증키, 인허가일자, 지역만 선택해 실데이터를 조회하고 엑셀로 내려받을 수 있습니다.",
-  description:
-    "행정안전부 OpenAPI(15154910) 기반으로 식품_외국인전용유흥음식점업 데이터를 조회하는 상품입니다. 테이블/엑셀 컬럼은 한국어 라벨로 표시됩니다.",
+  title: "외국인전용유흥음식점 조회",
+  summary: "지역과 인허가일자를 기준으로 외국인전용유흥음식점 데이터를 조회할 수 있습니다.",
+  description: "공공데이터포털 Data ID 15154910 API를 바탕으로 외국인전용유흥음식점 정보를 조회하고 지역별/영업상태별로 분석할 수 있는 페이지입니다.",
   stack: ["Node.js", "TypeScript", "REST API", "JSON", "XLSX"],
-  status: "판매 중",
-  priceLabel: "360,000원",
+  status: "분석 가능",
+  priceLabel: "Data ID 15154910",
   priceValue: 360000,
-  delivery: "결제 후 3영업일 내 세팅",
-  audience: "식품 인허가/영업상태 데이터를 빠르게 확인해야 하는 운영·분석 팀",
+  delivery: "조건 입력 후 바로 조회",
+  audience: "지역별 영업 현황과 영업상태를 빠르게 확인해야 하는 사용자",
   features: [
-    "사용자 입력: 인증키 + 지역(복수 선택) + 인허가일자",
-    "실데이터 조회 후 지역별 통계/필터 제공",
-    "조회 결과 전체 컬럼을 한국어 라벨로 표시",
-    "엑셀 다운로드 시 컬럼명을 한국어로 저장",
+    "지역을 여러 개 선택해 실제 API 데이터를 조회할 수 있습니다.",
+    "영업상태를 한국어 기준으로 필터링할 수 있습니다.",
+    "지역별 통계와 전체/필터 엑셀 다운로드를 지원합니다.",
+    "인증키가 없으면 실제 데이터 미리보기 5건만 표시됩니다.",
   ],
   portalDataId: "15154910",
   apiDocUrl: "https://www.data.go.kr/data/15154910/openapi.do",
   accountGuideUrl: ACCOUNT_GUIDE_URL,
-  collectFocus: "식품_외국인전용유흥음식점업 인허가/영업상태 데이터",
+  collectFocus: "외국인전용유흥음식점 인허가 및 영업상태 데이터",
   inputFields: [
     {
       key: "serviceKey",
       label: "인증키(serviceKey)",
-      example: DEFAULT_SERVICE_KEY,
+      example: "",
       required: true,
     },
     {
       key: "cond[OPN_ATMY_GRP_CD::EQ]",
       label: "개방자치단체코드",
-      example: "3020000",
+      example: "",
       required: false,
     },
     {
@@ -55,7 +52,7 @@ const product: ProductItem = {
       required: false,
     },
   ],
-  sampleRequest: `?serviceKey=${DEFAULT_SERVICE_KEY}&pageNo=1&numOfRows=100&returnType=json&cond[OPN_ATMY_GRP_CD::EQ]=3020000`,
+  sampleRequest: `?serviceKey=${SERVICE_KEY_SAMPLE}&pageNo=1&numOfRows=100&returnType=json&cond[OPN_ATMY_GRP_CD::EQ]=3020000`,
   apiCredential: serviceKeyCredential("15154910"),
   apiRuntime: {
     endpoint: "https://apis.data.go.kr/1741000/foreigners_entertainment_restaurants/info",

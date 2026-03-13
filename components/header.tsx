@@ -23,7 +23,7 @@ export default function Header({ locale }: HeaderProps) {
             {t.nav.services}
           </Link>
           <Link href={`/${locale}/db-cleanup`} className="transition-colors hover:text-blue-600">
-            {"DB \uC815\uB9AC"}
+            {t.nav.dbCleanup}
           </Link>
         </nav>
         <LanguageSwitcher locale={locale} />

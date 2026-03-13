@@ -2,28 +2,25 @@
 
 import { ACCOUNT_GUIDE_URL, serviceKeyCredential } from "../shared";
 
-const DEFAULT_SERVICE_KEY =
-  process.env.NEXT_PUBLIC_DATA_GO_KR_SERVICE_KEY?.trim() ||
-  "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
+const SERVICE_KEY_SAMPLE = "YOUR_DATA_GO_KR_SERVICE_KEY";
 
 const product: ProductItem = {
   slug: "api-15120791",
   collectorKey: "condition-paging",
-  title: "외국인근로자 취업교육 교육장 안내 수집기",
-  summary: "인증키만 입력하면 취업교육 교육장 정보를 조회하고 엑셀로 다운로드할 수 있습니다.",
-  description:
-    "한국산업인력공단 OpenAPI(15120791, getApiTbEduPlcList) 실데이터를 조회하는 상품입니다.",
+  title: "외국인근로자 취업교육 교육장 안내",
+  summary: "인증키를 입력하면 취업교육 교육장 정보를 조회하고 엑셀로 다운로드할 수 있습니다.",
+  description: "공공데이터포털 Data ID 15120791 API를 바탕으로 외국인근로자 취업교육 교육장 정보를 조회하는 분석 페이지입니다.",
   stack: ["Node.js", "TypeScript", "REST API", "XML", "XLSX"],
-  status: "판매 중",
-  priceLabel: "290,000원",
+  status: "분석 가능",
+  priceLabel: "Data ID 15120791",
   priceValue: 290000,
-  delivery: "결제 후 3영업일 내 세팅",
-  audience: "취업교육 교육장 정보를 조회/관리하려는 운영팀",
+  delivery: "조건 입력 후 바로 조회",
+  audience: "교육장 위치, 연락처, 기관 정보를 빠르게 확인해야 하는 사용자",
   features: [
-    "사용자 입력: serviceKey(인증키)",
-    "코드 기본값: pageNo=1, numOfRows=100, method=getApiTbEduPlcList",
-    "실제 API 조회 결과를 테이블 및 엑셀로 제공",
-    "교육장명/기관명/연락처/주소 컬럼 한글 라벨 출력",
+    "실제 API 응답 기준으로 교육장 정보를 조회합니다.",
+    "교육장명, 기관명, 연락처, 주소를 표로 확인할 수 있습니다.",
+    "조회 결과는 엑셀 파일로 바로 저장할 수 있습니다.",
+    "인증키가 없으면 실제 데이터 미리보기 5건만 표시됩니다.",
   ],
   portalDataId: "15120791",
   apiDocUrl: "https://www.data.go.kr/data/15120791/openapi.do",
@@ -33,11 +30,11 @@ const product: ProductItem = {
     {
       key: "serviceKey",
       label: "인증키(serviceKey)",
-      example: DEFAULT_SERVICE_KEY,
+      example: "",
       required: true,
     },
   ],
-  sampleRequest: `?serviceKey=${DEFAULT_SERVICE_KEY}&pageNo=1&numOfRows=100&method=getApiTbEduPlcList`,
+  sampleRequest: `?serviceKey=${SERVICE_KEY_SAMPLE}&pageNo=1&numOfRows=100&method=getApiTbEduPlcList`,
   apiCredential: serviceKeyCredential("15120791"),
   apiRuntime: {
     endpoint: "https://apis.data.go.kr/B490007/TbEduPlc/getApiTbEduPlcList",

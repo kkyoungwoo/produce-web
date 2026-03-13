@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<Params> }):
   const canonical = `${SITE_URL}/${locale}/services/${product.slug}/workbench`;
 
   return {
-    title: `${product.title} ${t.workbench.metaTitleSuffix} | GORHROD LAB`,
+    title: `${product.title} ${t.workbench.metaTitleSuffix} | ${t.brand}`,
     description: `${product.title} ${t.workbench.metaDescriptionSuffix}`,
     alternates: { canonical },
     robots: {

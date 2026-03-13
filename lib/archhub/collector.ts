@@ -53,6 +53,7 @@ type CollectArchhubRowsInput = {
   startDate: string;
   endDate: string;
   targets: ArchhubCollectTarget[];
+  maxRows?: number;
 };
 
 type CollectArchhubRowsResult = {
@@ -519,35 +520,21 @@ async function runWithConcurrency<T, R>(items: T[], limit: number, worker: (item
 }
 
 export async function collectArchhubRows(input: CollectArchhubRowsInput): Promise<CollectArchhubRowsResult> {
-  const { serviceKey, startDate, endDate, targets } = input;
+  const { serviceKey, startDate, endDate, targets, maxRows } = input;
 
   if (targets.length === 0) {
-    throw new Error("조회할 법정동 대상이 없습니다.");
+    throw new Error("??? ??? ??? ????.");
   }
 
+  const limit = typeof maxRows === "number" && maxRows > 0 ? maxRows : Number.POSITIVE_INFINITY;
   const family = await resolveServiceFamily(serviceKey, startDate, endDate, targets[0]);
-  const collected = await runWithConcurrency(targets, CONCURRENCY, async (target) => {
-    try {
-      const result = await collectTargetRows(family, target, { serviceKey, startDate, endDate });
-      return { ...result, error: "" };
-    } catch (error) {
-      return {
-        sourceUrl: "",
-        rows: [] as Array<Record<string, string | number>>,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-  });
-
   const deduped = new Map<string, Record<string, string | number>>();
   let sourceUrl = "";
   let firstError = "";
+  let searchedTargetCount = 0;
 
-  for (const item of collected) {
-    if (!sourceUrl && item.sourceUrl) sourceUrl = item.sourceUrl;
-    if (!firstError && item.error) firstError = item.error;
-
-    for (const row of item.rows) {
+  const appendRows = (rows: Array<Record<string, string | number>>) => {
+    for (const row of rows) {
       const key = [
         toText(row.permitNo),
         toText(row.siteLocation),
@@ -555,6 +542,43 @@ export async function collectArchhubRows(input: CollectArchhubRowsInput): Promis
         toText(row.buildingName),
       ].join("|");
       if (!deduped.has(key)) deduped.set(key, row);
+      if (deduped.size >= limit) break;
+    }
+  };
+
+  if (Number.isFinite(limit)) {
+    for (const target of targets) {
+      searchedTargetCount += 1;
+
+      try {
+        const result = await collectTargetRows(family, target, { serviceKey, startDate, endDate });
+        if (!sourceUrl && result.sourceUrl) sourceUrl = result.sourceUrl;
+        appendRows(result.rows);
+        if (deduped.size >= limit) break;
+      } catch (error) {
+        if (!firstError) firstError = error instanceof Error ? error.message : "Unknown error";
+      }
+    }
+  } else {
+    const collected = await runWithConcurrency(targets, CONCURRENCY, async (target) => {
+      try {
+        const result = await collectTargetRows(family, target, { serviceKey, startDate, endDate });
+        return { ...result, error: "" };
+      } catch (error) {
+        return {
+          sourceUrl: "",
+          rows: [] as Array<Record<string, string | number>>,
+          error: error instanceof Error ? error.message : "Unknown error",
+        };
+      }
+    });
+
+    searchedTargetCount = targets.length;
+
+    for (const item of collected) {
+      if (!sourceUrl && item.sourceUrl) sourceUrl = item.sourceUrl;
+      if (!firstError && item.error) firstError = item.error;
+      appendRows(item.rows);
     }
   }
 
@@ -565,7 +589,7 @@ export async function collectArchhubRows(input: CollectArchhubRowsInput): Promis
   return {
     endpointFamily: family.key,
     sourceUrl,
-    searchedTargetCount: targets.length,
-    rows: Array.from(deduped.values()),
+    searchedTargetCount,
+    rows: Array.from(deduped.values()).slice(0, Number.isFinite(limit) ? limit : undefined),
   };
 }

@@ -1,4 +1,4 @@
-import type { ProductItem } from "@/lib/i18n/types";
+﻿import type { ProductItem } from "@/lib/i18n/types";
 
 export type WorkbenchLabels = {
   runLabel: string;
@@ -24,6 +24,15 @@ export type CollectResponse = {
   sourceUrl?: string;
   message?: string;
   upstream?: string;
+  previewLimited?: boolean;
+  authStatus?: "full" | "default-preview" | "fallback-preview" | "missing-preview";
+  previewCount?: number;
+  endpointFamily?: "hs" | "arch";
+  searchedTargetCount?: number;
+  effectiveStartDate?: string;
+  effectiveEndDate?: string;
+  usedDateFallback?: boolean;
+  fallbackDays?: number;
 };
 
 export type WorkbenchStatMode =

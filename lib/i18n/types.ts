@@ -1,4 +1,4 @@
-export type NavKey = "home" | "about" | "services" | "contact";
+export type NavKey = "home" | "about" | "services" | "contact" | "dbCleanup";
 
 export type SeoItem = {
   title: string;
@@ -86,6 +86,17 @@ export type ProductItem = {
   workbench?: ProductWorkbenchConfig;
 };
 
+export type LandingTrustItem = {
+  kicker: string;
+  label: string;
+};
+
+export type LandingProcessCard = {
+  step: string;
+  title: string;
+  description: string;
+};
+
 export type LocaleContent = {
   brand: string;
   localeName: string;
@@ -106,6 +117,30 @@ export type LocaleContent = {
     description: string;
     primaryCta: string;
     secondaryCta: string;
+  };
+  landing: {
+    points: string[];
+    title: string;
+    titleAccent: string;
+    description: string;
+    primaryCta: string;
+    secondaryCta: string;
+    status: string;
+    panelTitle: string;
+    panelDescription: string;
+    trustItems: LandingTrustItem[];
+    whyTag: string;
+    whyTitle: string;
+    whyDescription: string;
+    processCards: LandingProcessCard[];
+    businessTag: string;
+    businessTitle: string;
+    businessDescription: string;
+    promiseKicker: string;
+    promiseTitle: string;
+    promiseDescription: string;
+    promisePrimary: string;
+    promiseSecondary: string;
   };
   home: {
     marketTitle: string;
@@ -136,6 +171,7 @@ export type LocaleContent = {
     realtimeLabel: string;
     realtimeValue: string;
     listDetailCta: string;
+    listStatusLabel: string;
   };
   serviceDetail: {
     badge: string;
@@ -156,6 +192,10 @@ export type LocaleContent = {
     cardDocLabel: string;
     cardGuideLabel: string;
     cardAccountLabel: string;
+    noOtherProducts: string;
+    prevLabel: string;
+    nextLabel: string;
+    relatedStatusLabel: string;
   };
   workbench: {
     metaTitleSuffix: string;
@@ -190,6 +230,176 @@ export type LocaleContent = {
     queryErrorLabel: string;
     noDataLabel: string;
     sourceUrlLabel: string;
+    ui: {
+      inputTitle: string;
+      serviceKeyLabel: string;
+      serviceKeyPlaceholder: string;
+      serviceKeyHelp: string;
+      regionSelectLabel: string;
+      selectAllLabel: string;
+      clearAllLabel: string;
+      permitFromLabel: string;
+      permitToLabel: string;
+      statRegion: string;
+      statCountry: string;
+      regionFilterTitle: string;
+      allFilterLabel: string;
+      totalPrefix: string;
+      currentPrefix: string;
+      countSuffix: string;
+      endpointMissing: string;
+      queryFailed: string;
+      networkFailed: string;
+      allExcelLabel: string;
+      filteredExcelLabel: string;
+      groupedRegionExcelLabel: string;
+      groupedCountryExcelLabel: string;
+      salesStatusLabel: string;
+      salesStatusHint: string;
+      regionRequired: string;
+      sidoRequired: string;
+      sigunguRequired: string;
+      archhubRegionLoadFailed: string;
+      archhubLegalDongLoadFailed: string;
+      archhubNoLegalDong: string;
+      archhubSidoLabel: string;
+      archhubSigunguLabel: string;
+      archhubSigunguHint: string;
+      elevatorConditionLabel: string;
+      elevatorPassengerLabel: string;
+      elevatorEmergencyLabel: string;
+      elevatorHint: string;
+      progressPreparing: string;
+      progressWaiting: string;
+      progressKeepPage: string;
+      progressDefaultDetail: string;
+      progressSingleRequestDetail: string;
+      progressCompletedTitle: string;
+      progressCancelled: string;
+      regionUnclassified: string;
+      previewUsingDefaultKey: string;
+      previewUsingFallbackKey: string;
+      previewMissingDefaultKey: string;
+      previewLimitSuffix: string;
+    };
+  };
+  dbCleanup: {
+    metaTitle: string;
+    metaDescription: string;
+    ogDescription: string;
+    twitterDescription: string;
+    eyebrow: string;
+    heroTitleLines: string[];
+    heroDescription: string;
+    flowSteps: Array<{
+      title: string;
+      description: string;
+    }>;
+    currentStatusTitle: string;
+    progress: {
+      idle: string;
+      existingOnly: string;
+      newOnly: string;
+      ready: string;
+      selecting: string;
+      processing: string;
+    };
+    statusMetrics: {
+      existingFile: string;
+      newFile: string;
+      ready: string;
+      waiting: string;
+      uploadNeeded: string;
+      rowsSuffix: string;
+      countSuffix: string;
+    };
+    infoItems: Array<{
+      label: string;
+      value: string;
+    }>;
+    upload: {
+      existingTitle: string;
+      existingDescription: string;
+      newTitle: string;
+      newDescription: string;
+      dropHintTitle: string;
+      dropHintDescription: string;
+      uploadedLabel: string;
+      columnsLabel: string;
+      loadedAtLabel: string;
+      changeFileLabel: string;
+      removeLabel: string;
+      rowsLoadedSuffix: string;
+    };
+    messages: {
+      errorTitle: string;
+      infoTitle: string;
+      infoLines: string[];
+    };
+    selection: {
+      step1: string;
+      step2: string;
+      pickedLabel: string;
+      selectAllLabel: string;
+      clearAllLabel: string;
+      newTitle: string;
+      newDescription: string;
+      existingTitle: string;
+      existingDescription: string;
+    };
+    actionBar: {
+      title: string;
+      description: string;
+      singleDescription: string;
+      runLabel: string;
+      runningLabel: string;
+      resetLabel: string;
+    };
+    errors: {
+      newFileRequired: string;
+      filesRequired: string;
+      newHeadersRequired: string;
+      existingHeadersRequired: string;
+      headersMustMatch: string;
+      newFileReadFailed: string;
+      existingFileReadFailed: string;
+      processFailed: string;
+    };
+    loading: {
+      title: string;
+      description: string;
+    };
+    singleMode: {
+      progress: string;
+      infoLines: string[];
+    };
+    result: {
+      eyebrow: string;
+      title: string;
+      downloadAllLabel: string;
+      newCriteriaLabel: string;
+      existingCriteriaLabel: string;
+      fileSuffixes: {
+        first: string;
+        second: string;
+      };
+      stats: {
+        newOriginal: string;
+        newRemoved: string;
+        newAfterFirstPass: string;
+        existingRemoved: string;
+        finalNew: string;
+        mergedTotal: string;
+      };
+      cards: {
+        firstEyebrow: string;
+        firstDescription: string;
+        firstButton: string;
+        secondEyebrow: string;
+        secondDescription: string;
+        secondButton: string;
+      };
+    };
   };
   contact: {
     title: string;

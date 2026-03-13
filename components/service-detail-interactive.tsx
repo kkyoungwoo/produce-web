@@ -15,13 +15,9 @@ type Props = {
 };
 
 const UI_TEXT = {
-  kakaoLabel: "카카오톡 상담하기",
-  noOtherProducts: "다른 판매 상품이 아직 없습니다.",
-  summaryArrow: "🔽",
-  prevLabel: "이전 상품",
-  nextLabel: "다음 상품",
-  prevIcon: "⟨",
-  nextIcon: "⟩",
+  summaryArrow: "v",
+  prevIcon: "<",
+  nextIcon: ">",
 } as const;
 
 function getVisibleCount(width: number) {
@@ -81,10 +77,10 @@ export default function ServiceDetailInteractive({ locale, products, initialSlug
           <p className="mt-2 break-words text-sm leading-7 text-slate-600">{product.description}</p>
 
           <div className="mt-3 grid gap-1 text-sm text-slate-600 [overflow-wrap:anywhere]">
-            <span>{t.store.priceLabel}: {product.priceLabel}</span>
+            <span>Data ID: {product.portalDataId}</span>
             <span>{t.store.deliveryLabel}: {product.delivery}</span>
             <span>{t.store.audienceLabel}: {product.audience}</span>
-            <span>Data ID: {product.portalDataId}</span>
+            <span>{t.serviceDetail.cardCollectLabel}: {product.delivery}</span>
           </div>
         </div>
 
@@ -124,7 +120,7 @@ export default function ServiceDetailInteractive({ locale, products, initialSlug
                 rel="noreferrer"
                 className="inline-flex min-h-[42px] w-full items-center justify-between rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-semibold text-blue-700 transition hover:border-blue-300 hover:bg-blue-50"
               >
-                <span className="truncate">{UI_TEXT.kakaoLabel}</span>
+                <span className="truncate">{t.serviceDetail.apiChatLabel}</span>
                 <span>{t.serviceDetail.openLabel}</span>
               </a>
             </li>
@@ -161,18 +157,14 @@ export default function ServiceDetailInteractive({ locale, products, initialSlug
         />
       </article>
 
-      <details
-        className="group mt-5"
-        data-reveal="up"
-        data-delay="2"
-      >
+      <details className="group mt-5" data-reveal="up" data-delay="2">
         <summary className="flex min-h-[46px] cursor-pointer list-none items-center justify-between gap-3 rounded-xl bg-white/90 px-4 py-2 text-sm font-extrabold text-amber-700 [&::-webkit-details-marker]:hidden">
           <span>{t.serviceDetail.allProductsLabel}</span>
           <span className="inline-flex items-center gap-2">
             <span className="hidden items-center gap-2 group-open:inline-flex">
               <button
                 type="button"
-                aria-label={UI_TEXT.prevLabel}
+                aria-label={t.serviceDetail.prevLabel}
                 disabled={!canPrev}
                 onClick={(event) => {
                   event.preventDefault();
@@ -185,7 +177,7 @@ export default function ServiceDetailInteractive({ locale, products, initialSlug
               </button>
               <button
                 type="button"
-                aria-label={UI_TEXT.nextLabel}
+                aria-label={t.serviceDetail.nextLabel}
                 disabled={!canNext}
                 onClick={(event) => {
                   event.preventDefault();
@@ -202,7 +194,7 @@ export default function ServiceDetailInteractive({ locale, products, initialSlug
         </summary>
 
         {otherProducts.length === 0 ? (
-          <p className="mt-3 rounded-xl bg-white px-4 py-3 text-sm text-slate-600 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.25)]">{UI_TEXT.noOtherProducts}</p>
+          <p className="mt-3 rounded-xl bg-white px-4 py-3 text-sm text-slate-600 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.25)]">{t.serviceDetail.noOtherProducts}</p>
         ) : (
           <div className="mt-3">
             <div className="overflow-hidden">
@@ -211,18 +203,14 @@ export default function ServiceDetailInteractive({ locale, products, initialSlug
                 style={{ transform: trackTransform }}
               >
                 {otherProducts.map((item) => (
-                  <div
-                    key={item.slug}
-                    className="flex-none px-1.5"
-                    style={{ flexBasis: cardBasisValue }}
-                  >
+                  <div key={item.slug} className="flex-none px-1.5" style={{ flexBasis: cardBasisValue }}>
                     <Link
                       href={`/${locale}/services/${item.slug}`}
                       className="group flex h-full flex-col rounded-xl bg-white px-4 py-3 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.35)] transition hover:bg-amber-50 hover:shadow-[inset_0_0_0_1px_rgba(245,158,11,0.6)] active:scale-[0.99]"
                     >
                       <p className="line-clamp-1 text-sm font-bold text-slate-900">{item.title}</p>
                       <p className="mt-1 line-clamp-2 flex-1 text-xs leading-6 text-slate-600">{item.summary}</p>
-                      <p className="mt-2 text-xs font-semibold text-amber-700">{item.priceLabel}</p>
+                      <p className="mt-2 text-xs font-semibold text-amber-700">{t.serviceDetail.relatedStatusLabel} · Data ID {item.portalDataId}</p>
                     </Link>
                   </div>
                 ))}

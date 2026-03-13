@@ -3,13 +3,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { CHUNK_SIZE } from "@/components/workbench/constants";
-import { getSampleRows } from "@/components/workbench/samples";
 import { downloadFlatExcel, downloadGroupedExcel } from "@/components/workbench/excel";
 import {
   dateBeforeDays,
   formatCellValue,
   getColumnLabel,
-  isInvalidServiceKeyError,
   toApiDate,
   toInputDate,
   toText,
@@ -159,7 +157,7 @@ function createChunkRequests(options: LegalDongOption[], selectedSigunguCodes: s
 }
 
 export default function WorkbenchArchhubClient({ product, labels }: WorkbenchProps) {
-  const [serviceKey, setServiceKey] = useState(product.inputFields.find((field) => field.key === "serviceKey")?.example ?? "");
+  const [serviceKey, setServiceKey] = useState("");
   const [startDate, setStartDate] = useState(dateBeforeDays(DEFAULT_START_DAYS));
   const [endDate, setEndDate] = useState(dateBeforeDays(DEFAULT_END_DAYS));
   const [sidoOptions, setSidoOptions] = useState<RegionOption[]>([]);
@@ -334,15 +332,6 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
   const onRun = async () => {
     setHasQueried(true);
 
-    if (!serviceKey.trim()) {
-      setRows(getSampleRows(product));
-      setIsError(true);
-      setMessage(`${labels.errorLabel}: ${WORKBENCH_TEXT.sampleError}`);
-      setRegionFilter(ALL_FILTER);
-      setVisibleCount(CHUNK_SIZE);
-      return;
-    }
-
     if (!selectedSidoCode) {
       setRows([]);
       setIsError(true);
@@ -390,6 +379,8 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
       let firstError = "";
       let usedFallback = false;
       let endpointFamily: "hs" | "arch" | "" = "";
+      let infoMessage = "";
+      let previewLimited = false;
 
       setProgressTitle("조회 준비 중입니다.");
       setProgressDetail(`시군구 ${totalSigunguCount}개 · 법정동 ${totalTargetCount}개 · 요청 ${totalChunkCount}묶음을 순차 조회합니다.`);
@@ -420,14 +411,10 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
         const data = (await response.json()) as ArchhubCollectResponse;
 
         if (!response.ok || !data.ok) {
-          if (isInvalidServiceKeyError(data, response.status)) {
-            setRows(getSampleRows(product));
-            setIsError(true);
-            setMessage(`${labels.errorLabel}: ${WORKBENCH_TEXT.sampleError}`);
-            return;
-          }
           if (!firstError) firstError = data.message ?? WORKBENCH_TEXT.queryFailed;
         } else {
+          if (data.message) infoMessage = data.message;
+          if (data.previewLimited) previewLimited = true;
           mergedRows.push(...(data.rows ?? []));
           usedFallback ||= Boolean(data.usedDateFallback);
           endpointFamily = data.endpointFamily ?? endpointFamily;
@@ -437,10 +424,20 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
         if (timerRef.current) clearInterval(timerRef.current);
         setProgress(Math.min(98, Math.round((completedTargetCount / totalTargetCount) * 98)));
         setProgressDetail(`시군구 ${chunk.sigunguOrder + 1}/${totalSigunguCount} · 요청 묶음 ${index + 1}/${totalChunkCount} · 완료 ${completedTargetCount}/${totalTargetCount}`);
+
+        if (previewLimited && mergeRows(mergedRows).length >= 5) {
+          break;
+        }
       }
 
-      const uniqueRows = mergeRows(mergedRows);
+      const uniqueRows = mergeRows(mergedRows).slice(0, previewLimited ? 5 : undefined);
       if (uniqueRows.length === 0) {
+        if (infoMessage) {
+          setRows([]);
+          setIsError(false);
+          setMessage(infoMessage);
+          return;
+        }
         setRows([]);
         setIsError(true);
         setMessage(`${labels.errorLabel}: ${firstError || WORKBENCH_TEXT.queryFailed}`);
@@ -449,12 +446,14 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
 
       setRows(uniqueRows);
       setIsError(false);
+      const successMessage = infoMessage || `${labels.successLabel}: ${WORKBENCH_TEXT.totalPrefix} ${uniqueRows.length}${WORKBENCH_TEXT.countSuffix}`;
       setMessage(
-        `${labels.successLabel}: ${WORKBENCH_TEXT.totalPrefix} ${uniqueRows.length}${WORKBENCH_TEXT.countSuffix}`
-        + `${usedFallback ? " (기간 자동 확장 적용)" : ""}`
-        + `${firstError ? " / 일부 요청은 제외되었습니다." : ""}`
-        + `${endpointFamily ? ` / ${endpointFamily === "hs" ? "주택 API" : "건축 API"}` : ""}`,
+        successMessage
+        + `${usedFallback ? " (?? ?? ?? ??)" : ""}`
+        + `${firstError ? " / ?? ??? ???????." : ""}`
+        + `${endpointFamily ? ` / ${endpointFamily === "hs" ? "?? API" : "?? API"}` : ""}`,
       );
+
       setProgressTitle("조회가 완료되었습니다.");
       setProgressDetail(`시군구 ${totalSigunguCount}개 · 법정동 ${completedTargetCount}/${totalTargetCount}개 조회 완료`);
     } catch (error) {
@@ -582,7 +581,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                     onClick={() => setSelectedSigunguCodes((prev) => (prev.length === sigunguOptions.length ? [] : sigunguOptions.map((item) => item.code)))}
                     className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"
                   >
-                    {selectedSigunguCodes.length === sigunguOptions.length ? WORKBENCH_TEXT.clearAllRegion : WORKBENCH_TEXT.selectAllRegion}
+                    {selectedSigunguCodes.length === sigunguOptions.length ? WORKBENCH_TEXT.clearAllLabel : WORKBENCH_TEXT.selectAllLabel}
                   </button>
                 ) : null}
               </div>
@@ -613,7 +612,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                     onClick={() => setSelectedElevatorModes((prev) => (prev.length === ALL_ELEVATOR_KEYS.length ? [] : [...ALL_ELEVATOR_KEYS]))}
                     className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"
                   >
-                    {activeElevatorModes.length === ALL_ELEVATOR_KEYS.length ? WORKBENCH_TEXT.clearAllRegion : WORKBENCH_TEXT.selectAllRegion}
+                    {activeElevatorModes.length === ALL_ELEVATOR_KEYS.length ? WORKBENCH_TEXT.clearAllLabel : WORKBENCH_TEXT.selectAllLabel}
                   </button>
                 </div>
               </div>

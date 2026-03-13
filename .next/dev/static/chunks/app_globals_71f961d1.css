@@ -827,6 +827,11 @@
     border-bottom-width: 1px;
   }
 
+  .border-l-4 {
+    border-left-style: var(--tw-border-style);
+    border-left-width: 4px;
+  }
+
   .border-blue-100 {
     border-color: var(--color-blue-100);
   }
@@ -873,6 +878,10 @@
     .border-slate-200\/80 {
       border-color: color-mix(in oklab, var(--color-slate-200) 80%, transparent);
     }
+  }
+
+  .border-l-blue-500 {
+    border-left-color: var(--color-blue-500);
   }
 
   .bg-amber-100 {

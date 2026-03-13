@@ -29,7 +29,7 @@ export default async function ContactPage({ params }: { params: Promise<Params> 
         <div className="rounded-2xl border border-blue-200 bg-white p-5 shadow-[0_16px_36px_rgba(44,86,150,0.12)] sm:p-6" data-clickable="true">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-xs font-extrabold tracking-[0.14em] text-blue-600">KAKAOTALK CONSULTING</p>
+              <p className="text-xs font-extrabold tracking-[0.14em] text-blue-600">DATA COLLABORATION</p>
               <h1 className="mt-1 text-3xl font-extrabold tracking-tight text-slate-900">{t.contact.title}</h1>
             </div>
             <p className="max-w-xl text-sm leading-7 text-slate-600">{t.contact.description}</p>
