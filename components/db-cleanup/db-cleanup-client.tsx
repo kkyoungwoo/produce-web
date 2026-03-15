@@ -64,6 +64,9 @@ type ProcessResult = {
     newRemovedInStep1Count: number;
     newStep1Count: number;
     removedAgainstExistingCount: number;
+    newRemovedInCompareHeaderStepCount: number;
+    newCompareHeaderStepCount: number;
+    removedInFinalMergeSafetyCount: number;
     finalNewCount: number;
     mergedFinalCount: number;
   };
@@ -130,24 +133,10 @@ function normalizeCellValue(value: unknown) {
   return trimmed.toLowerCase();
 }
 
-function hasBlankKey(row: Row, header: string) {
-  return !normalizeCellValue(row?.[header]);
-}
-
 function buildSingleHeaderKey(row: Row, header: string) {
   return normalizeCellValue(row?.[header]);
 }
 
-/**
- * 선택한 여러 컬럼 중 하나라도 같은 값이면 같은 중복 그룹으로 본다.
- * 그룹 안에서는 가장 먼저 나온 행 1개만 남긴다.
- *
- * 예:
- * 1행 전화번호 == 2행 전화번호
- * 2행 교육장명 == 3행 교육장명
- * => 1,2,3은 같은 그룹으로 간주
- * => 가장 먼저 나온 1행만 남김
- */
 function dedupeRowsBySelectedHeadersKeepFirst(rows: Row[], headers: string[]) {
   if (headers.length === 0) {
     return {
@@ -219,64 +208,91 @@ function dedupeRowsBySelectedHeadersKeepFirst(rows: Row[], headers: string[]) {
   };
 }
 
-/**
- * 신규 행이 기존 DB와 비교 기준 컬럼 중 하나라도 겹치면 제거
- * 비교는 "정리된 기존 DB"가 아니라 "기존 원본 DB 전체" 값을 기준으로 한다.
- * 그래야 기존 DB 내부 정리 과정에서 빠진 값 때문에 신규가 잘못 살아남는 문제를 막을 수 있다.
- */
-function removeRowsDuplicatedAgainstExistingByHeaders(
-  rows: Row[],
+function removeNewRowsConnectedToExistingByHeaders(
+  newRows: Row[],
   existingRows: Row[],
   headers: string[],
 ) {
   if (headers.length === 0) {
     return {
-      rows: [...rows],
+      rows: [...newRows],
       removedCount: 0,
-      finalCount: rows.length,
+      finalCount: newRows.length,
     };
   }
 
-  const existingKeyMap = new Map<string, Set<string>>();
+  const combinedRows = [...existingRows, ...newRows];
+  const existingCount = existingRows.length;
+
+  if (combinedRows.length === 0) {
+    return {
+      rows: [],
+      removedCount: 0,
+      finalCount: 0,
+    };
+  }
+
+  const parent = combinedRows.map((_, index) => index);
+
+  const find = (x: number): number => {
+    let current = x;
+    while (parent[current] !== current) {
+      parent[current] = parent[parent[current]];
+      current = parent[current];
+    }
+    return current;
+  };
+
+  const union = (a: number, b: number) => {
+    const rootA = find(a);
+    const rootB = find(b);
+
+    if (rootA === rootB) return;
+
+    if (rootA < rootB) {
+      parent[rootB] = rootA;
+    } else {
+      parent[rootA] = rootB;
+    }
+  };
 
   for (const header of headers) {
-    const set = new Set<string>();
+    const firstIndexByKey = new Map<string, number>();
 
-    for (const row of existingRows) {
+    combinedRows.forEach((row, index) => {
       const key = buildSingleHeaderKey(row, header);
-      if (key) set.add(key);
-    }
+      if (!key) return;
 
-    existingKeyMap.set(header, set);
+      const firstIndex = firstIndexByKey.get(key);
+      if (firstIndex === undefined) {
+        firstIndexByKey.set(key, index);
+        return;
+      }
+
+      union(firstIndex, index);
+    });
+  }
+
+  const rootsHavingExisting = new Set<number>();
+
+  for (let index = 0; index < existingCount; index += 1) {
+    rootsHavingExisting.add(find(index));
   }
 
   const finalRows: Row[] = [];
-  let removedCount = 0;
 
-  for (const row of rows) {
-    let isDuplicated = false;
+  for (let index = 0; index < newRows.length; index += 1) {
+    const combinedIndex = existingCount + index;
+    const root = find(combinedIndex);
 
-    for (const header of headers) {
-      const key = buildSingleHeaderKey(row, header);
-      if (!key) continue;
-
-      const existingSet = existingKeyMap.get(header);
-      if (existingSet?.has(key)) {
-        isDuplicated = true;
-        break;
-      }
-    }
-
-    if (isDuplicated) {
-      removedCount += 1;
-    } else {
-      finalRows.push(row);
+    if (!rootsHavingExisting.has(root)) {
+      finalRows.push(newRows[index]);
     }
   }
 
   return {
     rows: finalRows,
-    removedCount,
+    removedCount: newRows.length - finalRows.length,
     finalCount: finalRows.length,
   };
 }
@@ -502,17 +518,17 @@ function getLoadingText(labels: DbCleanupLabels, stage: LoadingStage) {
     case "compare-new-step1":
       return {
         title: labels.loading.title,
-        description: "신규 파일을 선택한 컬럼 기준으로 정리하고 있습니다.",
+        description: "신규 파일을 1차 기준으로 정리한 뒤 기존 DB와 연결 중복까지 검사하고 있습니다.",
       };
     case "compare-cross-check":
       return {
         title: labels.loading.title,
-        description: "신규 정리본을 기존 DB 원본과 비교해 중복을 제외하고 있습니다.",
+        description: "신규 정리본을 비교 기준 컬럼으로 다시 정리하고 있습니다.",
       };
     case "compare-merge":
       return {
         title: labels.loading.title,
-        description: "기존 정리본과 신규 추가 대상을 합쳐 최종 파일을 만들고 있습니다.",
+        description: "기존 정리본과 신규 추가 대상을 합치고 최종 안전 검사를 진행하고 있습니다.",
       };
     case "done":
       return {
@@ -653,7 +669,9 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
       setExistingDuplicateHeaders([]);
     } catch (error) {
       setExistingFileInfo(null);
-      setExistingFileError(error instanceof Error ? error.message : labels.errors.existingFileReadFailed);
+      setExistingFileError(
+        error instanceof Error ? error.message : labels.errors.existingFileReadFailed,
+      );
     } finally {
       setIsProcessing(false);
       setLoadingStage("idle");
@@ -789,6 +807,9 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
             newRemovedInStep1Count: newStep1Dedup.removedCount,
             newStep1Count: finalRows.length,
             removedAgainstExistingCount: 0,
+            newRemovedInCompareHeaderStepCount: 0,
+            newCompareHeaderStepCount: finalRows.length,
+            removedInFinalMergeSafetyCount: 0,
             finalNewCount: finalRows.length,
             mergedFinalCount: finalRows.length,
           },
@@ -811,17 +832,34 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
       );
       const newStep1Rows = newStep1Dedup.rows;
 
-      await tick("compare-cross-check");
-      const againstExisting = removeRowsDuplicatedAgainstExistingByHeaders(
+      const filteredAgainstExisting = removeNewRowsConnectedToExistingByHeaders(
         newStep1Rows,
         existingFileInfo.rows,
         comparableExistingHeaders,
       );
-      const appendableNewRows = againstExisting.rows;
+
+      await tick("compare-cross-check");
+
+      const newCompareHeaderDedup = dedupeRowsBySelectedHeadersKeepFirst(
+        filteredAgainstExisting.rows,
+        comparableExistingHeaders,
+      );
+      const comparePreparedNewRows = newCompareHeaderDedup.rows;
 
       await tick("compare-merge");
+
       const mergedHeaders = mergeHeaders(existingFileInfo.headers, newFileInfo.headers);
-      const finalMergedRows = [...cleanedExistingRows, ...appendableNewRows];
+      const mergedBeforeFinalSafety = [...cleanedExistingRows, ...comparePreparedNewRows];
+
+      const mergedFinalSafetyDedup = dedupeRowsBySelectedHeadersKeepFirst(
+        mergedBeforeFinalSafety,
+        comparableExistingHeaders,
+      );
+      const finalMergedRows = mergedFinalSafetyDedup.rows;
+
+      const finalMergedRowSet = new Set<Row>(finalMergedRows);
+      const appendableNewRows = comparePreparedNewRows.filter((row) => finalMergedRowSet.has(row));
+
       const fileNameBase = existingFileInfo.fileName || newFileInfo.fileName;
 
       await tick("done");
@@ -845,7 +883,11 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
           existingStepCount: cleanedExistingRows.length,
           newRemovedInStep1Count: newStep1Dedup.removedCount,
           newStep1Count: newStep1Rows.length,
-          removedAgainstExistingCount: againstExisting.removedCount,
+          removedAgainstExistingCount: filteredAgainstExisting.removedCount,
+          newRemovedInCompareHeaderStepCount: newCompareHeaderDedup.removedCount,
+          newCompareHeaderStepCount: comparePreparedNewRows.length,
+          removedInFinalMergeSafetyCount:
+            mergedBeforeFinalSafety.length - mergedFinalSafetyDedup.rows.length,
           finalNewCount: appendableNewRows.length,
           mergedFinalCount: finalMergedRows.length,
         },
@@ -860,7 +902,11 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
 
   const downloadAppendableNewFile = () => {
     if (!result) return;
-    downloadRows(result.appendableNewHeaders, result.appendableNewRows, result.appendableNewFileName);
+    downloadRows(
+      result.appendableNewHeaders,
+      result.appendableNewRows,
+      result.appendableNewFileName,
+    );
   };
 
   const downloadFinalMergedFile = () => {
@@ -896,8 +942,14 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
     newFileInfo,
   ]);
 
-  const infoLines = compareMode ? labels.messages.infoLines : singleMode ? labels.singleMode.infoLines : [];
-  const actionDescription = compareMode ? labels.actionBar.description : labels.actionBar.singleDescription;
+  const infoLines = compareMode
+    ? labels.messages.infoLines
+    : singleMode
+      ? labels.singleMode.infoLines
+      : [];
+  const actionDescription = compareMode
+    ? labels.actionBar.description
+    : labels.actionBar.singleDescription;
 
   return (
     <div className={styles.root}>
@@ -1124,62 +1176,145 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
             ) : null}
           </div>
 
-          {result.mode === "compare" ? (
-            <div className={styles.resultStatsGrid}>
-              <MetricCard label="기존 원본 데이터" value={result.stats.existingOriginalCount.toLocaleString()} tone="neutral" />
-              <MetricCard label="기존 정리본" value={result.stats.existingStepCount.toLocaleString()} tone="soft" sub={`중복 제거 ${result.stats.existingRemovedInStepCount.toLocaleString()}건`} />
-              <MetricCard label="신규 원본 데이터" value={result.stats.newOriginalCount.toLocaleString()} tone="neutral" />
-              <MetricCard label="신규 정리본" value={result.stats.newStep1Count.toLocaleString()} tone="soft" sub={`제거 ${result.stats.newRemovedInStep1Count.toLocaleString()}건`} />
-              <MetricCard label="기존과 중복 제외" value={`- ${result.stats.removedAgainstExistingCount.toLocaleString()}`} tone="minus" />
-              <MetricCard label="신규 추가 대상" value={result.stats.finalNewCount.toLocaleString()} tone="plus" />
-              <MetricCard label="최종 정리 결과" value={result.stats.mergedFinalCount.toLocaleString()} tone="final" sub={`${result.stats.existingStepCount.toLocaleString()} + ${result.stats.finalNewCount.toLocaleString()}`} />
+          {result.mode === "single" ? (
+            <div className={styles.resultStatsGridSingle}>
+              <MetricCard
+                label="신규 원본 데이터"
+                value={result.stats.newOriginalCount.toLocaleString()}
+                tone="neutral"
+              />
+              <MetricCard
+                label="내부 중복 제거"
+                value={`- ${result.stats.newRemovedInStep1Count.toLocaleString()}`}
+                tone="minus"
+              />
+              <MetricCard
+                label="최종 정리 결과"
+                value={result.stats.finalNewCount.toLocaleString()}
+                tone="final"
+              />
             </div>
-          ) : (
-            <div className={styles.resultStatsGrid}>
-              <MetricCard label="신규 원본 데이터" value={result.stats.newOriginalCount.toLocaleString()} tone="neutral" />
-              <MetricCard label="신규 내부 제거" value={`- ${result.stats.newRemovedInStep1Count.toLocaleString()}`} tone="minus" />
-              <MetricCard label="최종 정리 결과" value={result.stats.finalNewCount.toLocaleString()} tone="final" />
-            </div>
-          )}
+          ) : null}
 
           <div className={styles.resultDownloadPanel}>
             <div className={styles.resultDownloadCard}>
-              <div className={styles.resultDownloadText}>
-                <span className={styles.resultDownloadEyebrow}>추가할 신규 데이터 파일</span>
-                <strong>{result.appendableNewFileName}</strong>
-                <p>
-                  기존 DB에 없는 신규 데이터만 들어 있습니다.
-                  실제 추가되는 항목만 다운로드됩니다.
-                  {result.mode === "compare" ? ` 총 ${result.stats.finalNewCount.toLocaleString()}건입니다.` : ""}
-                </p>
+              <div className={styles.resultDownloadBody}>
+                <div className={styles.resultDownloadText}>
+                  <span className={styles.resultDownloadEyebrow}>
+                    {result.mode === "compare" ? "추가할 신규 데이터 파일" : "정리 완료 파일"}
+                  </span>
+                  <strong>{result.appendableNewFileName}</strong>
+
+                  <div className={styles.downloadMetaList}>
+                    {result.mode === "compare" ? (
+                      <>
+                        <div className={styles.downloadMetaItem}>
+                          <span>신규 원본</span>
+                          <strong>{result.stats.newOriginalCount.toLocaleString()}건</strong>
+                        </div>
+                        <div className={styles.downloadMetaItem}>
+                          <span>중복 제거</span>
+                          <strong>
+                            -{" "}
+                            {(
+                              result.stats.newRemovedInStep1Count +
+                              result.stats.removedAgainstExistingCount +
+                              result.stats.newRemovedInCompareHeaderStepCount
+                            ).toLocaleString()}
+                            건
+                          </strong>
+                        </div>
+                        <div className={styles.downloadMetaItem}>
+                          <span>최종 추가 대상</span>
+                          <strong>{result.stats.finalNewCount.toLocaleString()}건</strong>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className={styles.downloadMetaItem}>
+                          <span>신규 원본</span>
+                          <strong>{result.stats.newOriginalCount.toLocaleString()}건</strong>
+                        </div>
+                        <div className={styles.downloadMetaItem}>
+                          <span>중복 제거</span>
+                          <strong>- {result.stats.newRemovedInStep1Count.toLocaleString()}건</strong>
+                        </div>
+                        <div className={styles.downloadMetaItem}>
+                          <span>최종 정리</span>
+                          <strong>{result.stats.finalNewCount.toLocaleString()}건</strong>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  <p>
+                    {result.mode === "compare"
+                      ? "기존 DB에 실제로 추가되는 신규 데이터만 담았습니다."
+                      : "선택한 기준으로 중복을 제거한 최종 정리 파일입니다."}
+                  </p>
+                </div>
               </div>
-              <button
-                type="button"
-                className={`${styles.downloadButton} ${styles.downloadButtonDark}`}
-                onClick={downloadAppendableNewFile}
-              >
-                신규 추가 대상 다운로드
-              </button>
+
+              <div className={styles.resultDownloadAction}>
+                <button
+                  type="button"
+                  className={`${styles.downloadButton} ${styles.downloadButtonDark}`}
+                  onClick={downloadAppendableNewFile}
+                >
+                  {result.mode === "compare"
+                    ? `신규 추가 대상 다운로드 (${result.stats.finalNewCount.toLocaleString()}건)`
+                    : `정리 결과 다운로드 (${result.stats.finalNewCount.toLocaleString()}건)`}
+                </button>
+              </div>
             </div>
 
             {result.mode === "compare" ? (
-              <div className={styles.resultDownloadCard}>
-                <div className={styles.resultDownloadText}>
-                  <span className={styles.resultDownloadEyebrow}>최종 전체 DB 파일</span>
-                  <strong>{result.finalMergedFileName}</strong>
-                  <p>
-                    기존 데이터를 비교 기준 컬럼으로 정리한 뒤,
-                    신규 추가 대상만 합친 최종 파일입니다.
-                    총 {result.stats.mergedFinalCount.toLocaleString()}건입니다.
-                  </p>
+              <div className={styles.resultDownloadCard} data-featured="true">
+                <div className={styles.resultDownloadBody}>
+                  <div className={styles.resultDownloadText}>
+                    <span className={styles.resultDownloadEyebrow}>최종 전체 DB 파일</span>
+                    <strong>{result.finalMergedFileName}</strong>
+
+                    <div className={styles.downloadMetaList}>
+                      <div className={styles.downloadMetaItem}>
+                        <span>기존 원본</span>
+                        <strong>{result.stats.existingOriginalCount.toLocaleString()}건</strong>
+                      </div>
+                      <div className={styles.downloadMetaItem}>
+                        <span>기존 중복 제거</span>
+                        <strong>- {result.stats.existingRemovedInStepCount.toLocaleString()}건</strong>
+                      </div>
+                      <div className={styles.downloadMetaItem}>
+                        <span>기존 정리본</span>
+                        <strong>{result.stats.existingStepCount.toLocaleString()}건</strong>
+                      </div>
+                      <div className={styles.downloadMetaItem}>
+                        <span>신규 추가</span>
+                        <strong>+ {result.stats.finalNewCount.toLocaleString()}건</strong>
+                      </div>
+                      <div className={styles.downloadMetaItem} data-strong="true">
+                        <span>최종 전체 DB</span>
+                        <strong>{result.stats.mergedFinalCount.toLocaleString()}건</strong>
+                      </div>
+                    </div>
+
+                    <p>
+                      {result.stats.existingStepCount.toLocaleString()}건 기존 정리본 +{" "}
+                      {result.stats.finalNewCount.toLocaleString()}건 신규 추가 ={" "}
+                      {result.stats.mergedFinalCount.toLocaleString()}건 최종 DB
+                    </p>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  className={`${styles.downloadButton} ${styles.downloadButtonLight}`}
-                  onClick={downloadFinalMergedFile}
-                >
-                  최종 전체 DB 다운로드
-                </button>
+
+                <div className={styles.resultDownloadAction}>
+                  <button
+                    type="button"
+                    className={`${styles.downloadButton} ${styles.downloadButtonLight}`}
+                    onClick={downloadFinalMergedFile}
+                  >
+                    최종 전체 DB 다운로드 ({result.stats.mergedFinalCount.toLocaleString()}건)
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
