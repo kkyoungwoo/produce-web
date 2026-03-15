@@ -135,6 +135,55 @@ export function eduRegionName(value: string | number | undefined) {
   return cityNameFromAddress(value);
 }
 
+export function factoryRegionName(value: string | number | undefined) {
+  const text = toText(value);
+  if (!text) return REGION_UNKNOWN;
+
+  const first = text.split(/\s+/).filter(Boolean)[0] ?? "";
+  if (!first) return REGION_UNKNOWN;
+
+  return normalizeProvinceName(first) || REGION_UNKNOWN;
+}
+
+export function parseEmployeeCount(value: string | number | undefined) {
+  const digits = toText(value).replace(/[^0-9]/g, "");
+  if (!digits) return null;
+
+  const parsed = Number.parseInt(digits, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function matchFactoryEmployeeRange(
+  employeeRange: string,
+  value: string | number | undefined,
+) {
+  if (!employeeRange || employeeRange === "all") return true;
+
+  const count = parseEmployeeCount(value);
+  if (count === null) return false;
+
+  if (employeeRange === "lt1") return count < 1;
+  if (employeeRange === "1to4") return count >= 1 && count < 5;
+  if (employeeRange === "5to49") return count >= 5 && count < 50;
+  if (employeeRange === "gte50") return count >= 50;
+
+  return true;
+}
+
+export function matchFactoryRegDateRange(
+  value: string | number | undefined,
+  startDate: string,
+  endDate: string,
+) {
+  const target = toText(value).replace(/[^0-9]/g, "").slice(0, 8);
+  if (!target || target.length !== 8) return false;
+
+  if (startDate && target < startDate) return false;
+  if (endDate && target > endDate) return false;
+
+  return true;
+}
+
 export function formatYmd(value: string | number | undefined) {
   const digits = toText(value).replace(/[^0-9]/g, "");
   if (digits.length !== 8) return toText(value);
@@ -163,8 +212,9 @@ export function formatCellValue(
     );
   }
   if (key === "sigunguCd") return archRegionNameFromSigungu(text);
+  if (key === "rnAdres") return text;
   if (key === "platPlc") return text;
-  if (key === "LCPMT_YMD" || key === "LCPMT_RTRCN_YMD" || key === "crtnDay") return formatYmd(text);
+  if (key === "LCPMT_YMD" || key === "LCPMT_RTRCN_YMD" || key === "crtnDay" || key === "frstFctryRegistDe") return formatYmd(text);
   if (key === "LAST_MDFCN_PNT" || key === "DAT_UPDT_PNT") return formatYmdHms(text);
 
   if (key === "SALS_STTS_CD") {
