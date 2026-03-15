@@ -1,4 +1,74 @@
-[00:00:00.947] Server  LOG     ✓ Ready in 711ms
-[00:00:01.686] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:00:14.712] Server  LOG     ✓ Compiled in 424ms
-[00:00:16.489] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:02.302] Server  LOG     ✓ Ready in 1651ms
+[00:00:17.343] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:03:50.325] Server  LOG     ✓ Compiled in 583ms
+[00:03:50.567] Browser ERROR   uncaughtError: TypeError: Cannot read properties of undefined (reading 'toLocaleString')
+[00:03:53.039] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:12:09.695] Server  LOG     ✓ Compiled in 192ms
+[00:12:12.307] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:18:24.314] Server  LOG     ✓ Compiled in 34ms
+[00:18:27.937] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:22:22.720] Server  LOG     ✓ Compiled in 53ms
+[00:22:24.670] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:24:56.690] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:30:30.132] Server  LOG     ✓ Compiled in 96ms
+[00:30:30.218] Browser ERROR   uncaughtError: TypeError: Cannot read properties of undefined (reading 'toLocaleString')
+[00:30:33.141] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:33:24.155] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:33:55.686] Server  LOG     ✓ Compiled in 52ms
+[00:33:57.602] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:37:01.862] Server  LOG     ✓ Compiled in 43ms
+[00:37:06.145] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:40:58.915] Server  LOG     ✓ Compiled in 39ms
+[00:40:59.004] Browser ERROR   uncaughtError: TypeError: Cannot read properties of undefined (reading 'toLocaleString')
+[00:41:04.005] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:45:10.991] Server  LOG     ✓ Compiled in 40ms
+[00:45:12.712] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:47:54.231] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:48:35.041] Server  LOG     ✓ Compiled in 38ms
+[00:48:35.143] Browser ERROR   ./components/db-cleanup/db-cleanup-client.tsx:1:2
+Parsing ecmascript source code failed
+> 1 | 1차 정리 후 신규
+    |  ^^^
+  2 | 10
+  3 | 기존 정리본
+  4 |
+
+Expected ';', '}' or <eof>
+
+Import trace:
+  Server Component:
+    ./components/db-cleanup/db-cleanup-client.tsx
+    ./app/[locale]/db-cleanup/page.tsx
+[00:48:56.253] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:59:53.983] Server  LOG     ✓ Compiled in 51ms
+[00:59:56.565] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:04:20.177] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:10:12.865] Server  LOG     ✓ Compiled in 45ms
+[01:10:16.932] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:12:36.071] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:21:30.493] Server  LOG     ✓ Compiled in 65ms
+[01:22:43.789] Browser ERROR   ./lib/i18n/locales/ko.ts:312:5
+Parsing ecmascript source code failed
+  310 |   showNumberColumns: "번호/인덱스 컬럼 표시",
+  311 | }
+> 312 |     actionBar: {
+      |     ^^^^^^^^^
+  313 |       title: "최종 정리 준비",
+  314 |       description: "1차 신규 정리 후 2차 공통 컬럼 기준으로 비교해 최종 정리본과 누적 DB를 생성합니다.",
+  315 |       singleDescription: "선택한 기준으로 신규 데이터의 빈값과 내부 중복을 제거한 정리본을 생성합니다.",
+
+Expected ',', got 'ident'
+
+Import trace:
+  Server Component:
+    ./lib/i18n/locales/ko.ts
+    ./lib/i18n/translations.ts
+    ./lib/i18n/seo.ts
+    ./app/layout.tsx
+[01:22:50.433] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:30:52.237] Server  LOG     ✓ Compiled in 126ms
+[01:39:06.028] Server  LOG     ✓ Compiled in 134ms
+[01:39:48.811] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:44:34.400] Server  LOG     ✓ Compiled in 127ms
+[01:49:48.261] Server  LOG     ✓ Compiled in 268ms
+[01:49:59.622] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

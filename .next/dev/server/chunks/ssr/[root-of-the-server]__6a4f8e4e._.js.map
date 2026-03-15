@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 14, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/gorhr/Documents/GitHub/produce-web/src/App.tsx"],"sourcesContent":["export default function App() {\r\n  return (\r\n    <div className=\"App\">\r\n      <header className=\"App-header\">\r\n        <img src=\"/logo.svg\" className=\"App-logo\" alt=\"logo\" />\r\n        <p>\r\n          Edit <code>app/page.tsx</code> and save to reload.\r\n        </p>\r\n        <a\r\n          className=\"App-link\"\r\n          href=\"https://nextjs.org\"\r\n          target=\"_blank\"\r\n          rel=\"noopener noreferrer\"\r\n        >\r\n          Learn Next.js\r\n        </a>\r\n      </header>\r\n    </div>\r\n  );\r\n}\r\n"],"names":[],"mappings":";;;;;;AAAe,SAAS;IACtB,qBACE,8OAAC;QAAI,WAAU;kBACb,cAAA,8OAAC;YAAO,WAAU;;8BAChB,8OAAC;oBAAI,KAAI;oBAAY,WAAU;oBAAW,KAAI;;;;;;8BAC9C,8OAAC;;wBAAE;sCACI,8OAAC;sCAAK;;;;;;wBAAmB;;;;;;;8BAEhC,8OAAC;oBACC,WAAU;oBACV,MAAK;oBACL,QAAO;oBACP,KAAI;8BACL;;;;;;;;;;;;;;;;;AAMT"}},
-    {"offset": {"line": 79, "column": 0}, "map": {"version":3,"sources":["file:///C:/Users/gorhr/Documents/GitHub/produce-web/app/page.tsx"],"sourcesContent":["import App from '../src/App';\r\n\r\nexport default function HomePage() {\r\n  return <App />;\r\n}\r\n"],"names":[],"mappings":";;;;;AAAA;;;AAEe,SAAS;IACtB,qBAAO,8OAAC,sHAAG;;;;;AACb"}}]
-}

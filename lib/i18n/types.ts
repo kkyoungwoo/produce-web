@@ -336,17 +336,25 @@ export type LocaleContent = {
       infoTitle: string;
       infoLines: string[];
     };
-    selection: {
-      step1: string;
-      step2: string;
-      pickedLabel: string;
-      selectAllLabel: string;
-      clearAllLabel: string;
-      newTitle: string;
-      newDescription: string;
-      existingTitle: string;
-      existingDescription: string;
-    };
+
+selection: {
+  step1: string;
+  step2: string;
+  newSecondStepLabel: string;
+  newTitle: string;
+  newDescription: string;
+  newSecondTitle: string;
+  newSecondDescription: string;
+  existingTitle: string;
+  existingDescription: string;
+  pickedLabel: string;
+  selectAllLabel: string;
+  clearAllLabel: string;
+  blankRowsLabel: string;
+  blankRowsKeep: string;
+  blankRowsRemove: string;
+  showNumberColumns: string;
+};
     actionBar: {
       title: string;
       description: string;
