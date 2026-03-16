@@ -14,6 +14,8 @@ import {
 } from "@/components/workbench/helpers";
 import type { CollectResponse, WorkbenchProps } from "@/components/workbench/types";
 
+const apikey = "vip 인증키";
+
 type RegionOption = {
   code: string;
   name: string;
@@ -59,7 +61,7 @@ type ChunkRequest = {
 const UI = {
   inputTitle: "입력 설정",
   serviceKeyLabel: "인증키(serviceKey)",
-  serviceKeyPlaceholder: "실제 동작하는 인증키를 입력하면 전체 데이터를 조회합니다.",
+  serviceKeyPlaceholder: apikey,
   serviceKeyHelp: "인증키를 입력하지 않거나 올바르지 않으면 실제 데이터 샘플 최대 5건만 조회됩니다.",
   sidoLabel: "시도 선택",
   sigunguLabel: "시군구 선택",

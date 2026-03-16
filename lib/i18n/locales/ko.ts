@@ -4,6 +4,7 @@ import type { LocaleContent } from "../types";
 
 const KAKAO_CHAT_URL = "http://pf.kakao.com/_qiXpxj/chat";
 const products = getPublicApiProducts("ko");
+const apikey = "vip 인증키";
 
 const ko: LocaleContent = {
   brand: "WORKVISA DATA LAB",
@@ -178,7 +179,7 @@ const ko: LocaleContent = {
     ui: {
       inputTitle: "입력 설정",
       serviceKeyLabel: "인증키(serviceKey)",
-      serviceKeyPlaceholder: "vip 인증키",
+      serviceKeyPlaceholder: apikey,
       serviceKeyHelp: "입력하지 않거나 인증키가 올바르지 않으면 실제 데이터 미리보기 5건만 표시됩니다.",
       regionSelectLabel: "지역 선택",
       selectAllLabel: "전체 선택",
