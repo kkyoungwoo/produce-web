@@ -14,7 +14,14 @@ import {
 } from "@/components/workbench/helpers";
 import type { CollectResponse, WorkbenchProps } from "@/components/workbench/types";
 
-const apikey = "vip 인증키";
+const FALLBACK_PREVIEW_SERVICE_KEY =
+  "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
+
+const PREVIEW_SERVICE_KEY_MAP: Record<string, string> = {
+  vip: FALLBACK_PREVIEW_SERVICE_KEY,
+  gold: FALLBACK_PREVIEW_SERVICE_KEY,
+  master: FALLBACK_PREVIEW_SERVICE_KEY,
+};
 
 type RegionOption = {
   code: string;
@@ -61,7 +68,7 @@ type ChunkRequest = {
 const UI = {
   inputTitle: "입력 설정",
   serviceKeyLabel: "인증키(serviceKey)",
-  serviceKeyPlaceholder: apikey,
+  serviceKeyPlaceholder: "vip / gold / master 또는 실제 인증키 입력",
   serviceKeyHelp: "인증키를 입력하지 않거나 올바르지 않으면 실제 데이터 샘플 최대 5건만 조회됩니다.",
   sidoLabel: "시도 선택",
   sigunguLabel: "시군구 선택",
@@ -85,6 +92,7 @@ const UI = {
   noLegalDong: "선택한 지역에 해당하는 법정동 코드가 없습니다.",
   sidoRequired: "시도를 선택해 주세요.",
   sigunguRequired: "시군구를 1개 이상 선택해 주세요.",
+  dateRangeInvalid: "시작일은 종료일보다 늦을 수 없습니다.",
   regionUnclassified: "지역 미분류",
   preparing: "조회 준비 중입니다.",
   completed: "조회가 완료되었습니다.",
@@ -97,16 +105,38 @@ const UI = {
   dateExpanded: "기간 자동 확장 적용",
   endpointHs: "주택 API",
   endpointArch: "건축 API",
+  noData: "조회는 정상적으로 완료되었습니다. 다만 현재 검색 조건에 맞는 데이터가 없습니다.",
 } as const;
 
 const ELEVATOR_OPTIONS = [
   { key: "passenger", label: "승용승강기만 있음" },
   { key: "emergency", label: "비상용 승강기만 있음" },
 ] as const;
+
 const ALL_ELEVATOR_KEYS = ELEVATOR_OPTIONS.map((item) => item.key);
 const DEFAULT_START_DAYS = 7;
 const DEFAULT_END_DAYS = 1;
 const LEGAL_DONG_CHUNK_SIZE = 12;
+
+function normalizePreviewKey(value?: string) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function resolvePreviewServiceKey(inputKey?: string) {
+  const trimmed = String(inputKey ?? "").trim();
+  if (!trimmed) return "";
+  return PREVIEW_SERVICE_KEY_MAP[normalizePreviewKey(trimmed)] ?? trimmed;
+}
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const text = await response.text();
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`JSON 응답이 아닙니다. 응답 앞부분: ${text.slice(0, 200)}`);
+  }
+}
 
 function hasPositive(value: string | number | undefined) {
   const num = Number.parseFloat(toText(value));
@@ -148,7 +178,8 @@ async function fetchRegionOptions(
     body: JSON.stringify(body),
     signal,
   });
-  const data = (await response.json()) as RegionOptionsResponse;
+
+  const data = await parseJsonResponse<RegionOptionsResponse>(response);
 
   if (!response.ok || !data.ok) {
     throw new Error(data.message ?? UI.regionLoadFailed);
@@ -161,15 +192,20 @@ function createChunkRequests(options: LegalDongOption[], selectedSigunguCodes: s
   const grouped = new Map<string, { sigunguFullName: string; codes: string[] }>();
 
   for (const option of options) {
-    const current = grouped.get(option.sigunguCode) ?? { sigunguFullName: option.sigunguFullName, codes: [] };
+    const current = grouped.get(option.sigunguCode) ?? {
+      sigunguFullName: option.sigunguFullName,
+      codes: [],
+    };
     current.codes.push(option.fullCode);
     grouped.set(option.sigunguCode, current);
   }
 
   const requests: ChunkRequest[] = [];
+
   selectedSigunguCodes.forEach((sigunguCode, sigunguOrder) => {
     const group = grouped.get(sigunguCode);
     if (!group) return;
+
     chunkArray(group.codes, LEGAL_DONG_CHUNK_SIZE).forEach((legalDongCodes, chunkIndex) => {
       requests.push({
         sigunguCode,
@@ -186,6 +222,7 @@ function createChunkRequests(options: LegalDongOption[], selectedSigunguCodes: s
 
 function mergeRows(targets: Array<Record<string, string | number>>) {
   const map = new Map<string, Record<string, string | number>>();
+
   for (const row of targets) {
     const key = [
       String(toText(row.permitNo as string | number | undefined)),
@@ -193,8 +230,10 @@ function mergeRows(targets: Array<Record<string, string | number>>) {
       String(toText(row.dongName as string | number | undefined)),
       String(toText(row.buildingName as string | number | undefined)),
     ].join("|");
+
     if (!map.has(key)) map.set(key, row);
   }
+
   return Array.from(map.values());
 }
 
@@ -284,23 +323,27 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
 
   const columns = useMemo(() => {
     const rowKeys = Array.from(new Set(rows.flatMap((row) => Object.keys(row))));
-    const preferred = (product.workbench?.columns ?? []).map((column) => column.key).filter((key) => rowKeys.includes(key));
+    const preferred = (product.workbench?.columns ?? [])
+      .map((column) => column.key)
+      .filter((key) => rowKeys.includes(key));
     return preferred.length > 0 ? preferred : rowKeys;
   }, [product.workbench?.columns, rows]);
 
   const regionBuckets = useMemo(() => {
     const groups = new Map<string, Array<Record<string, string | number>>>();
+
     for (const row of rows) {
       const name = toText(row.agency as string | number | undefined) || UI.regionUnclassified;
       groups.set(name, [...(groups.get(name) ?? []), row]);
     }
+
     return Array.from(groups.entries()).map(([name, bucketRows]) => ({ name, rows: bucketRows }));
   }, [rows]);
 
-  const regionStats = useMemo(() => ([
-    { name: UI.allFilter, count: rows.length },
-    ...regionBuckets.map((item) => ({ name: item.name, count: item.rows.length })),
-  ]), [regionBuckets, rows.length]);
+  const regionStats = useMemo(
+    () => [{ name: UI.allFilter, count: rows.length }, ...regionBuckets.map((item) => ({ name: item.name, count: item.rows.length }))],
+    [regionBuckets, rows.length],
+  );
 
   const activeElevatorModes = normalizeElevatorSelection(selectedElevatorModes);
 
@@ -330,7 +373,9 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
     const observer = new IntersectionObserver(
       (entries) => {
         if (!entries[0]?.isIntersecting) return;
-        setVisibleCount((prev) => (prev >= filteredRows.length ? prev : Math.min(prev + CHUNK_SIZE, filteredRows.length)));
+        setVisibleCount((prev) =>
+          prev >= filteredRows.length ? prev : Math.min(prev + CHUNK_SIZE, filteredRows.length),
+        );
       },
       { root, rootMargin: "120px 0px", threshold: 0.1 },
     );
@@ -341,7 +386,9 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
 
   const startProgressRange = (from: number, to: number) => {
     if (timerRef.current) clearInterval(timerRef.current);
+
     setProgress((prev) => Math.max(prev, from));
+
     timerRef.current = setInterval(() => {
       setProgress((prev) => {
         if (prev >= to) return prev;
@@ -374,6 +421,13 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
       return;
     }
 
+    if (startDate && endDate && startDate > endDate) {
+      setRows([]);
+      setIsError(true);
+      setMessage(`${labels.errorLabel}: ${UI.dateRangeInvalid}`);
+      return;
+    }
+
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -386,10 +440,10 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
     setVisibleCount(CHUNK_SIZE);
 
     try {
-      const legalDongOptions = await fetchRegionOptions(
+      const legalDongOptions = (await fetchRegionOptions(
         { level: "bjdong", sigunguCodes: selectedSigunguCodes },
         controller.signal,
-      ) as LegalDongOption[];
+      )) as LegalDongOption[];
 
       if (legalDongOptions.length === 0) {
         setIsError(true);
@@ -411,23 +465,30 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
       let previewLimited = false;
 
       setProgressTitle(UI.preparing);
-      setProgressDetail(`시군구 ${totalSigunguCount}/${totalSigunguCount} · 요청 묶음 0/${totalChunkCount} · 완료 0/${totalTargetCount}`);
+      setProgressDetail(
+        `시군구 ${totalSigunguCount}/${totalSigunguCount} · 요청 묶음 0/${totalChunkCount} · 완료 0/${totalTargetCount}`,
+      );
       setProgress(2);
 
       for (let index = 0; index < chunkRequests.length; index += 1) {
         const chunk = chunkRequests[index];
         const from = Math.max(2, Math.round((completedTargetCount / totalTargetCount) * 98));
-        const to = Math.min(98, Math.max(from + 1, Math.round(((completedTargetCount + chunk.legalDongCodes.length) / totalTargetCount) * 98)));
+        const to = Math.min(
+          98,
+          Math.max(from + 1, Math.round(((completedTargetCount + chunk.legalDongCodes.length) / totalTargetCount) * 98)),
+        );
 
         setProgressTitle(`${chunk.sigunguFullName} 조회 중`);
-        setProgressDetail(`시군구 ${chunk.sigunguOrder + 1}/${totalSigunguCount} · 요청 묶음 ${index + 1}/${totalChunkCount} · 완료 ${completedTargetCount}/${totalTargetCount}`);
+        setProgressDetail(
+          `시군구 ${chunk.sigunguOrder + 1}/${totalSigunguCount} · 요청 묶음 ${index + 1}/${totalChunkCount} · 완료 ${completedTargetCount}/${totalTargetCount}`,
+        );
         startProgressRange(from, to);
 
         const response = await fetch("/api/public-data/archhub-collect", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            serviceKey: serviceKey.trim(),
+            serviceKey: resolvePreviewServiceKey(serviceKey),
             startDate,
             endDate,
             sigunguCodes: [chunk.sigunguCode],
@@ -436,7 +497,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
           signal: controller.signal,
         });
 
-        const data = (await response.json()) as ArchhubCollectResponse;
+        const data = await parseJsonResponse<ArchhubCollectResponse>(response);
 
         if (!response.ok || !data.ok) {
           if (!firstError) firstError = data.message ?? UI.queryFailed;
@@ -449,9 +510,12 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
         }
 
         completedTargetCount += chunk.legalDongCodes.length;
+
         if (timerRef.current) clearInterval(timerRef.current);
         setProgress(Math.min(98, Math.round((completedTargetCount / totalTargetCount) * 98)));
-        setProgressDetail(`시군구 ${chunk.sigunguOrder + 1}/${totalSigunguCount} · 요청 묶음 ${index + 1}/${totalChunkCount} · 완료 ${completedTargetCount}/${totalTargetCount}`);
+        setProgressDetail(
+          `시군구 ${chunk.sigunguOrder + 1}/${totalSigunguCount} · 요청 묶음 ${index + 1}/${totalChunkCount} · 완료 ${completedTargetCount}/${totalTargetCount}`,
+        );
 
         if (previewLimited && mergeRows(mergedRows).length >= 5) {
           break;
@@ -459,17 +523,11 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
       }
 
       const uniqueRows = mergeRows(mergedRows).slice(0, previewLimited ? 5 : undefined);
-      if (uniqueRows.length === 0) {
-        if (infoMessage) {
-          setRows([]);
-          setIsError(false);
-          setMessage(infoMessage);
-          return;
-        }
 
+      if (uniqueRows.length === 0) {
         setRows([]);
-        setIsError(true);
-        setMessage(`${labels.errorLabel}: ${firstError || UI.queryFailed}`);
+        setIsError(false);
+        setMessage(infoMessage || UI.noData);
         return;
       }
 
@@ -484,7 +542,9 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
       setMessage(summaryParts.join(" / "));
 
       setProgressTitle(UI.completed);
-      setProgressDetail(`시군구 ${totalSigunguCount}/${totalSigunguCount} · 요청 묶음 ${Math.min(chunkRequests.length, totalChunkCount)}/${totalChunkCount} · 완료 ${completedTargetCount}/${totalTargetCount}`);
+      setProgressDetail(
+        `시군구 ${totalSigunguCount}/${totalSigunguCount} · 요청 묶음 ${Math.min(chunkRequests.length, totalChunkCount)}/${totalChunkCount} · 완료 ${completedTargetCount}/${totalTargetCount}`,
+      );
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
         setMessage(`${labels.errorLabel}: ${UI.cancelled}`);
@@ -554,17 +614,19 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
   };
 
   const toggleElevatorMode = (key: string) => {
-    setSelectedElevatorModes((prev) => (
-      prev.includes(key)
-        ? prev.filter((item) => item !== key)
-        : [...prev, key]
-    ));
+    setSelectedElevatorModes((prev) =>
+      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
+    );
   };
 
   return (
     <>
       <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-stretch">
-        <article className={`rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_16px_36px_rgba(44,86,150,0.12)] transition-[width,transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${hasQueried ? "w-full lg:w-1/2" : "w-full lg:w-full"}`}>
+        <article
+          className={`rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_16px_36px_rgba(44,86,150,0.12)] transition-[width,transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            hasQueried ? "w-full lg:w-1/2" : "w-full lg:w-full"
+          }`}
+        >
           <p className="text-xs font-extrabold tracking-[0.14em] text-blue-600">{UI.inputTitle}</p>
 
           <div className="mt-3 grid max-h-[60vh] gap-3 overflow-y-auto pr-1">
@@ -596,7 +658,9 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                         setMessage("");
                         setIsError(false);
                       }}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-bold ${active ? "border-blue-600 bg-blue-600 text-white" : "border-blue-200 bg-white text-blue-700"}`}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+                        active ? "border-blue-600 bg-blue-600 text-white" : "border-blue-200 bg-white text-blue-700"
+                      }`}
                     >
                       {item.name}
                     </button>
@@ -611,13 +675,18 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                 {sigunguOptions.length > 0 ? (
                   <button
                     type="button"
-                    onClick={() => setSelectedSigunguCodes((prev) => (prev.length === sigunguOptions.length ? [] : sigunguOptions.map((item) => item.code)))}
+                    onClick={() =>
+                      setSelectedSigunguCodes((prev) =>
+                        prev.length === sigunguOptions.length ? [] : sigunguOptions.map((item) => item.code),
+                      )
+                    }
                     className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"
                   >
                     {selectedSigunguCodes.length === sigunguOptions.length ? "전체 해제" : "전체 선택"}
                   </button>
                 ) : null}
               </div>
+
               <div className="flex max-h-48 flex-wrap gap-2 overflow-y-auto pr-1">
                 {sigunguOptions.length === 0 ? <p className="text-xs text-slate-500">{UI.sigunguHint}</p> : null}
                 {sigunguOptions.map((item) => {
@@ -626,8 +695,16 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                     <button
                       key={item.code}
                       type="button"
-                      onClick={() => setSelectedSigunguCodes((prev) => (prev.includes(item.code) ? prev.filter((value) => value !== item.code) : [...prev, item.code]))}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-bold ${active ? "border-blue-600 bg-blue-600 text-white" : "border-blue-200 bg-white text-blue-700"}`}
+                      onClick={() =>
+                        setSelectedSigunguCodes((prev) =>
+                          prev.includes(item.code)
+                            ? prev.filter((value) => value !== item.code)
+                            : [...prev, item.code],
+                        )
+                      }
+                      className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+                        active ? "border-blue-600 bg-blue-600 text-white" : "border-blue-200 bg-white text-blue-700"
+                      }`}
                     >
                       {item.name}
                     </button>
@@ -641,12 +718,17 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                 <strong className="text-base font-bold text-slate-900">{UI.elevatorLabel}</strong>
                 <button
                   type="button"
-                  onClick={() => setSelectedElevatorModes((prev) => (prev.length === ALL_ELEVATOR_KEYS.length ? [] : [...ALL_ELEVATOR_KEYS]))}
+                  onClick={() =>
+                    setSelectedElevatorModes((prev) =>
+                      prev.length === ALL_ELEVATOR_KEYS.length ? [] : [...ALL_ELEVATOR_KEYS],
+                    )
+                  }
                   className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"
                 >
                   {activeElevatorModes.length === ALL_ELEVATOR_KEYS.length ? "전체 해제" : "전체 선택"}
                 </button>
               </div>
+
               <div className="flex flex-wrap gap-2">
                 {ELEVATOR_OPTIONS.map((item) => {
                   const active = activeElevatorModes.includes(item.key);
@@ -655,13 +737,16 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                       key={item.key}
                       type="button"
                       onClick={() => toggleElevatorMode(item.key)}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-bold ${active ? "border-blue-600 bg-blue-600 text-white" : "border-blue-200 bg-white text-blue-700"}`}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+                        active ? "border-blue-600 bg-blue-600 text-white" : "border-blue-200 bg-white text-blue-700"
+                      }`}
                     >
                       {item.label}
                     </button>
                   );
                 })}
               </div>
+
               <p className="text-xs leading-6 text-slate-500">{UI.elevatorHint}</p>
             </div>
 
@@ -675,6 +760,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                   onChange={(event) => setStartDate(toApiDate(event.target.value))}
                 />
               </label>
+
               <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
                 <strong className="text-base font-bold text-slate-900">{UI.permitToLabel}</strong>
                 <input
@@ -696,6 +782,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
             >
               {isLoading ? `${labels.runLabel} ${progress}%` : labels.runLabel}
             </button>
+
             <button
               type="button"
               onClick={onReset}
@@ -706,9 +793,17 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
           </div>
         </article>
 
-        <article aria-hidden={!hasQueried} className={`overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-[0_16px_36px_rgba(44,86,150,0.12)] transition-[width,opacity,padding,margin,border-color,box-shadow,background-color,height,max-height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${hasQueried ? "h-auto w-full p-4 opacity-100 lg:w-1/2" : "pointer-events-none h-0 max-h-0 w-0 border-0 bg-transparent p-0 opacity-0 shadow-none lg:w-0"}`}>
+        <article
+          aria-hidden={!hasQueried}
+          className={`overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-[0_16px_36px_rgba(44,86,150,0.12)] transition-[width,opacity,padding,margin,border-color,box-shadow,background-color,height,max-height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            hasQueried
+              ? "h-auto w-full p-4 opacity-100 lg:w-1/2"
+              : "pointer-events-none h-0 max-h-0 w-0 border-0 bg-transparent p-0 opacity-0 shadow-none lg:w-0"
+          }`}
+        >
           <p className="text-xs font-extrabold tracking-[0.14em] text-blue-600">{UI.resultBadge}</p>
           <h2 className="mt-1 text-xl font-bold text-slate-800">{UI.resultTitle}</h2>
+
           <div className="mt-4 flex w-full max-w-sm flex-col gap-2">
             {hasRegionDownload ? (
               <button
@@ -720,6 +815,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                 {UI.groupedExcelLabel}
               </button>
             ) : null}
+
             <button
               type="button"
               onClick={onDownloadAll}
@@ -728,6 +824,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
             >
               {UI.allExcelLabel}
             </button>
+
             {hasFilteredDownload ? (
               <button
                 type="button"
@@ -746,9 +843,14 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                 <span>{progressTitle || UI.preparing}</span>
                 <span>{progress}%</span>
               </div>
+
               <div className="mt-3 h-2 overflow-hidden rounded-full bg-blue-100">
-                <div className="h-full rounded-full bg-blue-600 transition-[width] duration-300" style={{ width: `${progress}%` }} />
+                <div
+                  className="h-full rounded-full bg-blue-600 transition-[width] duration-300"
+                  style={{ width: `${progress}%` }}
+                />
               </div>
+
               <p className="mt-3 text-xs leading-6 text-slate-600">{progressDetail || UI.progressFallback}</p>
               <p className="mt-1 text-xs leading-6 text-slate-500">{UI.keepPage}</p>
             </div>
@@ -756,23 +858,37 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
         </article>
       </div>
 
-      {message ? <p className={`mt-4 rounded-lg px-3 py-2 text-sm ${isError ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{message}</p> : null}
+      {message ? (
+        <p className={`mt-4 rounded-lg px-3 py-2 text-sm ${isError ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+          {message}
+        </p>
+      ) : null}
 
       {rows.length > 0 ? (
         <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-bold text-blue-700">{UI.regionFilterTitle}</p>
-            <p className="text-xs font-semibold text-slate-600">{UI.totalPrefix} {rows.length}{UI.countSuffix} | {UI.currentPrefix} {filteredRows.length}{UI.countSuffix}</p>
+            <p className="text-xs font-semibold text-slate-600">
+              {UI.totalPrefix} {rows.length}
+              {UI.countSuffix} | {UI.currentPrefix} {filteredRows.length}
+              {UI.countSuffix}
+            </p>
           </div>
+
           <div className="mt-2 flex flex-wrap gap-2">
             {regionStats.map((item) => {
               const active = regionFilter === item.name;
+
               return (
                 <button
                   key={item.name}
                   type="button"
                   onClick={() => setRegionFilter(item.name)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${active ? "border-blue-600 bg-blue-600 text-white" : "border-blue-200 bg-white text-blue-700 hover:bg-blue-100"}`}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+                    active
+                      ? "border-blue-600 bg-blue-600 text-white"
+                      : "border-blue-200 bg-white text-blue-700 hover:bg-blue-100"
+                  }`}
                 >
                   {item.name} ({item.count})
                 </button>
@@ -784,15 +900,21 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
 
       {filteredRows.length > 0 ? (
         <article className="mt-5 rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_16px_36px_rgba(44,86,150,0.12)]">
-          <div ref={tableScrollRef} className="max-h-[60vh] overflow-auto rounded-xl border border-blue-200 bg-white">
+          <div
+            ref={tableScrollRef}
+            className="max-h-[60vh] overflow-auto rounded-xl border border-blue-200 bg-white"
+          >
             <table className="min-w-full text-left text-sm">
               <thead className="sticky top-0 z-[1] bg-blue-50 text-slate-700">
                 <tr>
                   {columns.map((column) => (
-                    <th key={column} className="whitespace-nowrap px-3 py-2 font-bold">{getColumnLabel(column, labelMap)}</th>
+                    <th key={column} className="whitespace-nowrap px-3 py-2 font-bold">
+                      {getColumnLabel(column, labelMap)}
+                    </th>
                   ))}
                 </tr>
               </thead>
+
               <tbody>
                 {visibleRows.map((row, rowIndex) => (
                   <tr key={`row-${rowIndex}`} className="border-t border-blue-100 text-slate-600">
@@ -805,6 +927,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                 ))}
               </tbody>
             </table>
+
             <div ref={loadMoreRef} className="h-8" />
           </div>
         </article>

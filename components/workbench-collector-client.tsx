@@ -34,40 +34,11 @@ import type { CollectResponse, WorkbenchProps, WorkbenchStatMode } from "@/compo
 const FALLBACK_PREVIEW_SERVICE_KEY =
   "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
 
-/**
- * 사용자가 입력하는 별칭 -> 실제 적용할 키
- * 원하는 커스텀 텍스트를 여기에서 계속 추가하면 됨
- */
 const PREVIEW_SERVICE_KEY_MAP: Record<string, string> = {
   vip: FALLBACK_PREVIEW_SERVICE_KEY,
   gold: FALLBACK_PREVIEW_SERVICE_KEY,
   master: FALLBACK_PREVIEW_SERVICE_KEY,
 };
-
-function normalizePreviewKey(value?: string) {
-  return String(value ?? "").trim().toLowerCase();
-}
-
-function resolvePreviewServiceKey(inputKey?: string) {
-  const trimmed = String(inputKey ?? "").trim();
-
-  if (!trimmed) {
-    return "";
-  }
-
-  const normalizedInput = normalizePreviewKey(trimmed);
-  const mappedKey = PREVIEW_SERVICE_KEY_MAP[normalizedInput];
-
-  if (mappedKey) {
-    return mappedKey.trim();
-  }
-
-  return trimmed;
-}
-
-function getPreviewServiceKey(primaryKey?: string) {
-  return resolvePreviewServiceKey(primaryKey);
-}
 
 const ALL_FILTER = WORKBENCH_TEXT.allFilterLabel;
 const SALES_STATUS_PRODUCT_SLUGS = new Set(["api-15155139", "api-15154910"]);
@@ -77,13 +48,35 @@ const FACTORY_DEFAULT_FROM = dateBeforeDays(365);
 const FACTORY_DEFAULT_TO = dateBeforeDays(0);
 const FACTORY_FETCH_CONCURRENCY = 4;
 
+function normalizePreviewKey(value?: string) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function resolvePreviewServiceKey(inputKey?: string) {
+  const trimmed = String(inputKey ?? "").trim();
+  if (!trimmed) return "";
+  return PREVIEW_SERVICE_KEY_MAP[normalizePreviewKey(trimmed)] ?? trimmed;
+}
+
+async function parseJsonResponse<T>(response: Response): Promise<T> {
+  const text = await response.text();
+
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`JSON 응답이 아닙니다. 응답 앞부분: ${text.slice(0, 200)}`);
+  }
+}
+
 function getStatName(statMode: WorkbenchStatMode, row: Record<string, string | number>) {
   if (statMode === "country:worknational") {
     return normalizeCountry(row.worknational as string | number | undefined);
   }
+
   if (statMode === "country:nationalName") {
     return normalizeCountry(row.nationalName as string | number | undefined);
   }
+
   if (statMode === "region:homestay" || statMode === "region:food") {
     return homestayRegionName(
       row.OPN_ATMY_GRP_CD as string | number | undefined,
@@ -91,12 +84,15 @@ function getStatName(statMode: WorkbenchStatMode, row: Record<string, string | n
       row.LOTNO_ADDR as string | number | undefined,
     );
   }
+
   if (statMode === "region:addr") {
     return eduRegionName(row.addr as string | number | undefined);
   }
+
   if (statMode === "region:factory") {
     return factoryRegionName(row.rnAdres as string | number | undefined);
   }
+
   return "";
 }
 
@@ -125,6 +121,7 @@ function getCollectRowKey(row: Record<string, string | number>) {
     String(row.ROAD_NM_ADDR ?? row.rnAdres ?? row.LOTNO_ADDR ?? ""),
     String(row.irsttNm ?? ""),
   ];
+
   return keyParts.some(Boolean) ? keyParts.join("|") : JSON.stringify(row);
 }
 
@@ -212,11 +209,15 @@ function buildEmptyResultMessage(infoMessage: string, firstError: string) {
   return "조회는 정상적으로 완료되었습니다. 다만 현재 검색 조건에 맞는 데이터가 없습니다.";
 }
 
-export default function WorkbenchCollectorClient({ product, labels }: WorkbenchProps) {
-  if (product.slug === "api-15136560") {
-    return <WorkbenchArchhubClient product={product} labels={labels} />;
-  }
+export default function WorkbenchCollectorClient(props: WorkbenchProps) {
+  return props.product.slug === "api-15136560" ? (
+    <WorkbenchArchhubClient {...props} />
+  ) : (
+    <WorkbenchCollectorBody {...props} />
+  );
+}
 
+function WorkbenchCollectorBody({ product, labels }: WorkbenchProps) {
   const config = useMemo(() => getWorkbenchProductConfig(product.slug), [product.slug]);
   const supportsSalesStatusFilter = SALES_STATUS_PRODUCT_SLUGS.has(product.slug);
 
@@ -257,6 +258,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
   const [selectedEmployeeRange, setSelectedEmployeeRange] = useState("all");
   const [factoryDateFrom, setFactoryDateFrom] = useState(FACTORY_DEFAULT_FROM);
   const [factoryDateTo, setFactoryDateTo] = useState(FACTORY_DEFAULT_TO);
+
   const tableScrollRef = useRef<HTMLDivElement | null>(null);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -266,9 +268,10 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
     return FACTORY_INDUSTRIAL_ESTATE_OPTIONS[selectedFactoryRegion] ?? [];
   }, [selectedFactoryRegion]);
 
-  const selectedFactoryIndustrialEstates = useMemo(() => {
-    return factoryIndustrialEstateOptions.map((item) => item.name);
-  }, [factoryIndustrialEstateOptions]);
+  const selectedFactoryIndustrialEstates = useMemo(
+    () => factoryIndustrialEstateOptions.map((item) => item.name),
+    [factoryIndustrialEstateOptions],
+  );
 
   useEffect(() => {
     if (config.inputMode !== "homestay") {
@@ -298,9 +301,10 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
 
   const labelMap = useMemo(
     () =>
-      Object.fromEntries(
-        (product.workbench?.columns ?? []).map((column) => [column.key, column.label]),
-      ) as Record<string, string>,
+      Object.fromEntries((product.workbench?.columns ?? []).map((column) => [column.key, column.label])) as Record<
+        string,
+        string
+      >,
     [product.workbench?.columns],
   );
 
@@ -332,10 +336,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
     () =>
       config.statMode === "none"
         ? []
-        : [
-            { name: ALL_FILTER, count: rows.length },
-            ...statBuckets.map((bucket) => ({ name: bucket.name, count: bucket.rows.length })),
-          ],
+        : [{ name: ALL_FILTER, count: rows.length }, ...statBuckets.map((bucket) => ({ name: bucket.name, count: bucket.rows.length }))],
     [config.statMode, rows.length, statBuckets],
   );
 
@@ -360,10 +361,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
 
     if (config.inputMode === "factory") {
       output = output.filter((row) =>
-        matchFactoryEmployeeRange(
-          selectedEmployeeRange,
-          row.allEmplyCo as string | number | undefined,
-        ),
+        matchFactoryEmployeeRange(selectedEmployeeRange, row.allEmplyCo as string | number | undefined),
       );
 
       if (factoryDateFrom || factoryDateTo) {
@@ -394,6 +392,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
     const rowKeys = Array.from(new Set(rows.flatMap((row) => Object.keys(row)))).filter(
       (key) => !HIDDEN_META_KEYS.has(key),
     );
+
     const preferred = (product.workbench?.columns ?? [])
       .map((column) => column.key)
       .filter((key) => rowKeys.includes(key));
@@ -416,9 +415,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
         getDefaultFromDate(config.permitDateDefaultFrom, config.permitDateDefaultDaysFrom),
       "cond[LCPMT_YMD::LT]":
         prev["cond[LCPMT_YMD::LT]"] || getDefaultToDate(config.permitDateDefaultTo),
-      ...(config.forceBaseDateToYesterday
-        ? { "cond[BASE_DATE::EQ]": dateBeforeDays(1) }
-        : {}),
+      ...(config.forceBaseDateToYesterday ? { "cond[BASE_DATE::EQ]": dateBeforeDays(1) } : {}),
     }));
   }, [
     config.forceBaseDateToYesterday,
@@ -475,7 +472,6 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
     );
 
     observer.observe(target);
-
     return () => observer.disconnect();
   }, [filteredRows.length]);
 
@@ -502,7 +498,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
 
     const resolvedParams: Record<string, string> = {
       ...requestParams,
-      serviceKey: rawServiceKey ? getPreviewServiceKey(rawServiceKey) : "",
+      serviceKey: rawServiceKey ? resolvePreviewServiceKey(rawServiceKey) : "",
     };
 
     const response = await fetch("/api/public-data/collect", {
@@ -523,7 +519,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
 
     return {
       response,
-      data: (await response.json()) as CollectResponse,
+      data: await parseJsonResponse<CollectResponse>(response),
     };
   };
 
@@ -566,6 +562,17 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
       );
       requestParams["cond[LCPMT_YMD::LT]"] ||= getDefaultToDate(config.permitDateDefaultTo);
 
+      if (
+        requestParams["cond[LCPMT_YMD::GTE]"] &&
+        requestParams["cond[LCPMT_YMD::LT]"] &&
+        requestParams["cond[LCPMT_YMD::GTE]"] > requestParams["cond[LCPMT_YMD::LT]"]
+      ) {
+        setRows([]);
+        setIsError(true);
+        setMessage(`${labels.errorLabel}: 시작일은 종료일보다 늦을 수 없습니다.`);
+        return;
+      }
+
       if (config.forceBaseDateToYesterday) {
         requestParams["cond[BASE_DATE::EQ]"] = dateBeforeDays(1);
       }
@@ -580,6 +587,13 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
     }
 
     if (config.inputMode === "factory") {
+      if (factoryDateFrom && factoryDateTo && factoryDateFrom > factoryDateTo) {
+        setRows([]);
+        setIsError(true);
+        setMessage(`${labels.errorLabel}: 시작일은 종료일보다 늦을 수 없습니다.`);
+        return;
+      }
+
       requestParams.pageNo ||= "1";
       requestParams.numOfRows ||= "200";
       requestParams.type ||= "json";
@@ -741,7 +755,6 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
         }
 
         const nextRows = data.rows ?? [];
-
         setRows(nextRows);
         setIsError(false);
 
@@ -751,10 +764,12 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
           setMessage(buildMessage(data, nextRows.length, labels.successLabel));
         }
       }
-    } catch {
+    } catch (error) {
       setRows([]);
       setIsError(true);
-      setMessage(`${labels.errorLabel}: ${WORKBENCH_TEXT.networkFailed}`);
+      setMessage(
+        `${labels.errorLabel}: ${error instanceof Error ? error.message : WORKBENCH_TEXT.networkFailed}`,
+      );
     } finally {
       stopProgress();
       setIsLoading(false);
@@ -847,7 +862,9 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
     <>
       <div className="mt-5 flex flex-col gap-4 lg:flex-row lg:items-stretch">
         <article
-          className={`rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_16px_36px_rgba(44,86,150,0.12)] transition-[width,transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${hasQueried ? "w-full lg:w-1/2" : "w-full lg:w-full"}`}
+          className={`rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_16px_36px_rgba(44,86,150,0.12)] transition-[width,transform,opacity] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            hasQueried ? "w-full lg:w-1/2" : "w-full lg:w-full"
+          }`}
         >
           <p className="text-xs font-extrabold tracking-[0.14em] text-blue-600">
             {WORKBENCH_TEXT.inputTitle}
@@ -866,7 +883,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
                   </strong>
                   <input
                     className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
-                    placeholder={WORKBENCH_TEXT.serviceKeyPlaceholder}
+                    placeholder="vip / gold / master 또는 실제 인증키 입력"
                     value={params.serviceKey ?? ""}
                     onChange={(event) =>
                       setParams((prev) => ({ ...prev, serviceKey: event.target.value }))
@@ -886,9 +903,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
                       type="button"
                       onClick={() =>
                         setSelectedRegions((prev) =>
-                          prev.length === regionOptions.length
-                            ? []
-                            : regionOptions.map((item) => item.code),
+                          prev.length === regionOptions.length ? [] : regionOptions.map((item) => item.code),
                         )
                       }
                       className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"
@@ -937,9 +952,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
                         type="button"
                         onClick={() =>
                           setSelectedSalesStatuses((prev) =>
-                            prev.length === ALL_SALES_STATUS_CODES.length
-                              ? []
-                              : [...ALL_SALES_STATUS_CODES],
+                            prev.length === ALL_SALES_STATUS_CODES.length ? [] : [...ALL_SALES_STATUS_CODES],
                           )
                         }
                         className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"
@@ -1021,7 +1034,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
                   </strong>
                   <input
                     className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
-                    placeholder={WORKBENCH_TEXT.serviceKeyPlaceholder}
+                    placeholder="vip / gold / master 또는 실제 인증키 입력"
                     value={params.serviceKey ?? ""}
                     onChange={(event) =>
                       setParams((prev) => ({ ...prev, serviceKey: event.target.value }))
@@ -1080,6 +1093,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
                         초기화
                       </button>
                     </div>
+
                     <input
                       type="date"
                       className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
@@ -1108,7 +1122,9 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
                   <strong className="text-base font-bold text-slate-900">{field.label}</strong>
                   <input
                     className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
-                    placeholder={field.key === "serviceKey" ? WORKBENCH_TEXT.serviceKeyPlaceholder : undefined}
+                    placeholder={
+                      field.key === "serviceKey" ? "vip / gold / master 또는 실제 인증키 입력" : undefined
+                    }
                     value={params[field.key] ?? ""}
                     onChange={(event) =>
                       setParams((prev) => ({ ...prev, [field.key]: event.target.value }))
@@ -1146,7 +1162,11 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
 
         <article
           aria-hidden={!hasQueried}
-          className={`overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-[0_16px_36px_rgba(44,86,150,0.12)] transition-[width,opacity,padding,margin,border-color,box-shadow,background-color,height,max-height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${hasQueried ? "h-auto w-full p-4 opacity-100 lg:w-1/2" : "pointer-events-none h-0 max-h-0 w-0 border-0 bg-transparent p-0 opacity-0 shadow-none lg:w-0"}`}
+          className={`overflow-hidden rounded-2xl border border-blue-200 bg-white shadow-[0_16px_36px_rgba(44,86,150,0.12)] transition-[width,opacity,padding,margin,border-color,box-shadow,background-color,height,max-height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            hasQueried
+              ? "h-auto w-full p-4 opacity-100 lg:w-1/2"
+              : "pointer-events-none h-0 max-h-0 w-0 border-0 bg-transparent p-0 opacity-0 shadow-none lg:w-0"
+          }`}
         >
           <p className="text-xs font-extrabold tracking-[0.14em] text-blue-600">
             {labels.resultBadge}
@@ -1278,20 +1298,10 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
 
               <tbody>
                 {visibleRows.map((row, rowIndex) => (
-                  <tr
-                    key={`row-${rowIndex}`}
-                    className="border-t border-blue-100 text-slate-600"
-                  >
+                  <tr key={`row-${rowIndex}`} className="border-t border-blue-100 text-slate-600">
                     {columns.map((column) => (
-                      <td
-                        key={`${rowIndex}-${column}`}
-                        className="whitespace-nowrap px-3 py-2 align-top"
-                      >
-                        {formatCellValue(
-                          column,
-                          row[column] as string | number | undefined,
-                          row,
-                        )}
+                      <td key={`${rowIndex}-${column}`} className="whitespace-nowrap px-3 py-2 align-top">
+                        {formatCellValue(column, row[column] as string | number | undefined, row)}
                       </td>
                     ))}
                   </tr>

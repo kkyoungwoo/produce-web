@@ -17,7 +17,33 @@ type ArchhubCollectBody = {
   legalDongCodes?: string[];
 };
 
+type CollectSuccess = {
+  ok: true;
+  rows: Array<Record<string, string | number>>;
+  totalCount: number;
+  searchedTargetCount: number;
+  endpointFamily?: "hs" | "arch";
+  sourceUrl: string;
+  effectiveStartDate: string;
+  effectiveEndDate: string;
+  usedDateFallback: boolean;
+  fallbackDays: number;
+};
+
+type CollectFailure = {
+  ok: false;
+  status: number;
+  message: string;
+  sourceUrl?: string;
+  searchedTargetCount?: number;
+  endpointFamily?: "hs" | "arch";
+  invalidKey: boolean;
+};
+
+type CollectResult = CollectSuccess | CollectFailure;
+
 const PREVIEW_LIMIT = 5;
+
 const MSG_DEFAULT_PREVIEW =
   "인증키를 입력하지 않아 실제 데이터 샘플 최대 5건을 보여드립니다.";
 const MSG_FALLBACK_PREVIEW =
@@ -25,36 +51,34 @@ const MSG_FALLBACK_PREVIEW =
 const MSG_NO_DEFAULT_KEY =
   "인증키를 입력하면 전체 데이터를 조회할 수 있습니다. 현재 미리보기용 기본 인증키가 설정되어 있지 않습니다.";
 const MSG_NO_RESULT =
-  "조회 결과가 없습니다. 날짜 또는 지역 조건을 조정해 다시 시도해 주세요.";
+  "조회는 정상적으로 완료되었습니다. 다만 현재 검색 조건에 맞는 데이터가 없습니다.";
 
 function isYmd(value: string) {
   return /^\d{8}$/.test(value);
 }
 
-function shiftDate(value: string, days: number) {
+function parseYmd(value: string) {
   const year = Number.parseInt(value.slice(0, 4), 10);
   const month = Number.parseInt(value.slice(4, 6), 10) - 1;
   const day = Number.parseInt(value.slice(6, 8), 10);
-  const date = new Date(year, month, day);
-  date.setDate(date.getDate() + days);
+  return new Date(year, month, day);
+}
 
+function formatYmd(date: Date) {
   return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(
     date.getDate(),
   ).padStart(2, "0")}`;
 }
 
-function diffDays(startDate: string, endDate: string) {
-  const start = new Date(
-    Number.parseInt(startDate.slice(0, 4), 10),
-    Number.parseInt(startDate.slice(4, 6), 10) - 1,
-    Number.parseInt(startDate.slice(6, 8), 10),
-  );
-  const end = new Date(
-    Number.parseInt(endDate.slice(0, 4), 10),
-    Number.parseInt(endDate.slice(4, 6), 10) - 1,
-    Number.parseInt(endDate.slice(6, 8), 10),
-  );
+function shiftDate(value: string, days: number) {
+  const date = parseYmd(value);
+  date.setDate(date.getDate() + days);
+  return formatYmd(date);
+}
 
+function diffDays(startDate: string, endDate: string) {
+  const start = parseYmd(startDate);
+  const end = parseYmd(endDate);
   return Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000));
 }
 
@@ -70,6 +94,10 @@ function isCredentialErrorMessage(message: string) {
     normalized.includes("error code -4") ||
     normalized.includes("service_key_is_not_registered_error")
   );
+}
+
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
 function mergeRows(targets: Array<Record<string, string | number>>) {
@@ -102,37 +130,17 @@ function resolveInputServiceKey(rawServiceKey: string) {
   const normalized = normalizePreviewKey(trimmed);
 
   if (aliases.has(normalized)) {
-    return getPreviewServiceKey(trimmed);
+    return getPreviewServiceKey(trimmed).trim();
   }
 
   return trimmed;
 }
 
 function buildPreviewKeys() {
-  return getPreviewServiceKeys();
+  return uniqueStrings(getPreviewServiceKeys());
 }
 
-async function runCollect(options: {
-  serviceKey: string;
-  startDate: string;
-  endDate: string;
-  sigunguCodes: string[];
-  legalDongCodes: string[];
-  previewLimited: boolean;
-}) {
-  const { serviceKey, startDate, endDate, sigunguCodes, legalDongCodes, previewLimited } = options;
-
-  const targets = expandArchhubTargets({ sigunguCodes, legalDongCodes });
-
-  if (targets.length === 0) {
-    return {
-      ok: false as const,
-      status: 400,
-      message: "선택한 지역에 해당하는 법정동 코드가 없습니다.",
-      invalidKey: false,
-    };
-  }
-
+function buildAttemptRanges(startDate: string, endDate: string, previewLimited: boolean) {
   const attempts: Array<{
     startDate: string;
     endDate: string;
@@ -160,20 +168,43 @@ async function runCollect(options: {
     });
   }
 
-  const dedupedAttempts = attempts.filter(
+  return attempts.filter(
     (attempt, index, array) =>
       array.findIndex(
-        (item) =>
-          item.startDate === attempt.startDate &&
-          item.endDate === attempt.endDate,
+        (item) => item.startDate === attempt.startDate && item.endDate === attempt.endDate,
       ) === index,
   );
+}
+
+async function runCollect(options: {
+  serviceKey: string;
+  startDate: string;
+  endDate: string;
+  sigunguCodes: string[];
+  legalDongCodes: string[];
+  previewLimited: boolean;
+}): Promise<CollectResult> {
+  const { serviceKey, startDate, endDate, sigunguCodes, legalDongCodes, previewLimited } = options;
+
+  const targets = expandArchhubTargets({ sigunguCodes, legalDongCodes });
+
+  if (targets.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      message: "선택한 지역에 해당하는 법정동 코드가 없습니다.",
+      invalidKey: false,
+    };
+  }
+
+  const attempts = buildAttemptRanges(startDate, endDate, previewLimited);
 
   let lastError = MSG_NO_RESULT;
   let lastSourceUrl = "";
-  let lastResult: Awaited<ReturnType<typeof collectArchhubRows>> | null = null;
+  let lastSearchedTargetCount = targets.length;
+  let lastEndpointFamily: "hs" | "arch" | undefined;
 
-  for (const attempt of dedupedAttempts) {
+  for (const attempt of attempts) {
     try {
       const result = await collectArchhubRows({
         serviceKey,
@@ -183,16 +214,18 @@ async function runCollect(options: {
         maxRows: previewLimited ? PREVIEW_LIMIT : undefined,
       });
 
-      lastResult = result;
       lastSourceUrl = result.sourceUrl;
+      lastSearchedTargetCount = result.searchedTargetCount;
+      lastEndpointFamily = result.endpointFamily;
 
       if (result.rows.length > 0) {
+        const merged = mergeRows(result.rows);
+        const rows = previewLimited ? merged.slice(0, PREVIEW_LIMIT) : merged;
+
         return {
-          ok: true as const,
-          rows: previewLimited ? result.rows.slice(0, PREVIEW_LIMIT) : result.rows,
-          totalCount: previewLimited
-            ? Math.min(PREVIEW_LIMIT, result.rows.length)
-            : result.rows.length,
+          ok: true,
+          rows,
+          totalCount: rows.length,
           searchedTargetCount: result.searchedTargetCount,
           endpointFamily: result.endpointFamily,
           sourceUrl: result.sourceUrl,
@@ -204,13 +237,11 @@ async function runCollect(options: {
       }
     } catch (error) {
       lastError =
-        error instanceof Error
-          ? error.message
-          : "건축HUB 수집 중 오류가 발생했습니다.";
+        error instanceof Error ? error.message : "건축HUB 수집 중 오류가 발생했습니다.";
 
       if (isCredentialErrorMessage(lastError)) {
         return {
-          ok: false as const,
+          ok: false,
           status: 401,
           message: "인증키를 확인하지 못했습니다.",
           invalidKey: true,
@@ -220,14 +251,141 @@ async function runCollect(options: {
   }
 
   return {
-    ok: false as const,
+    ok: false,
     status: 404,
-    message: lastError,
-    sourceUrl: lastSourceUrl || lastResult?.sourceUrl || "",
-    searchedTargetCount: lastResult?.searchedTargetCount ?? targets.length,
-    endpointFamily: lastResult?.endpointFamily,
+    message: lastError || MSG_NO_RESULT,
+    sourceUrl: lastSourceUrl,
+    searchedTargetCount: lastSearchedTargetCount,
+    endpointFamily: lastEndpointFamily,
     invalidKey: false,
   };
+}
+
+async function runPreviewCollect(options: {
+  previewServiceKeys: string[];
+  startDate: string;
+  endDate: string;
+  sigunguCodes: string[];
+  legalDongCodes: string[];
+}) {
+  const { previewServiceKeys, startDate, endDate, sigunguCodes, legalDongCodes } = options;
+
+  const mergedRows: Array<Record<string, string | number>> = [];
+  let latestMeta: {
+    searchedTargetCount?: number;
+    endpointFamily?: "hs" | "arch";
+    sourceUrl?: string;
+    effectiveStartDate?: string;
+    effectiveEndDate?: string;
+    usedDateFallback?: boolean;
+    fallbackDays?: number;
+  } = {};
+
+  const previewDongGroups =
+    legalDongCodes.length > 0 ? legalDongCodes.map((code) => [code]) : [[]];
+
+  for (const previewServiceKey of previewServiceKeys) {
+    for (const legalDongGroup of previewDongGroups) {
+      const attempt = await runCollect({
+        serviceKey: previewServiceKey,
+        startDate,
+        endDate,
+        sigunguCodes,
+        legalDongCodes: legalDongGroup,
+        previewLimited: true,
+      });
+
+      if (attempt.ok) {
+        mergedRows.push(...attempt.rows);
+
+        latestMeta = {
+          searchedTargetCount: attempt.searchedTargetCount,
+          endpointFamily: attempt.endpointFamily,
+          sourceUrl: attempt.sourceUrl,
+          effectiveStartDate: attempt.effectiveStartDate,
+          effectiveEndDate: attempt.effectiveEndDate,
+          usedDateFallback: attempt.usedDateFallback,
+          fallbackDays: attempt.fallbackDays,
+        };
+
+        const uniqueRows = mergeRows(mergedRows).slice(0, PREVIEW_LIMIT);
+
+        if (uniqueRows.length >= PREVIEW_LIMIT) {
+          return {
+            kind: "ok" as const,
+            attempt: {
+              ok: true as const,
+              rows: uniqueRows,
+              totalCount: uniqueRows.length,
+              searchedTargetCount:
+                latestMeta.searchedTargetCount ??
+                (legalDongCodes.length > 0 ? legalDongCodes.length : sigunguCodes.length),
+              endpointFamily: latestMeta.endpointFamily,
+              sourceUrl: latestMeta.sourceUrl ?? "",
+              effectiveStartDate: latestMeta.effectiveStartDate ?? startDate,
+              effectiveEndDate: latestMeta.effectiveEndDate ?? endDate,
+              usedDateFallback: latestMeta.usedDateFallback ?? false,
+              fallbackDays: latestMeta.fallbackDays ?? 0,
+            },
+          };
+        }
+
+        continue;
+      }
+
+      if (attempt.status === 404) {
+        continue;
+      }
+
+      if (attempt.invalidKey) {
+        continue;
+      }
+
+      return {
+        kind: "error" as const,
+        attempt,
+      };
+    }
+  }
+
+  const uniqueRows = mergeRows(mergedRows).slice(0, PREVIEW_LIMIT);
+
+  if (uniqueRows.length > 0) {
+    return {
+      kind: "ok" as const,
+      attempt: {
+        ok: true as const,
+        rows: uniqueRows,
+        totalCount: uniqueRows.length,
+        searchedTargetCount:
+          latestMeta.searchedTargetCount ??
+          (legalDongCodes.length > 0 ? legalDongCodes.length : sigunguCodes.length),
+        endpointFamily: latestMeta.endpointFamily,
+        sourceUrl: latestMeta.sourceUrl ?? "",
+        effectiveStartDate: latestMeta.effectiveStartDate ?? startDate,
+        effectiveEndDate: latestMeta.effectiveEndDate ?? endDate,
+        usedDateFallback: latestMeta.usedDateFallback ?? false,
+        fallbackDays: latestMeta.fallbackDays ?? 0,
+      },
+    };
+  }
+
+  return null;
+}
+
+function buildEmptyPreviewResponse(
+  authStatus: "default-preview" | "fallback-preview",
+  message: string,
+) {
+  return NextResponse.json({
+    ok: true,
+    rows: [],
+    totalCount: 0,
+    previewLimited: true,
+    previewCount: PREVIEW_LIMIT,
+    authStatus,
+    message,
+  });
 }
 
 export async function POST(request: Request) {
@@ -240,11 +398,9 @@ export async function POST(request: Request) {
 
     const startDate = body.startDate?.trim() ?? "";
     const endDate = body.endDate?.trim() ?? "";
-    const sigunguCodes = Array.isArray(body.sigunguCodes)
-      ? body.sigunguCodes.map((value) => value.trim()).filter(Boolean)
-      : [];
+    const sigunguCodes = Array.isArray(body.sigunguCodes) ? uniqueStrings(body.sigunguCodes) : [];
     const legalDongCodes = Array.isArray(body.legalDongCodes)
-      ? body.legalDongCodes.map((value) => value.trim()).filter(Boolean)
+      ? uniqueStrings(body.legalDongCodes)
       : [];
 
     if (!isYmd(startDate) || !isYmd(endDate)) {
@@ -267,101 +423,6 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-
-    const runPreviewCollect = async () => {
-      const mergedRows: Array<Record<string, string | number>> = [];
-      let latestMeta: {
-        searchedTargetCount?: number;
-        endpointFamily?: "hs" | "arch";
-        sourceUrl?: string;
-        effectiveStartDate?: string;
-        effectiveEndDate?: string;
-        usedDateFallback?: boolean;
-        fallbackDays?: number;
-      } = {};
-
-      const previewDongCodes =
-        legalDongCodes.length > 0 ? legalDongCodes : [""];
-
-      for (const previewServiceKey of previewServiceKeys) {
-        for (const legalDongCode of previewDongCodes) {
-          const attempt = await runCollect({
-            serviceKey: previewServiceKey,
-            startDate,
-            endDate,
-            sigunguCodes,
-            legalDongCodes: legalDongCode ? [legalDongCode] : legalDongCodes,
-            previewLimited: true,
-          });
-
-          if (attempt.ok) {
-            mergedRows.push(...attempt.rows);
-            latestMeta = {
-              searchedTargetCount: attempt.searchedTargetCount,
-              endpointFamily: attempt.endpointFamily,
-              sourceUrl: attempt.sourceUrl,
-              effectiveStartDate: attempt.effectiveStartDate,
-              effectiveEndDate: attempt.effectiveEndDate,
-              usedDateFallback: attempt.usedDateFallback,
-              fallbackDays: attempt.fallbackDays,
-            };
-
-            const uniqueRows = mergeRows(mergedRows).slice(0, PREVIEW_LIMIT);
-
-            if (uniqueRows.length >= PREVIEW_LIMIT) {
-              return {
-                kind: "ok" as const,
-                attempt: {
-                  ok: true as const,
-                  rows: uniqueRows,
-                  totalCount: uniqueRows.length,
-                  searchedTargetCount:
-                    latestMeta.searchedTargetCount ??
-                    (legalDongCodes.length > 0 ? legalDongCodes.length : sigunguCodes.length),
-                  endpointFamily: latestMeta.endpointFamily,
-                  sourceUrl: latestMeta.sourceUrl ?? "",
-                  effectiveStartDate: latestMeta.effectiveStartDate ?? startDate,
-                  effectiveEndDate: latestMeta.effectiveEndDate ?? endDate,
-                  usedDateFallback: latestMeta.usedDateFallback ?? false,
-                  fallbackDays: latestMeta.fallbackDays ?? 0,
-                },
-              };
-            }
-
-            continue;
-          }
-
-          if (attempt.status === 404) continue;
-          if (attempt.invalidKey) continue;
-
-          return { kind: "error" as const, attempt };
-        }
-      }
-
-      const uniqueRows = mergeRows(mergedRows).slice(0, PREVIEW_LIMIT);
-
-      if (uniqueRows.length > 0) {
-        return {
-          kind: "ok" as const,
-          attempt: {
-            ok: true as const,
-            rows: uniqueRows,
-            totalCount: uniqueRows.length,
-            searchedTargetCount:
-              latestMeta.searchedTargetCount ??
-              (legalDongCodes.length > 0 ? legalDongCodes.length : sigunguCodes.length),
-            endpointFamily: latestMeta.endpointFamily,
-            sourceUrl: latestMeta.sourceUrl ?? "",
-            effectiveStartDate: latestMeta.effectiveStartDate ?? startDate,
-            effectiveEndDate: latestMeta.effectiveEndDate ?? endDate,
-            usedDateFallback: latestMeta.usedDateFallback ?? false,
-            fallbackDays: latestMeta.fallbackDays ?? 0,
-          },
-        };
-      }
-
-      return null;
-    };
 
     if (serviceKey) {
       const fullAttempt = await runCollect({
@@ -387,6 +448,7 @@ export async function POST(request: Request) {
           fallbackDays: fullAttempt.fallbackDays,
           previewLimited: false,
           authStatus: "full",
+          message: fullAttempt.totalCount > 0 ? undefined : MSG_NO_RESULT,
         });
       }
 
@@ -403,7 +465,20 @@ export async function POST(request: Request) {
         );
       }
 
-      const previewResult = await runPreviewCollect();
+      if (previewServiceKeys.length === 0) {
+        return buildEmptyPreviewResponse(
+          "fallback-preview",
+          `${MSG_FALLBACK_PREVIEW} ${MSG_NO_DEFAULT_KEY}`,
+        );
+      }
+
+      const previewResult = await runPreviewCollect({
+        previewServiceKeys,
+        startDate,
+        endDate,
+        sigunguCodes,
+        legalDongCodes,
+      });
 
       if (previewResult?.kind === "ok") {
         return NextResponse.json({
@@ -435,15 +510,10 @@ export async function POST(request: Request) {
         );
       }
 
-      return NextResponse.json({
-        ok: true,
-        rows: [],
-        totalCount: 0,
-        previewLimited: true,
-        previewCount: PREVIEW_LIMIT,
-        authStatus: "fallback-preview",
-        message: `${MSG_FALLBACK_PREVIEW} ${MSG_NO_RESULT}`,
-      });
+      return buildEmptyPreviewResponse(
+        "fallback-preview",
+        `${MSG_FALLBACK_PREVIEW} ${MSG_NO_RESULT}`,
+      );
     }
 
     if (previewServiceKeys.length === 0) {
@@ -458,7 +528,13 @@ export async function POST(request: Request) {
       });
     }
 
-    const previewResult = await runPreviewCollect();
+    const previewResult = await runPreviewCollect({
+      previewServiceKeys,
+      startDate,
+      endDate,
+      sigunguCodes,
+      legalDongCodes,
+    });
 
     if (previewResult?.kind === "ok") {
       return NextResponse.json({
@@ -490,15 +566,10 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({
-      ok: true,
-      rows: [],
-      totalCount: 0,
-      previewLimited: true,
-      previewCount: PREVIEW_LIMIT,
-      authStatus: "default-preview",
-      message: `${MSG_DEFAULT_PREVIEW} ${MSG_NO_RESULT}`,
-    });
+    return buildEmptyPreviewResponse(
+      "default-preview",
+      `${MSG_DEFAULT_PREVIEW} ${MSG_NO_RESULT}`,
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
 
