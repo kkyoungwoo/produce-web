@@ -70,15 +70,20 @@ function isValidProductItem(item: unknown): item is ProductItem {
   );
 }
 
+
 function normalizeProductCopy(product: ProductItem): ProductItem {
   return {
     ...product,
-    status: "분석 가능",
-    priceLabel: `Data ID ${product.portalDataId}`,
-    delivery: "조건 입력 후 바로 조회",
-    audience: "시장 조사, 운영 분석, 지역 비교, 영업 기회 탐색",
-    summary: `Data ID ${product.portalDataId} 기반 데이터를 날짜와 조건 중심으로 빠르게 확인할 수 있는 분석 페이지입니다.`,
-    description: `공공데이터포털 Data ID ${product.portalDataId} API를 바탕으로 필요한 조건의 데이터를 조회하고 표와 엑셀로 확인할 수 있습니다.`,
+    status: product.status || "분석 가능",
+    priceLabel: product.priceLabel || `Data ID ${product.portalDataId}`,
+    delivery: product.delivery || "조건 입력 후 바로 조회",
+    audience: product.audience || "시장 조사, 운영 분석, 지역 비교, 영업 기회 탐색",
+    summary:
+      product.summary ||
+      `Data ID ${product.portalDataId} 기반 데이터를 날짜와 조건 중심으로 빠르게 확인할 수 있는 분석 페이지입니다.`,
+    description:
+      product.description ||
+      `공공데이터포털 Data ID ${product.portalDataId} API를 바탕으로 필요한 조건의 데이터를 조회하고 표와 엑셀로 확인할 수 있습니다.`,
   };
 }
 

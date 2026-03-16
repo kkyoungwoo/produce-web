@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 
-import { getPreviewServiceKeys } from "@/lib/public-data/preview-key";
+import {
+  getPreviewKeyDebug,
+  getPreviewServiceKey,
+  resolveFullAccessServiceKey,
+} from "@/lib/public-data/preview-key";
 
 type CollectBody = {
   endpoint?: string;
@@ -51,9 +55,9 @@ const MSG_TOO_FAST = "요청 간격이 너무 짧습니다. 잠시 후 다시 �
 const MSG_NO_ENDPOINT = "서버 설정 오류: 엔드포인트가 없습니다.";
 const MSG_UPSTREAM_CONNECT_FAIL = "공공 API 서버 연결에 실패했습니다. 잠시 후 다시 시도해 주세요.";
 const MSG_NO_RESULT = "조회 결과가 없습니다. 날짜/지역 조건을 확인해 주세요.";
-const MSG_DEFAULT_PREVIEW = "인증키를 입력하지 않아 기본 인증키로 실제 데이터 미리보기 5건을 보여드립니다.";
-const MSG_FALLBACK_PREVIEW = "입력한 인증키를 확인하지 못해 기본 인증키로 실제 데이터 미리보기 5건을 보여드립니다.";
-const MSG_NO_DEFAULT_KEY = "인증키를 입력하면 전체 데이터를 조회할 수 있습니다. 현재 기본 인증키가 설정되어 있지 않습니다.";
+const MSG_DEFAULT_PREVIEW = "인증키를 입력하지 않아 실제 데이터 미리보기 5건을 보여드립니다.";
+const MSG_FALLBACK_PREVIEW = "입력한 인증키를 확인하지 못해 실제 데이터 미리보기 5건을 보여드립니다.";
+const MSG_NO_DEFAULT_KEY = "인증키를 입력하면 전체 데이터를 조회할 수 있습니다. 현재 미리보기용 기본 인증키가 설정되어 있지 않습니다.";
 const MSG_INVALID_KEY_NO_DEFAULT = "입력한 인증키를 확인하지 못했습니다. 올바른 인증키를 입력해 주세요.";
 
 function buildUrl(endpoint: string, query: Record<string, string>) {
@@ -258,13 +262,13 @@ async function collectWithKey(options: {
   const selectedEndpoint = useHistory && historyEndpoint ? historyEndpoint : endpoint;
 
   const requestedPageNo = previewLimited ? 1 : Math.max(1, asInt(params.pageNo || "1", 1));
-const endpointLimit =
-  selectedEndpoint.includes("foreigner_city_homestays") ||
-  selectedEndpoint.includes("foreigners_entertainment_restaurants")
-    ? 100
-    : selectedEndpoint.includes("fctryRegistInfo")
-      ? 500
-      : 500;
+  const endpointLimit =
+    selectedEndpoint.includes("foreigner_city_homestays") ||
+    selectedEndpoint.includes("foreigners_entertainment_restaurants")
+      ? 100
+      : selectedEndpoint.includes("fctryRegistInfo")
+        ? 500
+        : 500;
 
   const requestedNumOfRows = previewLimited
     ? Math.min(PREVIEW_LIMIT, endpointLimit)
@@ -417,12 +421,9 @@ export async function POST(request: Request) {
     };
 
     const serviceKeyQueryKey = body.serviceKeyQueryKey || "serviceKey";
-    const userServiceKey = String(params[serviceKeyQueryKey] ?? "").trim();
-    const envServiceKey = body.serviceKeyEnvVar
-      ? String(process.env[body.serviceKeyEnvVar] ?? "").trim()
-      : "";
-
-    const previewServiceKeys = getPreviewServiceKeys(envServiceKey);
+    const rawUserServiceKey = String(params[serviceKeyQueryKey] ?? "").trim();
+    const resolvedUserServiceKey = resolveFullAccessServiceKey(rawUserServiceKey);
+    const previewServiceKey = getPreviewServiceKey();
 
     const runCollect = async (serviceKey: string, previewLimited: boolean) =>
       collectWithKey({
@@ -436,28 +437,8 @@ export async function POST(request: Request) {
         previewLimited,
       });
 
-    const runPreviewCollect = async () => {
-      for (const previewServiceKey of previewServiceKeys) {
-        const attempt = await runCollect(previewServiceKey, true);
-
-        if (attempt.ok) {
-          return { kind: "ok" as const, attempt };
-        }
-        if (attempt.status === 404) {
-          return { kind: "empty" as const, attempt };
-        }
-        if (attempt.invalidKey) {
-          continue;
-        }
-
-        return { kind: "error" as const, attempt };
-      }
-
-      return null;
-    };
-
-    if (userServiceKey) {
-      const userAttempt = await runCollect(userServiceKey, false);
+    if (resolvedUserServiceKey) {
+      const userAttempt = await runCollect(resolvedUserServiceKey, false);
 
       if (userAttempt.ok) {
         return NextResponse.json({
@@ -467,6 +448,7 @@ export async function POST(request: Request) {
           sourceUrl: userAttempt.sourceUrl,
           previewLimited: false,
           authStatus: "full",
+          previewDebug: getPreviewKeyDebug(),
         });
       }
 
@@ -477,63 +459,68 @@ export async function POST(request: Request) {
             message: userAttempt.message,
             sourceUrl: userAttempt.sourceUrl,
             upstream: userAttempt.upstream,
+            previewDebug: getPreviewKeyDebug(),
           },
           { status: userAttempt.status },
         );
       }
 
-      const previewResult = await runPreviewCollect();
-
-      if (previewResult?.kind === "ok") {
-        return NextResponse.json({
-          ok: true,
-          rows: previewResult.attempt.rows,
-          totalCount: previewResult.attempt.totalCount,
-          sourceUrl: previewResult.attempt.sourceUrl,
-          previewLimited: true,
-          previewCount: PREVIEW_LIMIT,
-          authStatus: "fallback-preview",
-          message: MSG_FALLBACK_PREVIEW,
-        });
-      }
-
-      if (previewResult?.kind === "empty") {
+      if (!previewServiceKey) {
         return NextResponse.json({
           ok: true,
           rows: [],
           totalCount: 0,
-          sourceUrl: previewResult.attempt.sourceUrl,
+          previewLimited: true,
+          previewCount: PREVIEW_LIMIT,
+          authStatus: "missing-preview",
+          message: MSG_INVALID_KEY_NO_DEFAULT,
+          previewDebug: getPreviewKeyDebug(),
+        });
+      }
+
+      const previewAttempt = await runCollect(previewServiceKey, true);
+
+      if (previewAttempt.ok) {
+        return NextResponse.json({
+          ok: true,
+          rows: previewAttempt.rows,
+          totalCount: previewAttempt.totalCount,
+          sourceUrl: previewAttempt.sourceUrl,
+          previewLimited: true,
+          previewCount: PREVIEW_LIMIT,
+          authStatus: "fallback-preview",
+          message: MSG_FALLBACK_PREVIEW,
+          previewDebug: getPreviewKeyDebug(),
+        });
+      }
+
+      if (previewAttempt.status === 404) {
+        return NextResponse.json({
+          ok: true,
+          rows: [],
+          totalCount: 0,
+          sourceUrl: previewAttempt.sourceUrl,
           previewLimited: true,
           previewCount: PREVIEW_LIMIT,
           authStatus: "fallback-preview",
           message: `${MSG_FALLBACK_PREVIEW} ${MSG_NO_RESULT}`,
+          previewDebug: getPreviewKeyDebug(),
         });
       }
 
-      if (previewResult?.kind === "error") {
-        return NextResponse.json(
-          {
-            ok: false,
-            message: previewResult.attempt.message,
-            sourceUrl: previewResult.attempt.sourceUrl,
-            upstream: previewResult.attempt.upstream,
-          },
-          { status: previewResult.attempt.status },
-        );
-      }
-
-      return NextResponse.json({
-        ok: true,
-        rows: [],
-        totalCount: 0,
-        previewLimited: true,
-        previewCount: PREVIEW_LIMIT,
-        authStatus: "missing-preview",
-        message: MSG_INVALID_KEY_NO_DEFAULT,
-      });
+      return NextResponse.json(
+        {
+          ok: false,
+          message: previewAttempt.message,
+          sourceUrl: previewAttempt.sourceUrl,
+          upstream: previewAttempt.upstream,
+          previewDebug: getPreviewKeyDebug(),
+        },
+        { status: previewAttempt.status },
+      );
     }
 
-    if (previewServiceKeys.length === 0) {
+    if (!previewServiceKey) {
       return NextResponse.json({
         ok: true,
         rows: [],
@@ -542,58 +529,50 @@ export async function POST(request: Request) {
         previewCount: PREVIEW_LIMIT,
         authStatus: "missing-preview",
         message: MSG_NO_DEFAULT_KEY,
+        previewDebug: getPreviewKeyDebug(),
       });
     }
 
-    const previewResult = await runPreviewCollect();
+    const previewAttempt = await runCollect(previewServiceKey, true);
 
-    if (previewResult?.kind === "ok") {
+    if (previewAttempt.ok) {
       return NextResponse.json({
         ok: true,
-        rows: previewResult.attempt.rows,
-        totalCount: previewResult.attempt.totalCount,
-        sourceUrl: previewResult.attempt.sourceUrl,
+        rows: previewAttempt.rows,
+        totalCount: previewAttempt.totalCount,
+        sourceUrl: previewAttempt.sourceUrl,
         previewLimited: true,
         previewCount: PREVIEW_LIMIT,
         authStatus: "default-preview",
         message: MSG_DEFAULT_PREVIEW,
+        previewDebug: getPreviewKeyDebug(),
       });
     }
 
-    if (previewResult?.kind === "empty") {
+    if (previewAttempt.status === 404) {
       return NextResponse.json({
         ok: true,
         rows: [],
         totalCount: 0,
-        sourceUrl: previewResult.attempt.sourceUrl,
+        sourceUrl: previewAttempt.sourceUrl,
         previewLimited: true,
         previewCount: PREVIEW_LIMIT,
         authStatus: "default-preview",
         message: `${MSG_DEFAULT_PREVIEW} ${MSG_NO_RESULT}`,
+        previewDebug: getPreviewKeyDebug(),
       });
     }
 
-    if (previewResult?.kind === "error") {
-      return NextResponse.json(
-        {
-          ok: false,
-          message: previewResult.attempt.message,
-          sourceUrl: previewResult.attempt.sourceUrl,
-          upstream: previewResult.attempt.upstream,
-        },
-        { status: previewResult.attempt.status },
-      );
-    }
-
-    return NextResponse.json({
-      ok: true,
-      rows: [],
-      totalCount: 0,
-      previewLimited: true,
-      previewCount: PREVIEW_LIMIT,
-      authStatus: "missing-preview",
-      message: MSG_NO_DEFAULT_KEY,
-    });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: previewAttempt.message,
+        sourceUrl: previewAttempt.sourceUrl,
+        upstream: previewAttempt.upstream,
+        previewDebug: getPreviewKeyDebug(),
+      },
+      { status: previewAttempt.status },
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     return NextResponse.json(

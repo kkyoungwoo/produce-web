@@ -3,11 +3,9 @@ import { NextResponse } from "next/server";
 import { collectArchhubRows } from "@/lib/archhub/collector";
 import { expandArchhubTargets } from "@/lib/archhub/regions";
 import {
-  getAllPreviewServiceKeys,
-  getPreviewAliases,
   getPreviewKeyDebug,
   getPreviewServiceKey,
-  normalizePreviewKey,
+  resolveFullAccessServiceKey,
 } from "@/lib/public-data/preview-key";
 
 type ArchhubCollectBody = {
@@ -16,6 +14,10 @@ type ArchhubCollectBody = {
   endDate?: string;
   sigunguCodes?: string[];
   legalDongCodes?: string[];
+  buildingNameKeyword?: string;
+  siteLocationKeyword?: string;
+  mainUsageKeyword?: string;
+  dongNameKeyword?: string;
 };
 
 type CollectSuccess = {
@@ -104,6 +106,10 @@ function uniqueStrings(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
+function toText(value: unknown) {
+  return String(value ?? "").trim();
+}
+
 function mergeRows(rows: Array<Record<string, string | number>>) {
   const map = new Map<string, Record<string, string | number>>();
 
@@ -123,25 +129,51 @@ function mergeRows(rows: Array<Record<string, string | number>>) {
   return Array.from(map.values());
 }
 
-function resolveInputServiceKey(rawServiceKey: string) {
-  const trimmed = rawServiceKey.trim();
+function containsKeyword(value: unknown, keyword: string) {
+  const source = toText(value).toLowerCase();
+  const target = toText(keyword).toLowerCase();
 
-  if (!trimmed) {
-    return "";
-  }
-
-  const aliases = new Set(getPreviewAliases());
-  const normalized = normalizePreviewKey(trimmed);
-
-  if (aliases.has(normalized)) {
-    return getPreviewServiceKey(trimmed).trim();
-  }
-
-  return trimmed;
+  if (!target) return true;
+  return source.includes(target);
 }
 
-function buildPreviewKeys() {
-  return uniqueStrings(getAllPreviewServiceKeys());
+function filterRowsByKeywords(
+  rows: Array<Record<string, string | number>>,
+  options: {
+    buildingNameKeyword: string;
+    siteLocationKeyword: string;
+    mainUsageKeyword: string;
+    dongNameKeyword: string;
+  },
+) {
+  const {
+    buildingNameKeyword,
+    siteLocationKeyword,
+    mainUsageKeyword,
+    dongNameKeyword,
+  } = options;
+
+  return rows.filter((row) => {
+    const matchBuildingName = buildingNameKeyword
+      ? containsKeyword(row.buildingName, buildingNameKeyword)
+      : true;
+
+    const matchSiteLocation = siteLocationKeyword
+      ? containsKeyword(row.siteLocation, siteLocationKeyword)
+      : true;
+
+    const matchMainUsage = mainUsageKeyword
+      ? containsKeyword(row.mainUsage1, mainUsageKeyword) ||
+        containsKeyword(row.mainUsage2, mainUsageKeyword) ||
+        containsKeyword(row.etcUsage, mainUsageKeyword)
+      : true;
+
+    const matchDongName = dongNameKeyword
+      ? containsKeyword(row.dongName, dongNameKeyword)
+      : true;
+
+    return matchBuildingName && matchSiteLocation && matchMainUsage && matchDongName;
+  });
 }
 
 function buildAttemptRanges(startDate: string, endDate: string, previewLimited: boolean) {
@@ -194,8 +226,22 @@ async function runCollect(options: {
   sigunguCodes: string[];
   legalDongCodes: string[];
   previewLimited: boolean;
+  keywordOptions: {
+    buildingNameKeyword: string;
+    siteLocationKeyword: string;
+    mainUsageKeyword: string;
+    dongNameKeyword: string;
+  };
 }): Promise<CollectResult> {
-  const { serviceKey, startDate, endDate, sigunguCodes, legalDongCodes, previewLimited } = options;
+  const {
+    serviceKey,
+    startDate,
+    endDate,
+    sigunguCodes,
+    legalDongCodes,
+    previewLimited,
+    keywordOptions,
+  } = options;
 
   const targets = expandArchhubTargets({ sigunguCodes, legalDongCodes });
 
@@ -222,7 +268,7 @@ async function runCollect(options: {
         startDate: attempt.startDate,
         endDate: attempt.endDate,
         targets,
-        maxRows: previewLimited ? PREVIEW_LIMIT : undefined,
+        maxRows: previewLimited ? PREVIEW_LIMIT * 10 : undefined,
       });
 
       lastSourceUrl = result.sourceUrl;
@@ -231,20 +277,23 @@ async function runCollect(options: {
 
       if (result.rows.length > 0) {
         const merged = mergeRows(result.rows);
-        const rows = previewLimited ? merged.slice(0, PREVIEW_LIMIT) : merged;
+        const filtered = filterRowsByKeywords(merged, keywordOptions);
+        const rows = previewLimited ? filtered.slice(0, PREVIEW_LIMIT) : filtered;
 
-        return {
-          ok: true,
-          rows,
-          totalCount: rows.length,
-          searchedTargetCount: result.searchedTargetCount,
-          endpointFamily: result.endpointFamily,
-          sourceUrl: result.sourceUrl,
-          effectiveStartDate: attempt.startDate,
-          effectiveEndDate: attempt.endDate,
-          usedDateFallback: attempt.usedDateFallback,
-          fallbackDays: attempt.fallbackDays,
-        };
+        if (rows.length > 0) {
+          return {
+            ok: true,
+            rows,
+            totalCount: rows.length,
+            searchedTargetCount: result.searchedTargetCount,
+            endpointFamily: result.endpointFamily,
+            sourceUrl: result.sourceUrl,
+            effectiveStartDate: attempt.startDate,
+            effectiveEndDate: attempt.endDate,
+            usedDateFallback: attempt.usedDateFallback,
+            fallbackDays: attempt.fallbackDays,
+          };
+        }
       }
     } catch (error) {
       lastError =
@@ -272,151 +321,6 @@ async function runCollect(options: {
     searchedTargetCount: lastSearchedTargetCount,
     endpointFamily: lastEndpointFamily,
     invalidKey: false,
-  };
-}
-
-async function runPreviewCollect(options: {
-  previewServiceKeys: string[];
-  startDate: string;
-  endDate: string;
-  sigunguCodes: string[];
-  legalDongCodes: string[];
-}) {
-  const { previewServiceKeys, startDate, endDate, sigunguCodes, legalDongCodes } = options;
-
-  const mergedRows: Array<Record<string, string | number>> = [];
-  const debugAttempts: Array<{
-    keyMask: string;
-    legalDongCount: number;
-    ok: boolean;
-    status?: number;
-    invalidKey?: boolean;
-    message?: string;
-    rowCount?: number;
-  }> = [];
-
-  let latestMeta: {
-    searchedTargetCount?: number;
-    endpointFamily?: "hs" | "arch";
-    sourceUrl?: string;
-    effectiveStartDate?: string;
-    effectiveEndDate?: string;
-    usedDateFallback?: boolean;
-    fallbackDays?: number;
-  } = {};
-
-  const previewDongGroups =
-    legalDongCodes.length > 0 ? legalDongCodes.map((code) => [code]) : [[]];
-
-  for (const previewServiceKey of previewServiceKeys) {
-    const keyMask =
-      previewServiceKey.length <= 8
-        ? "********"
-        : `${previewServiceKey.slice(0, 4)}...${previewServiceKey.slice(-4)}`;
-
-    for (const legalDongGroup of previewDongGroups) {
-      const attempt = await runCollect({
-        serviceKey: previewServiceKey,
-        startDate,
-        endDate,
-        sigunguCodes,
-        legalDongCodes: legalDongGroup,
-        previewLimited: true,
-      });
-
-      if (attempt.ok) {
-        mergedRows.push(...attempt.rows);
-
-        debugAttempts.push({
-          keyMask,
-          legalDongCount: legalDongGroup.length,
-          ok: true,
-          rowCount: attempt.rows.length,
-        });
-
-        latestMeta = {
-          searchedTargetCount: attempt.searchedTargetCount,
-          endpointFamily: attempt.endpointFamily,
-          sourceUrl: attempt.sourceUrl,
-          effectiveStartDate: attempt.effectiveStartDate,
-          effectiveEndDate: attempt.effectiveEndDate,
-          usedDateFallback: attempt.usedDateFallback,
-          fallbackDays: attempt.fallbackDays,
-        };
-
-        const uniqueRows = mergeRows(mergedRows).slice(0, PREVIEW_LIMIT);
-
-        if (uniqueRows.length >= PREVIEW_LIMIT) {
-          return {
-            kind: "ok" as const,
-            attempt: {
-              ok: true as const,
-              rows: uniqueRows,
-              totalCount: uniqueRows.length,
-              searchedTargetCount:
-                latestMeta.searchedTargetCount ??
-                (legalDongCodes.length > 0 ? legalDongCodes.length : sigunguCodes.length),
-              endpointFamily: latestMeta.endpointFamily,
-              sourceUrl: latestMeta.sourceUrl ?? "",
-              effectiveStartDate: latestMeta.effectiveStartDate ?? startDate,
-              effectiveEndDate: latestMeta.effectiveEndDate ?? endDate,
-              usedDateFallback: latestMeta.usedDateFallback ?? false,
-              fallbackDays: latestMeta.fallbackDays ?? 0,
-            },
-            debugAttempts,
-          };
-        }
-
-        continue;
-      }
-
-      debugAttempts.push({
-        keyMask,
-        legalDongCount: legalDongGroup.length,
-        ok: false,
-        status: attempt.status,
-        invalidKey: attempt.invalidKey,
-        message: attempt.message,
-      });
-
-      if (attempt.status === 404 || attempt.invalidKey) {
-        continue;
-      }
-
-      return {
-        kind: "error" as const,
-        attempt,
-        debugAttempts,
-      };
-    }
-  }
-
-  const uniqueRows = mergeRows(mergedRows).slice(0, PREVIEW_LIMIT);
-
-  if (uniqueRows.length > 0) {
-    return {
-      kind: "ok" as const,
-      attempt: {
-        ok: true as const,
-        rows: uniqueRows,
-        totalCount: uniqueRows.length,
-        searchedTargetCount:
-          latestMeta.searchedTargetCount ??
-          (legalDongCodes.length > 0 ? legalDongCodes.length : sigunguCodes.length),
-        endpointFamily: latestMeta.endpointFamily,
-        sourceUrl: latestMeta.sourceUrl ?? "",
-        effectiveStartDate: latestMeta.effectiveStartDate ?? startDate,
-        effectiveEndDate: latestMeta.effectiveEndDate ?? endDate,
-        usedDateFallback: latestMeta.usedDateFallback ?? false,
-        fallbackDays: latestMeta.fallbackDays ?? 0,
-      },
-      debugAttempts,
-    };
-  }
-
-  return {
-    kind: "empty" as const,
-    debugAttempts,
   };
 }
 
@@ -456,8 +360,8 @@ export async function POST(request: Request) {
     }
 
     const rawServiceKey = String(body.serviceKey ?? "").trim();
-    const serviceKey = resolveInputServiceKey(rawServiceKey);
-    const previewServiceKeys = buildPreviewKeys();
+    const serviceKey = resolveFullAccessServiceKey(rawServiceKey);
+    const previewServiceKey = getPreviewServiceKey();
 
     const startDate = String(body.startDate ?? "").trim();
     const endDate = String(body.endDate ?? "").trim();
@@ -469,6 +373,13 @@ export async function POST(request: Request) {
     const legalDongCodes = Array.isArray(body.legalDongCodes)
       ? uniqueStrings(body.legalDongCodes)
       : [];
+
+    const keywordOptions = {
+      buildingNameKeyword: toText(body.buildingNameKeyword),
+      siteLocationKeyword: toText(body.siteLocationKeyword),
+      mainUsageKeyword: toText(body.mainUsageKeyword),
+      dongNameKeyword: toText(body.dongNameKeyword),
+    };
 
     if (!isYmd(startDate) || !isYmd(endDate)) {
       return NextResponse.json(
@@ -499,6 +410,7 @@ export async function POST(request: Request) {
         sigunguCodes,
         legalDongCodes,
         previewLimited: false,
+        keywordOptions,
       });
 
       if (fullAttempt.ok) {
@@ -534,72 +446,71 @@ export async function POST(request: Request) {
         );
       }
 
-      if (previewServiceKeys.length === 0) {
+      if (!previewServiceKey) {
         return buildEmptyPreviewResponse(
           "fallback-preview",
           `${MSG_FALLBACK_PREVIEW} ${MSG_NO_DEFAULT_KEY}`,
         );
       }
 
-      const previewResult = await runPreviewCollect({
-        previewServiceKeys,
+      const previewAttempt = await runCollect({
+        serviceKey: previewServiceKey,
         startDate,
         endDate,
         sigunguCodes,
         legalDongCodes,
+        previewLimited: true,
+        keywordOptions,
       });
 
-      if (previewResult?.kind === "ok") {
+      if (previewAttempt.ok) {
         return NextResponse.json({
           ok: true,
-          rows: previewResult.attempt.rows,
-          totalCount: previewResult.attempt.totalCount,
-          searchedTargetCount: previewResult.attempt.searchedTargetCount,
-          endpointFamily: previewResult.attempt.endpointFamily,
-          sourceUrl: previewResult.attempt.sourceUrl,
-          effectiveStartDate: previewResult.attempt.effectiveStartDate,
-          effectiveEndDate: previewResult.attempt.effectiveEndDate,
-          usedDateFallback: previewResult.attempt.usedDateFallback,
-          fallbackDays: previewResult.attempt.fallbackDays,
+          rows: previewAttempt.rows,
+          totalCount: previewAttempt.totalCount,
+          searchedTargetCount: previewAttempt.searchedTargetCount,
+          endpointFamily: previewAttempt.endpointFamily,
+          sourceUrl: previewAttempt.sourceUrl,
+          effectiveStartDate: previewAttempt.effectiveStartDate,
+          effectiveEndDate: previewAttempt.effectiveEndDate,
+          usedDateFallback: previewAttempt.usedDateFallback,
+          fallbackDays: previewAttempt.fallbackDays,
           previewLimited: true,
           previewCount: PREVIEW_LIMIT,
           authStatus: "fallback-preview",
           message:
-            previewResult.attempt.totalCount > 0
+            previewAttempt.totalCount > 0
               ? MSG_FALLBACK_PREVIEW
               : `${MSG_FALLBACK_PREVIEW} ${MSG_NO_RESULT}`,
           previewDebug: getPreviewKeyDebug(),
-          previewAttemptDebug: previewResult.debugAttempts,
         });
       }
 
-      if (previewResult?.kind === "error") {
-        return NextResponse.json(
-          {
-            ok: false,
-            message: previewResult.attempt.message,
-            sourceUrl: previewResult.attempt.sourceUrl,
-            previewDebug: getPreviewKeyDebug(),
-            previewAttemptDebug: previewResult.debugAttempts,
-          },
-          { status: previewResult.attempt.status },
-        );
+      if (previewAttempt.status === 404) {
+        return NextResponse.json({
+          ok: true,
+          rows: [],
+          totalCount: 0,
+          previewLimited: true,
+          previewCount: PREVIEW_LIMIT,
+          authStatus: "fallback-preview",
+          message: `${MSG_FALLBACK_PREVIEW} ${MSG_NO_RESULT}`,
+          previewDebug: getPreviewKeyDebug(),
+        });
       }
 
-      return NextResponse.json({
-        ok: true,
-        rows: [],
-        totalCount: 0,
-        previewLimited: true,
-        previewCount: PREVIEW_LIMIT,
-        authStatus: "fallback-preview",
-        message: `${MSG_FALLBACK_PREVIEW} ${MSG_NO_RESULT}`,
-        previewDebug: getPreviewKeyDebug(),
-        previewAttemptDebug: previewResult?.debugAttempts ?? [],
-      });
+      return NextResponse.json(
+        {
+          ok: false,
+          message: previewAttempt.message,
+          sourceUrl: previewAttempt.sourceUrl,
+          previewDebug: getPreviewKeyDebug(),
+        },
+        { status: previewAttempt.status },
+      );
     }
 
-    if (previewServiceKeys.length === 0) {
+    if (!previewServiceKey) {
       return NextResponse.json({
         ok: true,
         rows: [],
@@ -612,62 +523,61 @@ export async function POST(request: Request) {
       });
     }
 
-    const previewResult = await runPreviewCollect({
-      previewServiceKeys,
+    const previewAttempt = await runCollect({
+      serviceKey: previewServiceKey,
       startDate,
       endDate,
       sigunguCodes,
       legalDongCodes,
+      previewLimited: true,
+      keywordOptions,
     });
 
-    if (previewResult?.kind === "ok") {
+    if (previewAttempt.ok) {
       return NextResponse.json({
         ok: true,
-        rows: previewResult.attempt.rows,
-        totalCount: previewResult.attempt.totalCount,
-        searchedTargetCount: previewResult.attempt.searchedTargetCount,
-        endpointFamily: previewResult.attempt.endpointFamily,
-        sourceUrl: previewResult.attempt.sourceUrl,
-        effectiveStartDate: previewResult.attempt.effectiveStartDate,
-        effectiveEndDate: previewResult.attempt.effectiveEndDate,
-        usedDateFallback: previewResult.attempt.usedDateFallback,
-        fallbackDays: previewResult.attempt.fallbackDays,
+        rows: previewAttempt.rows,
+        totalCount: previewAttempt.totalCount,
+        searchedTargetCount: previewAttempt.searchedTargetCount,
+        endpointFamily: previewAttempt.endpointFamily,
+        sourceUrl: previewAttempt.sourceUrl,
+        effectiveStartDate: previewAttempt.effectiveStartDate,
+        effectiveEndDate: previewAttempt.effectiveEndDate,
+        usedDateFallback: previewAttempt.usedDateFallback,
+        fallbackDays: previewAttempt.fallbackDays,
         previewLimited: true,
         previewCount: PREVIEW_LIMIT,
         authStatus: "default-preview",
         message:
-          previewResult.attempt.totalCount > 0
+          previewAttempt.totalCount > 0
             ? MSG_DEFAULT_PREVIEW
             : `${MSG_DEFAULT_PREVIEW} ${MSG_NO_RESULT}`,
         previewDebug: getPreviewKeyDebug(),
-        previewAttemptDebug: previewResult.debugAttempts,
       });
     }
 
-    if (previewResult?.kind === "error") {
-      return NextResponse.json(
-        {
-          ok: false,
-          message: previewResult.attempt.message,
-          sourceUrl: previewResult.attempt.sourceUrl,
-          previewDebug: getPreviewKeyDebug(),
-          previewAttemptDebug: previewResult.debugAttempts,
-        },
-        { status: previewResult.attempt.status },
-      );
+    if (previewAttempt.status === 404) {
+      return NextResponse.json({
+        ok: true,
+        rows: [],
+        totalCount: 0,
+        previewLimited: true,
+        previewCount: PREVIEW_LIMIT,
+        authStatus: "default-preview",
+        message: `${MSG_DEFAULT_PREVIEW} ${MSG_NO_RESULT}`,
+        previewDebug: getPreviewKeyDebug(),
+      });
     }
 
-    return NextResponse.json({
-      ok: true,
-      rows: [],
-      totalCount: 0,
-      previewLimited: true,
-      previewCount: PREVIEW_LIMIT,
-      authStatus: "default-preview",
-      message: `${MSG_DEFAULT_PREVIEW} ${MSG_NO_RESULT}`,
-      previewDebug: getPreviewKeyDebug(),
-      previewAttemptDebug: previewResult?.debugAttempts ?? [],
-    });
+    return NextResponse.json(
+      {
+        ok: false,
+        message: previewAttempt.message,
+        sourceUrl: previewAttempt.sourceUrl,
+        previewDebug: getPreviewKeyDebug(),
+      },
+      { status: previewAttempt.status },
+    );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
 

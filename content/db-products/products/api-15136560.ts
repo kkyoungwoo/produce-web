@@ -9,7 +9,8 @@ const product: ProductItem = {
   collectorKey: "condition-paging",
   title: "건축HUB 주택 인허가 조회",
   summary: "시도와 시군구를 선택해 건축HUB 주택 인허가 데이터를 조회하고 내려받을 수 있습니다.",
-  description: "공공데이터포털 Data ID 15136560 API를 바탕으로 건축HUB 주택 인허가 기본개요와 총괄개요 데이터를 통합 조회하는 분석 페이지입니다.",
+  description:
+    "공공데이터포털 Data ID 15136560 API를 바탕으로 건축HUB 주택 인허가 기본개요와 총괄개요 데이터를 통합 조회하는 분석 페이지입니다.",
   stack: ["Node.js", "TypeScript", "REST API", "JSON", "XLSX"],
   status: "분석 가능",
   priceLabel: "Data ID 15136560",
@@ -19,6 +20,7 @@ const product: ProductItem = {
   features: [
     "시도와 시군구만 선택하면 법정동 전체를 자동으로 조회합니다.",
     "승강기 조건과 지역 필터를 함께 적용할 수 있습니다.",
+    "인허가일자와 착공일자를 기준으로 결과를 필터링할 수 있습니다.",
     "결과는 지역별 엑셀, 전체 엑셀, 필터 엑셀로 저장할 수 있습니다.",
     "인증키가 없으면 실제 데이터 미리보기 5건만 표시됩니다.",
   ],
@@ -45,8 +47,21 @@ const product: ProductItem = {
       example: "",
       required: false,
     },
+    {
+      key: "constructionStartDate",
+      label: "착공일자 시작(YYYYMMDD)",
+      example: "",
+      required: false,
+    },
+    {
+      key: "constructionEndDate",
+      label: "착공일자 종료(YYYYMMDD)",
+      example: "",
+      required: false,
+    },
   ],
-  sampleRequest: `?serviceKey=${SERVICE_KEY_SAMPLE}&sigunguCd=11680&bjdongCd=10300&startDate=20260306&endDate=20260313&_type=json&pageNo=1&numOfRows=100`,
+  sampleRequest:
+    "?serviceKey=YOUR_DATA_GO_KR_SERVICE_KEY&sigunguCd=11680&bjdongCd=10300&startDate=20260306&endDate=20260313&_type=json&pageNo=1&numOfRows=100",
   apiCredential: serviceKeyCredential("15136560"),
   apiRuntime: {
     endpoint: "https://apis.data.go.kr/1613000/HsPmsHubService/getHpDongOulnInfo",

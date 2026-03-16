@@ -14,15 +14,6 @@ import {
 } from "@/components/workbench/helpers";
 import type { CollectResponse, WorkbenchProps } from "@/components/workbench/types";
 
-const FALLBACK_PREVIEW_SERVICE_KEY =
-  "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
-
-const PREVIEW_SERVICE_KEY_MAP: Record<string, string> = {
-  vip: FALLBACK_PREVIEW_SERVICE_KEY,
-  gold: FALLBACK_PREVIEW_SERVICE_KEY,
-  master: FALLBACK_PREVIEW_SERVICE_KEY,
-};
-
 type RegionOption = {
   code: string;
   name: string;
@@ -68,8 +59,9 @@ type ChunkRequest = {
 const UI = {
   inputTitle: "입력 설정",
   serviceKeyLabel: "인증키(serviceKey)",
-  serviceKeyPlaceholder: "vip / gold / master 또는 실제 인증키 입력",
-  serviceKeyHelp: "인증키를 입력하지 않거나 올바르지 않으면 실제 데이터 샘플 최대 5건만 조회됩니다.",
+  serviceKeyPlaceholder: "vip / beta / gold / master 또는 실제 인증키 입력",
+  serviceKeyHelp:
+    "발급한 키를 입력하면 전체 조회가 가능합니다. 키가 없거나 확인되지 않으면 실제 데이터 샘플 최대 5건만 조회됩니다.",
   sidoLabel: "시도 선택",
   sigunguLabel: "시군구 선택",
   sigunguHint: "시도를 선택하면 시군구 목록이 표시됩니다.",
@@ -77,6 +69,10 @@ const UI = {
   elevatorHint: "승강기 조건은 선택 사항입니다. 전체 해제 시 조건 없이 전체 데이터를 조회합니다.",
   permitFromLabel: "인허가일자 시작",
   permitToLabel: "인허가일자 종료",
+  constructionFromLabel: "착공일자 시작",
+  constructionToLabel: "착공일자 종료",
+  constructionHint:
+    "착공일 필터는 선택 사항입니다. 입력하지 않으면 조회된 전체 데이터를 그대로 표에 표시합니다.",
   resultBadge: "데이터 다운로드",
   resultTitle: "입력 결과 테이블",
   regionFilterTitle: "지역별 보기",
@@ -93,11 +89,13 @@ const UI = {
   sidoRequired: "시도를 선택해 주세요.",
   sigunguRequired: "시군구를 1개 이상 선택해 주세요.",
   dateRangeInvalid: "시작일은 종료일보다 늦을 수 없습니다.",
+  constructionDateRangeInvalid: "착공일 시작일은 종료일보다 늦을 수 없습니다.",
   regionUnclassified: "지역 미분류",
   preparing: "조회 준비 중입니다.",
   completed: "조회가 완료되었습니다.",
   cancelled: "조회가 취소되었습니다.",
-  keepPage: "조회 중에는 이 페이지를 유지해 주세요. 시군구와 법정동 수에 따라 완료 시간이 달라질 수 있습니다.",
+  keepPage:
+    "조회 중에는 이 페이지를 유지해 주세요. 시군구와 법정동 수에 따라 완료 시간이 달라질 수 있습니다.",
   progressFallback: "요청 상태를 확인하는 중입니다.",
   queryFailed: "조회에 실패했습니다.",
   archhubError: "건축HUB 조회 중 오류가 발생했습니다.",
@@ -106,6 +104,13 @@ const UI = {
   endpointHs: "주택 API",
   endpointArch: "건축 API",
   noData: "조회는 정상적으로 완료되었습니다. 다만 현재 검색 조건에 맞는 데이터가 없습니다.",
+  filteredEmpty:
+    "조회된 데이터는 있지만 현재 지역/승강기/착공일 필터 조건에 맞는 행이 없습니다. 필터를 조정하거나 초기화해 주세요.",
+  buildingNameKeywordLabel: "건축물명 키워드",
+  siteLocationKeywordLabel: "대지위치 키워드",
+  mainUsageKeywordLabel: "주용도 키워드",
+  dongNameKeywordLabel: "동명칭 키워드",
+  keywordHint: "키워드는 선택 사항이며 부분 포함 검색입니다.",
 } as const;
 
 const ELEVATOR_OPTIONS = [
@@ -117,16 +122,6 @@ const ALL_ELEVATOR_KEYS = ELEVATOR_OPTIONS.map((item) => item.key);
 const DEFAULT_START_DAYS = 7;
 const DEFAULT_END_DAYS = 1;
 const LEGAL_DONG_CHUNK_SIZE = 12;
-
-function normalizePreviewKey(value?: string) {
-  return String(value ?? "").trim().toLowerCase();
-}
-
-function resolvePreviewServiceKey(inputKey?: string) {
-  const trimmed = String(inputKey ?? "").trim();
-  if (!trimmed) return "";
-  return PREVIEW_SERVICE_KEY_MAP[normalizePreviewKey(trimmed)] ?? trimmed;
-}
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
@@ -164,6 +159,22 @@ function matchesElevatorSelection(row: Record<string, string | number>, selected
   if (active.length === ALL_ELEVATOR_KEYS.length) return hasPassenger || hasEmergency;
   if (active.includes("passenger")) return hasPassenger && !hasEmergency;
   if (active.includes("emergency")) return !hasPassenger && hasEmergency;
+  return true;
+}
+
+function normalizeDateDigits(value: string | number | undefined) {
+  return toText(value).replace(/\D/g, "").slice(0, 8);
+}
+
+function matchesDateRange(value: string | number | undefined, from?: string, to?: string) {
+  const current = normalizeDateDigits(value);
+  const fromDigits = normalizeDateDigits(from);
+  const toDigits = normalizeDateDigits(to);
+
+  if (!fromDigits && !toDigits) return true;
+  if (!current || current.length !== 8) return false;
+  if (fromDigits && current < fromDigits) return false;
+  if (toDigits && current > toDigits) return false;
   return true;
 }
 
@@ -241,6 +252,12 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
   const [serviceKey, setServiceKey] = useState("");
   const [startDate, setStartDate] = useState(dateBeforeDays(DEFAULT_START_DAYS));
   const [endDate, setEndDate] = useState(dateBeforeDays(DEFAULT_END_DAYS));
+  const [constructionStartDate, setConstructionStartDate] = useState("");
+  const [constructionEndDate, setConstructionEndDate] = useState("");
+  const [buildingNameKeyword, setBuildingNameKeyword] = useState("");
+  const [siteLocationKeyword, setSiteLocationKeyword] = useState("");
+  const [mainUsageKeyword, setMainUsageKeyword] = useState("");
+  const [dongNameKeyword, setDongNameKeyword] = useState("");
   const [sidoOptions, setSidoOptions] = useState<RegionOption[]>([]);
   const [sigunguOptions, setSigunguOptions] = useState<RegionOption[]>([]);
   const [selectedSidoCode, setSelectedSidoCode] = useState("");
@@ -341,7 +358,10 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
   }, [rows]);
 
   const regionStats = useMemo(
-    () => [{ name: UI.allFilter, count: rows.length }, ...regionBuckets.map((item) => ({ name: item.name, count: item.rows.length }))],
+    () => [
+      { name: UI.allFilter, count: rows.length },
+      ...regionBuckets.map((item) => ({ name: item.name, count: item.rows.length })),
+    ],
     [regionBuckets, rows.length],
   );
 
@@ -354,8 +374,20 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
       output = output.filter((row) => toText(row.agency as string | number | undefined) === regionFilter);
     }
 
-    return output.filter((row) => matchesElevatorSelection(row, activeElevatorModes));
-  }, [activeElevatorModes, regionFilter, rows]);
+    output = output.filter((row) => matchesElevatorSelection(row, activeElevatorModes));
+
+    if (constructionStartDate || constructionEndDate) {
+      output = output.filter((row) =>
+        matchesDateRange(
+          row.constructionActualDate as string | number | undefined,
+          constructionStartDate,
+          constructionEndDate,
+        ),
+      );
+    }
+
+    return output;
+  }, [activeElevatorModes, constructionEndDate, constructionStartDate, regionFilter, rows]);
 
   const visibleRows = filteredRows.slice(0, visibleCount);
   const hasRegionDownload = regionBuckets.length > 1;
@@ -428,6 +460,13 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
       return;
     }
 
+    if (constructionStartDate && constructionEndDate && constructionStartDate > constructionEndDate) {
+      setRows([]);
+      setIsError(true);
+      setMessage(`${labels.errorLabel}: ${UI.constructionDateRangeInvalid}`);
+      return;
+    }
+
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -475,7 +514,10 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
         const from = Math.max(2, Math.round((completedTargetCount / totalTargetCount) * 98));
         const to = Math.min(
           98,
-          Math.max(from + 1, Math.round(((completedTargetCount + chunk.legalDongCodes.length) / totalTargetCount) * 98)),
+          Math.max(
+            from + 1,
+            Math.round(((completedTargetCount + chunk.legalDongCodes.length) / totalTargetCount) * 98),
+          ),
         );
 
         setProgressTitle(`${chunk.sigunguFullName} 조회 중`);
@@ -488,11 +530,15 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            serviceKey: resolvePreviewServiceKey(serviceKey),
+            serviceKey: serviceKey.trim(),
             startDate,
             endDate,
             sigunguCodes: [chunk.sigunguCode],
             legalDongCodes: chunk.legalDongCodes,
+            buildingNameKeyword: buildingNameKeyword.trim(),
+            siteLocationKeyword: siteLocationKeyword.trim(),
+            mainUsageKeyword: mainUsageKeyword.trim(),
+            dongNameKeyword: dongNameKeyword.trim(),
           }),
           signal: controller.signal,
         });
@@ -534,7 +580,25 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
       setRows(uniqueRows);
       setIsError(false);
 
-      const summaryParts = [infoMessage || `${labels.successLabel}: ${UI.totalPrefix} ${uniqueRows.length}${UI.countSuffix}`];
+      const constructionFilteredCount =
+        constructionStartDate || constructionEndDate
+          ? uniqueRows.filter((row) =>
+              matchesDateRange(
+                row.constructionActualDate as string | number | undefined,
+                constructionStartDate,
+                constructionEndDate,
+              ),
+            ).length
+          : uniqueRows.length;
+
+      const summaryParts = [
+        infoMessage || `${labels.successLabel}: ${UI.totalPrefix} ${uniqueRows.length}${UI.countSuffix}`,
+      ];
+
+      if (constructionStartDate || constructionEndDate) {
+        summaryParts.push(`착공일 필터 ${constructionFilteredCount}${UI.countSuffix}`);
+      }
+
       if (usedFallback) summaryParts.push(UI.dateExpanded);
       if (firstError) summaryParts.push(UI.partialWarning);
       if (endpointFamily === "hs") summaryParts.push(UI.endpointHs);
@@ -543,7 +607,10 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
 
       setProgressTitle(UI.completed);
       setProgressDetail(
-        `시군구 ${totalSigunguCount}/${totalSigunguCount} · 요청 묶음 ${Math.min(chunkRequests.length, totalChunkCount)}/${totalChunkCount} · 완료 ${completedTargetCount}/${totalTargetCount}`,
+        `시군구 ${totalSigunguCount}/${totalSigunguCount} · 요청 묶음 ${Math.min(
+          chunkRequests.length,
+          totalChunkCount,
+        )}/${totalChunkCount} · 완료 ${completedTargetCount}/${totalTargetCount}`,
       );
     } catch (error) {
       if (error instanceof Error && error.name === "AbortError") {
@@ -565,6 +632,12 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
     setServiceKey("");
     setStartDate(dateBeforeDays(DEFAULT_START_DAYS));
     setEndDate(dateBeforeDays(DEFAULT_END_DAYS));
+    setConstructionStartDate("");
+    setConstructionEndDate("");
+    setBuildingNameKeyword("");
+    setSiteLocationKeyword("");
+    setMainUsageKeyword("");
+    setDongNameKeyword("");
     setSelectedSidoCode("");
     setSelectedSigunguCodes([]);
     setSelectedElevatorModes([]);
@@ -642,6 +715,48 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                 {UI.serviceKeyHelp}
               </p>
             </label>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <strong className="text-base font-bold text-slate-900">{UI.buildingNameKeywordLabel}</strong>
+                <input
+                  className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
+                  value={buildingNameKeyword}
+                  onChange={(event) => setBuildingNameKeyword(event.target.value)}
+                />
+              </label>
+
+              <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <strong className="text-base font-bold text-slate-900">{UI.siteLocationKeywordLabel}</strong>
+                <input
+                  className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
+                  value={siteLocationKeyword}
+                  onChange={(event) => setSiteLocationKeyword(event.target.value)}
+                />
+              </label>
+
+              <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <strong className="text-base font-bold text-slate-900">{UI.mainUsageKeywordLabel}</strong>
+                <input
+                  className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
+                  value={mainUsageKeyword}
+                  onChange={(event) => setMainUsageKeyword(event.target.value)}
+                />
+              </label>
+
+              <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <strong className="text-base font-bold text-slate-900">{UI.dongNameKeywordLabel}</strong>
+                <input
+                  className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
+                  value={dongNameKeyword}
+                  onChange={(event) => setDongNameKeyword(event.target.value)}
+                />
+              </label>
+            </div>
+
+            <p className="rounded-lg border-l-4 border-slate-300 bg-slate-50 px-3 py-2 text-xs leading-6 text-slate-600">
+              {UI.keywordHint}
+            </p>
 
             <div className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
               <strong className="text-base font-bold text-slate-900">{UI.sidoLabel}</strong>
@@ -771,6 +886,32 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                 />
               </label>
             </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <strong className="text-base font-bold text-slate-900">{UI.constructionFromLabel}</strong>
+                <input
+                  type="date"
+                  className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
+                  value={toInputDate(constructionStartDate)}
+                  onChange={(event) => setConstructionStartDate(toApiDate(event.target.value))}
+                />
+              </label>
+
+              <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
+                <strong className="text-base font-bold text-slate-900">{UI.constructionToLabel}</strong>
+                <input
+                  type="date"
+                  className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
+                  value={toInputDate(constructionEndDate)}
+                  onChange={(event) => setConstructionEndDate(toApiDate(event.target.value))}
+                />
+              </label>
+            </div>
+
+            <p className="rounded-lg border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-xs leading-6 text-amber-700">
+              {UI.constructionHint}
+            </p>
           </div>
 
           <div className="mt-4 flex flex-wrap gap-2">
@@ -898,38 +1039,44 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
         </div>
       ) : null}
 
-      {filteredRows.length > 0 ? (
+      {rows.length > 0 ? (
         <article className="mt-5 rounded-2xl border border-blue-200 bg-white p-4 shadow-[0_16px_36px_rgba(44,86,150,0.12)]">
-          <div
-            ref={tableScrollRef}
-            className="max-h-[60vh] overflow-auto rounded-xl border border-blue-200 bg-white"
-          >
-            <table className="min-w-full text-left text-sm">
-              <thead className="sticky top-0 z-[1] bg-blue-50 text-slate-700">
-                <tr>
-                  {columns.map((column) => (
-                    <th key={column} className="whitespace-nowrap px-3 py-2 font-bold">
-                      {getColumnLabel(column, labelMap)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-
-              <tbody>
-                {visibleRows.map((row, rowIndex) => (
-                  <tr key={`row-${rowIndex}`} className="border-t border-blue-100 text-slate-600">
+          {filteredRows.length > 0 ? (
+            <div
+              ref={tableScrollRef}
+              className="max-h-[60vh] overflow-auto rounded-xl border border-blue-200 bg-white"
+            >
+              <table className="min-w-full text-left text-sm">
+                <thead className="sticky top-0 z-[1] bg-blue-50 text-slate-700">
+                  <tr>
                     {columns.map((column) => (
-                      <td key={`${rowIndex}-${column}`} className="whitespace-nowrap px-3 py-2 align-top">
-                        {formatCellValue(column, row[column] as string | number | undefined, row)}
-                      </td>
+                      <th key={column} className="whitespace-nowrap px-3 py-2 font-bold">
+                        {getColumnLabel(column, labelMap)}
+                      </th>
                     ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
 
-            <div ref={loadMoreRef} className="h-8" />
-          </div>
+                <tbody>
+                  {visibleRows.map((row, rowIndex) => (
+                    <tr key={`row-${rowIndex}`} className="border-t border-blue-100 text-slate-600">
+                      {columns.map((column) => (
+                        <td key={`${rowIndex}-${column}`} className="whitespace-nowrap px-3 py-2 align-top">
+                          {formatCellValue(column, row[column] as string | number | undefined, row)}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div ref={loadMoreRef} className="h-8" />
+            </div>
+          ) : (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {UI.filteredEmpty}
+            </div>
+          )}
         </article>
       ) : null}
     </>

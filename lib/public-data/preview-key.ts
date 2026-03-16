@@ -1,14 +1,20 @@
 import "server-only";
 
 /**
- * env 없이 파일 내부에서 직접 관리하는 미리보기 키 설정
+ * 키를 입력하지 않았거나 잘못 입력했을 때 사용할 샘플 조회용 기본 키
  */
 const DEFAULT_PREVIEW_SERVICE_KEY =
   "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
 
-const PREVIEW_SERVICE_KEY_MAP = new Map<string, string>([
+/**
+ * 전체조회용 사용자 alias -> 실제 비밀키
+ * 여기서 추가/삭제 관리하면 됩니다.
+ */
+const FULL_ACCESS_SERVICE_KEY_MAP = new Map<string, string>([
   ["vip", "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b"],
   ["beta", "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b"],
+  ["gold", "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b"],
+  ["master", "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b"],
 ]);
 
 function normalizePreviewKey(value?: string | null) {
@@ -23,15 +29,15 @@ function uniqueStrings(values: Array<string | null | undefined>) {
 
 export { normalizePreviewKey };
 
-export function resolvePreviewServiceKey(inputKey?: string | null) {
+export function resolveFullAccessServiceKey(inputKey?: string | null) {
   const rawInput = String(inputKey ?? "").trim();
   const normalizedInput = normalizePreviewKey(inputKey);
 
   if (!normalizedInput) {
-    return DEFAULT_PREVIEW_SERVICE_KEY;
+    return "";
   }
 
-  const mappedKey = PREVIEW_SERVICE_KEY_MAP.get(normalizedInput);
+  const mappedKey = FULL_ACCESS_SERVICE_KEY_MAP.get(normalizedInput);
   if (mappedKey) {
     return mappedKey;
   }
@@ -39,43 +45,40 @@ export function resolvePreviewServiceKey(inputKey?: string | null) {
   return rawInput;
 }
 
-export function getPreviewServiceKey(inputKey?: string | null) {
-  return resolvePreviewServiceKey(inputKey);
+export function getPreviewServiceKey() {
+  return DEFAULT_PREVIEW_SERVICE_KEY;
 }
 
-export function getPreviewServiceKeys(inputKey?: string | null) {
-  const resolvedKey = resolvePreviewServiceKey(inputKey);
-
-  return uniqueStrings([
-    resolvedKey,
-    DEFAULT_PREVIEW_SERVICE_KEY,
-    ...Array.from(PREVIEW_SERVICE_KEY_MAP.values()),
-  ]);
+export function getPreviewServiceKeys() {
+  return uniqueStrings([DEFAULT_PREVIEW_SERVICE_KEY]);
 }
 
 export function getAllPreviewServiceKeys() {
-  return uniqueStrings([
-    DEFAULT_PREVIEW_SERVICE_KEY,
-    ...Array.from(PREVIEW_SERVICE_KEY_MAP.values()),
-  ]);
+  return uniqueStrings([DEFAULT_PREVIEW_SERVICE_KEY]);
 }
 
 export function hasPreviewServiceKey() {
   return getAllPreviewServiceKeys().length > 0;
 }
 
-export function getPreviewAliases() {
-  return Array.from(PREVIEW_SERVICE_KEY_MAP.keys());
+export function getFullAccessAliases() {
+  return Array.from(FULL_ACCESS_SERVICE_KEY_MAP.keys());
 }
 
 export function getPreviewKeyDebug() {
-  const allKeys = getAllPreviewServiceKeys();
+  const previewKeys = getAllPreviewServiceKeys();
+  const fullAccessKeys = uniqueStrings(Array.from(FULL_ACCESS_SERVICE_KEY_MAP.values()));
 
   return {
     defaultKeyExists: Boolean(DEFAULT_PREVIEW_SERVICE_KEY),
-    aliasCount: PREVIEW_SERVICE_KEY_MAP.size,
-    totalPreviewKeys: allKeys.length,
-    maskedKeys: allKeys.map((key) =>
+    fullAccessAliasCount: FULL_ACCESS_SERVICE_KEY_MAP.size,
+    previewKeyCount: previewKeys.length,
+    fullAccessKeyCount: fullAccessKeys.length,
+    aliases: getFullAccessAliases(),
+    maskedPreviewKeys: previewKeys.map((key) =>
+      key.length <= 8 ? "********" : `${key.slice(0, 4)}...${key.slice(-4)}`,
+    ),
+    maskedFullAccessKeys: fullAccessKeys.map((key) =>
       key.length <= 8 ? "********" : `${key.slice(0, 4)}...${key.slice(-4)}`,
     ),
   };

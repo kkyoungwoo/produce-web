@@ -31,15 +31,6 @@ import { getWorkbenchProductConfig } from "@/components/workbench/product-config
 import { WORKBENCH_TEXT } from "@/components/workbench/text";
 import type { CollectResponse, WorkbenchProps, WorkbenchStatMode } from "@/components/workbench/types";
 
-const FALLBACK_PREVIEW_SERVICE_KEY =
-  "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
-
-const PREVIEW_SERVICE_KEY_MAP: Record<string, string> = {
-  vip: FALLBACK_PREVIEW_SERVICE_KEY,
-  gold: FALLBACK_PREVIEW_SERVICE_KEY,
-  master: FALLBACK_PREVIEW_SERVICE_KEY,
-};
-
 const ALL_FILTER = WORKBENCH_TEXT.allFilterLabel;
 const SALES_STATUS_PRODUCT_SLUGS = new Set(["api-15155139", "api-15154910"]);
 const ALL_SALES_STATUS_CODES = SALES_STATUS_OPTIONS.map((item) => item.code);
@@ -47,16 +38,6 @@ const ALL_SALES_STATUS_CODES = SALES_STATUS_OPTIONS.map((item) => item.code);
 const FACTORY_DEFAULT_FROM = dateBeforeDays(365);
 const FACTORY_DEFAULT_TO = dateBeforeDays(0);
 const FACTORY_FETCH_CONCURRENCY = 4;
-
-function normalizePreviewKey(value?: string) {
-  return String(value ?? "").trim().toLowerCase();
-}
-
-function resolvePreviewServiceKey(inputKey?: string) {
-  const trimmed = String(inputKey ?? "").trim();
-  if (!trimmed) return "";
-  return PREVIEW_SERVICE_KEY_MAP[normalizePreviewKey(trimmed)] ?? trimmed;
-}
 
 async function parseJsonResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
@@ -493,13 +474,13 @@ function WorkbenchCollectorBody({ product, labels }: WorkbenchProps) {
     window.setTimeout(() => setProgress(0), 400);
   };
 
-  const requestCollect = async (requestParams: Record<string, string>) => {
-    const rawServiceKey = String(requestParams.serviceKey ?? "").trim();
+const requestCollect = async (requestParams: Record<string, string>) => {
+  const rawServiceKey = String(requestParams.serviceKey ?? "").trim();
 
-    const resolvedParams: Record<string, string> = {
-      ...requestParams,
-      serviceKey: rawServiceKey ? resolvePreviewServiceKey(rawServiceKey) : "",
-    };
+  const resolvedParams: Record<string, string> = {
+    ...requestParams,
+    serviceKey: rawServiceKey,
+  };
 
     const response = await fetch("/api/public-data/collect", {
       method: "POST",
