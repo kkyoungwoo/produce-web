@@ -235,7 +235,7 @@ function WorkbenchCollectorBody({ product, labels }: WorkbenchProps) {
   const [statFilter, setStatFilter] = useState<string>(ALL_FILTER);
   const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
   const [selectedSalesStatuses, setSelectedSalesStatuses] = useState<string[]>([]);
-  const [selectedFactoryRegion, setSelectedFactoryRegion] = useState("");
+  const [selectedFactoryRegions, setSelectedFactoryRegions] = useState<string[]>([]);
   const [selectedEmployeeRange, setSelectedEmployeeRange] = useState("all");
   const [factoryDateFrom, setFactoryDateFrom] = useState(FACTORY_DEFAULT_FROM);
   const [factoryDateTo, setFactoryDateTo] = useState(FACTORY_DEFAULT_TO);
@@ -245,9 +245,23 @@ function WorkbenchCollectorBody({ product, labels }: WorkbenchProps) {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const factoryIndustrialEstateOptions = useMemo(() => {
-    if (!selectedFactoryRegion) return [];
-    return FACTORY_INDUSTRIAL_ESTATE_OPTIONS[selectedFactoryRegion] ?? [];
-  }, [selectedFactoryRegion]);
+    if (selectedFactoryRegions.length === 0) return [];
+
+    const seen = new Set<string>();
+    const merged: Array<{ code: string; name: string }> = [];
+
+    for (const regionCode of selectedFactoryRegions) {
+      const estates = FACTORY_INDUSTRIAL_ESTATE_OPTIONS[regionCode] ?? [];
+      for (const estate of estates) {
+        const key = `${estate.code}|${estate.name}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        merged.push(estate);
+      }
+    }
+
+    return merged;
+  }, [selectedFactoryRegions]);
 
   const selectedFactoryIndustrialEstates = useMemo(
     () => factoryIndustrialEstateOptions.map((item) => item.name),
@@ -268,7 +282,7 @@ function WorkbenchCollectorBody({ product, labels }: WorkbenchProps) {
 
   useEffect(() => {
     if (config.inputMode !== "factory") return;
-    setSelectedFactoryRegion("");
+    setSelectedFactoryRegions([]);
     setSelectedEmployeeRange("all");
     setFactoryDateFrom(FACTORY_DEFAULT_FROM);
     setFactoryDateTo(FACTORY_DEFAULT_TO);
@@ -474,13 +488,13 @@ function WorkbenchCollectorBody({ product, labels }: WorkbenchProps) {
     window.setTimeout(() => setProgress(0), 400);
   };
 
-const requestCollect = async (requestParams: Record<string, string>) => {
-  const rawServiceKey = String(requestParams.serviceKey ?? "").trim();
+  const requestCollect = async (requestParams: Record<string, string>) => {
+    const rawServiceKey = String(requestParams.serviceKey ?? "").trim();
 
-  const resolvedParams: Record<string, string> = {
-    ...requestParams,
-    serviceKey: rawServiceKey,
-  };
+    const resolvedParams: Record<string, string> = {
+      ...requestParams,
+      serviceKey: rawServiceKey,
+    };
 
     const response = await fetch("/api/public-data/collect", {
       method: "POST",
@@ -520,7 +534,7 @@ const requestCollect = async (requestParams: Record<string, string>) => {
       return;
     }
 
-    if (config.inputMode === "factory" && !selectedFactoryRegion) {
+    if (config.inputMode === "factory" && selectedFactoryRegions.length === 0) {
       setRows([]);
       setIsError(true);
       setMessage(`${labels.errorLabel}: 시도를 선택해 주세요.`);
@@ -663,9 +677,9 @@ const requestCollect = async (requestParams: Record<string, string>) => {
             Math.max(rangeStart + 3, Math.round(((start + batch.length) / total) * 96) - 1),
           );
 
-          setProgressTitle(`${selectedFactoryRegion} 조회 중`);
+          setProgressTitle(`등록공장 생산정보 조회 중`);
           setProgressDetail(
-            `${selectedFactoryRegion} 산업단지 ${start + 1}-${Math.min(start + batch.length, total)}/${total} 요청 중`,
+            `산업단지 ${start + 1}-${Math.min(start + batch.length, total)}/${total} 요청 중`,
           );
           startProgressRange(rangeStart, rangeEnd);
 
@@ -698,7 +712,7 @@ const requestCollect = async (requestParams: Record<string, string>) => {
 
             if (timerRef.current) clearInterval(timerRef.current);
             setProgress(Math.min(96, Math.round((completed / total) * 96)));
-            setProgressDetail(`${selectedFactoryRegion} 산업단지 ${completed}/${total} 완료`);
+            setProgressDetail(`산업단지 ${completed}/${total} 완료`);
           }
 
           if (previewLimited && uniqueRowMap.size >= 5) {
@@ -783,7 +797,7 @@ const requestCollect = async (requestParams: Record<string, string>) => {
     }
 
     if (config.inputMode === "factory") {
-      setSelectedFactoryRegion("");
+      setSelectedFactoryRegions([]);
       setSelectedEmployeeRange("all");
       setFactoryDateFrom(FACTORY_DEFAULT_FROM);
       setFactoryDateTo(FACTORY_DEFAULT_TO);
@@ -838,6 +852,11 @@ const requestCollect = async (requestParams: Record<string, string>) => {
         ? current.filter((item) => item !== code)
         : [...current, code].sort();
     });
+
+  const toggleFactoryRegion = (code: string) =>
+    setSelectedFactoryRegions((prev) =>
+      prev.includes(code) ? prev.filter((value) => value !== code) : [...prev, code],
+    );
 
   return (
     <>
@@ -1026,23 +1045,45 @@ const requestCollect = async (requestParams: Record<string, string>) => {
                   </p>
                 </label>
 
-                <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
-                  <strong className="text-base font-bold text-slate-900">시도</strong>
-                  <select
-                    className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
-                    value={selectedFactoryRegion}
-                    onChange={(event) => {
-                      setSelectedFactoryRegion(event.target.value);
-                    }}
-                  >
-                    <option value="">시도를 선택해 주세요</option>
-                    {factoryRegionOptions.map((item) => (
-                      <option key={item.code} value={item.code}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <div className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <strong className="text-base font-bold text-slate-900">시도</strong>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedFactoryRegions((prev) =>
+                          prev.length === factoryRegionOptions.length
+                            ? []
+                            : factoryRegionOptions.map((item) => item.code),
+                        )
+                      }
+                      className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700"
+                    >
+                      {selectedFactoryRegions.length === factoryRegionOptions.length ? "전체 해제" : "전체 선택"}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {factoryRegionOptions.map((item) => {
+                      const active = selectedFactoryRegions.includes(item.code);
+
+                      return (
+                        <button
+                          key={item.code}
+                          type="button"
+                          onClick={() => toggleFactoryRegion(item.code)}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
+                            active
+                              ? "border-blue-600 bg-blue-600 text-white"
+                              : "border-blue-200 bg-white text-blue-700"
+                          }`}
+                        >
+                          {item.name}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
                 <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
                   <strong className="text-base font-bold text-slate-900">고용인원</strong>

@@ -84,7 +84,6 @@ const UI = {
   allExcelLabel: "전체 엑셀 다운로드",
   filteredExcelLabel: "현재 필터 엑셀 다운로드",
   regionLoadFailed: "지역 정보를 불러오지 못했습니다.",
-  legalDongLoadFailed: "법정동 목록을 불러오지 못했습니다.",
   noLegalDong: "선택한 지역에 해당하는 법정동 코드가 없습니다.",
   sidoRequired: "시도를 선택해 주세요.",
   sigunguRequired: "시군구를 1개 이상 선택해 주세요.",
@@ -106,11 +105,6 @@ const UI = {
   noData: "조회는 정상적으로 완료되었습니다. 다만 현재 검색 조건에 맞는 데이터가 없습니다.",
   filteredEmpty:
     "조회된 데이터는 있지만 현재 지역/승강기/착공일 필터 조건에 맞는 행이 없습니다. 필터를 조정하거나 초기화해 주세요.",
-  buildingNameKeywordLabel: "건축물명 키워드",
-  siteLocationKeywordLabel: "대지위치 키워드",
-  mainUsageKeywordLabel: "주용도 키워드",
-  dongNameKeywordLabel: "동명칭 키워드",
-  keywordHint: "키워드는 선택 사항이며 부분 포함 검색입니다.",
 } as const;
 
 const ELEVATOR_OPTIONS = [
@@ -254,10 +248,6 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
   const [endDate, setEndDate] = useState(dateBeforeDays(DEFAULT_END_DAYS));
   const [constructionStartDate, setConstructionStartDate] = useState("");
   const [constructionEndDate, setConstructionEndDate] = useState("");
-  const [buildingNameKeyword, setBuildingNameKeyword] = useState("");
-  const [siteLocationKeyword, setSiteLocationKeyword] = useState("");
-  const [mainUsageKeyword, setMainUsageKeyword] = useState("");
-  const [dongNameKeyword, setDongNameKeyword] = useState("");
   const [sidoOptions, setSidoOptions] = useState<RegionOption[]>([]);
   const [sigunguOptions, setSigunguOptions] = useState<RegionOption[]>([]);
   const [selectedSidoCode, setSelectedSidoCode] = useState("");
@@ -514,10 +504,7 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
         const from = Math.max(2, Math.round((completedTargetCount / totalTargetCount) * 98));
         const to = Math.min(
           98,
-          Math.max(
-            from + 1,
-            Math.round(((completedTargetCount + chunk.legalDongCodes.length) / totalTargetCount) * 98),
-          ),
+          Math.max(from + 1, Math.round(((completedTargetCount + chunk.legalDongCodes.length) / totalTargetCount) * 98)),
         );
 
         setProgressTitle(`${chunk.sigunguFullName} 조회 중`);
@@ -535,10 +522,6 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
             endDate,
             sigunguCodes: [chunk.sigunguCode],
             legalDongCodes: chunk.legalDongCodes,
-            buildingNameKeyword: buildingNameKeyword.trim(),
-            siteLocationKeyword: siteLocationKeyword.trim(),
-            mainUsageKeyword: mainUsageKeyword.trim(),
-            dongNameKeyword: dongNameKeyword.trim(),
           }),
           signal: controller.signal,
         });
@@ -634,10 +617,6 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
     setEndDate(dateBeforeDays(DEFAULT_END_DAYS));
     setConstructionStartDate("");
     setConstructionEndDate("");
-    setBuildingNameKeyword("");
-    setSiteLocationKeyword("");
-    setMainUsageKeyword("");
-    setDongNameKeyword("");
     setSelectedSidoCode("");
     setSelectedSigunguCodes([]);
     setSelectedElevatorModes([]);
@@ -715,48 +694,6 @@ export default function WorkbenchArchhubClient({ product, labels }: WorkbenchPro
                 {UI.serviceKeyHelp}
               </p>
             </label>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <strong className="text-base font-bold text-slate-900">{UI.buildingNameKeywordLabel}</strong>
-                <input
-                  className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
-                  value={buildingNameKeyword}
-                  onChange={(event) => setBuildingNameKeyword(event.target.value)}
-                />
-              </label>
-
-              <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <strong className="text-base font-bold text-slate-900">{UI.siteLocationKeywordLabel}</strong>
-                <input
-                  className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
-                  value={siteLocationKeyword}
-                  onChange={(event) => setSiteLocationKeyword(event.target.value)}
-                />
-              </label>
-
-              <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <strong className="text-base font-bold text-slate-900">{UI.mainUsageKeywordLabel}</strong>
-                <input
-                  className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
-                  value={mainUsageKeyword}
-                  onChange={(event) => setMainUsageKeyword(event.target.value)}
-                />
-              </label>
-
-              <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <strong className="text-base font-bold text-slate-900">{UI.dongNameKeywordLabel}</strong>
-                <input
-                  className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
-                  value={dongNameKeyword}
-                  onChange={(event) => setDongNameKeyword(event.target.value)}
-                />
-              </label>
-            </div>
-
-            <p className="rounded-lg border-l-4 border-slate-300 bg-slate-50 px-3 py-2 text-xs leading-6 text-slate-600">
-              {UI.keywordHint}
-            </p>
 
             <div className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
               <strong className="text-base font-bold text-slate-900">{UI.sidoLabel}</strong>
