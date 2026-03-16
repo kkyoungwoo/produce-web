@@ -43,9 +43,10 @@ export type WorkbenchStatMode =
   | "region:food"
   | "region:city"
   | "region:addr"
-  | "region:arch";
+  | "region:arch"
+  | "region:factory";
 
-export type WorkbenchInputMode = "default" | "homestay" | "archhub";
+export type WorkbenchInputMode = "default" | "homestay" | "archhub" | "factory";
 
 export type WorkbenchProductConfig = {
   inputMode: WorkbenchInputMode;
@@ -56,4 +57,6 @@ export type WorkbenchProductConfig = {
   permitDateDefaultDaysFrom?: number;
   permitDateDefaultFrom?: string;
   permitDateDefaultTo?: "today" | string;
+  factoryRegionParamKey?: string;
+  factoryRegionStepMode?: "sido-industrial-estate";
 };

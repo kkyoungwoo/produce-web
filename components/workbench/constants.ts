@@ -91,6 +91,107 @@ export const REGION_OPTIONS_15154910 = [
   { code: joinRegionCodes("6510000", "6520000"), name: "제주특별자치도" },
 ] as const;
 
+export const FACTORY_REGION_OPTIONS = [
+  { code: "서울특별시", name: "서울특별시" },
+  { code: "부산광역시", name: "부산광역시" },
+  { code: "대구광역시", name: "대구광역시" },
+  { code: "인천광역시", name: "인천광역시" },
+  { code: "광주광역시", name: "광주광역시" },
+  { code: "대전광역시", name: "대전광역시" },
+  { code: "울산광역시", name: "울산광역시" },
+  { code: "세종특별자치시", name: "세종특별자치시" },
+  { code: "경기도", name: "경기도" },
+  { code: "강원특별자치도", name: "강원특별자치도" },
+  { code: "충청북도", name: "충청북도" },
+  { code: "충청남도", name: "충청남도" },
+  { code: "전북특별자치도", name: "전북특별자치도" },
+  { code: "전라남도", name: "전라남도" },
+  { code: "경상북도", name: "경상북도" },
+  { code: "경상남도", name: "경상남도" },
+  { code: "제주특별자치도", name: "제주특별자치도" },
+] as const;
+
+export const FACTORY_INDUSTRIAL_ESTATE_OPTIONS: Record<
+  string,
+  ReadonlyArray<{ code: string; name: string }>
+> = {
+  서울특별시: [
+    { code: "서울디지털국가산업단지", name: "서울디지털국가산업단지" },
+  ],
+  부산광역시: [
+    { code: "명지녹산국가산업단지", name: "명지녹산국가산업단지" },
+    { code: "신평장림일반산업단지", name: "신평장림일반산업단지" },
+  ],
+  대구광역시: [
+    { code: "성서일반산업단지", name: "성서일반산업단지" },
+    { code: "대구국가산업단지", name: "대구국가산업단지" },
+  ],
+  인천광역시: [
+    { code: "남동국가산업단지", name: "남동국가산업단지" },
+    { code: "부평국가산업단지", name: "부평국가산업단지" },
+    { code: "주안국가산업단지", name: "주안국가산업단지" },
+  ],
+  광주광역시: [
+    { code: "광주첨단과학국가산업단지", name: "광주첨단과학국가산업단지" },
+    { code: "평동일반산업단지", name: "평동일반산업단지" },
+  ],
+  대전광역시: [
+    { code: "대덕연구개발특구", name: "대덕연구개발특구" },
+  ],
+  울산광역시: [
+    { code: "울산미포국가산업단지", name: "울산미포국가산업단지" },
+    { code: "온산국가산업단지", name: "온산국가산업단지" },
+  ],
+  세종특별자치시: [
+    { code: "세종첨단일반산업단지", name: "세종첨단일반산업단지" },
+  ],
+  경기도: [
+    { code: "반월국가산업단지", name: "반월국가산업단지" },
+    { code: "시화국가산업단지", name: "시화국가산업단지" },
+    { code: "파주출판문화정보국가산업단지", name: "파주출판문화정보국가산업단지" },
+    { code: "파주탄현국가산업단지", name: "파주탄현국가산업단지" },
+  ],
+  강원특별자치도: [
+    { code: "북평국가산업단지", name: "북평국가산업단지" },
+  ],
+  충청북도: [
+    { code: "오송생명과학일반산업단지", name: "오송생명과학일반산업단지" },
+    { code: "청주일반산업단지", name: "청주일반산업단지" },
+  ],
+  충청남도: [
+    { code: "아산국가산업단지", name: "아산국가산업단지" },
+    { code: "석문국가산업단지", name: "석문국가산업단지" },
+  ],
+  전북특별자치도: [
+    { code: "군산국가산업단지", name: "군산국가산업단지" },
+    { code: "익산국가산업단지", name: "익산국가산업단지" },
+  ],
+  전라남도: [
+    { code: "여수국가산업단지", name: "여수국가산업단지" },
+    { code: "광양국가산업단지", name: "광양국가산업단지" },
+    { code: "대불국가산업단지", name: "대불국가산업단지" },
+  ],
+  경상북도: [
+    { code: "구미국가산업단지", name: "구미국가산업단지" },
+    { code: "포항철강일반산업단지", name: "포항철강일반산업단지" },
+  ],
+  경상남도: [
+    { code: "창원국가산업단지", name: "창원국가산업단지" },
+    { code: "진주상평일반산업단지", name: "진주상평일반산업단지" },
+  ],
+  제주특별자치도: [
+    { code: "제주첨단과학기술단지", name: "제주첨단과학기술단지" },
+  ],
+} as const;
+
+export const FACTORY_EMPLOYEE_OPTIONS = [
+  { code: "all", name: "전체" },
+  { code: "lt1", name: "1명 미만" },
+  { code: "1to4", name: "1명 이상 5명 미만" },
+  { code: "5to49", name: "5명 이상 50명 미만" },
+  { code: "gte50", name: "50명 이상" },
+] as const;
+
 export const ARCH_REGION_OPTIONS = [
   { code: "11680|00000", name: "서울특별시" },
   { code: "26350|00000", name: "부산광역시" },
@@ -194,4 +295,19 @@ export const COLUMN_LABEL_KR: Record<string, string> = {
   rideUseElvtCnt: "승용승강기수",
   emgenUseElvtCnt: "비상용승강기수",
   crtnDay: "생성일자",
+  fctryManageNo: "공장관리번호",
+  cmpnyNm: "회사명",
+  rnAdres: "도로명주소",
+  rprsntvNm: "대표자",
+  cvplChrgOrgnztNm: "행정기관",
+  cmpnyTelno: "회사전화번호",
+  cmpnyFxnum: "팩스번호",
+  allEmplyCo: "고용인원",
+  frstFctryRegistDe: "공장 등록일자",
+  indutyNm: "업종명",
+  mainProductCn: "주생산품",
+  hmpadr: "홈페이지",
+  rprsntvIndutyCode: "대표업종코드",
+  indutyCodes: "전체업종코드",
+  irsttNm: "산업단지명",
 };

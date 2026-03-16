@@ -3,6 +3,7 @@
   "/[locale]/page": "app/[locale]/page.js",
   "/[locale]/services/[slug]/page": "app/[locale]/services/[slug]/page.js",
   "/[locale]/services/page": "app/[locale]/services/page.js",
+  "/api/public-data/archhub-collect/route": "app/api/public-data/archhub-collect/route.js",
   "/api/public-data/archhub-regions/route": "app/api/public-data/archhub-regions/route.js",
-  "/page": "app/page.js"
+  "/api/public-data/collect/route": "app/api/public-data/collect/route.js"
 }

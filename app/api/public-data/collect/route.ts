@@ -40,9 +40,9 @@ type CollectAttemptFailure = {
 type CollectAttemptResult = CollectAttemptSuccess | CollectAttemptFailure;
 
 const MIN_INTERVAL_MS = 250;
-const FETCH_TIMEOUT_MS = 15000;
 const MAX_PAGE_FETCH = 400;
-const MAX_TOTAL_ROWS = 200_000;
+const FETCH_TIMEOUT_MS = 30000;
+const MAX_TOTAL_ROWS = 300_000;
 const PREVIEW_LIMIT = 5;
 
 const lastRequestMap = new Map<string, number>();
@@ -184,14 +184,14 @@ function isCredentialErrorMessage(text: string, status?: number) {
   if (status === 401 || status === 403) return true;
 
   return (
-    normalized.includes("service key")
-    || normalized.includes("servicekey")
-    || normalized.includes("service key is not registered")
-    || normalized.includes("invalid service key")
-    || normalized.includes("forbidden")
-    || normalized.includes("인증키")
-    || normalized.includes("오류(-4)")
-    || normalized.includes("error code(-4)")
+    normalized.includes("service key") ||
+    normalized.includes("servicekey") ||
+    normalized.includes("service key is not registered") ||
+    normalized.includes("invalid service key") ||
+    normalized.includes("forbidden") ||
+    normalized.includes("인증키") ||
+    normalized.includes("오류(-4)") ||
+    normalized.includes("error code(-4)")
   );
 }
 
@@ -218,12 +218,21 @@ function dedupeRows(rows: Record<string, unknown>[]) {
   return Array.from(
     new Map(
       rows.map((row) => {
+        const normalizedRow = row as Record<string, unknown>;
+
         const keyParts = [
-          String((row as Record<string, unknown>).MNG_NO ?? ""),
-          String((row as Record<string, unknown>).BPLC_NM ?? ""),
-          String((row as Record<string, unknown>).LCPMT_YMD ?? ""),
-          String((row as Record<string, unknown>).ROAD_NM_ADDR ?? ""),
+          String(normalizedRow.MNG_NO ?? normalizedRow.fctryManageNo ?? ""),
+          String(normalizedRow.BPLC_NM ?? normalizedRow.cmpnyNm ?? ""),
+          String(normalizedRow.LCPMT_YMD ?? normalizedRow.frstFctryRegistDe ?? ""),
+          String(
+            normalizedRow.ROAD_NM_ADDR ??
+              normalizedRow.rnAdres ??
+              normalizedRow.LOTNO_ADDR ??
+              "",
+          ),
+          String(normalizedRow.irsttNm ?? ""),
         ];
+
         const key = keyParts.some(Boolean) ? keyParts.join("|") : JSON.stringify(row);
         return [key, row] as const;
       }),
@@ -239,6 +248,7 @@ async function collectWithKey(options: {
   previewLimited: boolean;
 }): Promise<CollectAttemptResult> {
   const { endpoint, historyEndpoint, historySwitchParamKey, params, previewLimited } = options;
+
   const historyKey = historySwitchParamKey?.trim();
   const hasBaseDate = Boolean(historyKey && params[historyKey]);
   const hasRegionForHistory = Boolean(String(params["cond[OPN_ATMY_GRP_CD::EQ]"] ?? "").trim());
@@ -248,12 +258,14 @@ async function collectWithKey(options: {
   const selectedEndpoint = useHistory && historyEndpoint ? historyEndpoint : endpoint;
 
   const requestedPageNo = previewLimited ? 1 : Math.max(1, asInt(params.pageNo || "1", 1));
-  const endpointLimit = (
-    selectedEndpoint.includes("foreigner_city_homestays")
-    || selectedEndpoint.includes("foreigners_entertainment_restaurants")
-  )
+const endpointLimit =
+  selectedEndpoint.includes("foreigner_city_homestays") ||
+  selectedEndpoint.includes("foreigners_entertainment_restaurants")
     ? 100
-    : 500;
+    : selectedEndpoint.includes("fctryRegistInfo")
+      ? 500
+      : 500;
+
   const requestedNumOfRows = previewLimited
     ? Math.min(PREVIEW_LIMIT, endpointLimit)
     : Math.min(Math.max(asInt(params.numOfRows || "50", 50), 1), endpointLimit);
@@ -263,6 +275,7 @@ async function collectWithKey(options: {
     .split(",")
     .map((token) => token.trim())
     .filter(Boolean);
+
   const targetRegions = regionTokens.length > 0 ? Array.from(new Set(regionTokens)) : [""];
 
   let totalCount = 0;
@@ -275,6 +288,7 @@ async function collectWithKey(options: {
 
     for (let pageIndex = 0; pageIndex < (previewLimited ? 1 : MAX_PAGE_FETCH); pageIndex += 1) {
       const baseParams = { ...params };
+
       if (!useHistory && historyKey) delete baseParams[historyKey];
       if (regionCode) baseParams[regionKey] = regionCode;
 
@@ -283,6 +297,7 @@ async function collectWithKey(options: {
         pageNo: String(currentPage),
         numOfRows: String(requestedNumOfRows),
       };
+
       const targetUrl = buildUrl(selectedEndpoint, pageParams);
       if (!firstUrl) firstUrl = targetUrl.toString();
 
@@ -315,9 +330,11 @@ async function collectWithKey(options: {
 
       const parsed = parseUpstream(upstream.text);
       const successCodes = new Set(["", "0", "00"]);
+
       if (!successCodes.has(parsed.resultCode)) {
         const detail = `${parsed.resultCode} ${parsed.resultMsg || ""}`;
         const invalidKey = isCredentialErrorMessage(detail);
+
         return {
           ok: false,
           status: invalidKey ? 401 : 502,
@@ -333,13 +350,17 @@ async function collectWithKey(options: {
       if (parsed.rows.length === 0) break;
 
       allRows.push(...parsed.rows);
+
       if (allRows.length >= (previewLimited ? PREVIEW_LIMIT : MAX_TOTAL_ROWS)) break;
 
       if (previewLimited) {
         break;
       }
 
-      if (perRegionCount > 0 && (currentPage - requestedPageNo + 1) * requestedNumOfRows >= perRegionCount) {
+      if (
+        perRegionCount > 0 &&
+        (currentPage - requestedPageNo + 1) * requestedNumOfRows >= perRegionCount
+      ) {
         break;
       }
 
@@ -350,7 +371,11 @@ async function collectWithKey(options: {
     if (allRows.length >= (previewLimited ? PREVIEW_LIMIT : MAX_TOTAL_ROWS)) break;
   }
 
-  const normalizedRows = normalizeRows(dedupeRows(allRows)).slice(0, previewLimited ? PREVIEW_LIMIT : MAX_TOTAL_ROWS);
+  const normalizedRows = normalizeRows(dedupeRows(allRows)).slice(
+    0,
+    previewLimited ? PREVIEW_LIMIT : MAX_TOTAL_ROWS,
+  );
+
   if (normalizedRows.length === 0) {
     return {
       ok: false,
@@ -364,7 +389,7 @@ async function collectWithKey(options: {
   return {
     ok: true,
     rows: normalizedRows,
-    totalCount: previewLimited ? normalizedRows.length : (totalCount || normalizedRows.length),
+    totalCount: previewLimited ? normalizedRows.length : totalCount || normalizedRows.length,
     sourceUrl: firstUrl,
   };
 }
@@ -381,30 +406,40 @@ export async function POST(request: Request) {
     lastRequestMap.set(clientKey, now);
 
     const body = (await request.json()) as CollectBody;
+
     if (!body.endpoint) {
       return NextResponse.json({ ok: false, message: MSG_NO_ENDPOINT }, { status: 400 });
     }
 
-    const params: Record<string, string> = { ...(body.params ?? {}), ...(body.forcedQuery ?? {}) };
+    const params: Record<string, string> = {
+      ...(body.params ?? {}),
+      ...(body.forcedQuery ?? {}),
+    };
+
     const serviceKeyQueryKey = body.serviceKeyQueryKey || "serviceKey";
     const userServiceKey = String(params[serviceKeyQueryKey] ?? "").trim();
-    const envServiceKey = body.serviceKeyEnvVar ? String(process.env[body.serviceKeyEnvVar] ?? "").trim() : "";
+    const envServiceKey = body.serviceKeyEnvVar
+      ? String(process.env[body.serviceKeyEnvVar] ?? "").trim()
+      : "";
+
     const previewServiceKeys = getPreviewServiceKeys(envServiceKey);
 
-    const runCollect = async (serviceKey: string, previewLimited: boolean) => collectWithKey({
-      endpoint: body.endpoint!,
-      historyEndpoint: body.historyEndpoint,
-      historySwitchParamKey: body.historySwitchParamKey,
-      params: {
-        ...params,
-        [serviceKeyQueryKey]: serviceKey,
-      },
-      previewLimited,
-    });
+    const runCollect = async (serviceKey: string, previewLimited: boolean) =>
+      collectWithKey({
+        endpoint: body.endpoint!,
+        historyEndpoint: body.historyEndpoint,
+        historySwitchParamKey: body.historySwitchParamKey,
+        params: {
+          ...params,
+          [serviceKeyQueryKey]: serviceKey,
+        },
+        previewLimited,
+      });
 
     const runPreviewCollect = async () => {
       for (const previewServiceKey of previewServiceKeys) {
         const attempt = await runCollect(previewServiceKey, true);
+
         if (attempt.ok) {
           return { kind: "ok" as const, attempt };
         }
@@ -414,6 +449,7 @@ export async function POST(request: Request) {
         if (attempt.invalidKey) {
           continue;
         }
+
         return { kind: "error" as const, attempt };
       }
 
@@ -422,6 +458,7 @@ export async function POST(request: Request) {
 
     if (userServiceKey) {
       const userAttempt = await runCollect(userServiceKey, false);
+
       if (userAttempt.ok) {
         return NextResponse.json({
           ok: true,
@@ -446,6 +483,7 @@ export async function POST(request: Request) {
       }
 
       const previewResult = await runPreviewCollect();
+
       if (previewResult?.kind === "ok") {
         return NextResponse.json({
           ok: true,
@@ -508,6 +546,7 @@ export async function POST(request: Request) {
     }
 
     const previewResult = await runPreviewCollect();
+
     if (previewResult?.kind === "ok") {
       return NextResponse.json({
         ok: true,

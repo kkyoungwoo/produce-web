@@ -29,6 +29,16 @@ const ARCHHUB_STYLE_CONFIG: WorkbenchProductConfig = {
   permitDateDefaultTo: "today",
 };
 
+const FACTORY_STYLE_CONFIG: WorkbenchProductConfig = {
+  inputMode: "factory",
+  statMode: "region:factory",
+  hideInputKeys: ["adres", "irsttNm"],
+  factoryRegionParamKey: "irsttNm",
+  factoryRegionStepMode: "sido-industrial-estate",
+  forceDefaultDates: true,
+  permitDateDefaultDaysFrom: 7,
+};
+
 const CONFIG_BY_SLUG: Record<string, WorkbenchProductConfig> = {
   "api-15086411": {
     inputMode: "default",
@@ -53,6 +63,9 @@ const CONFIG_BY_SLUG: Record<string, WorkbenchProductConfig> = {
   },
   "api-15136560": {
     ...ARCHHUB_STYLE_CONFIG,
+  },
+  "api-15087611": {
+    ...FACTORY_STYLE_CONFIG,
   },
 };
 

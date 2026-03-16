@@ -291,10 +291,6 @@ export type LocaleContent = {
     eyebrow: string;
     heroTitleLines: string[];
     heroDescription: string;
-    flowSteps: Array<{
-      title: string;
-      description: string;
-    }>;
     currentStatusTitle: string;
     progress: {
       idle: string;

@@ -137,12 +137,45 @@ function buildSingleHeaderKey(row: Row, header: string) {
   return normalizeCellValue(row?.[header]);
 }
 
+function removeRowsWithEmptySelectedHeaders(rows: Row[], headers: string[]) {
+  if (headers.length === 0) {
+    return {
+      rows: [...rows],
+      removedCount: 0,
+      finalCount: rows.length,
+    };
+  }
+
+  const filteredRows = rows.filter((row) =>
+    headers.every((header) => buildSingleHeaderKey(row, header) !== ""),
+  );
+
+  return {
+    rows: filteredRows,
+    removedCount: rows.length - filteredRows.length,
+    finalCount: filteredRows.length,
+  };
+}
+
+/**
+ * 선택한 여러 컬럼 중
+ * "어느 한 컬럼이라도 같은 값이면 같은 그룹"으로 묶고
+ * 각 그룹에서 엑셀 상단(먼저 나온 행) 1개만 유지합니다.
+ */
 function dedupeRowsBySelectedHeadersKeepFirst(rows: Row[], headers: string[]) {
   if (headers.length === 0) {
     return {
       rows: [...rows],
       removedCount: 0,
       finalCount: rows.length,
+    };
+  }
+
+  if (rows.length === 0) {
+    return {
+      rows: [],
+      removedCount: 0,
+      finalCount: 0,
     };
   }
 
@@ -208,6 +241,12 @@ function dedupeRowsBySelectedHeadersKeepFirst(rows: Row[], headers: string[]) {
   };
 }
 
+/**
+ * 기존 정리본(existingRows)과 신규 정리본(newRows)을
+ * 비교 기준 컬럼으로 연결 그룹 처리해서,
+ * 기존과 연결되는 신규는 제거하고
+ * 기존과 연결되지 않는 신규만 남깁니다.
+ */
 function removeNewRowsConnectedToExistingByHeaders(
   newRows: Row[],
   existingRows: Row[],
@@ -218,6 +257,14 @@ function removeNewRowsConnectedToExistingByHeaders(
       rows: [...newRows],
       removedCount: 0,
       finalCount: newRows.length,
+    };
+  }
+
+  if (newRows.length === 0) {
+    return {
+      rows: [],
+      removedCount: 0,
+      finalCount: 0,
     };
   }
 
@@ -513,22 +560,22 @@ function getLoadingText(labels: DbCleanupLabels, stage: LoadingStage) {
     case "compare-existing-step":
       return {
         title: labels.loading.title,
-        description: "기존 DB를 선택한 비교 컬럼 기준으로 정리하고 있습니다.",
+        description: "기존 DB를 비교 기준 컬럼으로 먼저 정리하고 있습니다.",
       };
     case "compare-new-step1":
       return {
         title: labels.loading.title,
-        description: "신규 파일을 1차 기준으로 정리한 뒤 기존 DB와 연결 중복까지 검사하고 있습니다.",
+        description: "신규 DB를 1차 기준으로 먼저 정리하고 있습니다.",
       };
     case "compare-cross-check":
       return {
         title: labels.loading.title,
-        description: "신규 정리본을 비교 기준 컬럼으로 다시 정리하고 있습니다.",
+        description: "정리된 신규 DB를 기준으로 기존 DB와 비교 중입니다.",
       };
     case "compare-merge":
       return {
         title: labels.loading.title,
-        description: "기존 정리본과 신규 추가 대상을 합치고 최종 안전 검사를 진행하고 있습니다.",
+        description: "신규 추가 대상과 최종 전체 DB 파일을 만들고 있습니다.",
       };
     case "done":
       return {
@@ -778,10 +825,16 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
       if (!existingFileInfo) {
         await tick("single-step1");
 
-        const newStep1Dedup = dedupeRowsBySelectedHeadersKeepFirst(
+        const newEmptyFiltered = removeRowsWithEmptySelectedHeaders(
           newFileInfo.rows,
           newDuplicateHeaders,
         );
+
+        const newStep1Dedup = dedupeRowsBySelectedHeadersKeepFirst(
+          newEmptyFiltered.rows,
+          newDuplicateHeaders,
+        );
+
         const finalRows = newStep1Dedup.rows;
         const fileNameBase = newFileInfo.fileName;
 
@@ -804,7 +857,8 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
             existingOriginalCount: 0,
             existingRemovedInStepCount: 0,
             existingStepCount: 0,
-            newRemovedInStep1Count: newStep1Dedup.removedCount,
+            newRemovedInStep1Count:
+              newEmptyFiltered.removedCount + newStep1Dedup.removedCount,
             newStep1Count: finalRows.length,
             removedAgainstExistingCount: 0,
             newRemovedInCompareHeaderStepCount: 0,
@@ -818,47 +872,82 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
         return;
       }
 
+      /**
+       * 비교 모드 처리 순서
+       * 1. 기존 DB를 비교 기준 컬럼으로 먼저 정리
+       * 2. 신규 DB를 1차 기준 컬럼으로 먼저 정리
+       * 3. 신규 정리본에서 비교 기준 컬럼 빈 값 제거
+       * 4. 기존 정리본과 비교해서 겹치는 신규 제거
+       * 5. 남은 신규를 비교 기준 컬럼으로 다시 중복 정리
+       * 6. 최종 전체 DB = 기존 정리본 + 신규 추가 대상
+       */
+
       await tick("compare-existing-step");
-      const existingStepDedup = dedupeRowsBySelectedHeadersKeepFirst(
+
+      const existingEmptyFiltered = removeRowsWithEmptySelectedHeaders(
         existingFileInfo.rows,
         comparableExistingHeaders,
       );
+
+      const existingStepDedup = dedupeRowsBySelectedHeadersKeepFirst(
+        existingEmptyFiltered.rows,
+        comparableExistingHeaders,
+      );
+
       const cleanedExistingRows = existingStepDedup.rows;
 
       await tick("compare-new-step1");
-      const newStep1Dedup = dedupeRowsBySelectedHeadersKeepFirst(
+
+      const newStep1EmptyFiltered = removeRowsWithEmptySelectedHeaders(
         newFileInfo.rows,
         newDuplicateHeaders,
       );
+
+      const newStep1Dedup = dedupeRowsBySelectedHeadersKeepFirst(
+        newStep1EmptyFiltered.rows,
+        newDuplicateHeaders,
+      );
+
       const newStep1Rows = newStep1Dedup.rows;
 
-      const filteredAgainstExisting = removeNewRowsConnectedToExistingByHeaders(
+      await tick("compare-cross-check");
+
+      const newCompareHeaderEmptyFiltered = removeRowsWithEmptySelectedHeaders(
         newStep1Rows,
-        existingFileInfo.rows,
         comparableExistingHeaders,
       );
 
-      await tick("compare-cross-check");
+      const filteredAgainstExisting = removeNewRowsConnectedToExistingByHeaders(
+        newCompareHeaderEmptyFiltered.rows,
+        cleanedExistingRows,
+        comparableExistingHeaders,
+      );
 
       const newCompareHeaderDedup = dedupeRowsBySelectedHeadersKeepFirst(
         filteredAgainstExisting.rows,
         comparableExistingHeaders,
       );
-      const comparePreparedNewRows = newCompareHeaderDedup.rows;
+
+      const appendableNewRows = newCompareHeaderDedup.rows;
 
       await tick("compare-merge");
 
       const mergedHeaders = mergeHeaders(existingFileInfo.headers, newFileInfo.headers);
-      const mergedBeforeFinalSafety = [...cleanedExistingRows, ...comparePreparedNewRows];
+      const mergedBeforeFinalSafety = [...cleanedExistingRows, ...appendableNewRows];
 
       const mergedFinalSafetyDedup = dedupeRowsBySelectedHeadersKeepFirst(
         mergedBeforeFinalSafety,
         comparableExistingHeaders,
       );
+
       const finalMergedRows = mergedFinalSafetyDedup.rows;
 
-      const finalMergedRowSet = new Set<Row>(finalMergedRows);
-      const appendableNewRows = comparePreparedNewRows.filter((row) => finalMergedRowSet.has(row));
+      /**
+       * 안전 검사는 keep-first 이므로 기존 정리본이 항상 우선 유지됩니다.
+       * 따라서 최종 merged에서 기존 정리본 길이 이후 부분이
+       * 실제 최종 추가된 신규 데이터입니다.
+       */
+      const finalAppendableNewRows = finalMergedRows.slice(cleanedExistingRows.length);
 
       const fileNameBase = existingFileInfo.fileName || newFileInfo.fileName;
 
@@ -869,7 +958,7 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
         processedAt: formatDateTime(),
         selectedNewDuplicateHeaders: [...newDuplicateHeaders],
         selectedExistingDuplicateHeaders: [...comparableExistingHeaders],
-        appendableNewRows,
+        appendableNewRows: finalAppendableNewRows,
         cleanedExistingRows,
         finalMergedRows,
         appendableNewHeaders: newFileInfo.headers,
@@ -879,16 +968,19 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
         stats: {
           newOriginalCount: newFileInfo.rows.length,
           existingOriginalCount: existingFileInfo.rows.length,
-          existingRemovedInStepCount: existingStepDedup.removedCount,
+          existingRemovedInStepCount:
+            existingEmptyFiltered.removedCount + existingStepDedup.removedCount,
           existingStepCount: cleanedExistingRows.length,
-          newRemovedInStep1Count: newStep1Dedup.removedCount,
+          newRemovedInStep1Count:
+            newStep1EmptyFiltered.removedCount + newStep1Dedup.removedCount,
           newStep1Count: newStep1Rows.length,
-          removedAgainstExistingCount: filteredAgainstExisting.removedCount,
+          removedAgainstExistingCount:
+            newCompareHeaderEmptyFiltered.removedCount + filteredAgainstExisting.removedCount,
           newRemovedInCompareHeaderStepCount: newCompareHeaderDedup.removedCount,
-          newCompareHeaderStepCount: comparePreparedNewRows.length,
+          newCompareHeaderStepCount: appendableNewRows.length,
           removedInFinalMergeSafetyCount:
-            mergedBeforeFinalSafety.length - mergedFinalSafetyDedup.rows.length,
-          finalNewCount: appendableNewRows.length,
+            mergedBeforeFinalSafety.length - finalMergedRows.length,
+          finalNewCount: finalAppendableNewRows.length,
           mergedFinalCount: finalMergedRows.length,
         },
       });
@@ -947,6 +1039,7 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
     : singleMode
       ? labels.singleMode.infoLines
       : [];
+
   const actionDescription = compareMode
     ? labels.actionBar.description
     : labels.actionBar.singleDescription;
@@ -975,18 +1068,6 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
             ))}
           </h1>
           <p className={styles.heroDescription}>{labels.heroDescription}</p>
-
-          <div className={styles.flowRail}>
-            {labels.flowSteps.map((step, index) => (
-              <div key={`${step.title}-${index}`} className={styles.flowRailItem}>
-                <div className={styles.flowStep} data-final={index === labels.flowSteps.length - 1}>
-                  <b>{step.title}</b>
-                  <span>{step.description}</span>
-                </div>
-                {index < labels.flowSteps.length - 1 ? <i className={styles.flowConnector} /> : null}
-              </div>
-            ))}
-          </div>
         </article>
 
         <aside className={`${styles.heroCard} ${styles.heroStatus} ${styles.interactiveSurface}`}>
@@ -1018,15 +1099,6 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
               }
               tone={newFileInfo ? "good" : "neutral"}
             />
-          </div>
-
-          <div className={styles.infoList}>
-            {labels.infoItems.map((item) => (
-              <div key={item.label} className={styles.infoItem}>
-                <span>{item.label}</span>
-                <strong>{item.value}</strong>
-              </div>
-            ))}
           </div>
         </aside>
       </section>
@@ -1164,13 +1236,13 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
 
           <div className={styles.criteriaWrap}>
             <div className={styles.criteriaCard}>
-              <span>신규 중복 제거 기준</span>
+              <span>신규 1차 중복 제거 기준</span>
               <strong>{result.selectedNewDuplicateHeaders.join(" / ")}</strong>
             </div>
 
             {result.mode === "compare" ? (
               <div className={styles.criteriaCard}>
-                <span>기존 DB 중복 제거 및 비교 기준</span>
+                <span>기존 DB 비교 및 중복 제거 기준</span>
                 <strong>{result.selectedExistingDuplicateHeaders.join(" / ")}</strong>
               </div>
             ) : null}
@@ -1213,11 +1285,14 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
                           <strong>{result.stats.newOriginalCount.toLocaleString()}건</strong>
                         </div>
                         <div className={styles.downloadMetaItem}>
-                          <span>중복 제거</span>
+                          <span>1차 정리 후</span>
+                          <strong>{result.stats.newStep1Count.toLocaleString()}건</strong>
+                        </div>
+                        <div className={styles.downloadMetaItem}>
+                          <span>기존/비교 기준 제거</span>
                           <strong>
                             -{" "}
                             {(
-                              result.stats.newRemovedInStep1Count +
                               result.stats.removedAgainstExistingCount +
                               result.stats.newRemovedInCompareHeaderStepCount
                             ).toLocaleString()}
@@ -1249,7 +1324,7 @@ export default function DbCleanupClient({ labels }: DbCleanupClientProps) {
 
                   <p>
                     {result.mode === "compare"
-                      ? "기존 DB에 실제로 추가되는 신규 데이터만 담았습니다."
+                      ? "신규 파일을 먼저 정리한 뒤, 기존 DB와 비교했을 때 실제로 추가 가능한 데이터만 담았습니다."
                       : "선택한 기준으로 중복을 제거한 최종 정리 파일입니다."}
                   </p>
                 </div>

@@ -179,7 +179,7 @@ const ko: LocaleContent = {
       inputTitle: "입력 설정",
       serviceKeyLabel: "인증키(serviceKey)",
       serviceKeyPlaceholder: "실제로 동작하는 인증키를 입력하면 전체 데이터가 조회됩니다.",
-      serviceKeyHelp: "입력하지 않거나 인증키가 올바르지 않으면 실제 데이터 미리보기 5건만 표시됩니다. (591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b)",
+      serviceKeyHelp: "입력하지 않거나 인증키가 올바르지 않으면 실제 데이터 미리보기 5건만 표시됩니다.",
       regionSelectLabel: "지역 선택",
       selectAllLabel: "전체 선택",
       clearAllLabel: "전체 해제",
@@ -234,14 +234,8 @@ const ko: LocaleContent = {
     ogDescription: "신규 DB 파일을 정리하고 기존 DB와 비교해 활용 가능한 결과만 남기는 작업 화면입니다.",
     twitterDescription: "중복 제거, 기존 DB 비교, 누적본 생성까지 한 화면에서 처리할 수 있는 DB 정리 페이지입니다.",
     eyebrow: "DB DUPLICATE REMOVER",
-    heroTitleLines: ["중복은 걷어내고", "비교 가능한 데이터만 남기는", "누적형 DB 정리 도구"],
-    heroDescription: "신규 파일은 1차 기준으로 먼저 정리하고, 그 결과를 바탕으로 2차 비교 컬럼으로 기존 DB와 다시 비교해 최종 데이터만 남길 수 있도록 구성했습니다.",
-    flowSteps: [
-      { title: "기존 파일 등록", description: "비교 기준이 되는 누적 DB" },
-      { title: "신규 파일 등록", description: "새로 확보한 분석 대상 데이터" },
-      { title: "1차 정리", description: "신규 데이터 내부 빈값과 중복 정리" },
-      { title: "2차 비교", description: "기존 DB와 비교 후 최종 병합" },
-    ],
+    heroTitleLines: ["중복을 제거하는", "DB 정리 도구"],
+    heroDescription: "신규 파일과 기존 파일을 비교해 최종 데이터만 남길 수 있도록 구성했습니다.",
     currentStatusTitle: "현재 상태",
     progress: {
       idle: "기존 관리 파일과 신규 데이터 파일을 등록하면 바로 정리할 수 있습니다.",
@@ -261,9 +255,6 @@ const ko: LocaleContent = {
       countSuffix: "개",
     },
     infoItems: [
-      { label: "비교 규칙", value: "2차 비교는 신규 파일과 기존 파일에 공통으로 있는 컬럼만 선택해 진행합니다." },
-      { label: "1차 처리", value: "신규 데이터에서 선택한 컬럼의 빈값 행을 모두 제외하고, 각 선택 컬럼 기준으로 마지막 값만 남깁니다." },
-      { label: "2차 처리", value: "1차 정리 결과를 다시 정리한 뒤 기존 DB와 비교해 중복을 제거하고 누적합니다." },
     ],
     upload: {
       existingTitle: "기존 관리 파일",
