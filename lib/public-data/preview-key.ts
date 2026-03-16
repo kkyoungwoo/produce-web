@@ -1,46 +1,81 @@
-export const FALLBACK_PREVIEW_SERVICE_KEY =
-  "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
+import "server-only";
 
-/**
- * 사용자가 입력하는 별칭 -> 실제 적용할 등록 키
- * 왼쪽은 사용자가 입력할 값
- * 오른쪽은 실제 적용할 키
- */
-export const PREVIEW_SERVICE_KEY_MAP: Record<string, string> = {
-  vip: FALLBACK_PREVIEW_SERVICE_KEY,
-};
+const DEFAULT_PREVIEW_SERVICE_KEY =
+  process.env.PREVIEW_DEFAULT_SERVICE_KEY?.trim() || "";
 
-export function normalizePreviewKey(value?: string) {
+function normalizePreviewKey(value?: string | null) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-export function resolvePreviewServiceKey(inputKey?: string) {
+function parsePreviewAliasMap(): Map<string, string> {
+  const raw = process.env.PREVIEW_SERVICE_KEY_MAP?.trim();
+
+  if (!raw) {
+    return new Map<string, string>();
+  }
+
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+
+    const entries = Object.entries(parsed)
+      .map(([alias, key]): [string, string] => [
+        normalizePreviewKey(alias),
+        String(key ?? "").trim(),
+      ])
+      .filter(
+        (entry): entry is [string, string] =>
+          Boolean(entry[0]) && Boolean(entry[1]),
+      );
+
+    return new Map<string, string>(entries);
+  } catch {
+    return new Map<string, string>();
+  }
+}
+
+const PREVIEW_SERVICE_KEY_MAP = parsePreviewAliasMap();
+
+export { normalizePreviewKey };
+
+export function resolvePreviewServiceKey(inputKey?: string | null) {
   const normalizedInput = normalizePreviewKey(inputKey);
 
   if (!normalizedInput) {
-    return FALLBACK_PREVIEW_SERVICE_KEY;
+    return DEFAULT_PREVIEW_SERVICE_KEY;
   }
 
-  const mappedKey = PREVIEW_SERVICE_KEY_MAP[normalizedInput];
+  const mappedKey = PREVIEW_SERVICE_KEY_MAP.get(normalizedInput);
   if (mappedKey) {
-    return mappedKey.trim();
+    return mappedKey;
   }
 
-  if (inputKey?.trim() === FALLBACK_PREVIEW_SERVICE_KEY) {
-    return FALLBACK_PREVIEW_SERVICE_KEY;
+  if (inputKey?.trim() === DEFAULT_PREVIEW_SERVICE_KEY) {
+    return DEFAULT_PREVIEW_SERVICE_KEY;
   }
 
-  return FALLBACK_PREVIEW_SERVICE_KEY;
+  return DEFAULT_PREVIEW_SERVICE_KEY;
 }
 
-export function getPreviewServiceKey(primaryKey?: string) {
-  return resolvePreviewServiceKey(primaryKey);
+export function getPreviewServiceKey(inputKey?: string | null) {
+  return resolvePreviewServiceKey(inputKey);
 }
 
-export function getPreviewServiceKeys(primaryKey?: string) {
-  const resolvedKey = resolvePreviewServiceKey(primaryKey);
+export function getPreviewServiceKeys(inputKey?: string | null) {
+  const resolvedKey = resolvePreviewServiceKey(inputKey);
 
   return Array.from(
-    new Set([resolvedKey, FALLBACK_PREVIEW_SERVICE_KEY].filter(Boolean))
+    new Set(
+      [resolvedKey, DEFAULT_PREVIEW_SERVICE_KEY].filter(
+        (value): value is string => Boolean(value),
+      ),
+    ),
   );
+}
+
+export function hasPreviewServiceKey() {
+  return Boolean(DEFAULT_PREVIEW_SERVICE_KEY);
+}
+
+export function getPreviewAliases() {
+  return Array.from(PREVIEW_SERVICE_KEY_MAP.keys());
 }

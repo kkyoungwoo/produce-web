@@ -29,8 +29,45 @@ import {
 } from "@/components/workbench/helpers";
 import { getWorkbenchProductConfig } from "@/components/workbench/product-config";
 import { WORKBENCH_TEXT } from "@/components/workbench/text";
-import { getPreviewServiceKey } from "@/lib/public-data/preview-key";
 import type { CollectResponse, WorkbenchProps, WorkbenchStatMode } from "@/components/workbench/types";
+
+const FALLBACK_PREVIEW_SERVICE_KEY =
+  "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
+
+/**
+ * 사용자가 입력하는 별칭 -> 실제 적용할 키
+ * 원하는 커스텀 텍스트를 여기에서 계속 추가하면 됨
+ */
+const PREVIEW_SERVICE_KEY_MAP: Record<string, string> = {
+  vip: FALLBACK_PREVIEW_SERVICE_KEY,
+  gold: FALLBACK_PREVIEW_SERVICE_KEY,
+  master: FALLBACK_PREVIEW_SERVICE_KEY,
+};
+
+function normalizePreviewKey(value?: string) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function resolvePreviewServiceKey(inputKey?: string) {
+  const trimmed = String(inputKey ?? "").trim();
+
+  if (!trimmed) {
+    return "";
+  }
+
+  const normalizedInput = normalizePreviewKey(trimmed);
+  const mappedKey = PREVIEW_SERVICE_KEY_MAP[normalizedInput];
+
+  if (mappedKey) {
+    return mappedKey.trim();
+  }
+
+  return trimmed;
+}
+
+function getPreviewServiceKey(primaryKey?: string) {
+  return resolvePreviewServiceKey(primaryKey);
+}
 
 const ALL_FILTER = WORKBENCH_TEXT.allFilterLabel;
 const SALES_STATUS_PRODUCT_SLUGS = new Set(["api-15155139", "api-15154910"]);
@@ -187,7 +224,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
     () =>
       Object.fromEntries(
         product.inputFields.map((field) => [field.key, field.key === "serviceKey" ? "" : field.example]),
-      ),
+      ) as Record<string, string>,
     [product],
   );
 
@@ -253,12 +290,17 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
     setFactoryDateTo(FACTORY_DEFAULT_TO);
   }, [config.inputMode, product.slug]);
 
-  useEffect(() => () => {
-    if (timerRef.current) clearInterval(timerRef.current);
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
   }, []);
 
   const labelMap = useMemo(
-    () => Object.fromEntries((product.workbench?.columns ?? []).map((column) => [column.key, column.label])),
+    () =>
+      Object.fromEntries(
+        (product.workbench?.columns ?? []).map((column) => [column.key, column.label]),
+      ) as Record<string, string>,
     [product.workbench?.columns],
   );
 
@@ -290,7 +332,10 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
     () =>
       config.statMode === "none"
         ? []
-        : [{ name: ALL_FILTER, count: rows.length }, ...statBuckets.map((bucket) => ({ name: bucket.name, count: bucket.rows.length }))],
+        : [
+            { name: ALL_FILTER, count: rows.length },
+            ...statBuckets.map((bucket) => ({ name: bucket.name, count: bucket.rows.length })),
+          ],
     [config.statMode, rows.length, statBuckets],
   );
 
@@ -399,11 +444,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
       ...prev,
       [key]: selectedFactoryIndustrialEstates[0] ?? "",
     }));
-  }, [
-    config.factoryRegionParamKey,
-    config.inputMode,
-    selectedFactoryIndustrialEstates,
-  ]);
+  }, [config.factoryRegionParamKey, config.inputMode, selectedFactoryIndustrialEstates]);
 
   useEffect(() => {
     setVisibleCount(CHUNK_SIZE);
@@ -457,9 +498,11 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
   };
 
   const requestCollect = async (requestParams: Record<string, string>) => {
-    const resolvedParams = {
+    const rawServiceKey = String(requestParams.serviceKey ?? "").trim();
+
+    const resolvedParams: Record<string, string> = {
       ...requestParams,
-      serviceKey: getPreviewServiceKey(requestParams.serviceKey),
+      serviceKey: rawServiceKey ? getPreviewServiceKey(rawServiceKey) : "",
     };
 
     const response = await fetch("/api/public-data/collect", {
@@ -514,7 +557,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
       return;
     }
 
-    const requestParams = { ...params };
+    const requestParams: Record<string, string> = { ...params };
 
     if (config.inputMode === "homestay") {
       requestParams["cond[LCPMT_YMD::GTE]"] ||= getDefaultFromDate(
