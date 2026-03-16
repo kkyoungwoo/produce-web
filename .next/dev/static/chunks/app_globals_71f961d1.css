@@ -531,28 +531,8 @@
     margin-top: calc(var(--spacing) * 6);
   }
 
-  .mt-15 {
-    margin-top: calc(var(--spacing) * 15);
-  }
-
-  .mt-\[15px\] {
-    margin-top: 15px;
-  }
-
-  .mt-\[35px\] {
-    margin-top: 35px;
-  }
-
   .mt-\[50px\] {
     margin-top: 50px;
-  }
-
-  .mt-\[135px\] {
-    margin-top: 135px;
-  }
-
-  .mb-5 {
-    margin-bottom: calc(var(--spacing) * 5);
   }
 
   .line-clamp-1 {
@@ -1103,10 +1083,6 @@
 
   .pr-1 {
     padding-right: calc(var(--spacing) * 1);
-  }
-
-  .pb-5 {
-    padding-bottom: calc(var(--spacing) * 5);
   }
 
   .pb-10 {

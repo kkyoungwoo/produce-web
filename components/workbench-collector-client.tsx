@@ -29,6 +29,7 @@ import {
 } from "@/components/workbench/helpers";
 import { getWorkbenchProductConfig } from "@/components/workbench/product-config";
 import { WORKBENCH_TEXT } from "@/components/workbench/text";
+import { getPreviewServiceKey } from "@/lib/public-data/preview-key";
 import type { CollectResponse, WorkbenchProps, WorkbenchStatMode } from "@/components/workbench/types";
 
 const ALL_FILTER = WORKBENCH_TEXT.allFilterLabel;
@@ -456,6 +457,11 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
   };
 
   const requestCollect = async (requestParams: Record<string, string>) => {
+    const resolvedParams = {
+      ...requestParams,
+      serviceKey: getPreviewServiceKey(requestParams.serviceKey),
+    };
+
     const response = await fetch("/api/public-data/collect", {
       method: "POST",
       headers: {
@@ -463,7 +469,7 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
       },
       body: JSON.stringify({
         endpoint: product.apiRuntime?.endpoint,
-        params: requestParams,
+        params: resolvedParams,
         serviceKeyEnvVar: product.apiCredential?.envVarName,
         serviceKeyQueryKey: product.apiCredential?.queryKey,
         forcedQuery: product.apiRuntime?.forcedQuery,
@@ -999,9 +1005,6 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
                       </option>
                     ))}
                   </select>
-                  <p className="text-xs leading-6 text-slate-500">
-                    산업단지는 UI 없이 내부적으로 자동 처리됩니다.
-                  </p>
                 </label>
 
                 <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
@@ -1020,38 +1023,38 @@ export default function WorkbenchCollectorClient({ product, labels }: WorkbenchP
                 </label>
 
                 <div className="grid gap-3 md:grid-cols-2">
-  <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
-    <div className="flex items-center justify-between gap-2">
-      <strong className="text-base font-bold text-slate-900">공장 등록일자 시작</strong>
-      <button
-        type="button"
-        onClick={() => {
-          setFactoryDateFrom("");
-          setFactoryDateTo("");
-        }}
-        className="inline-flex min-h-[32px] items-center justify-center rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
-      >
-        초기화
-      </button>
-    </div>
-    <input
-      type="date"
-      className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
-      value={toInputDate(factoryDateFrom)}
-      onChange={(event) => setFactoryDateFrom(toApiDate(event.target.value))}
-    />
-  </label>
+                  <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <div className="flex items-center justify-between gap-2">
+                      <strong className="text-base font-bold text-slate-900">공장 등록일자 시작</strong>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFactoryDateFrom("");
+                          setFactoryDateTo("");
+                        }}
+                        className="inline-flex min-h-[32px] items-center justify-center rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-slate-700 transition hover:bg-slate-100"
+                      >
+                        초기화
+                      </button>
+                    </div>
+                    <input
+                      type="date"
+                      className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
+                      value={toInputDate(factoryDateFrom)}
+                      onChange={(event) => setFactoryDateFrom(toApiDate(event.target.value))}
+                    />
+                  </label>
 
-  <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
-    <strong className="text-base font-bold text-slate-900">공장 등록일자 종료</strong>
-    <input
-      type="date"
-      className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
-      value={toInputDate(factoryDateTo)}
-      onChange={(event) => setFactoryDateTo(toApiDate(event.target.value))}
-    />
-  </label>
-</div>
+                  <label className="grid gap-2 rounded-xl border border-blue-200 bg-slate-50 p-4 text-sm text-slate-700">
+                    <strong className="text-base font-bold text-slate-900">공장 등록일자 종료</strong>
+                    <input
+                      type="date"
+                      className="w-full rounded-lg border border-blue-300 bg-white px-4 py-3 text-sm text-slate-800"
+                      value={toInputDate(factoryDateTo)}
+                      onChange={(event) => setFactoryDateTo(toApiDate(event.target.value))}
+                    />
+                  </label>
+                </div>
               </>
             ) : (
               visibleInputFields.map((field) => (

@@ -178,7 +178,7 @@ const ko: LocaleContent = {
     ui: {
       inputTitle: "입력 설정",
       serviceKeyLabel: "인증키(serviceKey)",
-      serviceKeyPlaceholder: "실제로 동작하는 인증키를 입력하면 전체 데이터가 조회됩니다.",
+      serviceKeyPlaceholder: "vip 인증키",
       serviceKeyHelp: "입력하지 않거나 인증키가 올바르지 않으면 실제 데이터 미리보기 5건만 표시됩니다.",
       regionSelectLabel: "지역 선택",
       selectAllLabel: "전체 선택",
