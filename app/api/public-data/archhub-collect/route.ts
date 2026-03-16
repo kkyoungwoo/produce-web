@@ -3,9 +3,10 @@ import { NextResponse } from "next/server";
 import { collectArchhubRows } from "@/lib/archhub/collector";
 import { expandArchhubTargets } from "@/lib/archhub/regions";
 import {
+  getAllPreviewServiceKeys,
   getPreviewAliases,
+  getPreviewKeyDebug,
   getPreviewServiceKey,
-  getPreviewServiceKeys,
   normalizePreviewKey,
 } from "@/lib/public-data/preview-key";
 
@@ -83,7 +84,7 @@ function diffDays(startDate: string, endDate: string) {
 }
 
 function isCredentialErrorMessage(message: string) {
-  const normalized = message.toLowerCase();
+  const normalized = String(message).toLowerCase();
 
   return (
     normalized.includes("service key") ||
@@ -92,7 +93,10 @@ function isCredentialErrorMessage(message: string) {
     normalized.includes("인증") ||
     normalized.includes("등록되지") ||
     normalized.includes("error code -4") ||
-    normalized.includes("service_key_is_not_registered_error")
+    normalized.includes("service_key_is_not_registered_error") ||
+    normalized.includes("service key is not registered") ||
+    normalized.includes("decoding error") ||
+    normalized.includes("invalid")
   );
 }
 
@@ -100,10 +104,10 @@ function uniqueStrings(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
-function mergeRows(targets: Array<Record<string, string | number>>) {
+function mergeRows(rows: Array<Record<string, string | number>>) {
   const map = new Map<string, Record<string, string | number>>();
 
-  for (const row of targets) {
+  for (const row of rows) {
     const key = [
       String(row.permitNo ?? "").trim(),
       String(row.siteLocation ?? "").trim(),
@@ -137,7 +141,7 @@ function resolveInputServiceKey(rawServiceKey: string) {
 }
 
 function buildPreviewKeys() {
-  return uniqueStrings(getPreviewServiceKeys());
+  return uniqueStrings(getAllPreviewServiceKeys());
 }
 
 function buildAttemptRanges(startDate: string, endDate: string, previewLimited: boolean) {
@@ -146,7 +150,14 @@ function buildAttemptRanges(startDate: string, endDate: string, previewLimited: 
     endDate: string;
     usedDateFallback: boolean;
     fallbackDays: number;
-  }> = [{ startDate, endDate, usedDateFallback: false, fallbackDays: 0 }];
+  }> = [
+    {
+      startDate,
+      endDate,
+      usedDateFallback: false,
+      fallbackDays: 0,
+    },
+  ];
 
   const requestedDays = diffDays(startDate, endDate);
 
@@ -245,6 +256,9 @@ async function runCollect(options: {
           status: 401,
           message: "인증키를 확인하지 못했습니다.",
           invalidKey: true,
+          sourceUrl: lastSourceUrl,
+          searchedTargetCount: lastSearchedTargetCount,
+          endpointFamily: lastEndpointFamily,
         };
       }
     }
@@ -271,6 +285,16 @@ async function runPreviewCollect(options: {
   const { previewServiceKeys, startDate, endDate, sigunguCodes, legalDongCodes } = options;
 
   const mergedRows: Array<Record<string, string | number>> = [];
+  const debugAttempts: Array<{
+    keyMask: string;
+    legalDongCount: number;
+    ok: boolean;
+    status?: number;
+    invalidKey?: boolean;
+    message?: string;
+    rowCount?: number;
+  }> = [];
+
   let latestMeta: {
     searchedTargetCount?: number;
     endpointFamily?: "hs" | "arch";
@@ -285,6 +309,11 @@ async function runPreviewCollect(options: {
     legalDongCodes.length > 0 ? legalDongCodes.map((code) => [code]) : [[]];
 
   for (const previewServiceKey of previewServiceKeys) {
+    const keyMask =
+      previewServiceKey.length <= 8
+        ? "********"
+        : `${previewServiceKey.slice(0, 4)}...${previewServiceKey.slice(-4)}`;
+
     for (const legalDongGroup of previewDongGroups) {
       const attempt = await runCollect({
         serviceKey: previewServiceKey,
@@ -297,6 +326,13 @@ async function runPreviewCollect(options: {
 
       if (attempt.ok) {
         mergedRows.push(...attempt.rows);
+
+        debugAttempts.push({
+          keyMask,
+          legalDongCount: legalDongGroup.length,
+          ok: true,
+          rowCount: attempt.rows.length,
+        });
 
         latestMeta = {
           searchedTargetCount: attempt.searchedTargetCount,
@@ -327,23 +363,30 @@ async function runPreviewCollect(options: {
               usedDateFallback: latestMeta.usedDateFallback ?? false,
               fallbackDays: latestMeta.fallbackDays ?? 0,
             },
+            debugAttempts,
           };
         }
 
         continue;
       }
 
-      if (attempt.status === 404) {
-        continue;
-      }
+      debugAttempts.push({
+        keyMask,
+        legalDongCount: legalDongGroup.length,
+        ok: false,
+        status: attempt.status,
+        invalidKey: attempt.invalidKey,
+        message: attempt.message,
+      });
 
-      if (attempt.invalidKey) {
+      if (attempt.status === 404 || attempt.invalidKey) {
         continue;
       }
 
       return {
         kind: "error" as const,
         attempt,
+        debugAttempts,
       };
     }
   }
@@ -367,10 +410,14 @@ async function runPreviewCollect(options: {
         usedDateFallback: latestMeta.usedDateFallback ?? false,
         fallbackDays: latestMeta.fallbackDays ?? 0,
       },
+      debugAttempts,
     };
   }
 
-  return null;
+  return {
+    kind: "empty" as const,
+    debugAttempts,
+  };
 }
 
 function buildEmptyPreviewResponse(
@@ -385,20 +432,40 @@ function buildEmptyPreviewResponse(
     previewCount: PREVIEW_LIMIT,
     authStatus,
     message,
+    previewDebug: getPreviewKeyDebug(),
   });
+}
+
+async function safeReadJson<T>(request: Request): Promise<T | null> {
+  try {
+    return (await request.json()) as T;
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as ArchhubCollectBody;
+    const body = await safeReadJson<ArchhubCollectBody>(request);
 
-    const rawServiceKey = body.serviceKey?.trim() ?? "";
+    if (!body) {
+      return NextResponse.json(
+        { ok: false, message: "잘못된 요청 형식입니다." },
+        { status: 400 },
+      );
+    }
+
+    const rawServiceKey = String(body.serviceKey ?? "").trim();
     const serviceKey = resolveInputServiceKey(rawServiceKey);
     const previewServiceKeys = buildPreviewKeys();
 
-    const startDate = body.startDate?.trim() ?? "";
-    const endDate = body.endDate?.trim() ?? "";
-    const sigunguCodes = Array.isArray(body.sigunguCodes) ? uniqueStrings(body.sigunguCodes) : [];
+    const startDate = String(body.startDate ?? "").trim();
+    const endDate = String(body.endDate ?? "").trim();
+
+    const sigunguCodes = Array.isArray(body.sigunguCodes)
+      ? uniqueStrings(body.sigunguCodes)
+      : [];
+
     const legalDongCodes = Array.isArray(body.legalDongCodes)
       ? uniqueStrings(body.legalDongCodes)
       : [];
@@ -449,6 +516,7 @@ export async function POST(request: Request) {
           previewLimited: false,
           authStatus: "full",
           message: fullAttempt.totalCount > 0 ? undefined : MSG_NO_RESULT,
+          previewDebug: getPreviewKeyDebug(),
         });
       }
 
@@ -460,6 +528,7 @@ export async function POST(request: Request) {
             searchedTargetCount: fullAttempt.searchedTargetCount,
             endpointFamily: fullAttempt.endpointFamily,
             sourceUrl: fullAttempt.sourceUrl,
+            previewDebug: getPreviewKeyDebug(),
           },
           { status: fullAttempt.status },
         );
@@ -495,7 +564,12 @@ export async function POST(request: Request) {
           previewLimited: true,
           previewCount: PREVIEW_LIMIT,
           authStatus: "fallback-preview",
-          message: MSG_FALLBACK_PREVIEW,
+          message:
+            previewResult.attempt.totalCount > 0
+              ? MSG_FALLBACK_PREVIEW
+              : `${MSG_FALLBACK_PREVIEW} ${MSG_NO_RESULT}`,
+          previewDebug: getPreviewKeyDebug(),
+          previewAttemptDebug: previewResult.debugAttempts,
         });
       }
 
@@ -505,15 +579,24 @@ export async function POST(request: Request) {
             ok: false,
             message: previewResult.attempt.message,
             sourceUrl: previewResult.attempt.sourceUrl,
+            previewDebug: getPreviewKeyDebug(),
+            previewAttemptDebug: previewResult.debugAttempts,
           },
           { status: previewResult.attempt.status },
         );
       }
 
-      return buildEmptyPreviewResponse(
-        "fallback-preview",
-        `${MSG_FALLBACK_PREVIEW} ${MSG_NO_RESULT}`,
-      );
+      return NextResponse.json({
+        ok: true,
+        rows: [],
+        totalCount: 0,
+        previewLimited: true,
+        previewCount: PREVIEW_LIMIT,
+        authStatus: "fallback-preview",
+        message: `${MSG_FALLBACK_PREVIEW} ${MSG_NO_RESULT}`,
+        previewDebug: getPreviewKeyDebug(),
+        previewAttemptDebug: previewResult?.debugAttempts ?? [],
+      });
     }
 
     if (previewServiceKeys.length === 0) {
@@ -525,6 +608,7 @@ export async function POST(request: Request) {
         previewCount: PREVIEW_LIMIT,
         authStatus: "missing-preview",
         message: MSG_NO_DEFAULT_KEY,
+        previewDebug: getPreviewKeyDebug(),
       });
     }
 
@@ -551,7 +635,12 @@ export async function POST(request: Request) {
         previewLimited: true,
         previewCount: PREVIEW_LIMIT,
         authStatus: "default-preview",
-        message: MSG_DEFAULT_PREVIEW,
+        message:
+          previewResult.attempt.totalCount > 0
+            ? MSG_DEFAULT_PREVIEW
+            : `${MSG_DEFAULT_PREVIEW} ${MSG_NO_RESULT}`,
+        previewDebug: getPreviewKeyDebug(),
+        previewAttemptDebug: previewResult.debugAttempts,
       });
     }
 
@@ -561,15 +650,24 @@ export async function POST(request: Request) {
           ok: false,
           message: previewResult.attempt.message,
           sourceUrl: previewResult.attempt.sourceUrl,
+          previewDebug: getPreviewKeyDebug(),
+          previewAttemptDebug: previewResult.debugAttempts,
         },
         { status: previewResult.attempt.status },
       );
     }
 
-    return buildEmptyPreviewResponse(
-      "default-preview",
-      `${MSG_DEFAULT_PREVIEW} ${MSG_NO_RESULT}`,
-    );
+    return NextResponse.json({
+      ok: true,
+      rows: [],
+      totalCount: 0,
+      previewLimited: true,
+      previewCount: PREVIEW_LIMIT,
+      authStatus: "default-preview",
+      message: `${MSG_DEFAULT_PREVIEW} ${MSG_NO_RESULT}`,
+      previewDebug: getPreviewKeyDebug(),
+      previewAttemptDebug: previewResult?.debugAttempts ?? [],
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
 
@@ -577,6 +675,7 @@ export async function POST(request: Request) {
       {
         ok: false,
         message: `건축HUB 수집 처리 중 오류가 발생했습니다: ${message}`,
+        previewDebug: getPreviewKeyDebug(),
       },
       { status: 500 },
     );

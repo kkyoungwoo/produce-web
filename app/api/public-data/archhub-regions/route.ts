@@ -13,9 +13,29 @@ type ArchhubRegionsBody = {
   sigunguCodes?: string[];
 };
 
+function uniqueStrings(values: string[]) {
+  return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+async function safeReadJson<T>(request: Request): Promise<T | null> {
+  try {
+    return (await request.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(request: Request) {
-  const body = (await request.json()) as ArchhubRegionsBody;
-  const level = body.level?.trim();
+  const body = await safeReadJson<ArchhubRegionsBody>(request);
+
+  if (!body) {
+    return NextResponse.json(
+      { ok: false, message: "잘못된 요청 형식입니다." },
+      { status: 400 },
+    );
+  }
+
+  const level = String(body.level ?? "").trim();
 
   if (level === "sido") {
     return NextResponse.json({
@@ -26,9 +46,13 @@ export async function POST(request: Request) {
   }
 
   if (level === "sigungu") {
-    const sidoCode = body.sidoCode?.trim() ?? "";
+    const sidoCode = String(body.sidoCode ?? "").trim();
+
     if (!sidoCode) {
-      return NextResponse.json({ ok: false, message: "시도 코드가 필요합니다." }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, message: "시도 코드가 필요합니다." },
+        { status: 400 },
+      );
     }
 
     return NextResponse.json({
@@ -39,9 +63,15 @@ export async function POST(request: Request) {
   }
 
   if (level === "bjdong") {
-    const sigunguCodes = Array.isArray(body.sigunguCodes) ? body.sigunguCodes.map((value) => value.trim()).filter(Boolean) : [];
+    const sigunguCodes = Array.isArray(body.sigunguCodes)
+      ? uniqueStrings(body.sigunguCodes)
+      : [];
+
     if (sigunguCodes.length === 0) {
-      return NextResponse.json({ ok: false, message: "시군구 코드가 필요합니다." }, { status: 400 });
+      return NextResponse.json(
+        { ok: false, message: "시군구 코드가 필요합니다." },
+        { status: 400 },
+      );
     }
 
     return NextResponse.json({
@@ -52,7 +82,10 @@ export async function POST(request: Request) {
   }
 
   return NextResponse.json(
-    { ok: false, message: "level 값은 sido, sigungu, bjdong 중 하나여야 합니다." },
+    {
+      ok: false,
+      message: "level 값은 sido, sigungu, bjdong 중 하나여야 합니다.",
+    },
     { status: 400 },
   );
 }

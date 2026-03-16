@@ -1,43 +1,30 @@
 import "server-only";
 
+/**
+ * env 없이 파일 내부에서 직접 관리하는 미리보기 키 설정
+ */
 const DEFAULT_PREVIEW_SERVICE_KEY =
-  process.env.PREVIEW_DEFAULT_SERVICE_KEY?.trim() || "";
+  "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b";
+
+const PREVIEW_SERVICE_KEY_MAP = new Map<string, string>([
+  ["vip", "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b"],
+  ["beta", "591089a0b764d1e7aedea398987e4560a22a0c3c82504cf0279781b0ff06668b"],
+]);
 
 function normalizePreviewKey(value?: string | null) {
   return String(value ?? "").trim().toLowerCase();
 }
 
-function parsePreviewAliasMap(): Map<string, string> {
-  const raw = process.env.PREVIEW_SERVICE_KEY_MAP?.trim();
-
-  if (!raw) {
-    return new Map<string, string>();
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
-
-    const entries = Object.entries(parsed)
-      .map(([alias, key]): [string, string] => [
-        normalizePreviewKey(alias),
-        String(key ?? "").trim(),
-      ])
-      .filter(
-        (entry): entry is [string, string] =>
-          Boolean(entry[0]) && Boolean(entry[1]),
-      );
-
-    return new Map<string, string>(entries);
-  } catch {
-    return new Map<string, string>();
-  }
+function uniqueStrings(values: Array<string | null | undefined>) {
+  return Array.from(
+    new Set(values.map((value) => String(value ?? "").trim()).filter(Boolean)),
+  );
 }
-
-const PREVIEW_SERVICE_KEY_MAP = parsePreviewAliasMap();
 
 export { normalizePreviewKey };
 
 export function resolvePreviewServiceKey(inputKey?: string | null) {
+  const rawInput = String(inputKey ?? "").trim();
   const normalizedInput = normalizePreviewKey(inputKey);
 
   if (!normalizedInput) {
@@ -49,11 +36,7 @@ export function resolvePreviewServiceKey(inputKey?: string | null) {
     return mappedKey;
   }
 
-  if (inputKey?.trim() === DEFAULT_PREVIEW_SERVICE_KEY) {
-    return DEFAULT_PREVIEW_SERVICE_KEY;
-  }
-
-  return DEFAULT_PREVIEW_SERVICE_KEY;
+  return rawInput;
 }
 
 export function getPreviewServiceKey(inputKey?: string | null) {
@@ -63,19 +46,37 @@ export function getPreviewServiceKey(inputKey?: string | null) {
 export function getPreviewServiceKeys(inputKey?: string | null) {
   const resolvedKey = resolvePreviewServiceKey(inputKey);
 
-  return Array.from(
-    new Set(
-      [resolvedKey, DEFAULT_PREVIEW_SERVICE_KEY].filter(
-        (value): value is string => Boolean(value),
-      ),
-    ),
-  );
+  return uniqueStrings([
+    resolvedKey,
+    DEFAULT_PREVIEW_SERVICE_KEY,
+    ...Array.from(PREVIEW_SERVICE_KEY_MAP.values()),
+  ]);
+}
+
+export function getAllPreviewServiceKeys() {
+  return uniqueStrings([
+    DEFAULT_PREVIEW_SERVICE_KEY,
+    ...Array.from(PREVIEW_SERVICE_KEY_MAP.values()),
+  ]);
 }
 
 export function hasPreviewServiceKey() {
-  return Boolean(DEFAULT_PREVIEW_SERVICE_KEY);
+  return getAllPreviewServiceKeys().length > 0;
 }
 
 export function getPreviewAliases() {
   return Array.from(PREVIEW_SERVICE_KEY_MAP.keys());
+}
+
+export function getPreviewKeyDebug() {
+  const allKeys = getAllPreviewServiceKeys();
+
+  return {
+    defaultKeyExists: Boolean(DEFAULT_PREVIEW_SERVICE_KEY),
+    aliasCount: PREVIEW_SERVICE_KEY_MAP.size,
+    totalPreviewKeys: allKeys.length,
+    maskedKeys: allKeys.map((key) =>
+      key.length <= 8 ? "********" : `${key.slice(0, 4)}...${key.slice(-4)}`,
+    ),
+  };
 }

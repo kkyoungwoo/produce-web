@@ -9,9 +9,10 @@
     "xlsx": "^0.18.5"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
-    "start": "node scripts/start-dev.mjs",
+    "start": "next dev --webpack",
+    "serve": "next start",
     "serve:out": "npx serve@latest out --listen 3000",
     "preview": "npx serve@latest out --listen 3000",
     "lint": "npm run check:encoding && eslint .",
