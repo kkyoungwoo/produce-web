@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@google/genai": "^1.45.0",
+    "exceljs": "^4.4.0",
+    "file-saver": "^2.0.5",
+    "jszip": "^3.10.1",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
@@ -21,6 +25,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.2.1",
+    "@types/file-saver": "^2.0.7",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

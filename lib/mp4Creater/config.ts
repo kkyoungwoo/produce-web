@@ -123,7 +123,12 @@ export const CONFIG = {
     // Gemini 전용 화풍 설정
     GEMINI_STYLE: 'tubegen_gemini_style',
     GEMINI_CUSTOM_STYLE: 'tubegen_gemini_custom_style',
-    PROJECTS: 'tubegen_projects'
+    PROJECTS: 'tubegen_projects',
+    STUDIO_STATE_CACHE: 'tubegen_studio_state_cache',
+    OPENROUTER_API_KEY: 'tubegen_openrouter_key',
+    OPENROUTER_MODELS: 'tubegen_openrouter_models',
+    STUDIO_STORAGE_DIR: 'tubegen_storage_dir',
+    SELECTED_CHARACTER_ID: 'tubegen_selected_character_id'
   },
 
   // 애니메이션 설정

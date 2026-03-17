@@ -168,3 +168,46 @@ export interface SavedProject {
   // 비용 정보 (선택적 - 이전 버전 호환)
   cost?: CostBreakdown;
 }
+
+
+export type AiTaskKind = 'script' | 'scene' | 'imagePrompt' | 'motionPrompt' | 'image' | 'audio' | 'video';
+
+export interface CharacterProfile {
+  id: string;
+  name: string;
+  description: string;
+  visualStyle: string;
+  voiceHint?: string;
+  createdAt: number;
+}
+
+export interface AiRoutingSettings {
+  scriptModel: string;
+  sceneModel: string;
+  imagePromptModel: string;
+  motionPromptModel: string;
+  imageProvider: 'gemini' | 'openrouter' | 'custom';
+  imageModel: string;
+  audioProvider: 'elevenlabs' | 'openai-audio' | 'custom';
+  audioModel: string;
+  videoProvider: 'fal' | 'runway' | 'custom';
+  videoModel: string;
+}
+
+export interface StudioProviderSecrets {
+  openRouterApiKey?: string;
+  elevenLabsApiKey?: string;
+  falApiKey?: string;
+}
+
+export interface StudioState {
+  version: number;
+  storageDir: string;
+  configuredAt: number;
+  updatedAt: number;
+  selectedCharacterId: string | null;
+  characters: CharacterProfile[];
+  routing: AiRoutingSettings;
+  providers: StudioProviderSecrets;
+  projects: SavedProject[];
+}

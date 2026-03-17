@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "storageDir": "./local-data/tubegen-studio",
+  "configuredAt": 1773736210097,
+  "updatedAt": 1773736210109,
+  "selectedCharacterId": "char_1773736205675_9cmvdu",
+  "characters": [
+    {
+      "id": "char_1773736205675_9cmvdu",
+      "name": "대표 캐릭터",
+      "description": "브랜드의 중심 화자. 친근하고 명확하게 전달한다.",
+      "visualStyle": "깔끔한 2D 일러스트, 미니멀한 표정, 밝은 하이라이트",
+      "createdAt": 1773736205675
+    }
+  ],
+  "routing": {
+    "scriptModel": "openrouter/auto",
+    "sceneModel": "openrouter/auto",
+    "imagePromptModel": "openrouter/auto",
+    "motionPromptModel": "openrouter/auto",
+    "imageProvider": "gemini",
+    "imageModel": "gemini-2.5-flash-image",
+    "audioProvider": "elevenlabs",
+    "audioModel": "eleven_multilingual_v2",
+    "videoProvider": "fal",
+    "videoModel": "pixverse/v5.5"
+  },
+  "providers": {},
+  "projects": []
+}

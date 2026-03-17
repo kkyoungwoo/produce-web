@@ -10,7 +10,7 @@ const BOM = "\uFEFF";
 
 export const downloadCSV = (data: GeneratedAsset[]) => {
   const headers = ['Scene', 'Narration', 'Visual Prompt'];
-  
+
   const rows = data.map(item => [
     item.sceneNumber.toString(),
     `"${item.narration.replace(/"/g, '""')}"`, // 따옴표 이스케이프
@@ -37,7 +37,7 @@ export const downloadCSV = (data: GeneratedAsset[]) => {
 export const downloadImagesAsZip = async (data: GeneratedAsset[]) => {
   const zip = new JSZip();
   const folder = zip.folder("images");
-  
+
   let imageCount = 0;
 
   data.forEach((item) => {
@@ -68,7 +68,7 @@ export const downloadImagesAsZip = async (data: GeneratedAsset[]) => {
 export const downloadProjectZip = async (data: GeneratedAsset[]) => {
   const zip = new JSZip();
   const imgFolder = zip.folder("images");
-  
+
   // CSV 헤더에 'Image File' 추가
   const headers = ['Scene', 'Narration', 'Visual Prompt', 'Image File'];
   const rows = [];
@@ -76,7 +76,7 @@ export const downloadProjectZip = async (data: GeneratedAsset[]) => {
 
   for (const item of data) {
     let imageFileName = '';
-    
+
     // 이미지가 존재하면 ZIP에 추가하고 파일명 기록
     if (item.imageData && imgFolder) {
       const filename = `scene_${item.sceneNumber.toString().padStart(3, '0')}.jpg`;

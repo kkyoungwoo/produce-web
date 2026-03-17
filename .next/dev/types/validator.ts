@@ -74,6 +74,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../../app/[locale]/mp4Creater/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/[locale]/mp4Creater">> = Specific
+  const handler = {} as typeof import("../../../app/[locale]/mp4Creater/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../../app/[locale]/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/[locale]">> = Specific
@@ -114,6 +123,24 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends AppPageConfig<"/">> = Specific
   const handler = {} as typeof import("../../../app/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/local-storage/config/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/local-storage/config">> = Specific
+  const handler = {} as typeof import("../../../app/api/local-storage/config/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/local-storage/state/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/local-storage/state">> = Specific
+  const handler = {} as typeof import("../../../app/api/local-storage/state/route.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check

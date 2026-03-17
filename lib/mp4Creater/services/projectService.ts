@@ -1,41 +1,32 @@
-
 /**
- * 프로젝트 저장/로드 서비스 (IndexedDB 버전)
- * - 대용량 저장 지원 (수백 MB~수 GB)
- * - 프로젝트 수십~수백 개 저장 가능
+ * 프로젝트 저장/로드 서비스
+ * - 기본은 브라우저 IndexedDB 백업
+ * - 가능하면 Next API를 통해 로컬 JSON 파일에도 동기화
  */
 
 import { CONFIG } from '../config';
 import { SavedProject, GeneratedAsset, CostBreakdown } from '../types';
 import { getSelectedImageModel } from './imageService';
+import { fetchStudioState, saveProjectsToStudio } from './localFileApi';
 
 const DB_NAME = 'TubeGenAI';
 const DB_VERSION = 1;
 const STORE_NAME = 'projects';
 
-/**
- * IndexedDB 열기
- */
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
-
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-        store.createIndex('createdAt', 'createdAt', { unique: false });
+        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
       }
     };
   });
 }
 
-/**
- * 이미지 축소 (썸네일 생성용)
- */
 function createThumbnail(base64Image: string, maxWidth: number = 200): Promise<string> {
   return new Promise((resolve) => {
     const img = new Image();
@@ -44,23 +35,15 @@ function createThumbnail(base64Image: string, maxWidth: number = 200): Promise<s
       const ratio = maxWidth / img.width;
       canvas.width = maxWidth;
       canvas.height = img.height * ratio;
-
       const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
-      } else {
-        resolve(base64Image.slice(0, 1000));
-      }
+      if (!ctx) return resolve(base64Image.slice(0, 1000));
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.7).split(',')[1]);
     };
     img.onerror = () => resolve('');
     img.src = `data:image/png;base64,${base64Image}`;
   });
 }
-
-/**
- * 현재 설정값 가져오기
- */
 
 function normalizeAsset(asset: any, index: number): GeneratedAsset {
   return {
@@ -113,16 +96,39 @@ function normalizeProject(raw: any): SavedProject {
 
 function getCurrentSettings() {
   const elevenLabsModel = localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_MODEL) || CONFIG.DEFAULT_ELEVENLABS_MODEL;
-
   return {
     imageModel: getSelectedImageModel(),
     elevenLabsModel
   };
 }
 
-/**
- * 프로젝트 저장
- */
+async function readIndexedProjects(): Promise<SavedProject[]> {
+  try {
+    const db = await openDB();
+    return await new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], 'readonly');
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.getAll();
+      request.onsuccess = () => resolve((request.result as SavedProject[]).map(normalizeProject));
+      request.onerror = () => reject(request.error);
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function writeIndexedProjects(projects: SavedProject[]): Promise<void> {
+  const db = await openDB();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    store.clear();
+    projects.forEach((project) => store.put(project));
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
 export async function saveProject(
   topic: string,
   assets: GeneratedAsset[],
@@ -131,8 +137,6 @@ export async function saveProject(
 ): Promise<SavedProject> {
   const id = `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const now = Date.now();
-
-  // 첫 번째 이미지로 썸네일 생성
   let thumbnail: string | null = null;
   const firstImageAsset = assets.find(a => a.imageData);
   if (firstImageAsset?.imageData) {
@@ -150,194 +154,71 @@ export async function saveProject(
     cost
   };
 
-  // IndexedDB에 저장
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.put(project);
+  const current = await readIndexedProjects();
+  const next = [project, ...current].sort((a, b) => b.createdAt - a.createdAt);
+  await writeIndexedProjects(next);
 
-    request.onsuccess = () => {
-      console.log(`[Project] 프로젝트 저장 완료: ${project.name} (${assets.length}씬)`);
-      resolve(project);
-    };
-    request.onerror = () => reject(request.error);
-  });
+  try {
+    await saveProjectsToStudio(next);
+  } catch (error) {
+    console.warn('[Project] 로컬 파일 동기화 실패. IndexedDB 백업 유지.', error);
+  }
+
+  return project;
 }
 
-/**
- * 저장된 프로젝트 목록 가져오기
- */
 export async function getSavedProjects(): Promise<SavedProject[]> {
   try {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.getAll();
+    const studioState = await fetchStudioState();
+    if (Array.isArray(studioState.projects) && studioState.projects.length > 0) {
+      const projects = studioState.projects.map(normalizeProject).sort((a, b) => b.createdAt - a.createdAt);
+      await writeIndexedProjects(projects);
+      return projects;
+    }
+  } catch {}
 
-      request.onsuccess = () => {
-        // 최신순 정렬
-        const projects = (request.result as SavedProject[])
-          .map(normalizeProject)
-          .sort((a, b) => b.createdAt - a.createdAt);
-        resolve(projects);
-      };
-      request.onerror = () => reject(request.error);
-    });
-  } catch (e) {
-    console.error('[Project] 프로젝트 목록 로드 실패:', e);
-    return [];
-  }
+  const indexed = await readIndexedProjects();
+  return indexed.sort((a, b) => b.createdAt - a.createdAt);
 }
 
-/**
- * 특정 프로젝트 가져오기
- */
 export async function getProjectById(id: string): Promise<SavedProject | null> {
-  try {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.get(id);
-
-      request.onsuccess = () => resolve(request.result ? normalizeProject(request.result) : null);
-      request.onerror = () => reject(request.error);
-    });
-  } catch (e) {
-    console.error('[Project] 프로젝트 로드 실패:', e);
-    return null;
-  }
-}
-
-/**
- * 프로젝트 삭제
- */
-export async function deleteProject(id: string): Promise<boolean> {
-  try {
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.delete(id);
-
-      request.onsuccess = () => {
-        console.log(`[Project] 프로젝트 삭제: ${id}`);
-        resolve(true);
-      };
-      request.onerror = () => reject(request.error);
-    });
-  } catch (e) {
-    console.error('[Project] 프로젝트 삭제 실패:', e);
-    return false;
-  }
-}
-
-/**
- * 프로젝트 이름 변경
- */
-export async function renameProject(id: string, newName: string): Promise<boolean> {
-  try {
-    const project = await getProjectById(id);
-    if (!project) return false;
-
-    project.name = newName;
-
-    const db = await openDB();
-    return new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readwrite');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.put(project);
-
-      request.onsuccess = () => {
-        console.log(`[Project] 프로젝트 이름 변경: ${newName}`);
-        resolve(true);
-      };
-      request.onerror = () => reject(request.error);
-    });
-  } catch (e) {
-    console.error('[Project] 프로젝트 이름 변경 실패:', e);
-    return false;
-  }
-}
-
-/**
- * 저장 용량 계산 (IndexedDB는 정확한 측정 어려움, 추정치 반환)
- */
-export async function getStorageUsage(): Promise<{ used: number; available: number; percentage: number }> {
-  try {
-    if ('storage' in navigator && 'estimate' in navigator.storage) {
-      const estimate = await navigator.storage.estimate();
-      return {
-        used: estimate.usage || 0,
-        available: estimate.quota || 0,
-        percentage: Math.round(((estimate.usage || 0) / (estimate.quota || 1)) * 100)
-      };
-    }
-  } catch (e) {
-    console.warn('[Project] 용량 측정 실패');
-  }
-
-  return { used: 0, available: 0, percentage: 0 };
-}
-
-/**
- * 오래된 프로젝트 정리
- */
-export async function cleanupOldProjects(keepCount: number = 50): Promise<number> {
   const projects = await getSavedProjects();
-  if (projects.length <= keepCount) return 0;
-
-  const toDelete = projects.slice(keepCount);
-  let removed = 0;
-
-  for (const project of toDelete) {
-    const success = await deleteProject(project.id);
-    if (success) removed++;
-  }
-
-  console.log(`[Project] ${removed}개 오래된 프로젝트 정리됨`);
-  return removed;
+  return projects.find((project) => project.id === id) || null;
 }
 
-/**
- * localStorage에서 IndexedDB로 마이그레이션 (기존 데이터 이전)
- */
-export async function migrateFromLocalStorage(): Promise<number> {
+export async function deleteProject(id: string): Promise<boolean> {
+  const current = await getSavedProjects();
+  const next = current.filter((project) => project.id !== id);
+  await writeIndexedProjects(next);
   try {
-    const oldData = localStorage.getItem(CONFIG.STORAGE_KEYS.PROJECTS);
-    if (!oldData) return 0;
+    await saveProjectsToStudio(next);
+  } catch {}
+  return true;
+}
 
-    const oldProjects = (JSON.parse(oldData) as any[]).map(normalizeProject);
-    if (!oldProjects.length) return 0;
+export async function renameProject(id: string, newName: string): Promise<boolean> {
+  const current = await getSavedProjects();
+  const next = current.map((project) => project.id === id ? { ...project, name: newName } : project);
+  await writeIndexedProjects(next);
+  try {
+    await saveProjectsToStudio(next);
+  } catch {}
+  return true;
+}
 
-    console.log(`[Project] localStorage에서 ${oldProjects.length}개 프로젝트 마이그레이션 시작...`);
-
-    const db = await openDB();
-    let migrated = 0;
-
-    for (const project of oldProjects) {
-      await new Promise<void>((resolve, reject) => {
-        const transaction = db.transaction([STORE_NAME], 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.put(project);
-
-        request.onsuccess = () => {
-          migrated++;
-          resolve();
-        };
-        request.onerror = () => reject(request.error);
-      });
-    }
-
-    // 마이그레이션 완료 후 localStorage 정리
+export async function migrateFromLocalStorage(): Promise<void> {
+  const raw = localStorage.getItem(CONFIG.STORAGE_KEYS.PROJECTS);
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return;
+    const normalized = parsed.map(normalizeProject);
+    await writeIndexedProjects(normalized);
+    try {
+      await saveProjectsToStudio(normalized);
+    } catch {}
     localStorage.removeItem(CONFIG.STORAGE_KEYS.PROJECTS);
-    console.log(`[Project] 마이그레이션 완료: ${migrated}개`);
-
-    return migrated;
-  } catch (e) {
-    console.error('[Project] 마이그레이션 실패:', e);
-    return 0;
+  } catch (error) {
+    console.error('[Project] 로컬스토리지 마이그레이션 실패:', error);
   }
 }
