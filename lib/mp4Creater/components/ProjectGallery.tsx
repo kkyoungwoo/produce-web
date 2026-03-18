@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { SavedProject } from '../types';
 import { formatKRW } from '../config';
 import { LoadingOverlay } from './LoadingOverlay';
+import { rememberProjectNavigationProject } from '../services/projectNavigationCache';
 
 interface ProjectGalleryProps {
   projects: SavedProject[];
@@ -13,6 +14,7 @@ interface ProjectGalleryProps {
   onRefresh: () => void;
   onLoad: (project: SavedProject) => void;
   basePath: string;
+  onCreateNewProject?: () => void;
 }
 
 const getProjectSettings = (project: SavedProject) => ({
@@ -27,7 +29,7 @@ const resolveImageSrc = (value?: string | null) => {
   return `data:image/jpeg;base64,${value}`;
 };
 
-const ProjectGallery: React.FC<ProjectGalleryProps> = ({ projects, onBack, onDelete, onRefresh, onLoad, basePath }) => {
+const ProjectGallery: React.FC<ProjectGalleryProps> = ({ projects, onBack, onDelete, onRefresh, onLoad, basePath, onCreateNewProject }) => {
   const router = useRouter();
   const [selectedProject, setSelectedProject] = useState<SavedProject | null>(null);
   const [navigationOverlay, setNavigationOverlay] = useState<{ title: string; description: string } | null>(null);
@@ -49,11 +51,30 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({ projects, onBack, onDel
   };
 
   const openProjectScene = (project: SavedProject) => {
+    rememberProjectNavigationProject(project);
+    try {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    } catch {}
     setNavigationOverlay({
       title: '프로젝트 씬 제작을 여는 중',
       description: '프로젝트 요약을 먼저 보여 주고, 필요한 생성은 버튼을 눌렀을 때만 시작되도록 준비합니다.',
     });
-    router.push(`${basePath}/scene-studio?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+    router.push(`${basePath}/scene-studio?projectId=${encodeURIComponent(project.id)}`, { scroll: true });
+  };
+
+  const openCreateProject = () => {
+    try {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    } catch {}
+    setNavigationOverlay({
+      title: '새 프로젝트 제작을 여는 중',
+      description: '프로젝트 보관함에서 바로 새 제작 흐름으로 이동합니다. Step 1부터 순서대로 이어집니다.',
+    });
+    if (onCreateNewProject) {
+      onCreateNewProject();
+      return;
+    }
+    router.push(`${basePath}?view=main&new=${Date.now()}`, { scroll: true });
   };
 
   /**
@@ -174,6 +195,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({ projects, onBack, onDel
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-8">
+      <LoadingOverlay open={Boolean(navigationOverlay)} title={navigationOverlay?.title || '이동 중'} description={navigationOverlay?.description} />
       <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <button
           onClick={onBack}
@@ -194,15 +216,35 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({ projects, onBack, onDel
         <span className="rounded-full bg-slate-100 px-3 py-2 text-sm font-bold text-slate-600">{sortedProjects.length}개 프로젝트</span>
       </div>
 
-      {sortedProjects.length === 0 ? (
-        <div className="rounded-[28px] border border-slate-200 bg-white py-20 text-center shadow-sm">
-          <div className="text-6xl">📁</div>
-          <h3 className="mt-5 text-xl font-black text-slate-900">저장된 프로젝트가 없습니다</h3>
-          <p className="mt-2 text-sm text-slate-500">사용자가 작성하거나 AI로 생성한 프로젝트는 씬 생성 후 자동 저장되어 여기에서 다시 열 수 있습니다.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {sortedProjects.map((project) => {
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+        <button
+          type="button"
+          onClick={openCreateProject}
+          className="group flex min-h-[320px] flex-col justify-between overflow-hidden rounded-[28px] border border-dashed border-blue-300 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-6 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-lg"
+        >
+          <div>
+            <div className="inline-flex rounded-full bg-blue-600 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-white">새 제작</div>
+            <h3 className="mt-4 text-2xl font-black text-slate-900">제작하기</h3>
+            <p className="mt-3 text-sm leading-6 text-slate-600">프로젝트 보관함에서 바로 새 프로젝트를 시작합니다. 주제 / 프롬프트 생성, 대본 정리, 출연자 준비, 화풍 선택 순서로 자연스럽게 이어집니다.</p>
+          </div>
+          <div className="space-y-3">
+            <div className="rounded-2xl border border-blue-100 bg-white/90 p-4">
+              <div className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">권장 순서</div>
+              <div className="mt-2 text-sm leading-6 text-slate-700">1. 프롬프트 / 주제 정리 → 2. 대본 생성 → 3. 대본 기준 출연자 준비 → 4. 출연자 / 화풍 선택 → 5. 프로젝트에 추가 후 씬 제작</div>
+            </div>
+            <div className="inline-flex items-center gap-2 rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white">지금 새 프로젝트 시작하기 <span aria-hidden="true">→</span></div>
+          </div>
+        </button>
+
+        {sortedProjects.length === 0 && (
+          <div className="rounded-[28px] border border-slate-200 bg-white py-20 text-center shadow-sm xl:col-span-2">
+            <div className="text-6xl">📁</div>
+            <h3 className="mt-5 text-xl font-black text-slate-900">저장된 프로젝트가 없습니다</h3>
+            <p className="mt-2 text-sm text-slate-500">첫 프로젝트는 왼쪽 상단의 제작하기 카드에서 바로 시작할 수 있습니다.</p>
+          </div>
+        )}
+
+        {sortedProjects.map((project) => {
             const settings = getProjectSettings(project);
             const thumbSrc = resolveImageSrc(project.thumbnail) || '/mp4Creater/flow-story.svg';
             const assetCount = project.assets?.length || 0;
@@ -268,8 +310,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({ projects, onBack, onDel
               </div>
             );
           })}
-        </div>
-      )}
+      </div>
     </div>
   );
 };

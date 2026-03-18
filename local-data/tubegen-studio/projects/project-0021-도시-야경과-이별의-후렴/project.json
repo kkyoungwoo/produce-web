@@ -1,0 +1,68 @@
+{
+  "id": "project_1773758124449_g4djh9",
+  "name": "도시 야경과 이별의 후렴",
+  "createdAt": 1773758124449,
+  "topic": "도시 야경과 이별의 후렴",
+  "lastSavedAt": 1773876732562,
+  "settings": {
+    "imageModel": "gemini-2.5-flash-image",
+    "outputMode": "video",
+    "elevenLabsModel": "eleven_multilingual_v2"
+  },
+  "assets": [
+    {
+      "sceneNumber": 1,
+      "narration": "ㅁㄴㅇ",
+      "visualPrompt": "Music video storyboard illustration, lyrical, symbolic, cinematic rhythm. Scene 1. Show the main visual idea from this narration: ㅁㄴㅇ Clean composition, 16:9, strong subject focus, no watermark, no text overlay. Keep character appearance consistent across scenes.",
+      "analysis": {
+        "composition_type": "MACRO",
+        "sentiment": "NEUTRAL"
+      },
+      "imageData": "CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjgwIiBoZWlnaHQ9IjcyMCIgdmlld0JveD0iMCAwIDEyODAgNzIwIj4KICAgIDxkZWZzPgogICAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIvPgogICAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2VmZjZmZiIvPgogICAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPC9kZWZzPgogICAgPHJlY3Qgd2lkdGg9IjEyODAiIGhlaWdodD0iNzIwIiBmaWxsPSJ1cmwoI2JnKSIgcng9IjMyIi8+CiAgICA8cmVjdCB4PSI3MiIgeT0iNzIiIHdpZHRoPSIxMTM2IiBoZWlnaHQ9IjU3NiIgcng9IjI4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkYmVhZmUiIHN0cm9rZS13aWR0aD0iMyIvPgogICAgPHRleHQgeD0iMTIwIiB5PSIxNTAiIGZpbGw9IiMyNTYzZWIiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjcwMCI+U0FNUExFIFNDRU5FIDAxPC90ZXh0PgogICAgPHRleHQgeD0iMTIwIiB5PSIyMjAiIGZpbGw9IiMwZjE3MmEiIGZvbnQtc2l6ZT0iNTQiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjgwMCI+QVBJIO2CpOqwgCDsl4bsnYQg65WM64+EIO2dkOumhCDtmZXsnbgg6rCA64qlPC90ZXh0PgogICAgPGZvcmVpZ25PYmplY3QgeD0iMTIwIiB5PSIyODAiIHdpZHRoPSIxMDQwIiBoZWlnaHQ9IjI1MCI+CiAgICAgIDxkaXYgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGh0bWwiIHN0eWxlPSJmb250LWZhbWlseTogQXJpYWwsIHNhbnMtc2VyaWY7IGZvbnQtc2l6ZTogMzRweDsgbGluZS1oZWlnaHQ6IDEuNTsgY29sb3I6ICMzMzQxNTU7IHdvcmQtYnJlYWs6IGtlZXAtYWxsOyI+44WB44S044WHPC9kaXY+CiAgICA8L2ZvcmVpZ25PYmplY3Q+CiAgICA8dGV4dCB4PSIxMjAiIHk9IjYxMCIgZmlsbD0iIzY0NzQ4YiIgZm9udC1zaXplPSIyNiIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIj7shKTsoJXsl5DshJwg7J2066+47KeAIEFQSeulvCDrk7HroZ3tlZjrqbQg7J20IOy5uOydtCDsi6TsoJwg7IOd7ISxIOydtOuvuOyngOuhnCDrsJTrgJ3ri4jri6QuPC90ZXh0PgogIDwvc3ZnPg==",
+      "audioData": null,
+      "audioDuration": null,
+      "subtitleData": null,
+      "videoData": null,
+      "videoDuration": null,
+      "targetDuration": 3,
+      "aspectRatio": "16:9",
+      "imageHistory": [],
+      "videoHistory": [],
+      "status": "completed",
+      "sourceMode": "sample"
+    }
+  ],
+  "thumbnail": "",
+  "thumbnailTitle": null,
+  "thumbnailPrompt": null,
+  "thumbnailHistory": [],
+  "selectedThumbnailId": null,
+  "cost": {
+    "images": 0,
+    "tts": 0,
+    "videos": 0,
+    "total": 0,
+    "imageCount": 0,
+    "ttsCharacters": 0,
+    "videoCount": 0
+  },
+  "backgroundMusicTracks": [],
+  "workflowDraft": null,
+  "projectNumber": 21,
+  "folderName": "project-0021-도시-야경과-이별의-후렴",
+  "folderPath": "local-data/tubegen-studio/projects/project-0021-도시-야경과-이별의-후렴",
+  "summary": {
+    "id": "project_1773758124449_g4djh9",
+    "name": "도시 야경과 이별의 후렴",
+    "topic": "도시 야경과 이별의 후렴",
+    "projectNumber": 21,
+    "folderName": "project-0021-도시-야경과-이별의-후렴",
+    "createdAt": 1773758124449,
+    "lastSavedAt": 1773876732562,
+    "assetCount": 1,
+    "imageCount": 1,
+    "videoCount": 0,
+    "audioCount": 0,
+    "thumbnailPath": null
+  }
+}

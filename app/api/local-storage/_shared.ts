@@ -531,7 +531,40 @@ async function hydrateStateProjects(state: StudioState): Promise<StudioState> {
   };
 }
 
-export async function ensureState(storageDir?: string): Promise<StudioState> {
+type WriteStateOptions = {
+  previousState?: StudioState | null;
+  persistProjects?: boolean;
+};
+
+function buildProjectIndex(projects: any[]) {
+  return projects.map((project) => ({
+    id: project.id,
+    name: project.name,
+    topic: project.topic,
+    createdAt: project.createdAt,
+    lastSavedAt: project.lastSavedAt || project.createdAt,
+    projectNumber: project.projectNumber || 0,
+    folderName: project.folderName || '',
+    folderPath: project.folderPath || '',
+  }));
+}
+
+function shouldPersistProjectFolder(project: any, previousProject?: any | null) {
+  if (!project?.id) return false;
+  if (!previousProject) return true;
+  if (!project?.folderName || !project?.projectNumber) return true;
+  return (project.lastSavedAt || project.createdAt || 0) !== (previousProject.lastSavedAt || previousProject.createdAt || 0);
+}
+
+async function persistChangedProjectFolders(storageDir: string, projects: any[], previousProjects?: any[]) {
+  const previousMap = new Map((previousProjects || []).filter((item) => item?.id).map((item) => [item.id, item] as const));
+  for (const project of projects) {
+    if (!shouldPersistProjectFolder(project, previousMap.get(project.id))) continue;
+    await persistProjectFolder(storageDir, project);
+  }
+}
+
+export async function readStoredState(storageDir?: string): Promise<StudioState> {
   const explicitStorageDir = storageDir?.trim() || '';
   const effectiveStorageDir = explicitStorageDir || DEFAULT_STORAGE_DIR;
   const filePath = stateFilePath(effectiveStorageDir);
@@ -539,23 +572,26 @@ export async function ensureState(storageDir?: string): Promise<StudioState> {
 
   if (!stateExists) {
     const configured = Boolean(explicitStorageDir) && explicitStorageDir !== DEFAULT_STORAGE_DIR;
-    const transient = createDefaultState(configured ? effectiveStorageDir : '', { configured });
-    if (!configured) return transient;
-    return writeState(transient);
+    return createDefaultState(configured ? effectiveStorageDir : '', { configured });
   }
 
   const raw = await fs.readFile(filePath, 'utf-8');
   const parsed = safeJsonParse<StudioState>(raw, createDefaultState(effectiveStorageDir, { configured: true }));
-  const normalized = {
+  return {
     ...createDefaultState(parsed.storageDir || effectiveStorageDir, { configured: parsed.isStorageConfigured ?? true }),
     ...parsed,
     storageDir: parsed.storageDir || effectiveStorageDir,
     isStorageConfigured: parsed.isStorageConfigured ?? true,
   };
+}
+
+export async function ensureState(storageDir?: string): Promise<StudioState> {
+  const normalized = await readStoredState(storageDir);
+  if (!normalized?.isStorageConfigured || !normalized?.storageDir?.trim()) return normalized;
   return hydrateStateProjects(normalized);
 }
 
-export async function writeState(state: StudioState): Promise<StudioState> {
+export async function writeState(state: StudioState, options?: WriteStateOptions): Promise<StudioState> {
   const configured = Boolean(state?.isStorageConfigured) && Boolean(state?.storageDir?.trim());
   const normalizedBase = {
     ...createDefaultState(configured ? state.storageDir : '', { configured }),
@@ -573,28 +609,36 @@ export async function writeState(state: StudioState): Promise<StudioState> {
     };
   }
 
+  const filePath = stateFilePath(normalizedBase.storageDir);
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.mkdir(projectsRootPath(normalizedBase.storageDir), { recursive: true });
+
+  const shouldPersistProjects = Boolean(options?.persistProjects);
+
+  if (!shouldPersistProjects) {
+    const existingProjects = Array.isArray(normalizedBase.projects) ? normalizedBase.projects : [];
+    const nextState = {
+      ...normalizedBase,
+      projectIndex: buildProjectIndex(existingProjects),
+      projects: existingProjects.map(summarizeProjectForState),
+    };
+    await fs.writeFile(filePath, JSON.stringify(nextState, null, 2), 'utf-8');
+    return {
+      ...normalizedBase,
+      projectIndex: nextState.projectIndex,
+      projects: existingProjects,
+    };
+  }
+
   const existingIndex = await readExistingProjectIndex(normalizedBase.storageDir);
   const normalizedProjects = normalizeProjectFolders(Array.isArray(normalizedBase.projects) ? normalizedBase.projects : [], normalizedBase.storageDir, existingIndex);
   const normalized = {
     ...normalizedBase,
     projects: normalizedProjects,
-    projectIndex: normalizedProjects.map((project) => ({
-      id: project.id,
-      name: project.name,
-      topic: project.topic,
-      createdAt: project.createdAt,
-      lastSavedAt: project.lastSavedAt,
-      projectNumber: project.projectNumber,
-      folderName: project.folderName,
-      folderPath: project.folderPath,
-    })),
+    projectIndex: buildProjectIndex(normalizedProjects),
   };
 
-  const filePath = stateFilePath(normalized.storageDir);
-  await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.mkdir(projectsRootPath(normalized.storageDir), { recursive: true });
-
-  await Promise.all(normalizedProjects.map((project) => persistProjectFolder(normalized.storageDir, project)));
+  await persistChangedProjectFolders(normalized.storageDir, normalizedProjects, options?.previousState?.projects || []);
   await cleanupRemovedProjectFolders(normalized.storageDir, normalizedProjects);
   const persistedState = {
     ...normalized,

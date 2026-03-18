@@ -668,6 +668,24 @@ const InputSection: React.FC<InputSectionProps> = ({
     return { total, remaining: Math.max(0, 100 - total) };
   }, [stageStatus]);
 
+  const step3GuideItems = useMemo(() => {
+    const items = [
+      normalizedScript.trim()
+        ? `대본 준비 완료: ${sceneCount}문단으로 씬 분할이 가능합니다.`
+        : '먼저 프롬프트로 대본을 만들거나 직접 입력해 주세요.',
+      selectedPromptTemplateId
+        ? '프롬프트 선택 완료: 지금 보이는 프롬프트로 바로 대본 생성이 가능합니다.'
+        : '프롬프트를 하나 선택해야 AI 대본 생성 흐름이 자연스럽게 이어집니다.',
+      selectedCharacters.length
+        ? `출연자 준비 완료: ${selectedCharacters.length}명을 씬 참조 이미지로 넘길 수 있습니다.`
+        : '대본 기준 출연자 준비를 눌러 주인공/조연/나레이터 카드를 먼저 채워 주세요.',
+      selectedStyle
+        ? `화풍 선택 완료: "${selectedStyle.label}"이 씬 전체 스타일로 연결됩니다.`
+        : 'Step 4에서 화풍 1개를 꼭 선택해야 프로젝트에 추가 후 씬 제작으로 넘어갑니다.',
+    ];
+    return items;
+  }, [normalizedScript, sceneCount, selectedPromptTemplateId, selectedCharacters.length, selectedStyle]);
+
   const canOpenStage = (stage: StepId) => stage <= activeStage;
 
   const visibleStepIds = STEP_META
@@ -907,10 +925,10 @@ const InputSection: React.FC<InputSectionProps> = ({
 
   const completeStage = (stage: StepId, nextStage?: StepId) => {
     const messages: Record<StepId, string> = {
-      1: 'Step 1에서 콘텐츠 유형을 먼저 선택해 주세요.',
-      2: 'Step 2의 주제와 선택값을 채운 뒤 완료 버튼을 눌러 주세요.',
-      3: 'Step 3에서 프롬프트와 대본을 준비하고, 주인공과 조연 선택까지 마쳐 주세요.',
-      4: 'Step 4에서 화풍을 하나 선택해야 씬 제작으로 넘어갈 수 있습니다.',
+      1: 'Step 1에서 먼저 제작 유형과 화면 비율을 고른 뒤 Step 2로 넘어가 주세요.',
+      2: 'Step 2에서 주제와 핵심 선택값을 채워 프롬프트 / 대본 방향을 먼저 고정해 주세요.',
+      3: 'Step 3에서 프롬프트와 대본을 만든 뒤, 대본 기준 출연자 준비와 출연자 선택까지 마쳐 주세요.',
+      4: 'Step 4에서는 Step 3에서 고른 출연자를 확인하고 화풍 1개를 선택해야 프로젝트에 추가 후 씬 제작으로 넘어갈 수 있습니다.',
     };
 
     if (!stepCompleted[stage]) {
@@ -1481,7 +1499,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       scrollStageIntoFocus(stepCompleted[3] ? 4 : 3);
       return;
     }
-    setNotice('현재 선택값을 프로젝트에 추가하고 씬 제작 작업 화면으로 이동합니다.');
+    setNotice('현재 선택값을 프로젝트에 추가하고 씬 제작 작업 화면으로 이동합니다. 순서는 프롬프트 / 대본 → 출연자 준비 → 출연자 / 화풍 선택 → 씬 제작입니다.');
     try {
       await onOpenSceneStudio?.({
         ...buildDraftPayload(),
@@ -1495,7 +1513,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       });
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
-      setNotice('씬 제작 화면으로 넘기기 전에 비어 있는 항목이 있는지 다시 확인해 주세요. 필요한 단계로 자동 이동했습니다.');
+      setNotice('씬 제작 화면으로 넘기기 전에 비어 있는 항목이 있습니다. 프롬프트 / 대본 → 출연자 준비 → 출연자 / 화풍 선택 순서로 필요한 단계로 자동 이동했습니다.');
       scrollStageIntoFocus(stepCompleted[4] ? 4 : 3);
     }
   };
@@ -1581,6 +1599,39 @@ const InputSection: React.FC<InputSectionProps> = ({
           {notice}
         </div>
       )}
+
+      <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.22em] text-blue-600">순서 가이드</div>
+            <h2 className="mt-2 text-2xl font-black text-slate-900">처음 쓰는 사용자도 길을 잃지 않도록</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Step 1부터 4까지는 아래 순서대로 진행하면 됩니다. 비어 있는 항목이 있으면 씬 제작으로 넘어가기 전에 해당 단계로 다시 안내합니다.</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">현재 진행률 {completion.total}%</div>
+        </div>
+        <div className="mt-5 grid gap-3 lg:grid-cols-4">
+          <div className={`rounded-[22px] border p-4 ${stepCompleted[1] ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">1단계</div>
+            <div className="mt-2 text-base font-black text-slate-900">프롬프트 / 제작 방향 정하기</div>
+            <p className="mt-2 text-sm leading-6 text-slate-600">콘텐츠 유형, 화면 비율, 주제와 선택값을 채워 전체 방향을 먼저 고정합니다.</p>
+          </div>
+          <div className={`rounded-[22px] border p-4 ${stepCompleted[2] ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">2단계</div>
+            <div className="mt-2 text-base font-black text-slate-900">대본 만들기</div>
+            <p className="mt-2 text-sm leading-6 text-slate-600">선택한 프롬프트로 대본 초안을 만들고, 씬 기준이 되는 문단 구조를 정리합니다.</p>
+          </div>
+          <div className={`rounded-[22px] border p-4 ${stepCompleted[3] ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">3단계</div>
+            <div className="mt-2 text-base font-black text-slate-900">대본 기준 출연자 준비</div>
+            <p className="mt-2 text-sm leading-6 text-slate-600">주인공과 조연 후보를 대본에서 뽑고, 실제 출연자로 쓸 인물을 선택합니다. 현재 {selectedCharacters.length}명 선택됨.</p>
+          </div>
+          <div className={`rounded-[22px] border p-4 ${stepCompleted[4] ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">4단계</div>
+            <div className="mt-2 text-base font-black text-slate-900">출연자 / 화풍 확정 후 씬 제작</div>
+            <p className="mt-2 text-sm leading-6 text-slate-600">출연자가 비어 있거나 화풍이 선택되지 않으면 프로젝트에 추가되지 않습니다. 현재 화풍 {selectedStyle ? '선택됨' : '미선택'}.</p>
+          </div>
+        </div>
+      </div>
 
       <div className="mt-6 space-y-6">
         <AccordionSection
@@ -1790,7 +1841,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
             <div>
               <div className="text-xs font-black uppercase tracking-[0.18em] text-violet-600">Step 3 작업 집중 보기</div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">대본 수정이나 출연자 카드 제작이 길어질 때, 한쪽 작업만 더 크게 보고 나머지는 잠시 눌러 둘 수 있습니다.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">PC에서는 5:5 균형 또는 집중 보기 1:9 비율로 바로 전환됩니다. 작업 중인 영역을 더 크게 보고, 나머지 영역은 좁고 짧게 접어 흐름을 잃지 않게 했습니다.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {[
@@ -1809,6 +1860,24 @@ const InputSection: React.FC<InputSectionProps> = ({
               ))}
             </div>
           </div>
+          <div className="mb-5 rounded-[24px] border border-violet-200 bg-violet-50/70 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">초보자 진행 가이드</div>
+                <div className="mt-2 text-sm font-black text-slate-900">지금 해야 할 순서</div>
+              </div>
+              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-violet-700">Step 3 집중 체크</span>
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-2">
+              {step3GuideItems.map((item, index) => (
+                <div key={`step3-guide-${index}`} className="rounded-2xl border border-violet-100 bg-white px-4 py-3 text-sm leading-6 text-slate-700">
+                  <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-xs font-black text-white">{index + 1}</span>
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className={`space-y-5 ${step3PanelMode === 'character-focus' ? 'opacity-70' : ''}`}>
               <div className="flex min-h-[560px] flex-col rounded-[28px] border border-slate-200 bg-slate-50 p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1886,7 +1955,7 @@ const InputSection: React.FC<InputSectionProps> = ({
                   <SummaryChip accent="blue">{sceneCount}문단</SummaryChip>
                 </div>
 
-                <div className="grid gap-4 xl:grid-cols-2 xl:items-stretch">
+                <div className={`grid gap-4 xl:items-stretch ${step3PanelMode === 'balanced' ? 'lg:grid-cols-2' : step3PanelMode === 'script-focus' ? 'lg:grid-cols-[minmax(0,9fr)_minmax(260px,1fr)]' : 'lg:grid-cols-[minmax(260px,1fr)_minmax(0,9fr)]'}`}>
                   <div>
                     <textarea
                       value={storyScript}
@@ -1940,7 +2009,7 @@ const InputSection: React.FC<InputSectionProps> = ({
                         </div>
 
                         <div className="mt-4 flex items-center justify-between gap-3">
-                          <div className="text-xs font-bold text-slate-500">지금은 {step3PanelMode === 'character-focus' ? '캐릭터 집중 보기' : step3PanelMode === 'script-focus' ? '대본 집중 보기' : '5:5 균형'} 모드입니다. 카드 영역은 화면 밖으로 새지 않게 숨겼고, 바깥 화살표로 카드 줄을 움직이며 카드 안쪽 화살표로 각 출연자 유사안을 넘길 수 있습니다.</div>
+                          <div className="text-xs font-bold text-slate-500">지금은 {step3PanelMode === 'character-focus' ? '캐릭터 집중 보기 9칸 / 대본 1칸' : step3PanelMode === 'script-focus' ? '대본 집중 보기 9칸 / 캐릭터 1칸' : '5:5 균형'} 모드입니다. PC에서는 좌우 비율이 즉시 바뀌고, 카드 영역은 화면 밖으로 새지 않게 숨겼습니다.</div>
                           <div className="flex items-center gap-2">
                             <ArrowButton direction="left" disabled={!extractedCharacters.length} onClick={() => scrollContainerBy(characterStripRef.current, 'left', 360)} />
                             <ArrowButton direction="right" disabled={!extractedCharacters.length} onClick={() => scrollContainerBy(characterStripRef.current, 'right', 360)} />
@@ -1960,7 +2029,7 @@ const InputSection: React.FC<InputSectionProps> = ({
                             const active = selectedCharacterIds.includes(character.id);
                             const currentPrompt = character.prompt || currentRealSlide?.prompt || '';
                             return (
-                              <div key={`step3-character-${character.id}`} data-character-card-id={character.id} className={`shrink-0 snap-start rounded-[24px] border p-3 shadow-sm transition-all duration-300 ${step3PanelMode === 'character-focus' ? 'w-[min(92vw,380px)]' : 'w-[min(82vw,328px)]'} ${active ? 'border-violet-300 bg-violet-50/60' : 'border-slate-200 bg-white'}`}>
+                              <div key={`step3-character-${character.id}`} data-character-card-id={character.id} className={`shrink-0 snap-start rounded-[24px] border p-3 shadow-sm transition-all duration-300 ${step3PanelMode === 'character-focus' ? 'w-[min(84vw,460px)]' : step3PanelMode === 'balanced' ? 'w-[min(44vw,340px)]' : 'w-[min(26vw,290px)]'} ${active ? 'border-violet-300 bg-violet-50/60 ring-2 ring-violet-100' : 'border-slate-200 bg-white'}`}>
                                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
                                   <div className="flex transition-transform duration-500" style={{ transform: `translateX(-${activeIndex * 100}%)` }}>
                                     {slides.map((image) => (

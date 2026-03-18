@@ -6,12 +6,20 @@ export function LoadingOverlay({
   open,
   title,
   description,
+  progressPercent,
+  progressLabel,
 }: {
   open: boolean;
   title: string;
   description?: string;
+  progressPercent?: number;
+  progressLabel?: string;
 }) {
   if (!open) return null;
+
+  const safeProgress = typeof progressPercent === 'number'
+    ? Math.max(0, Math.min(100, Math.round(progressPercent)))
+    : null;
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/30 px-4 backdrop-blur-[2px]">
@@ -26,6 +34,19 @@ export function LoadingOverlay({
           </div>
         </div>
         <p className="mt-4 text-sm leading-6 text-slate-600">{description || '필요한 데이터만 먼저 준비하고 있습니다.'}</p>
+
+        {safeProgress !== null && (
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3 text-xs font-black text-slate-600">
+              <span>{progressLabel || '진행률'}</span>
+              <span>{safeProgress}%</span>
+            </div>
+            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
+              <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${safeProgress}%` }} />
+            </div>
+          </div>
+        )}
+
         <div className="mt-5 space-y-3">
           <div className="h-3 animate-pulse rounded-full bg-slate-200" />
           <div className="h-3 w-5/6 animate-pulse rounded-full bg-slate-200" />
@@ -39,10 +60,16 @@ export function LoadingOverlay({
 export function StudioPageSkeleton({
   title = '프로젝트를 부드럽게 불러오는 중',
   description = '필요한 카드만 먼저 준비하고 나머지는 화면 안에서 자연스럽게 이어집니다.',
+  progressPercent = 18,
+  progressLabel,
 }: {
   title?: string;
   description?: string;
+  progressPercent?: number;
+  progressLabel?: string;
 }) {
+  const safeProgress = Math.max(0, Math.min(100, Math.round(progressPercent || 0)));
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <div className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 px-4 py-4 backdrop-blur-md sm:px-6 lg:px-8">
@@ -56,6 +83,15 @@ export function StudioPageSkeleton({
           <div className="text-[11px] font-black uppercase tracking-[0.22em] text-blue-600">Preparing</div>
           <h1 className="mt-2 text-3xl font-black text-slate-900">{title}</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>
+          <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3 text-xs font-black text-slate-600">
+              <span>{progressLabel || '화면 준비 진행률'}</span>
+              <span>{safeProgress}%</span>
+            </div>
+            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
+              <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${safeProgress}%` }} />
+            </div>
+          </div>
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
             {Array.from({ length: 3 }).map((_, index) => (
               <div key={index} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">

@@ -33,6 +33,9 @@ interface ResultTableProps {
   totalCost?: CostBreakdown;
   isGenerating?: boolean;
   progressMessage?: string;
+  progressPercent?: number | null;
+  progressLabel?: string;
+  sceneProgressMap?: Record<number, { percent: number; label: string }>;
   finalVideoUrl?: string | null;
   finalVideoTitle?: string;
   onGenerateThumbnail?: () => void | Promise<void>;
@@ -159,6 +162,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
   totalCost,
   isGenerating,
   progressMessage,
+  progressPercent,
+  progressLabel,
+  sceneProgressMap,
   finalVideoUrl,
   finalVideoTitle,
   onGenerateThumbnail,
@@ -174,6 +180,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [mediaViewer, setMediaViewer] = useState<{ kind: 'image' | 'video'; sceneNumber: number; entries: AssetHistoryItem[]; currentIndex: number; aspectRatio?: GeneratedAsset['aspectRatio'] } | null>(null);
   const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const bgmStripRef = useRef<HTMLDivElement | null>(null);
+  const sceneCardRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const lastAutoFocusedSceneRef = useRef<number | null>(null);
 
   const summary = useMemo(() => {
     const imageCount = data.filter((item) => item.imageData).length;
@@ -189,6 +197,15 @@ const ResultTable: React.FC<ResultTableProps> = ({
     return backgroundMusicTracks.find((item) => item.id === activeBackgroundTrackId) || backgroundMusicTracks[0];
   }, [backgroundMusicTracks, activeBackgroundTrackId]);
 
+  const activeOverallProgress = typeof progressPercent === 'number'
+    ? Math.max(0, Math.min(100, Math.round(progressPercent)))
+    : null;
+
+  const activeSceneIndex = useMemo(() => data.findIndex((row, index) => {
+    const sceneProgress = sceneProgressMap?.[index];
+    return Boolean(animatingIndices?.has(index) || row.status === 'generating' || (sceneProgress && sceneProgress.percent < 100));
+  }), [animatingIndices, data, sceneProgressMap]);
+
   const togglePanel = (key: string) => {
     setOpenPanels((prev) => ({ ...prev, [key]: !prev[key] }));
   };
@@ -199,6 +216,16 @@ const ResultTable: React.FC<ResultTableProps> = ({
     const target = container.querySelector<HTMLElement>(`[data-bgm-card-id="${mainBgm.id}"]`);
     if (target) scrollElementIntoView(target);
   }, [mainBgm?.id, backgroundMusicTracks.length]);
+
+  useEffect(() => {
+    if (activeSceneIndex < 0 || lastAutoFocusedSceneRef.current === activeSceneIndex) return;
+    lastAutoFocusedSceneRef.current = activeSceneIndex;
+    const target = sceneCardRefs.current[activeSceneIndex];
+    if (!target) return;
+    window.setTimeout(() => {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
+  }, [activeSceneIndex]);
 
   if (!data.length) {
     return (
@@ -286,10 +313,38 @@ const ResultTable: React.FC<ResultTableProps> = ({
           </div>
         </div>
 
-        {(isGenerating || progressMessage) && (
-          <div className={`mt-4 flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${isGenerating ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
-            {isGenerating ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />}
-            <span className="font-bold">{progressMessage || '씬 상태를 준비했습니다.'}</span>
+        <div className="mt-4 grid gap-3 lg:grid-cols-4">
+          {[
+            activeSceneIndex >= 0 ? `현재 작업 중인 씬은 자동으로 화면 중앙에 맞춰 보여 줍니다.` : '아직 작업 중인 씬은 없습니다. 전체 씬 생성부터 눌러 주세요.',
+            summary.imageCount === data.length ? '모든 씬 이미지가 준비되었습니다. 필요한 카드만 다시 생성해도 됩니다.' : `이미지 ${summary.imageCount}/${data.length}개 준비됨`,
+            summary.videoCount > 0 ? `영상 ${summary.videoCount}개 준비됨. 모두 확인 후 최종 MP4를 내보낼 수 있습니다.` : '영상화는 이미지가 준비된 뒤 각 씬 또는 전체 일괄 생성으로 진행합니다.',
+            finalVideoUrl ? '최종 MP4 결과가 준비되었습니다. 플레이어에서 바로 검수할 수 있습니다.' : '마지막 단계에서는 결과 미리보기로 순서와 컷 길이를 확인한 뒤 MP4를 내보내세요.',
+          ].map((item, index) => (
+            <div key={`scene-guide-${index}`} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">Guide {index + 1}</div>
+              <p className="mt-2">{item}</p>
+            </div>
+          ))}
+        </div>
+
+        {(isGenerating || progressMessage || activeOverallProgress !== null) && (
+          <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${isGenerating || activeOverallProgress !== null ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+            <div className="flex items-center gap-3">
+              {isGenerating || activeOverallProgress !== null ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />}
+              <span className="font-bold">{progressMessage || '씬 상태를 준비했습니다.'}</span>
+            </div>
+            {activeOverallProgress !== null && (
+              <div className="mt-4 rounded-2xl border border-blue-100 bg-white/80 p-4">
+                <div className="flex items-center justify-between gap-3 text-xs font-black text-slate-600">
+                  <span>{progressLabel || '현재 작업 진행률'}</span>
+                  <span>{activeOverallProgress}%</span>
+                </div>
+                <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${activeOverallProgress}%` }} />
+                </div>
+                <p className="mt-3 text-xs leading-5 text-slate-500">화면 전체를 멈추지 않고, 실제 생성 중인 부분만 단계별로 표시합니다.</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -407,11 +462,19 @@ const ResultTable: React.FC<ResultTableProps> = ({
           const imageSrc = resolveImageSrc(row.imageData);
           const audioSrc = resolveNarrationAudioSrc(row.audioData);
           const isAnimating = animatingIndices?.has(index) || false;
+          const sceneProgress = sceneProgressMap?.[index] || null;
+          const isSceneWorking = isAnimating || row.status === 'generating' || Boolean(sceneProgress && sceneProgress.percent < 100);
           const imageHistoryEntries = collectMediaHistory(row, 'image');
           const videoHistoryEntries = collectMediaHistory(row, 'video');
 
           return (
-            <div key={`${row.sceneNumber}-${index}`} className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+            <div
+              key={`${row.sceneNumber}-${index}`}
+              ref={(node) => {
+                sceneCardRefs.current[index] = node;
+              }}
+              className={`overflow-hidden rounded-[28px] border bg-white shadow-sm transition-all duration-300 ${activeSceneIndex === index ? 'border-blue-300 ring-2 ring-blue-100' : 'border-slate-200'}`}
+            >
               <div className="border-b border-slate-200 px-5 py-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-2">
@@ -419,17 +482,49 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">컷 길이 {formatSeconds(row.targetDuration)}</span>
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">오디오 {formatSeconds(row.audioDuration)}</span>
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">비율 {row.aspectRatio || '16:9'}</span>
+                    {sceneProgress && (
+                      <span className={`rounded-full px-3 py-1 text-xs font-black ${sceneProgress.percent >= 100 ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700'}`}>
+                        {sceneProgress.label} {sceneProgress.percent < 100 ? `${sceneProgress.percent}%` : ''}
+                      </span>
+                    )}
                   </div>
-                  <HelpTip title="씬 카드 사용법" compact>
-                    카드 본문은 단순하게 유지하고, 컷 길이 조절, 오디오 미리듣기, 비주얼 프롬프트는 버튼으로 펼쳐서 쓰도록 구성했습니다.
-                  </HelpTip>
+                  <div className="flex items-center gap-2">
+                    {activeSceneIndex === index && (
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">현재 작업 중인 카드</span>
+                    )}
+                    <HelpTip title="씬 카드 사용법" compact>
+                      카드 본문은 단순하게 유지하고, 컷 길이 조절, 오디오 미리듣기, 비주얼 프롬프트는 버튼으로 펼쳐서 쓰도록 구성했습니다.
+                    </HelpTip>
+                  </div>
                 </div>
               </div>
 
               <div className="grid gap-5 p-5 xl:grid-cols-[0.78fr_1.22fr]">
                 <div className="space-y-4">
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                    <button type="button" onClick={() => setImageLightbox({ src: imageSrc, title: `씬 ${row.sceneNumber}`, aspectRatio: row.aspectRatio })} className="block w-full text-left"><img src={imageSrc} alt={`씬 ${row.sceneNumber}`} className={`${getAspectRatioClass(row.aspectRatio || '16:9')} w-full object-cover transition-transform duration-300 hover:scale-[1.01]`} /></button>
+                  <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                    <button type="button" onClick={() => setImageLightbox({ src: imageSrc, title: `씬 ${row.sceneNumber}`, aspectRatio: row.aspectRatio })} className="block w-full text-left"><img src={imageSrc} alt={`씬 ${row.sceneNumber}`} className={`${getAspectRatioClass(row.aspectRatio || '16:9')} w-full object-cover transition-transform duration-300 hover:scale-[1.01] ${isSceneWorking ? 'opacity-70' : ''}`} /></button>
+                    {isSceneWorking && (
+                      <div className="absolute inset-0 flex flex-col justify-between bg-white/78 p-4 backdrop-blur-[1px]">
+                        <div>
+                          <div className="text-[11px] font-black uppercase tracking-[0.22em] text-blue-600">Generating</div>
+                          <div className="mt-2 text-sm font-black text-slate-900">{sceneProgress?.label || (isAnimating ? '영상 만드는 중' : 'AI 결과 준비 중')}</div>
+                          <div className="mt-3 space-y-2">
+                            <div className="h-3 w-3/4 animate-pulse rounded-full bg-slate-200" />
+                            <div className="h-3 w-2/3 animate-pulse rounded-full bg-slate-200" />
+                            <div className="h-3 w-1/2 animate-pulse rounded-full bg-slate-200" />
+                          </div>
+                        </div>
+                        <div>
+                          <div className="flex items-center justify-between gap-3 text-xs font-black text-slate-600">
+                            <span>{sceneProgress?.label || '진행 상황'}</span>
+                            <span>{sceneProgress?.percent ?? (isAnimating ? 88 : 52)}%</span>
+                          </div>
+                          <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-white">
+                            <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${sceneProgress?.percent ?? (isAnimating ? 88 : 52)}%` }} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button type="button" onClick={() => setMediaViewer({ kind: 'image', sceneNumber: row.sceneNumber, entries: imageHistoryEntries, currentIndex: 0, aspectRatio: row.aspectRatio })} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
@@ -439,12 +534,12 @@ const ResultTable: React.FC<ResultTableProps> = ({
                       영상 보기 {videoHistoryEntries.length > 1 ? `(${videoHistoryEntries.length})` : ''}
                     </button>
                     {onRegenerateImage && (
-                      <button type="button" onClick={() => onRegenerateImage?.(index)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                      <button type="button" disabled={isSceneWorking} onClick={() => onRegenerateImage?.(index)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
                         이미지 다시 만들기
                       </button>
                     )}
                     {onGenerateAnimation && (
-                      <button type="button" onClick={() => onGenerateAnimation?.(index)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                      <button type="button" disabled={isSceneWorking} onClick={() => onGenerateAnimation?.(index)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
                         {isAnimating ? '영상 변환 중...' : '이 씬만 영상화'}
                       </button>
                     )}
@@ -459,12 +554,12 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <div className="text-sm font-black text-slate-900">나레이션 / 대본 문단</div>
                       {onRegenerateAudio && (
-                        <button type="button" onClick={() => onRegenerateAudio?.(index)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-white">
+                        <button type="button" disabled={isSceneWorking} onClick={() => onRegenerateAudio?.(index)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
                           오디오 다시 생성
                         </button>
                       )}
                     </div>
-                    <textarea value={row.narration} onChange={(e) => onNarrationChange?.(index, e.target.value)} className="min-h-[160px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-900 outline-none focus:border-blue-400" />
+                    <textarea value={row.narration} disabled={isSceneWorking} onChange={(e) => onNarrationChange?.(index, e.target.value)} className="min-h-[160px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400" />
                   </div>
 
                   <div className="grid gap-3 md:grid-cols-3">
@@ -654,8 +749,21 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 {data.map((row, index) => (
                   <div key={`preview-${row.sceneNumber}-${index}`} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                     <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                      <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white">
                         <button type="button" onClick={() => setImageLightbox({ src: resolveImageSrc(row.imageData), title: `미리보기 씬 ${row.sceneNumber}`, aspectRatio: row.aspectRatio })} className="block w-full text-left"><img src={resolveImageSrc(row.imageData)} alt={`미리보기 씬 ${row.sceneNumber}`} className={`${getAspectRatioClass(row.aspectRatio || '16:9')} w-full object-cover`} /></button>
+                        {sceneProgressMap?.[index] && sceneProgressMap[index].percent < 100 && (
+                          <div className="absolute inset-0 flex items-end bg-white/70 p-3">
+                            <div className="w-full rounded-2xl border border-slate-200 bg-white/90 p-3">
+                              <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
+                                <span>{sceneProgressMap[index].label}</span>
+                                <span>{sceneProgressMap[index].percent}%</span>
+                              </div>
+                              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                                <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${sceneProgressMap[index].percent}%` }} />
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="space-y-3">
                         <div className="flex flex-wrap items-center gap-2">

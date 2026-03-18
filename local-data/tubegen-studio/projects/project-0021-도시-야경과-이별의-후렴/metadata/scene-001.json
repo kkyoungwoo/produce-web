@@ -1,0 +1,21 @@
+{
+  "sceneNumber": 1,
+  "narration": "ㅁㄴㅇ",
+  "visualPrompt": "Music video storyboard illustration, lyrical, symbolic, cinematic rhythm. Scene 1. Show the main visual idea from this narration: ㅁㄴㅇ Clean composition, 16:9, strong subject focus, no watermark, no text overlay. Keep character appearance consistent across scenes.",
+  "targetDuration": 3,
+  "audioDuration": null,
+  "videoDuration": null,
+  "status": "completed",
+  "aspectRatio": "16:9",
+  "sourceMode": "sample",
+  "subtitleData": null,
+  "analysis": {
+    "composition_type": "MACRO",
+    "sentiment": "NEUTRAL"
+  },
+  "files": {
+    "imagePath": "images/scene-001-main.jpg",
+    "audioPath": null,
+    "videoPath": null
+  }
+}

@@ -40,6 +40,7 @@ import { createInitialSceneAssetsFromDraft } from './services/sceneAssemblyServi
 import { createSampleBackgroundTrack, getDefaultPreviewMix } from './services/musicService';
 import { createDefaultWorkflowDraft, ensureWorkflowDraft } from './services/workflowDraftService';
 import { CONFIG } from './config';
+import { rememberProjectNavigationProject } from './services/projectNavigationCache';
 
 function normalizeLoadedAssets(assets: GeneratedAsset[]): GeneratedAsset[] {
   return assets.map((asset) => ({
@@ -50,6 +51,12 @@ function normalizeLoadedAssets(assets: GeneratedAsset[]): GeneratedAsset[] {
         : asset.audioDuration || asset.videoDuration || estimateClipDuration(asset.narration),
   }));
 }
+
+const resolveAppViewMode = (params: ReturnType<typeof useSearchParams>) => {
+  if (params?.get('view') === 'gallery') return 'gallery' as const;
+  if (params?.get('view') === 'main' || params?.get('new') || params?.get('projectId') || params?.get('returnTo')) return 'main' as const;
+  return 'gallery' as const;
+};
 
 const App: React.FC = () => {
   const router = useRouter();
@@ -72,7 +79,7 @@ const App: React.FC = () => {
   const [apiModalTitle, setApiModalTitle] = useState('API 키 등록');
   const [apiModalDescription, setApiModalDescription] = useState('필요한 키를 등록하면 실제 생성 품질이 올라갑니다.');
   const [apiModalFocusField, setApiModalFocusField] = useState<'openRouter' | 'elevenLabs' | 'fal' | null>(null);
-  const [viewMode, setViewMode] = useState<'main' | 'gallery'>(searchParams?.get('view') === 'gallery' ? 'gallery' : 'main');
+  const [viewMode, setViewMode] = useState<'main' | 'gallery'>(resolveAppViewMode(searchParams));
   const [currentTopic, setCurrentTopic] = useState<string>('');
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [backgroundMusicTracks, setBackgroundMusicTracks] = useState<BackgroundMusicTrack[]>([]);
@@ -194,7 +201,7 @@ const App: React.FC = () => {
   }, [studioState]);
 
   useEffect(() => {
-    setViewMode(searchParams?.get('view') === 'gallery' ? 'gallery' : 'main');
+    setViewMode(resolveAppViewMode(searchParams));
   }, [searchParams]);
 
 
@@ -228,7 +235,7 @@ const App: React.FC = () => {
 
     void (async () => {
       await handleStartNewProject(studioState.lastContentType);
-      router.replace(basePath, { scroll: false });
+      router.replace(`${basePath}?view=main`, { scroll: false });
     })();
   }, [searchParams, studioState, handleStartNewProject, router, basePath]);
 
@@ -444,11 +451,13 @@ const App: React.FC = () => {
       setProgressMessage('문단별 씬 카드와 신규 배경음을 먼저 준비했습니다. 씬 제작 화면에서는 생성 버튼을 누를 때만 실제 AI 작업이 시작됩니다.');
 
       setCurrentProjectId(project.id);
+      rememberProjectNavigationProject(project);
       await refreshProjects();
       try {
         localStorage.removeItem(CONFIG.STORAGE_KEYS.PENDING_SCENE_AUTOSTART);
       } catch {}
-      router.push(`${basePath}/scene-studio?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+      try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
+      router.push(`${basePath}/scene-studio?projectId=${encodeURIComponent(project.id)}`, { scroll: true });
     } catch (error) {
       console.error('[mp4Creater] scene studio open failed', error);
       setNavigationOverlay(null);
@@ -480,7 +489,7 @@ const App: React.FC = () => {
         selectedCharacterName={selectedCharacterName}
         storageDir={studioState?.storageDir}
         onOpenSettings={() => setShowSettings(true)}
-        onGoMain={() => { router.push(`${basePath}?new=${Date.now()}`, { scroll: false }); }}
+        onGoMain={() => { router.push(`${basePath}?view=main&new=${Date.now()}`, { scroll: false }); }}
         onGoGallery={() => { router.push(`${basePath}?view=gallery`, { scroll: false }); }}
         viewMode={viewMode}
         basePath={basePath}
@@ -522,6 +531,10 @@ const App: React.FC = () => {
           onRefresh={refreshProjects}
           onLoad={handleLoadProject}
           basePath={basePath}
+          onCreateNewProject={() => {
+            try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
+            router.push(`${basePath}?view=main&new=${Date.now()}`, { scroll: true });
+          }}
         />
       )}
 

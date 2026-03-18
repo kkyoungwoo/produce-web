@@ -1,0 +1,21 @@
+{
+  "sceneNumber": 3,
+  "narration": "중간 장면에서는 서로 다른 시각이나 데이터가 부딪히며 이슈의 핵심 긴장이 드러난다. 앵커은 복잡한 내용을 흐트러지지 않게 정돈해 전달한다.",
+  "visualPrompt": "News explainer storyboard illustration, clean visual hierarchy, credible composition. Scene 3. Show the main visual idea from this narration: 중간 장면에서는 서로 다른 시각이나 데이터가 부딪히며 이슈의 핵심 긴장이 드러난다. 앵커은 복잡한 내용을 흐트러지지 않게 정돈해 전달한다. Clean composition, 16:9, strong subject focus, no watermark, no text overlay. Keep character appearance consistent across scenes.",
+  "targetDuration": 7.1,
+  "audioDuration": null,
+  "videoDuration": null,
+  "status": "completed",
+  "aspectRatio": "16:9",
+  "sourceMode": "sample",
+  "subtitleData": null,
+  "analysis": {
+    "composition_type": "MACRO",
+    "sentiment": "NEUTRAL"
+  },
+  "files": {
+    "imagePath": "images/scene-003-main.jpg",
+    "audioPath": null,
+    "videoPath": null
+  }
+}

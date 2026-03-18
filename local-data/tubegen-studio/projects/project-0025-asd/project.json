@@ -1,0 +1,37 @@
+{
+  "id": "1773657894346",
+  "name": "asd",
+  "createdAt": 1773657894346,
+  "topic": "asd",
+  "lastSavedAt": 1773874284827,
+  "settings": {
+    "imageModel": "gemini-2.5-flash-image",
+    "outputMode": "video",
+    "elevenLabsModel": "eleven_multilingual_v2"
+  },
+  "assets": [],
+  "thumbnail": null,
+  "thumbnailTitle": null,
+  "thumbnailPrompt": null,
+  "thumbnailHistory": [],
+  "selectedThumbnailId": null,
+  "backgroundMusicTracks": [],
+  "workflowDraft": null,
+  "projectNumber": 25,
+  "folderName": "project-0025-asd",
+  "folderPath": "local-data/tubegen-studio/projects/project-0025-asd",
+  "summary": {
+    "id": "1773657894346",
+    "name": "asd",
+    "topic": "asd",
+    "projectNumber": 25,
+    "folderName": "project-0025-asd",
+    "createdAt": 1773657894346,
+    "lastSavedAt": 1773874284827,
+    "assetCount": 0,
+    "imageCount": 0,
+    "videoCount": 0,
+    "audioCount": 0,
+    "thumbnailPath": null
+  }
+}

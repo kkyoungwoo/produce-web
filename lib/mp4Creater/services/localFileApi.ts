@@ -256,6 +256,19 @@ function syncStudioStateToLocalCache(state: StudioState) {
   }
 }
 
+function haveProjectsMeaningfullyChanged(nextProjects: any[] | undefined, currentProjects: any[] | undefined) {
+  const nextList = Array.isArray(nextProjects) ? nextProjects : [];
+  const currentList = Array.isArray(currentProjects) ? currentProjects : [];
+  if (nextList.length !== currentList.length) return true;
+  return nextList.some((project, index) => {
+    const current = currentList[index];
+    return project?.id !== current?.id
+      || (project?.lastSavedAt || project?.createdAt || 0) !== (current?.lastSavedAt || current?.createdAt || 0)
+      || (project?.folderName || '') !== (current?.folderName || '')
+      || (project?.projectNumber || 0) !== (current?.projectNumber || 0);
+  });
+}
+
 function buildLeanStatePayload(partial: Partial<StudioState>, cachedState?: StudioState | null) {
   const base = cachedState || createDefaultStudioState();
   const payload: Partial<StudioState> = {
@@ -275,11 +288,11 @@ function buildLeanStatePayload(partial: Partial<StudioState>, cachedState?: Stud
     lastContentType: partial.lastContentType || base.lastContentType || 'story',
   };
 
-  if (Array.isArray(partial.projects)) {
+  if (Array.isArray(partial.projects) && haveProjectsMeaningfullyChanged(partial.projects, base.projects)) {
     payload.projects = partial.projects;
   }
 
-  if (Array.isArray((partial as any).projectIndex)) {
+  if (Array.isArray((partial as any).projectIndex) && haveProjectsMeaningfullyChanged((partial as any).projectIndex, (base as any).projectIndex)) {
     (payload as any).projectIndex = (partial as any).projectIndex;
   }
 

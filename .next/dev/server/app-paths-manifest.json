@@ -1,5 +1,4 @@
 {
   "/api/local-storage/state/route": "app/api/local-storage/state/route.js",
-  "/[locale]/mp4Creater/page": "app/[locale]/mp4Creater/page.js",
-  "/[locale]/mp4Creater/scene-studio/page": "app/[locale]/mp4Creater/scene-studio/page.js"
+  "/[locale]/mp4Creater/page": "app/[locale]/mp4Creater/page.js"
 }

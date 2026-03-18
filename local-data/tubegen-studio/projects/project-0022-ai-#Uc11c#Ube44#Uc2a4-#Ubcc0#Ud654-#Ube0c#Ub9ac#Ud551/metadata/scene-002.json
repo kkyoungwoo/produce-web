@@ -1,0 +1,21 @@
+{
+  "sceneNumber": 2,
+  "narration": "이어지는 장면에서는 현재 상황과 배경이 차례로 설명되고, 엇갈리는 해석이 왜 논점이 되는지 시청자가 한 번에 이해할 수 있게 연결한다.",
+  "visualPrompt": "News explainer storyboard illustration, clean visual hierarchy, credible composition. Scene 2. Show the main visual idea from this narration: 이어지는 장면에서는 현재 상황과 배경이 차례로 설명되고, 엇갈리는 해석이 왜 논점이 되는지 시청자가 한 번에 이해할 수 있게 연결한다. Clean composition, 16:9, strong subject focus, no watermark, no text overlay. Keep character appearance consistent across scenes.",
+  "targetDuration": 7,
+  "audioDuration": null,
+  "videoDuration": null,
+  "status": "completed",
+  "aspectRatio": "16:9",
+  "sourceMode": "sample",
+  "subtitleData": null,
+  "analysis": {
+    "composition_type": "MACRO",
+    "sentiment": "NEUTRAL"
+  },
+  "files": {
+    "imagePath": "images/scene-002-main.jpg",
+    "audioPath": null,
+    "videoPath": null
+  }
+}
