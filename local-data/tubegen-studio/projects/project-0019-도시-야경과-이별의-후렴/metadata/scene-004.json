@@ -1,0 +1,21 @@
+{
+  "sceneNumber": 4,
+  "narration": "[Verse 2]\n리듬이 올라가듯 작은 단서와 움직임이 쌓이며, 화면은 더 선명한 상징과 대비를 만든다. 숨기고 있던 감정이 결국 노래의 중심으로 올라온다.",
+  "visualPrompt": "Music video storyboard illustration, lyrical, symbolic, cinematic rhythm. Scene 4. Show the main visual idea from this narration: [Verse 2]\n리듬이 올라가듯 작은 단서와 움직임이 쌓이며, 화면은 더 선명한 상징과 대비를 만든다. 숨기고 있던 감정이 결국 노래의 중심으로 올라온다. Clean composition, 16:9, strong subject focus, no watermark, no text overlay. Keep character appearance consistent across scenes.",
+  "targetDuration": 7.6,
+  "audioDuration": null,
+  "videoDuration": null,
+  "status": "completed",
+  "aspectRatio": "16:9",
+  "sourceMode": "sample",
+  "subtitleData": null,
+  "analysis": {
+    "composition_type": "STANDARD",
+    "sentiment": "NEUTRAL"
+  },
+  "files": {
+    "imagePath": "images/scene-004-main.jpg",
+    "audioPath": null,
+    "videoPath": null
+  }
+}

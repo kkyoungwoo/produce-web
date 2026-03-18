@@ -1,5 +1,12 @@
 import { CONFIG } from '../config';
-import { SavedProject, StudioState, CharacterProfile, AiRoutingSettings } from '../types';
+import {
+  SavedProject,
+  StudioState,
+  CharacterProfile,
+  AiRoutingSettings,
+  ProviderRegistryItem,
+} from '../types';
+import { createDefaultWorkflowDraft } from './workflowDraftService';
 
 export const DEFAULT_STORAGE_DIR = './local-data/tubegen-studio';
 
@@ -16,6 +23,8 @@ export const DEFAULT_ROUTING: AiRoutingSettings = {
   videoModel: 'pixverse/v5.5',
 };
 
+let studioStateMemoryCache: StudioState | null = null;
+
 export const createDefaultCharacter = (): CharacterProfile => ({
   id: `char_${Date.now()}`,
   name: '기본 캐릭터',
@@ -23,11 +32,29 @@ export const createDefaultCharacter = (): CharacterProfile => ({
   visualStyle: '심플한 2D 일러스트, 또렷한 실루엣, 따뜻한 톤',
   voiceHint: '차분하고 선명한 설명형 톤',
   createdAt: Date.now(),
+  role: 'lead',
 });
 
+function createDefaultRegistry(): ProviderRegistryItem[] {
+  return [
+    {
+      id: 'provider_seedance_direct',
+      name: 'Seedance 2.0 (직접 연결 슬롯)',
+      kind: 'video',
+      baseUrl: '',
+      modelHint: 'seedance-2.0',
+      apiKey: '',
+      authScheme: 'Authorization: Bearer YOUR_KEY',
+      notes: 'OpenRouter에 없는 외부 영상 모델을 저장하는 자리입니다.',
+      enabled: false,
+    },
+  ];
+}
+
 export const createDefaultStudioState = (): StudioState => ({
-  version: 1,
-  storageDir: DEFAULT_STORAGE_DIR,
+  version: 5,
+  storageDir: '',
+  isStorageConfigured: false,
   configuredAt: Date.now(),
   updatedAt: Date.now(),
   selectedCharacterId: null,
@@ -35,6 +62,16 @@ export const createDefaultStudioState = (): StudioState => ({
   routing: { ...DEFAULT_ROUTING },
   providers: {},
   projects: [],
+  workflowDraft: createDefaultWorkflowDraft('story'),
+  agentProfile: {
+    name: '나만의 기본 제작 에이전트',
+    mission: '초보 사용자도 스토리부터 장면, 나레이션, 영상까지 자연스럽게 따라오게 돕는다.',
+    toneGuide: '선택형 옵션을 많이 보여주고, 직접 입력은 꼭 필요한 순간만 요청한다.',
+    defaultWorkflow: 'general_youtube',
+  },
+  preferredPromptProfile: 'general_youtube',
+  providerRegistry: createDefaultRegistry(),
+  lastContentType: 'story',
 });
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -55,16 +92,226 @@ async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   return response.json();
 }
 
-export async function fetchStudioState(): Promise<StudioState> {
+function getCachedStorageDir() {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(CONFIG.STORAGE_KEYS.STUDIO_STORAGE_DIR) || '';
+}
+
+function stripBinaryPayloadFromImage(item: any) {
+  if (!item || typeof item !== 'object') return item;
+  return {
+    ...item,
+    imageData: undefined,
+    data: undefined,
+  };
+}
+
+function stripBinaryPayloadFromCharacter(character: any) {
+  if (!character || typeof character !== 'object') return character;
+  return {
+    ...character,
+    imageData: undefined,
+    generatedImages: Array.isArray(character.generatedImages) ? character.generatedImages.map(stripBinaryPayloadFromImage) : [],
+  };
+}
+
+function createLightweightWorkflowDraft(draft: any) {
+  if (!draft || typeof draft !== 'object') return draft;
+  return {
+    ...draft,
+    styleImages: Array.isArray(draft.styleImages) ? draft.styleImages.map(stripBinaryPayloadFromImage) : [],
+    thumbnailHistory: Array.isArray(draft.thumbnailHistory) ? draft.thumbnailHistory.map(stripBinaryPayloadFromImage) : [],
+    extractedCharacters: Array.isArray(draft.extractedCharacters) ? draft.extractedCharacters.map(stripBinaryPayloadFromCharacter) : [],
+  };
+}
+
+function summarizeProject(project: any): SavedProject {
+  const assets = Array.isArray(project?.assets) ? project.assets : [];
+  const firstImage = assets.find((asset: any) => asset?.imageData)?.imageData || null;
+  return {
+    id: typeof project?.id === 'string' ? project.id : `project_${Date.now()}`,
+    name: typeof project?.name === 'string' ? project.name : 'Untitled Project',
+    createdAt: typeof project?.createdAt === 'number' ? project.createdAt : Date.now(),
+    topic: typeof project?.topic === 'string' ? project.topic : 'Untitled Project',
+    projectNumber: typeof project?.projectNumber === 'number' ? project.projectNumber : undefined,
+    folderName: typeof project?.folderName === 'string' ? project.folderName : undefined,
+    folderPath: typeof project?.folderPath === 'string' ? project.folderPath : undefined,
+    lastSavedAt: typeof project?.lastSavedAt === 'number' ? project.lastSavedAt : Date.now(),
+    settings: project?.settings || {
+      imageModel: CONFIG.DEFAULT_IMAGE_MODEL,
+      outputMode: 'video',
+      elevenLabsModel: CONFIG.DEFAULT_ELEVENLABS_MODEL,
+    },
+    assets: [],
+    thumbnail: typeof project?.thumbnail === 'string' ? project.thumbnail : firstImage,
+    thumbnailTitle: typeof project?.thumbnailTitle === 'string' ? project.thumbnailTitle : null,
+    thumbnailPrompt: typeof project?.thumbnailPrompt === 'string' ? project.thumbnailPrompt : null,
+    thumbnailHistory: [],
+    selectedThumbnailId: typeof project?.selectedThumbnailId === 'string' ? project.selectedThumbnailId : null,
+    cost: project?.cost,
+    backgroundMusicTracks: [],
+    previewMix: project?.previewMix,
+    workflowDraft: project?.workflowDraft ? { updatedAt: project.workflowDraft.updatedAt, aspectRatio: project.workflowDraft.aspectRatio, script: project.workflowDraft.script, selectedStyleImageId: project.workflowDraft.selectedStyleImageId, selectedCharacterIds: project.workflowDraft.selectedCharacterIds || [] } as any : null,
+  };
+}
+
+function createLightweightStudioState(state: StudioState): StudioState {
+  return {
+    ...state,
+    projects: Array.isArray(state.projects) ? state.projects.map(summarizeProject) : [],
+    characters: Array.isArray(state.characters) ? state.characters.map(stripBinaryPayloadFromCharacter) : [],
+    workflowDraft: createLightweightWorkflowDraft(state.workflowDraft),
+  };
+}
+
+function readStudioStateCacheFromLocalStorage(): StudioState | null {
+  if (typeof window === 'undefined') return null;
+  const cached = localStorage.getItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE);
+  if (!cached) return null;
   try {
-    const state = await requestJson<StudioState>('/api/local-storage/state');
-    localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE, JSON.stringify(state));
-    return state;
+    return JSON.parse(cached) as StudioState;
+  } catch {
+    return null;
+  }
+}
+
+export function getCachedStudioState(): StudioState | null {
+  if (studioStateMemoryCache) return studioStateMemoryCache;
+  const localCache = readStudioStateCacheFromLocalStorage();
+  if (localCache) {
+    studioStateMemoryCache = localCache;
+    return localCache;
+  }
+  return null;
+}
+
+function syncStudioStateToLocalCache(state: StudioState) {
+  studioStateMemoryCache = state;
+  if (typeof window === 'undefined') return;
+
+  const lightState = createLightweightStudioState(state);
+
+  try {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE, JSON.stringify(lightState));
   } catch (error) {
-    const cached = localStorage.getItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE);
-    if (cached) return JSON.parse(cached) as StudioState;
+    console.warn('[mp4Creater] lightweight studio cache write failed', error);
+    try {
+      const emergencyState: Partial<StudioState> = {
+        version: lightState.version,
+        storageDir: lightState.storageDir,
+        isStorageConfigured: lightState.isStorageConfigured,
+        configuredAt: lightState.configuredAt,
+        updatedAt: lightState.updatedAt,
+        selectedCharacterId: lightState.selectedCharacterId,
+        routing: lightState.routing,
+        providers: lightState.providers,
+        workflowDraft: lightState.workflowDraft,
+        lastContentType: lightState.lastContentType,
+        projects: Array.isArray(lightState.projects) ? lightState.projects.map(summarizeProject) : [],
+        characters: [],
+      };
+      localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE, JSON.stringify(emergencyState));
+    } catch {
+      localStorage.removeItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE);
+    }
+  }
+
+  if (state.isStorageConfigured && state.storageDir) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STORAGE_DIR, state.storageDir);
+  } else {
+    localStorage.removeItem(CONFIG.STORAGE_KEYS.STUDIO_STORAGE_DIR);
+  }
+  localStorage.setItem(CONFIG.STORAGE_KEYS.LAST_CONTENT_TYPE, state.lastContentType || 'story');
+
+  if (state.providers?.openRouterApiKey) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY, state.providers.openRouterApiKey);
+  } else {
+    localStorage.removeItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY);
+  }
+
+  if (state.providers?.elevenLabsApiKey) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY, state.providers.elevenLabsApiKey);
+  } else {
+    localStorage.removeItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY);
+  }
+
+  if (state.providers?.falApiKey) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.FAL_API_KEY, state.providers.falApiKey);
+  } else {
+    localStorage.removeItem(CONFIG.STORAGE_KEYS.FAL_API_KEY);
+  }
+
+  if (state.routing?.imageModel) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.IMAGE_MODEL, state.routing.imageModel);
+  }
+
+  if (state.routing?.audioModel) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_MODEL, state.routing.audioModel);
+  }
+
+  if (state.selectedCharacterId) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.SELECTED_CHARACTER_ID, state.selectedCharacterId);
+  } else {
+    localStorage.removeItem(CONFIG.STORAGE_KEYS.SELECTED_CHARACTER_ID);
+  }
+}
+
+function buildLeanStatePayload(partial: Partial<StudioState>, cachedState?: StudioState | null) {
+  const base = cachedState || createDefaultStudioState();
+  const payload: Partial<StudioState> = {
+    version: partial.version || base.version,
+    storageDir: typeof partial.storageDir === 'string' ? partial.storageDir : base.storageDir,
+    isStorageConfigured: typeof partial.isStorageConfigured === 'boolean' ? partial.isStorageConfigured : base.isStorageConfigured,
+    configuredAt: partial.configuredAt || base.configuredAt,
+    updatedAt: partial.updatedAt || Date.now(),
+    selectedCharacterId: Object.prototype.hasOwnProperty.call(partial, 'selectedCharacterId') ? partial.selectedCharacterId ?? null : base.selectedCharacterId,
+    characters: Array.isArray(partial.characters) ? partial.characters : base.characters,
+    routing: partial.routing ? { ...(base.routing || DEFAULT_ROUTING), ...partial.routing } : base.routing,
+    providers: partial.providers ? { ...(base.providers || {}), ...partial.providers } : base.providers,
+    workflowDraft: Object.prototype.hasOwnProperty.call(partial, 'workflowDraft') ? partial.workflowDraft ?? null : base.workflowDraft,
+    agentProfile: partial.agentProfile || base.agentProfile,
+    preferredPromptProfile: partial.preferredPromptProfile || base.preferredPromptProfile,
+    providerRegistry: Array.isArray(partial.providerRegistry) ? partial.providerRegistry : base.providerRegistry,
+    lastContentType: partial.lastContentType || base.lastContentType || 'story',
+  };
+
+  if (Array.isArray(partial.projects)) {
+    payload.projects = partial.projects;
+  }
+
+  if (Array.isArray((partial as any).projectIndex)) {
+    (payload as any).projectIndex = (partial as any).projectIndex;
+  }
+
+  return payload;
+}
+
+export async function fetchStudioState(options?: { force?: boolean; storageDir?: string }): Promise<StudioState> {
+  const cachedDir = options?.storageDir || getCachedStorageDir();
+  const cachedState = getCachedStudioState();
+
+  if (!options?.force && cachedState && (cachedState.storageDir || '') === cachedDir) {
+    return cachedState;
+  }
+
+  try {
+    const query = cachedDir ? `?storageDir=${encodeURIComponent(cachedDir)}` : '';
+    const state = await requestJson<StudioState>(`/api/local-storage/state${query}`);
+    syncStudioStateToLocalCache(state);
+    return state;
+  } catch {
+    if (cachedState) return cachedState;
     return createDefaultStudioState();
   }
+}
+
+export async function fetchStudioProjects(options?: { storageDir?: string }): Promise<SavedProject[]> {
+  const storageDir = options?.storageDir || getCachedStorageDir();
+  const query = new URLSearchParams();
+  if (storageDir) query.set('storageDir', storageDir);
+  query.set('includeProjects', '1');
+  const state = await requestJson<StudioState>(`/api/local-storage/state?${query.toString()}`);
+  return Array.isArray(state.projects) ? state.projects : [];
 }
 
 export async function configureStorage(storageDir: string): Promise<StudioState> {
@@ -72,28 +319,43 @@ export async function configureStorage(storageDir: string): Promise<StudioState>
     method: 'POST',
     body: JSON.stringify({ storageDir }),
   });
-  localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE, JSON.stringify(state));
-  localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STORAGE_DIR, state.storageDir);
+  syncStudioStateToLocalCache(state);
   return state;
 }
 
 export async function saveStudioState(partial: Partial<StudioState>): Promise<StudioState> {
+  const cachedState = getCachedStudioState();
+  const payload = buildLeanStatePayload(partial, cachedState);
+
   const state = await requestJson<StudioState>('/api/local-storage/state', {
     method: 'POST',
-    body: JSON.stringify(partial),
+    body: JSON.stringify(payload),
   });
-  localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE, JSON.stringify(state));
-  if (state.providers?.openRouterApiKey) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY, state.providers.openRouterApiKey);
-  }
-  if (state.selectedCharacterId) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.SELECTED_CHARACTER_ID, state.selectedCharacterId);
-  }
-  return state;
+
+  const nextMemoryState = cachedState
+    ? {
+        ...cachedState,
+        ...payload,
+        ...state,
+        projects: Array.isArray(partial.projects) ? partial.projects : (cachedState.projects || state.projects || []),
+      }
+    : state;
+
+  syncStudioStateToLocalCache(nextMemoryState as StudioState);
+  return nextMemoryState as StudioState;
 }
 
 export async function saveProjectsToStudio(projects: SavedProject[]): Promise<StudioState> {
-  return saveStudioState({ projects, updatedAt: Date.now() });
+  const cachedState = getCachedStudioState() || createDefaultStudioState();
+  if (!cachedState.isStorageConfigured || !cachedState.storageDir) {
+    throw new Error('저장 폴더가 아직 설정되지 않았습니다. 먼저 저장 폴더를 선택해 주세요.');
+  }
+  return saveStudioState({
+    storageDir: cachedState.storageDir,
+    isStorageConfigured: true,
+    projects,
+    updatedAt: Date.now(),
+  });
 }
 
 export async function importStudioState(file: File): Promise<StudioState> {

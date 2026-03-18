@@ -1,0 +1,21 @@
+{
+  "sceneNumber": 1,
+  "narration": "뉴스룸 스튜디오에서 앵커은 AI 서비스 변화 브리핑의 핵심을 먼저 짚으며, 이번 이슈가 왜 중요한지 정돈된 톤으로 정리한다.",
+  "visualPrompt": "News explainer storyboard illustration, clean visual hierarchy, credible composition. Scene 1. Show the main visual idea from this narration: 뉴스룸 스튜디오에서 앵커은 AI 서비스 변화 브리핑의 핵심을 먼저 짚으며, 이번 이슈가 왜 중요한지 정돈된 톤으로 정리한다. Clean composition, 9:16 vertical composition, strong subject focus, no watermark, no text overlay. Keep character appearance consistent across scenes.\n\n[SELECTED CHARACTER PROMPTS]\n- 앵커: 앵커 / 주인공 / 서사를 이끄는 중심 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 정돈된. Scene context: 뉴스룸 스튜디오에서 앵커은 AI 서비스 변화 브리핑의 핵심을 먼저 짚으며, 이번 이슈가 왜 중요한지 정돈된 톤으로 정리한다.\n\n이어지는 장면에서는 현재 상황과 배경이 차례로 설명되고, 엇갈리는 해석이 왜 논점이 되는지 시청자가 한 번에 이해할 수 있게 연결한다.\n\n중간 장면에서는 서로 다른 시각이나 데이터가 부딪히며 이슈\n\n[SELECTED STYLE PROMPT]\n네온 시티팝 스타일. Stylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only. Simple anime background, clean line art, soft cel shading, 9:16 vertical composition. Variation seed 21984.\nsimilar variant 2, keep the same art direction, color palette family, lighting rhythm, texture density, mood, and composition language. Only make a near-match visual alternative, highly similar result\n\n[STYLE LABEL] 네온 시티팝 유사안 2\n\n[SCENE RULE] Scene 1 must keep the selected character feeling and selected style prompt consistently.",
+  "targetDuration": 6.6,
+  "audioDuration": null,
+  "videoDuration": null,
+  "status": "completed",
+  "aspectRatio": "9:16",
+  "sourceMode": "sample",
+  "subtitleData": null,
+  "analysis": {
+    "composition_type": "MICRO",
+    "sentiment": "NEUTRAL"
+  },
+  "files": {
+    "imagePath": "images/scene-001-main.jpg",
+    "audioPath": null,
+    "videoPath": null
+  }
+}

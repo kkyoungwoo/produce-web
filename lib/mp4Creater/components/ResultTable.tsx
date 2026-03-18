@@ -1,300 +1,693 @@
+'use client';
 
-import React, { useRef, useState, useEffect, memo } from 'react';
-import { GeneratedAsset } from '../types';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AssetHistoryItem, BackgroundMusicTrack, CostBreakdown, GeneratedAsset, PreviewMixSettings } from '../types';
+import { getAspectRatioClass } from '../utils/aspectRatio';
+import { handleHorizontalWheel, scrollContainerBy, scrollElementIntoView } from '../utils/horizontalScroll';
+import { exportAssetsToZip } from '../services/exportService';
 import { downloadProjectZip } from '../utils/csvHelper';
 import { downloadSrt } from '../services/srtService';
-import { exportAssetsToZip } from '../services/exportService';
+import HelpTip from './HelpTip';
+import JSZip from 'jszip';
+import * as FileSaver from 'file-saver';
 
 interface ResultTableProps {
   data: GeneratedAsset[];
   onRegenerateImage?: (index: number) => void;
-  onUpgradeImage?: (index: number) => void;
+  onRegenerateAudio?: (index: number) => void;
   onExportVideo?: (enableSubtitles: boolean) => void;
-  onGenerateAnimation?: (index: number) => void;  // 영상 변환 콜백
+  onGenerateAnimation?: (index: number) => void;
+  onNarrationChange?: (index: number, narration: string) => void;
+  onDurationChange?: (index: number, duration: number) => void;
+  onOpenSettings?: () => void;
+  onRequestProviderSetup?: (kind: 'text' | 'audio' | 'video') => void;
   isExporting?: boolean;
-  animatingIndices?: Set<number>;  // 현재 영상 변환 중인 인덱스들
+  animatingIndices?: Set<number>;
+  backgroundMusicTracks?: BackgroundMusicTrack[];
+  previewMix?: PreviewMixSettings;
+  onPreviewMixChange?: (mix: PreviewMixSettings) => void;
+  onSelectBackgroundTrack?: (trackId: string) => void;
+  activeBackgroundTrackId?: string | null;
+  onCreateBackgroundTrack?: () => void;
+  currentTopic?: string;
+  totalCost?: CostBreakdown;
+  isGenerating?: boolean;
+  progressMessage?: string;
+  finalVideoUrl?: string | null;
+  finalVideoTitle?: string;
+  onGenerateThumbnail?: () => void | Promise<void>;
+  isThumbnailGenerating?: boolean;
+  onGenerateAllImages?: () => void | Promise<void>;
+  onGenerateAllVideos?: () => void | Promise<void>;
+  isGeneratingAllVideos?: boolean;
 }
 
-// 오디오 디코딩 함수 (컴포넌트 외부로 이동하여 재생성 방지)
-async function decodeAudio(base64: string, ctx: AudioContext): Promise<AudioBuffer> {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
 
-  try {
-    return await ctx.decodeAudioData(bytes.buffer.slice(0));
-  } catch (e) {
-    const dataInt16 = new Int16Array(bytes.buffer);
-    const frameCount = dataInt16.length;
-    const buffer = ctx.createBuffer(1, frameCount, 24000);
-    const channelData = buffer.getChannelData(0);
-    for (let i = 0; i < frameCount; i++) {
-      channelData[i] = dataInt16[i] / 32768.0;
+const formatSeconds = (value?: number | null) => (typeof value === 'number' ? `${value.toFixed(1)}초` : '-');
+
+const resolveImageSrc = (value?: string | null) => {
+  if (!value) return '/mp4Creater/flow-character.svg';
+  if (value.startsWith('data:') || value.startsWith('/') || value.startsWith('http')) return value;
+  return `data:image/png;base64,${value}`;
+};
+
+const resolveNarrationAudioSrc = (value?: string | null) => {
+  if (!value) return '';
+  return value.startsWith('data:') ? value : `data:audio/mpeg;base64,${value}`;
+};
+
+const resolveBackgroundAudioSrc = (value?: string | null) => {
+  if (!value) return '';
+  return value.startsWith('data:') ? value : `data:audio/wav;base64,${value}`;
+};
+
+const resolveVideoSrc = (value?: string | null) => {
+  if (!value) return '';
+  if (value.startsWith('data:') || value.startsWith('blob:') || value.startsWith('http')) return value;
+  return value;
+};
+
+function collectMediaHistory(row: GeneratedAsset, kind: 'image' | 'video'): AssetHistoryItem[] {
+  const currentData = kind === 'image' ? row.imageData : row.videoData;
+  const current: AssetHistoryItem[] = currentData ? [{
+    id: `${kind}_current_${row.sceneNumber}`,
+    kind,
+    data: currentData,
+    sourceMode: row.sourceMode === 'ai' ? 'ai' : 'sample',
+    createdAt: Date.now(),
+    label: kind === 'image' ? '현재 사용 중 이미지' : '현재 사용 중 영상',
+  }] : [];
+  const history = (kind === 'image' ? row.imageHistory : row.videoHistory) || [];
+  const deduped: AssetHistoryItem[] = [];
+  const seen = new Set<string>();
+  [...current, ...history].forEach((item) => {
+    if (!item?.data || seen.has(item.data)) return;
+    seen.add(item.data);
+    deduped.push(item);
+  });
+  return deduped;
+}
+
+function dataUrlToParts(value: string, fallbackMime: string) {
+  if (!value.startsWith('data:')) return null;
+  const [meta, data] = value.split(',', 2);
+  const mime = meta.match(/data:(.*?);base64/)?.[1] || fallbackMime;
+  return { mime, data };
+}
+
+async function downloadScenePackage(row: GeneratedAsset) {
+  const zip = new JSZip();
+  const sceneNo = String(row.sceneNumber).padStart(3, '0');
+  zip.file(`scene_${sceneNo}_narration.txt`, row.narration || '');
+  zip.file(`scene_${sceneNo}_visual_prompt.txt`, row.visualPrompt || '');
+
+  if (row.imageData) {
+    const imageParts = dataUrlToParts(resolveImageSrc(row.imageData), 'image/png');
+    if (imageParts) {
+      const imageExt = imageParts.mime.includes('svg') ? 'svg' : imageParts.mime.includes('jpeg') ? 'jpg' : 'png';
+      zip.file(`scene_${sceneNo}_image.${imageExt}`, imageParts.data, { base64: true });
     }
-    return buffer;
   }
+
+  if (row.audioData) {
+    const audioParts = dataUrlToParts(resolveNarrationAudioSrc(row.audioData), 'audio/mpeg');
+    if (audioParts) {
+      const audioExt = audioParts.mime.includes('wav') ? 'wav' : 'mp3';
+      zip.file(`scene_${sceneNo}_audio.${audioExt}`, audioParts.data, { base64: true });
+    }
+  }
+
+  if (row.subtitleData?.fullText) {
+    zip.file(`scene_${sceneNo}_subtitle.txt`, row.subtitleData.fullText);
+  }
+
+  if (row.videoData) {
+    if (row.videoData.startsWith('data:')) {
+      const videoParts = dataUrlToParts(row.videoData, 'video/mp4');
+      if (videoParts) {
+        zip.file(`scene_${sceneNo}_video.mp4`, videoParts.data, { base64: true });
+      }
+    } else {
+      zip.file(`scene_${sceneNo}_video_link.txt`, row.videoData);
+    }
+  }
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  saveAs(blob, `scene_${sceneNo}_package.zip`);
 }
 
-// 이미지 Lazy Loading 컴포넌트 (Intersection Observer 사용)
-const LazyImage: React.FC<{
-  src: string;
-  alt: string;
-  className?: string;
-}> = memo(({ src, alt, className }) => {
-  const imgRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
-  const [isLoaded, setIsLoaded] = useState(false);
+const ResultTable: React.FC<ResultTableProps> = ({
+  data,
+  onRegenerateImage,
+  onRegenerateAudio,
+  onExportVideo,
+  onGenerateAnimation,
+  onNarrationChange,
+  onDurationChange,
+  onOpenSettings,
+  onRequestProviderSetup,
+  isExporting,
+  animatingIndices,
+  backgroundMusicTracks = [],
+  previewMix,
+  onPreviewMixChange,
+  onSelectBackgroundTrack,
+  activeBackgroundTrackId,
+  onCreateBackgroundTrack,
+  currentTopic,
+  totalCost,
+  isGenerating,
+  progressMessage,
+  finalVideoUrl,
+  finalVideoTitle,
+  onGenerateThumbnail,
+  isThumbnailGenerating,
+  onGenerateAllImages,
+  onGenerateAllVideos,
+  isGeneratingAllVideos,
+}) => {
+  const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [finalOutputMode, setFinalOutputMode] = useState<'video' | 'image'>('video');
+  const [imageLightbox, setImageLightbox] = useState<{ src: string; title: string; aspectRatio?: GeneratedAsset['aspectRatio'] } | null>(null);
+  const [mediaViewer, setMediaViewer] = useState<{ kind: 'image' | 'video'; sceneNumber: number; entries: AssetHistoryItem[]; currentIndex: number; aspectRatio?: GeneratedAsset['aspectRatio'] } | null>(null);
+  const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
+  const bgmStripRef = useRef<HTMLDivElement | null>(null);
+
+  const summary = useMemo(() => {
+    const imageCount = data.filter((item) => item.imageData).length;
+    const audioCount = data.filter((item) => item.audioData).length;
+    const videoCount = data.filter((item) => item.videoData).length;
+    return { imageCount, audioCount, videoCount };
+  }, [data]);
+
+  const totalDuration = useMemo(() => data.reduce((sum, item) => sum + (item.targetDuration || item.audioDuration || 0), 0), [data]);
+
+  const mainBgm = useMemo(() => {
+    if (!backgroundMusicTracks.length) return null;
+    return backgroundMusicTracks.find((item) => item.id === activeBackgroundTrackId) || backgroundMusicTracks[0];
+  }, [backgroundMusicTracks, activeBackgroundTrackId]);
+
+  const togglePanel = (key: string) => {
+    setOpenPanels((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '100px' } // 100px 전에 미리 로드
+    const container = bgmStripRef.current;
+    if (!container || !mainBgm?.id) return;
+    const target = container.querySelector<HTMLElement>(`[data-bgm-card-id="${mainBgm.id}"]`);
+    if (target) scrollElementIntoView(target);
+  }, [mainBgm?.id, backgroundMusicTracks.length]);
+
+  if (!data.length) {
+    return (
+      <div className="mx-auto w-full px-0 pb-16">
+        <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="text-4xl">🎬</div>
+          <h3 className="mt-4 text-xl font-black text-slate-900">씬 생성 전입니다</h3>
+          <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+            캐릭터와 화풍을 정리한 뒤 씬이 생성되면 여기서는 편집과 재생성만 다루고, 실제 결과 확인은 미리보기 팝업에서 먼저 볼 수 있습니다.
+          </p>
+        </div>
+      </div>
     );
-
-    if (imgRef.current) {
-      observer.observe(imgRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
+  }
 
   return (
-    <div ref={imgRef} className="w-full h-full">
-      {isVisible ? (
-        <img
-          src={src}
-          alt={alt}
-          className={`${className} ${isLoaded ? 'opacity-100' : 'opacity-0'} transition-opacity duration-300`}
-          onLoad={() => setIsLoaded(true)}
-          loading="lazy"
-        />
-      ) : (
-        <div className="w-full h-full bg-slate-800 animate-pulse" />
+    <div className="mx-auto w-full px-0 pb-20">
+      <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">씬 작업 도구</div>
+            <h2 className="mt-2 text-2xl font-black text-slate-900">{currentTopic || '프로젝트'} 씬 카드</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">페이지에서는 장면 편집과 재생성에 집중하고, 최종 확인은 결과 미리보기 팝업에서 먼저 검토하도록 정리했습니다.</p>
+          </div>
+          <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+            <span className="rounded-full bg-slate-100 px-3 py-2">씬 {data.length}개</span>
+            <span className="rounded-full bg-slate-100 px-3 py-2">이미지 {summary.imageCount}개</span>
+            <span className="rounded-full bg-slate-100 px-3 py-2">오디오 {summary.audioCount}개</span>
+            <span className="rounded-full bg-slate-100 px-3 py-2">영상 {summary.videoCount}개</span>
+            {mainBgm && <span className="rounded-full bg-violet-50 px-3 py-2 text-violet-700">배경음 {backgroundMusicTracks.length}트랙</span>}
+            <span className={`rounded-full px-3 py-2 ${finalOutputMode === 'video' ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700'}`}>최종 출력 {finalOutputMode === 'video' ? '영상' : '이미지'}</span>
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">최종 출력 선택</div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">마지막 단계에서 이미지 패키지로 받을지, 합쳐진 영상으로 볼지 선택한 뒤 바로 내보낼 수 있습니다.</p>
+            </div>
+            <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
+              <button type="button" onClick={() => setFinalOutputMode('video')} className={`rounded-2xl px-4 py-2 text-sm font-black transition-colors ${finalOutputMode === 'video' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>영상으로 보기</button>
+              <button type="button" onClick={() => setFinalOutputMode('image')} className={`rounded-2xl px-4 py-2 text-sm font-black transition-colors ${finalOutputMode === 'image' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'}`}>이미지로 받기</button>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button onClick={() => setPreviewOpen(true)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white hover:bg-slate-800">
+              결과 미리보기
+            </button>
+            {onGenerateAllImages && (
+              <button onClick={() => void onGenerateAllImages?.()} disabled={isGenerating} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">
+                {isGenerating ? '전체 생성 중...' : '모든 씬 다시 생성'}
+              </button>
+            )}
+            {onGenerateAllVideos && (
+              <button onClick={() => void onGenerateAllVideos?.()} disabled={Boolean(isGeneratingAllVideos) || isGenerating} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">
+                {isGeneratingAllVideos ? '모든 영상 생성 중...' : '모든 씬 영상 생성'}
+              </button>
+            )}
+            <button onClick={() => exportAssetsToZip(data, 'mp4Creater_storyboard')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              스토리보드 XLSX
+            </button>
+            <button onClick={() => downloadProjectZip(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              CSV / ZIP
+            </button>
+            <button onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              SRT 저장
+            </button>
+            {finalOutputMode === 'image' && (
+              <button onClick={() => exportAssetsToZip(data, 'mp4Creater_image_storyboard')} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-500">
+                이미지 패키지 ZIP
+              </button>
+            )}
+            {onExportVideo && finalOutputMode === 'video' && (
+              <>
+                <button onClick={() => onExportVideo?.(true)} disabled={isExporting} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">
+                  {isExporting ? '렌더링 중...' : 'MP4 내보내기 (자막 O)'}
+                </button>
+                <button onClick={() => onExportVideo?.(false)} disabled={isExporting} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">
+                  MP4 내보내기 (자막 X)
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {(isGenerating || progressMessage) && (
+          <div className={`mt-4 flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm ${isGenerating ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+            {isGenerating ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />}
+            <span className="font-bold">{progressMessage || '씬 상태를 준비했습니다.'}</span>
+          </div>
+        )}
+
+        {totalCost && (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
+            이미지 {totalCost.imageCount}장 · TTS {totalCost.ttsCharacters}자 · 영상 {totalCost.videoCount}개
+          </div>
+        )}
+      </div>
+
+      {finalVideoUrl && finalOutputMode === 'video' && (
+        <div className="mt-6 overflow-hidden rounded-[28px] border border-emerald-200 bg-white shadow-sm">
+          <div className="border-b border-emerald-100 bg-emerald-50/70 px-5 py-4">
+            <div className="text-xs font-black uppercase tracking-[0.24em] text-emerald-600">최종 출력 결과</div>
+            <h3 className="mt-2 text-xl font-black text-slate-900">{finalVideoTitle || '합쳐진 최종 영상'}</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">렌더링이 끝난 합쳐진 영상을 바로 확인할 수 있습니다. 아래 플레이어는 현재 브라우저 세션 결과를 보여줍니다.</p>
+          </div>
+          <div className="p-5">
+            <video controls className="w-full rounded-[24px] border border-slate-200 bg-slate-950">
+              <source src={finalVideoUrl} type="video/mp4" />
+            </video>
+          </div>
+        </div>
       )}
-    </div>
-  );
-});
 
-LazyImage.displayName = 'LazyImage';
-
-// 오디오 플레이어 메모이제이션 (props가 같으면 리렌더 방지)
-const AudioPlayer: React.FC<{ base64: string }> = memo(({ base64 }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
-
-  const stopAudio = () => {
-    if (sourceRef.current) { try { sourceRef.current.stop(); } catch (e) {} sourceRef.current = null; }
-    setIsPlaying(false);
-  };
-
-  const playAudio = async () => {
-    if (isPlaying) { stopAudio(); return; }
-    try {
-      setIsPlaying(true);
-      if (!audioContextRef.current) {
-        const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-        audioContextRef.current = new AudioContextClass();
-      }
-      const ctx = audioContextRef.current;
-      if (ctx.state === 'suspended') await ctx.resume();
-      
-      const audioBuffer = await decodeAudio(base64, ctx);
-      const source = ctx.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(ctx.destination);
-      source.onended = () => setIsPlaying(false);
-      source.start();
-      sourceRef.current = source;
-    } catch (error) { console.error(error); setIsPlaying(false); }
-  };
-
-  return (
-    <button onClick={playAudio} className={`p-2.5 rounded-full border transition-all ${isPlaying ? 'bg-brand-600 border-brand-500 text-white animate-pulse' : 'bg-slate-800 border-slate-700 text-slate-400 hover:text-white'}`}>
-      {isPlaying ? <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg> : <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
-    </button>
-  );
-});
-
-AudioPlayer.displayName = 'AudioPlayer';
-
-// 테이블 행 컴포넌트 (개별 행 메모이제이션으로 리렌더 최소화)
-interface TableRowProps {
-  row: GeneratedAsset;
-  index: number;
-  isAnimating: boolean;
-  onRegenerateImage?: (index: number) => void;
-  onGenerateAnimation?: (index: number) => void;
-}
-
-const TableRow: React.FC<TableRowProps> = memo(({ row, index, isAnimating, onRegenerateImage, onGenerateAnimation }) => {
-  return (
-    <tr className="group hover:bg-slate-800/20 transition-colors">
-      <td className="py-5 px-6 align-top font-mono text-slate-600 text-[10px]">#{row.sceneNumber.toString().padStart(2, '0')}</td>
-      <td className="py-5 px-6 align-top">
-        <div className="space-y-3">
-          <p className="text-slate-200 text-[11px] leading-relaxed font-medium tracking-tight">{row.narration}</p>
-          {row.analysis?.composition_type && (
-            <div className="flex flex-wrap gap-1">
-              <span className={`text-[7px] font-black px-1.5 py-0.5 rounded border uppercase ${
-                row.analysis.composition_type === 'MACRO' ? 'text-brand-400 bg-brand-400/5 border-brand-400/20' :
-                row.analysis.composition_type === 'STANDARD' ? 'text-emerald-400 bg-emerald-400/5 border-emerald-400/20' :
-                'text-amber-400 bg-amber-400/5 border-amber-400/20'
-              }`}>{row.analysis.composition_type}</span>
-              {row.analysis.sentiment && (
-                <span className={`text-[7px] font-black px-1.5 py-0.5 rounded border uppercase ${
-                  row.analysis.sentiment === 'POSITIVE' ? 'text-green-400 bg-green-400/5 border-green-400/20' :
-                  row.analysis.sentiment === 'NEGATIVE' ? 'text-red-400 bg-red-400/5 border-red-400/20' :
-                  'text-slate-400 bg-slate-400/5 border-slate-400/20'
-                }`}>{row.analysis.sentiment}</span>
+      {(mainBgm || onPreviewMixChange) && (
+        <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-black uppercase tracking-[0.24em] text-violet-600">최종 미리보기 사운드</div>
+              <h3 className="mt-2 text-xl font-black text-slate-900">나레이션 / 배경음 밸런스</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">배경음은 컷과 별도로 전체 영상에 깔리고, 여러 트랙을 새로 만들어 비교한 뒤 하나를 선택해 렌더링할 수 있습니다.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {onCreateBackgroundTrack && (
+                <button type="button" onClick={onCreateBackgroundTrack} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                  새 배경음 생성
+                </button>
               )}
+              <HelpTip title="배경음 적용 방식" compact>
+                배경음은 컷마다 붙는 오디오가 아니라 전체 타임라인용 보조 트랙입니다. 렌더링할 때 장면 오디오 아래에 따로 섞입니다.
+              </HelpTip>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3 text-sm font-black text-slate-900">
+                <span>나레이션 볼륨</span>
+                <span>{Math.round((previewMix?.narrationVolume || 1) * 100)}%</span>
+              </div>
+              <input type="range" min="0" max="1.6" step="0.05" value={previewMix?.narrationVolume || 1} onChange={(e) => onPreviewMixChange?.({ ...(previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 }), narrationVolume: Number(e.target.value) })} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="flex items-center justify-between gap-3 text-sm font-black text-slate-900">
+                <span>배경음 볼륨</span>
+                <span>{Math.round((previewMix?.backgroundMusicVolume || mainBgm?.volume || 0.28) * 100)}%</span>
+              </div>
+              <input type="range" min="0" max="1" step="0.02" value={previewMix?.backgroundMusicVolume || mainBgm?.volume || 0.28} onChange={(e) => onPreviewMixChange?.({ ...(previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 }), backgroundMusicVolume: Number(e.target.value) })} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-violet-600" />
+            </div>
+          </div>
+
+          {backgroundMusicTracks.length > 0 && (
+            <div className="mt-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="text-xs font-bold text-slate-500">새 배경음이 생기면 자동 선택되고, 카드 줄도 그 위치까지 부드럽게 이동합니다.</div>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => scrollContainerBy(bgmStripRef.current, 'left', 360)} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">←</button>
+                  <button type="button" onClick={() => scrollContainerBy(bgmStripRef.current, 'right', 360)} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">→</button>
+                </div>
+              </div>
+              <div ref={bgmStripRef} onWheel={(event) => handleHorizontalWheel(event, 0.9)} className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {backgroundMusicTracks.map((track) => {
+                  const active = track.id === (mainBgm?.id || '');
+                  return (
+                    <div key={track.id} data-bgm-card-id={track.id} className={`w-[min(82vw,340px)] shrink-0 rounded-2xl border p-4 transition-all duration-300 ${active ? 'border-violet-300 bg-violet-50/60' : 'border-slate-200 bg-slate-50'}`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-black text-slate-900">{track.title}</div>
+                          <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-500">{track.prompt}</p>
+                        </div>
+                        <button type="button" onClick={() => onSelectBackgroundTrack?.(track.id)} className={`rounded-xl px-3 py-2 text-xs font-black ${active ? 'bg-violet-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
+                          {active ? '선택됨' : '이 트랙 사용'}
+                        </button>
+                      </div>
+                      {active && (
+                        <div className="mt-3">
+                          <button type="button" onClick={() => {
+                            if (!bgmAudioRef.current) return;
+                            if (bgmAudioRef.current.paused) {
+                              bgmAudioRef.current.volume = previewMix?.backgroundMusicVolume || track.volume || 0.28;
+                              bgmAudioRef.current.play();
+                            } else {
+                              bgmAudioRef.current.pause();
+                            }
+                          }} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-white">
+                            배경음 미리듣기
+                          </button>
+                          <audio ref={bgmAudioRef} controls className="mt-3 w-full">
+                            <source src={resolveBackgroundAudioSrc(track.audioData)} type="audio/wav" />
+                          </audio>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
-      </td>
-      <td className="py-5 px-6 align-top">
-        <div className="bg-slate-950/30 rounded-lg p-3 border border-slate-800/50 text-[9px] text-slate-600 font-mono leading-tight whitespace-pre-wrap">
-          {row.visualPrompt}
-        </div>
-      </td>
-      <td className="py-5 px-6 align-top">
-        <div className="relative aspect-video w-48 mx-auto rounded-xl overflow-hidden bg-slate-950 border border-slate-800 shadow-inner group/img">
-          {row.status === 'generating' ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-              <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent animate-spin rounded-full"></div>
-              <span className="text-[7px] text-brand-500 font-black uppercase tracking-widest">렌더링 중</span>
-            </div>
-          ) : isAnimating ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-cyan-950/30">
-              <div className="w-5 h-5 border-2 border-cyan-500 border-t-transparent animate-spin rounded-full"></div>
-              <span className="text-[7px] text-cyan-400 font-black uppercase tracking-widest">영상 변환 중</span>
-            </div>
-          ) : row.status === 'error' ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-red-950/30 border-2 border-dashed border-red-800/50 m-2 rounded-lg">
-              <svg className="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-              <span className="text-[8px] text-red-400 font-black uppercase">생성 실패</span>
-              <button
-                onClick={() => onRegenerateImage?.(index)}
-                className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1.5 shadow-lg"
-              >
-                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                다시 생성
-              </button>
-            </div>
-          ) : row.videoData ? (
-            <>
-              <video src={row.videoData} className="w-full h-full object-cover" autoPlay loop muted playsInline />
-              <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded bg-cyan-500/80 text-[6px] font-black text-white uppercase">영상</div>
-              <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center gap-1.5">
-                <button onClick={() => onRegenerateImage?.(index)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all" title="이미지 재생성">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                </button>
-                <button onClick={() => onGenerateAnimation?.(index)} className="p-2 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/40 border border-cyan-500/30 text-cyan-400 transition-all" title="영상 재생성">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </button>
+      )}
+
+      <div className="mt-6 space-y-5">
+        {data.map((row, index) => {
+          const imageSrc = resolveImageSrc(row.imageData);
+          const audioSrc = resolveNarrationAudioSrc(row.audioData);
+          const isAnimating = animatingIndices?.has(index) || false;
+          const imageHistoryEntries = collectMediaHistory(row, 'image');
+          const videoHistoryEntries = collectMediaHistory(row, 'video');
+
+          return (
+            <div key={`${row.sceneNumber}-${index}`} className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-200 px-5 py-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">씬 {row.sceneNumber}</span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">컷 길이 {formatSeconds(row.targetDuration)}</span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">오디오 {formatSeconds(row.audioDuration)}</span>
+                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">비율 {row.aspectRatio || '16:9'}</span>
+                  </div>
+                  <HelpTip title="씬 카드 사용법" compact>
+                    카드 본문은 단순하게 유지하고, 컷 길이 조절, 오디오 미리듣기, 비주얼 프롬프트는 버튼으로 펼쳐서 쓰도록 구성했습니다.
+                  </HelpTip>
+                </div>
               </div>
-            </>
-          ) : row.imageData ? (
-            <>
-              <LazyImage
-                src={`data:image/jpeg;base64,${row.imageData}`}
-                alt="Scene"
-                className="w-full h-full object-cover transition-transform group-hover/img:scale-105"
-              />
-              <div className="absolute inset-0 bg-slate-950/80 opacity-0 group-hover/img:opacity-100 transition-all flex items-center justify-center gap-1.5">
-                <button onClick={() => onRegenerateImage?.(index)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all" title="이미지 재생성">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                </button>
-                <button onClick={() => onGenerateAnimation?.(index)} className="p-2 rounded-lg bg-cyan-500/20 hover:bg-cyan-500/40 border border-cyan-500/30 text-cyan-400 transition-all" title="영상 변환">
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                </button>
+
+              <div className="grid gap-5 p-5 xl:grid-cols-[0.78fr_1.22fr]">
+                <div className="space-y-4">
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                    <button type="button" onClick={() => setImageLightbox({ src: imageSrc, title: `씬 ${row.sceneNumber}`, aspectRatio: row.aspectRatio })} className="block w-full text-left"><img src={imageSrc} alt={`씬 ${row.sceneNumber}`} className={`${getAspectRatioClass(row.aspectRatio || '16:9')} w-full object-cover transition-transform duration-300 hover:scale-[1.01]`} /></button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button type="button" onClick={() => setMediaViewer({ kind: 'image', sceneNumber: row.sceneNumber, entries: imageHistoryEntries, currentIndex: 0, aspectRatio: row.aspectRatio })} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                      이미지 보기 {imageHistoryEntries.length > 1 ? `(${imageHistoryEntries.length})` : ''}
+                    </button>
+                    <button type="button" disabled={!videoHistoryEntries.length} onClick={() => videoHistoryEntries.length && setMediaViewer({ kind: 'video', sceneNumber: row.sceneNumber, entries: videoHistoryEntries, currentIndex: 0, aspectRatio: row.aspectRatio })} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
+                      영상 보기 {videoHistoryEntries.length > 1 ? `(${videoHistoryEntries.length})` : ''}
+                    </button>
+                    {onRegenerateImage && (
+                      <button type="button" onClick={() => onRegenerateImage?.(index)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                        이미지 다시 만들기
+                      </button>
+                    )}
+                    {onGenerateAnimation && (
+                      <button type="button" onClick={() => onGenerateAnimation?.(index)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                        {isAnimating ? '영상 변환 중...' : '이 씬만 영상화'}
+                      </button>
+                    )}
+                    <button type="button" onClick={() => void downloadScenePackage(row)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+                      이 문단 다운로드
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <div className="text-sm font-black text-slate-900">나레이션 / 대본 문단</div>
+                      {onRegenerateAudio && (
+                        <button type="button" onClick={() => onRegenerateAudio?.(index)} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-white">
+                          오디오 다시 생성
+                        </button>
+                      )}
+                    </div>
+                    <textarea value={row.narration} onChange={(e) => onNarrationChange?.(index, e.target.value)} className="min-h-[160px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-7 text-slate-900 outline-none focus:border-blue-400" />
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-3">
+                    <button type="button" onClick={() => togglePanel(`duration-${index}`)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">컷 길이 조절</button>
+                    <button type="button" onClick={() => togglePanel(`audio-${index}`)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">오디오 미리듣기</button>
+                    <button type="button" onClick={() => togglePanel(`prompt-${index}`)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">비주얼 프롬프트</button>
+                  </div>
+
+                  {openPanels[`duration-${index}`] && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-black text-slate-900">컷 길이 조절</div>
+                        <div className="text-xs font-bold text-slate-500">현재 {formatSeconds(row.targetDuration)}</div>
+                      </div>
+                      <input type="range" min="3" max="14" step="0.5" value={row.targetDuration || 5} onChange={(e) => onDurationChange?.(index, Number(e.target.value))} className="mt-4 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
+                    </div>
+                  )}
+
+                  {openPanels[`audio-${index}`] && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-black text-slate-900">오디오 미리듣기</div>
+                        {!row.audioData && (
+                          <button type="button" onClick={() => onRequestProviderSetup?.('audio') || onOpenSettings?.()} className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-700 hover:bg-white">
+                            API 키 연결
+                          </button>
+                        )}
+                      </div>
+                      {row.audioData ? (
+                        <audio controls className="mt-3 w-full">
+                          <source src={audioSrc} type="audio/mpeg" />
+                        </audio>
+                      ) : (
+                        <p className="mt-3 text-sm leading-6 text-slate-500">오디오 API가 없거나 아직 생성되지 않았습니다. 설정에서 키를 넣고 이 씬만 다시 생성할 수 있습니다.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {openPanels[`prompt-${index}`] && (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-sm font-black text-slate-900">비주얼 프롬프트</div>
+                      <p className="mt-3 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{row.visualPrompt}</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </>
-          ) : <div className="absolute inset-0 flex items-center justify-center border-2 border-dashed border-slate-800 m-2 rounded-lg"><span className="text-[7px] text-slate-700 font-black uppercase">대기 중</span></div>}
-        </div>
-      </td>
-      <td className="py-5 px-6 align-top text-center">
-        {row.audioData ? <div className="flex justify-center"><AudioPlayer base64={row.audioData} /></div> : <div className="flex flex-col items-center gap-1.5 opacity-30"><div className="w-2.5 h-2.5 border-2 border-slate-700 border-t-slate-500 animate-spin rounded-full"></div><span className="text-[6px] text-slate-600 font-black uppercase">VO</span></div>}
-      </td>
-    </tr>
-  );
-});
+            </div>
+          );
+        })}
+      </div>
 
-TableRow.displayName = 'TableRow';
 
-const ResultTable: React.FC<ResultTableProps> = ({ data, onRegenerateImage, onExportVideo, onGenerateAnimation, isExporting, animatingIndices }) => {
-  if (data.length === 0) return null;
 
-  return (
-    <div className="w-full max-w-[98%] mx-auto pb-32 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center justify-between mb-6 bg-slate-900/90 backdrop-blur-md p-5 rounded-3xl border border-slate-800">
-        <div className="flex items-center gap-4">
-          <div className="w-1 h-10 bg-brand-500 rounded-full"></div>
-          <div>
-            <h2 className="text-xl font-black text-white tracking-tight">졸라맨 V10.0 마스터 스토리보드</h2>
-            <p className="text-slate-500 text-[9px] font-bold uppercase tracking-widest">Ultra-Detail Identity Sync Active</p>
+      {mediaViewer && (
+        <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/75 p-4" onClick={() => setMediaViewer(null)}>
+          <div className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">{mediaViewer.kind === 'image' ? '이미지 보기' : '영상 보기'}</div>
+                <div className="mt-1 text-lg font-black text-slate-900">씬 {mediaViewer.sceneNumber} 생성 이력</div>
+              </div>
+              <button type="button" onClick={() => setMediaViewer(null)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
+            </div>
+            <div className="grid flex-1 gap-0 lg:grid-cols-[1.18fr_0.82fr]">
+              <div className="flex items-center justify-center bg-slate-950 p-4">
+                {mediaViewer.kind === 'image' ? (
+                  <img src={resolveImageSrc(mediaViewer.entries[mediaViewer.currentIndex]?.data)} alt={`씬 ${mediaViewer.sceneNumber} 이미지`} className={`${getAspectRatioClass(mediaViewer.aspectRatio || '16:9')} max-h-[72vh] max-w-full rounded-[24px] object-contain`} />
+                ) : (
+                  <video controls className="max-h-[72vh] w-full rounded-[24px] border border-slate-800 bg-black">
+                    <source src={resolveVideoSrc(mediaViewer.entries[mediaViewer.currentIndex]?.data)} type="video/mp4" />
+                  </video>
+                )}
+              </div>
+              <div className="overflow-y-auto border-t border-slate-200 bg-slate-50 p-4 lg:border-l lg:border-t-0">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="text-sm font-black text-slate-900">생성본 {mediaViewer.currentIndex + 1}/{mediaViewer.entries.length}</div>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => setMediaViewer((prev) => prev ? { ...prev, currentIndex: Math.max(0, prev.currentIndex - 1) } : prev)} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">←</button>
+                    <button type="button" onClick={() => setMediaViewer((prev) => prev ? { ...prev, currentIndex: Math.min(prev.entries.length - 1, prev.currentIndex + 1) } : prev)} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">→</button>
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  {mediaViewer.entries.map((entry, entryIndex) => {
+                    const active = entryIndex === mediaViewer.currentIndex;
+                    return (
+                      <button key={entry.id} type="button" onClick={() => setMediaViewer((prev) => prev ? { ...prev, currentIndex: entryIndex } : prev)} className={`w-full rounded-2xl border p-3 text-left transition ${active ? 'border-blue-300 bg-blue-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}>
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-black text-slate-900">{entry.label || `${mediaViewer.kind === 'image' ? '이미지' : '영상'} ${entryIndex + 1}`}</div>
+                            <div className="mt-1 text-xs text-slate-500">{new Date(entry.createdAt).toLocaleString('ko-KR')} · {entry.sourceMode === 'ai' ? 'AI 결과' : '샘플 / 대체본'}</div>
+                          </div>
+                          <span className={`rounded-full px-3 py-1 text-[11px] font-black ${active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{active ? '보는 중' : `#${entryIndex + 1}`}</span>
+                        </div>
+                        {mediaViewer.kind === 'image' ? (
+                          <img src={resolveImageSrc(entry.data)} alt="이력 썸네일" className={`${getAspectRatioClass(mediaViewer.aspectRatio || '16:9')} mt-3 w-full rounded-xl object-cover`} />
+                        ) : (
+                          <div className="mt-3 rounded-xl border border-slate-200 bg-slate-900/95 p-3 text-xs font-bold text-slate-200">영상 생성본은 왼쪽 플레이어에서 바로 재생됩니다.</div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div className="flex gap-2">
-            <button onClick={() => downloadProjectZip(data)} className="px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 font-bold text-[10px] hover:bg-slate-700 transition-all flex items-center gap-2">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-              전체 프로젝트 저장
-            </button>
-            <button onClick={() => exportAssetsToZip(data, `스토리보드_${new Date().toLocaleDateString('ko-KR')}`)} className="px-4 py-2.5 rounded-xl bg-emerald-800 border border-emerald-700 text-emerald-300 font-bold text-[10px] hover:bg-emerald-700 transition-all flex items-center gap-2">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              엑셀+이미지 내보내기
-            </button>
-            <button onClick={async () => await downloadSrt(data, `subtitles_${Date.now()}.srt`)} className="px-4 py-2.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 font-bold text-[10px] hover:bg-slate-700 transition-all flex items-center gap-2">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              SRT 자막 다운로드
-            </button>
-            <button onClick={() => onExportVideo?.(false)} disabled={isExporting} className={`px-5 py-2.5 rounded-xl transition-all font-black text-[10px] flex items-center justify-center gap-2 ${isExporting ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-slate-700 text-white hover:bg-slate-600 border border-slate-600'}`}>
-                {isExporting ? <div className="w-3 h-3 border-2 border-slate-500 border-t-transparent animate-spin rounded-full"></div> : <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
-                MP4 (자막 X)
-            </button>
-            <button onClick={() => onExportVideo?.(true)} disabled={isExporting} className={`px-5 py-2.5 rounded-xl transition-all font-black text-[10px] flex items-center justify-center gap-2 ${isExporting ? 'bg-slate-800 text-slate-500 cursor-not-allowed' : 'bg-brand-600 text-white hover:bg-brand-500 shadow-lg shadow-brand-900/20'}`}>
-                {isExporting ? <div className="w-3 h-3 border-2 border-slate-500 border-t-transparent animate-spin rounded-full"></div> : <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>}
-                MP4 (자막 O)
-            </button>
-        </div>
-      </div>
+      )}
 
-      <div className="overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/20 backdrop-blur-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1200px] table-fixed">
-            <thead className="bg-slate-900/80 border-b border-slate-800">
-              <tr>
-                <th className="py-4 px-6 text-[9px] font-black text-slate-500 uppercase tracking-widest w-16">번호</th>
-                <th className="py-4 px-6 text-[9px] font-black text-slate-500 uppercase tracking-widest w-[30%]">나레이션 / CEO 프로토콜</th>
-                <th className="py-4 px-6 text-[9px] font-black text-slate-500 uppercase tracking-widest w-[30%]">V9.2 통합 영문 프롬프트</th>
-                <th className="py-4 px-6 text-[9px] font-black text-slate-500 uppercase tracking-widest w-56 text-center">생성 결과물</th>
-                <th className="py-4 px-6 text-[9px] font-black text-slate-500 uppercase tracking-widest w-20 text-center">음성</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/40">
-              {data.map((row, index) => (
-                <TableRow
-                  key={row.sceneNumber}
-                  row={row}
-                  index={index}
-                  isAnimating={animatingIndices?.has(index) || false}
-                  onRegenerateImage={onRegenerateImage}
-                  onGenerateAnimation={onGenerateAnimation}
-                />
-              ))}
-            </tbody>
-          </table>
+      {imageLightbox && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/75 p-4" onClick={() => setImageLightbox(null)}>
+          <div className="relative max-h-[92vh] w-full max-w-5xl rounded-[28px] border border-slate-200 bg-white p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">이미지 크게 보기</div>
+                <div className="mt-1 text-lg font-black text-slate-900">{imageLightbox.title}</div>
+              </div>
+              <button type="button" onClick={() => setImageLightbox(null)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
+            </div>
+            <div className="max-h-[78vh] overflow-auto rounded-[24px] border border-slate-200 bg-slate-50 p-3">
+              <img src={imageLightbox.src} alt={imageLightbox.title} className={`${getAspectRatioClass(imageLightbox.aspectRatio || '16:9')} mx-auto max-w-full rounded-2xl object-contain`} />
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {previewOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 p-3 sm:items-center sm:p-6" onClick={() => setPreviewOpen(false)}>
+          <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:px-6">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600">웹 미리보기</div>
+                <h3 className="mt-1 text-2xl font-black text-slate-900">최종 출력 전 결과 미리보기</h3>
+                <p className="mt-2 text-sm text-slate-600">씬 순서, 문단, 이미지, 오디오 상태를 먼저 웹에서 검토한 뒤 바로 최종 출력할 수 있습니다.</p>
+              </div>
+              <button type="button" onClick={() => setPreviewOpen(false)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
+            </div>
+
+            <div className="grid gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:grid-cols-4 sm:px-6">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">씬</div>
+                <div className="mt-2 text-2xl font-black text-slate-900">{data.length}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">예상 길이</div>
+                <div className="mt-2 text-2xl font-black text-slate-900">{formatSeconds(totalDuration)}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">나레이션</div>
+                <div className="mt-2 text-2xl font-black text-slate-900">{summary.audioCount}/{data.length}</div>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">배경음</div>
+                <div className="mt-2 text-sm font-black text-slate-900">{mainBgm?.title || '미선택'}</div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-4 sm:px-6">
+              <div className="mr-2 inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
+                <button type="button" onClick={() => setFinalOutputMode('video')} className={`rounded-2xl px-3 py-2 text-sm font-black transition-colors ${finalOutputMode === 'video' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-white'}`}>영상</button>
+                <button type="button" onClick={() => setFinalOutputMode('image')} className={`rounded-2xl px-3 py-2 text-sm font-black transition-colors ${finalOutputMode === 'image' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-white'}`}>이미지</button>
+              </div>
+              {onGenerateThumbnail && (
+                <button type="button" onClick={() => void onGenerateThumbnail?.()} disabled={isThumbnailGenerating} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500">{isThumbnailGenerating ? '썸네일 생성 중...' : 'AI 썸네일 생성'}</button>
+              )}
+              {onGenerateAllImages && (
+                <button type="button" onClick={() => void onGenerateAllImages?.()} disabled={isGenerating} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGenerating ? '전체 생성 중...' : '모든 씬 다시 생성'}</button>
+              )}
+              {onGenerateAllVideos && (
+                <button type="button" onClick={() => void onGenerateAllVideos?.()} disabled={Boolean(isGeneratingAllVideos) || isGenerating} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGeneratingAllVideos ? '모든 영상 생성 중...' : '모든 씬 영상 생성'}</button>
+              )}
+              <button type="button" onClick={() => exportAssetsToZip(data, 'mp4Creater_storyboard')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">스토리보드 XLSX</button>
+              <button type="button" onClick={() => downloadProjectZip(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">CSV / ZIP</button>
+              {finalOutputMode === 'image' && (
+                <button type="button" onClick={() => exportAssetsToZip(data, 'mp4Creater_image_storyboard')} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-500">이미지 패키지 ZIP</button>
+              )}
+              <button type="button" onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">SRT 저장</button>
+              {onExportVideo && finalOutputMode === 'video' && (
+                <>
+                  <button type="button" onClick={() => onExportVideo?.(true)} disabled={isExporting} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isExporting ? '렌더링 중...' : '최종 출력 (자막 O)'}</button>
+                  <button type="button" onClick={() => onExportVideo?.(false)} disabled={isExporting} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">최종 출력 (자막 X)</button>
+                </>
+              )}
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+                {data.map((row, index) => (
+                  <div key={`preview-${row.sceneNumber}-${index}`} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                    <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
+                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                        <button type="button" onClick={() => setImageLightbox({ src: resolveImageSrc(row.imageData), title: `미리보기 씬 ${row.sceneNumber}`, aspectRatio: row.aspectRatio })} className="block w-full text-left"><img src={resolveImageSrc(row.imageData)} alt={`미리보기 씬 ${row.sceneNumber}`} className={`${getAspectRatioClass(row.aspectRatio || '16:9')} w-full object-cover`} /></button>
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">씬 {row.sceneNumber}</span>
+                          <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">{formatSeconds(row.targetDuration)}</span>
+                        </div>
+                        <p className="text-sm leading-7 text-slate-700 md:line-clamp-5">{row.narration}</p>
+                        {row.audioData && (
+                          <audio controls className="w-full">
+                            <source src={resolveNarrationAudioSrc(row.audioData)} type="audio/mpeg" />
+                          </audio>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" onClick={() => void downloadScenePackage(row)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">이 문단 다운로드</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={() => setPreviewOpen(true)}
+        className="fixed bottom-5 right-5 z-40 rounded-full bg-slate-900 px-5 py-4 text-sm font-black text-white shadow-2xl hover:bg-slate-800"
+      >
+        결과 미리보기
+      </button>
     </div>
   );
 };

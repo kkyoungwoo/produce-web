@@ -1,0 +1,21 @@
+{
+  "sceneNumber": 3,
+  "narration": "[Chorus]\n무대를 떠난 보컬은 같은 마음을 다른 표정으로 다시 부른다. 반복되는 한 문장이 영상의 중심 훅이 되고, 감정은 더 크게 열리기 시작한다.",
+  "visualPrompt": "Music video storyboard illustration, lyrical, symbolic, cinematic rhythm. Scene 3. Show the main visual idea from this narration: [Chorus]\n무대를 떠난 보컬은 같은 마음을 다른 표정으로 다시 부른다. 반복되는 한 문장이 영상의 중심 훅이 되고, 감정은 더 크게 열리기 시작한다. Clean composition, 16:9, strong subject focus, no watermark, no text overlay. Keep character appearance consistent across scenes.",
+  "targetDuration": 7.6,
+  "audioDuration": null,
+  "videoDuration": null,
+  "status": "completed",
+  "aspectRatio": "16:9",
+  "sourceMode": "sample",
+  "subtitleData": null,
+  "analysis": {
+    "composition_type": "STANDARD",
+    "sentiment": "NEUTRAL"
+  },
+  "files": {
+    "imagePath": "images/scene-003-main.jpg",
+    "audioPath": null,
+    "videoPath": null
+  }
+}

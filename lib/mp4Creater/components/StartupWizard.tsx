@@ -1,111 +1,106 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
-import { CharacterProfile } from '../types';
+import React, { useState } from 'react';
 import { DEFAULT_STORAGE_DIR } from '../services/localFileApi';
+import { pickFolderPath } from '../services/folderPicker';
+import HelpTip from './HelpTip';
 
 interface StartupWizardProps {
   initialStorageDir?: string;
   onComplete: (payload: {
     storageDir: string;
-    characters: CharacterProfile[];
-    selectedCharacterId: string;
-  }) => void;
-}
-
-function createCharacter(name: string, description: string, visualStyle: string): CharacterProfile {
-  return {
-    id: `char_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-    name,
-    description,
-    visualStyle,
-    createdAt: Date.now(),
-  };
+  }) => void | Promise<void>;
 }
 
 const StartupWizard: React.FC<StartupWizardProps> = ({ initialStorageDir, onComplete }) => {
-  const [storageDir, setStorageDir] = useState(initialStorageDir || DEFAULT_STORAGE_DIR);
-  const [name, setName] = useState('대표 캐릭터');
-  const [description, setDescription] = useState('브랜드의 중심 화자. 친근하고 명확하게 전달한다.');
-  const [visualStyle, setVisualStyle] = useState('깔끔한 2D 일러스트, 미니멀한 표정, 밝은 하이라이트');
-  const preview = useMemo(() => createCharacter(name, description, visualStyle), [name, description, visualStyle]);
+  const [storageDir, setStorageDir] = useState(initialStorageDir || '');
+  const [pickedFolderLabel, setPickedFolderLabel] = useState('');
+  const canStart = Boolean(storageDir.trim());
+
+  const handleFolderPick = async () => {
+    const picked = await pickFolderPath(storageDir);
+    if (!picked) return;
+    setStorageDir(picked.nextPath);
+    setPickedFolderLabel(picked.selectedLabel);
+  };
 
   return (
-    <div className="fixed inset-0 z-[90] bg-slate-950/95 backdrop-blur-sm flex items-center justify-center p-6">
-      <div className="w-full max-w-4xl rounded-3xl border border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
-        <div className="grid lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="p-8 border-b lg:border-b-0 lg:border-r border-slate-800">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/10 text-brand-300 text-xs font-bold mb-4">
-              Local-first setup
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/35 p-4 backdrop-blur-sm">
+      <div className="w-full max-w-4xl overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+        <div className="grid lg:grid-cols-[1.08fr_0.92fr]">
+          <div className="border-b border-slate-200 p-8 lg:border-b-0 lg:border-r">
+            <div className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">
+              처음 한 번만 설정
             </div>
-            <h2 className="text-3xl font-black text-white mb-3">첫 시작부터 저장 경로를 먼저 잡습니다</h2>
-            <p className="text-slate-400 leading-relaxed mb-6">
-              이 버전은 프로젝트, 캐릭터, 모델 설정을 브라우저 임시 저장소가 아니라
-              Next 서버가 접근 가능한 로컬 JSON 파일에 함께 저장하도록 설계했습니다.
+            <h2 className="mt-4 text-3xl font-black text-slate-900">저장 폴더부터 먼저 고릅니다</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
+              초기 팝업에서는 저장 위치만 빠르게 정하도록 단순화했습니다.
+              캐릭터 제작은 프로젝트 안에서 바로 이어서 진행하도록 옮겨 초보자도 헷갈리지 않게 정리했습니다.
             </p>
 
-            <label className="block text-sm font-bold text-slate-200 mb-2">저장 경로</label>
-            <input
-              value={storageDir}
-              onChange={(e) => setStorageDir(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-slate-100 outline-none focus:border-brand-500"
-              placeholder={DEFAULT_STORAGE_DIR}
-            />
-            <p className="text-xs text-slate-500 mt-2">
-              예: <code className="text-slate-300">./local-data/tubegen-studio</code> 또는
-              <code className="text-slate-300"> C:/TubeGenData</code>
-            </p>
-
-            <div className="mt-8">
-              <h3 className="text-lg font-bold text-white mb-3">대표 캐릭터 등록</h3>
-              <div className="space-y-3">
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm"
-                  placeholder="캐릭터 이름"
-                />
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full min-h-[96px] rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm"
-                  placeholder="캐릭터 성격 / 화법 / 역할"
-                />
-                <textarea
-                  value={visualStyle}
-                  onChange={(e) => setVisualStyle(e.target.value)}
-                  className="w-full min-h-[88px] rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm"
-                  placeholder="캐릭터 비주얼 스타일"
-                />
+            <div className="mt-8 space-y-6">
+              <div>
+                <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-800">
+                  저장 폴더
+                  <HelpTip title="저장 폴더 안내" compact>
+                    처음 지정한 폴더는 고정이 아닙니다. 설정 화면에서 다시 바꿀 수 있습니다. 예시는
+                    <strong className="text-slate-900"> ./local-data/tubegen-studio</strong> 또는
+                    <strong className="text-slate-900"> C:/TubeGenData</strong> 처럼 적으면 됩니다.
+                  </HelpTip>
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={storageDir}
+                    onChange={(e) => setStorageDir(e.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-400"
+                    placeholder={DEFAULT_STORAGE_DIR}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleFolderPick}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50"
+                  >
+                    폴더 선택
+                  </button>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  예시: <code className="text-slate-700">./local-data/tubegen-studio</code>, <code className="text-slate-700">D:/TubeGenProjects</code>
+                </p>
+                {pickedFolderLabel && (
+                  <p className="mt-1 text-xs text-blue-600">최근 선택한 폴더명: {pickedFolderLabel}</p>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="p-8 flex flex-col">
-            <h3 className="text-lg font-bold text-white mb-4">시작 미리보기</h3>
-            <div className="rounded-2xl border border-slate-800 bg-slate-950 p-5 space-y-4">
+          <div className="flex flex-col bg-slate-50 p-8">
+            <h3 className="text-lg font-black text-slate-900">시작 미리보기</h3>
+            <div className="mt-4 space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
               <div>
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1">Storage</div>
-                <div className="text-sm text-slate-200 break-all">{storageDir || DEFAULT_STORAGE_DIR}</div>
+                <div className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Storage</div>
+                <div className="mt-2 break-all text-sm text-slate-700">{storageDir || '아직 선택되지 않았습니다'}</div>
               </div>
-              <div>
-                <div className="text-xs font-bold uppercase tracking-widest text-slate-500 mb-1">Character</div>
-                <div className="text-lg font-bold text-white">{preview.name}</div>
-                <p className="text-sm text-slate-400 mt-1">{preview.description}</p>
-                <p className="text-xs text-slate-500 mt-3">{preview.visualStyle}</p>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                시작 후에는 Step 1에서 비율과 유형을 고르고, Step 3이 끝나면 대본에 맞춘 주인공 / 조연 카드가 자동으로 준비됩니다.
+                초기 팝업에서는 불필요한 캐릭터 입력을 제거해서 시작 흐름을 더 짧게 만들었습니다.
+              </div>
+              <div className="rounded-2xl border border-blue-200 bg-blue-50 p-4 text-sm leading-6 text-blue-800">
+                프로젝트는 번호별 폴더로 저장됩니다. 예를 들면 <strong>projects/project-0001-...</strong> 구조가 자동으로 만들어지고, 이미지·영상·프롬프트·썸네일이 모두 그 안에 정리됩니다.
               </div>
             </div>
 
             <div className="mt-auto pt-8">
               <button
-                onClick={() => onComplete({
-                  storageDir: storageDir || DEFAULT_STORAGE_DIR,
-                  characters: [preview],
-                  selectedCharacterId: preview.id,
-                })}
-                className="w-full rounded-2xl bg-brand-500 hover:bg-brand-400 text-white font-black py-4 transition-colors"
+                onClick={() => {
+                  if (!storageDir.trim()) return;
+                  onComplete({
+                    storageDir: storageDir.trim(),
+                  });
+                }}
+                disabled={!canStart}
+                className={`w-full rounded-2xl py-4 text-sm font-black text-white transition-colors ${canStart ? 'bg-blue-600 hover:bg-blue-500' : 'cursor-not-allowed bg-slate-300'}`}
               >
-                저장 경로 설정하고 시작하기
+                저장 폴더 확정하고 mp4Creater 시작하기
               </button>
             </div>
           </div>

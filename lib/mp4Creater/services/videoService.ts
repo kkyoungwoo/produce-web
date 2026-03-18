@@ -1,5 +1,5 @@
 
-import { GeneratedAsset, SubtitleData, SubtitleConfig, DEFAULT_SUBTITLE_CONFIG } from '../types';
+import { AspectRatio, BackgroundMusicTrack, GeneratedAsset, PreviewMixSettings, SubtitleData, SubtitleConfig, DEFAULT_SUBTITLE_CONFIG } from '../types';
 
 /**
  * 고정밀 오디오 디코딩: ElevenLabs(MP3)와 Gemini(PCM) 통합 처리
@@ -30,6 +30,41 @@ interface SubtitleChunk {
   text: string;       // 표시할 텍스트
   startTime: number;  // 시작 시간
   endTime: number;    // 끝 시간
+}
+
+
+interface RenderProfile {
+  width: number;
+  height: number;
+  fps: number;
+  bitrate: number;
+}
+
+/**
+ * 렌더링 과부하 방지용 프로파일
+ * - 씬 수가 많을수록 해상도와 FPS를 낮춰 CPU/GPU 순간 피크를 줄입니다.
+ * - 사용자가 브라우저에서 직접 렌더링하므로 안전한 기본값을 우선합니다.
+ */
+function resolveRenderProfile(sceneCount: number, aspectRatio: AspectRatio = '16:9'): RenderProfile {
+  const profileKey = sceneCount >= 14 ? 'small' : sceneCount >= 8 ? 'medium' : 'large';
+  const profiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+    '16:9': {
+      small: { width: 854, height: 480, fps: 18, bitrate: 4_000_000 },
+      medium: { width: 960, height: 540, fps: 20, bitrate: 5_000_000 },
+      large: { width: 1280, height: 720, fps: 24, bitrate: 6_000_000 },
+    },
+    '1:1': {
+      small: { width: 720, height: 720, fps: 18, bitrate: 4_000_000 },
+      medium: { width: 900, height: 900, fps: 20, bitrate: 5_000_000 },
+      large: { width: 1080, height: 1080, fps: 24, bitrate: 6_000_000 },
+    },
+    '9:16': {
+      small: { width: 480, height: 854, fps: 18, bitrate: 4_000_000 },
+      medium: { width: 540, height: 960, fps: 20, bitrate: 5_000_000 },
+      large: { width: 720, height: 1280, fps: 24, bitrate: 6_000_000 },
+    },
+  };
+  return profiles[aspectRatio]?.[profileKey] || profiles['16:9'][profileKey];
 }
 
 interface PreparedScene {
@@ -209,6 +244,9 @@ function renderSubtitle(
 export interface VideoExportOptions {
   enableSubtitles?: boolean;  // 자막 활성화 여부 (기본: true)
   subtitleConfig?: Partial<SubtitleConfig>;
+  backgroundTracks?: BackgroundMusicTrack[];
+  previewMix?: PreviewMixSettings;
+  aspectRatio?: AspectRatio;
 }
 
 // 실제 렌더링된 자막 타이밍 기록용 인터페이스
@@ -234,6 +272,9 @@ export const generateVideo = async (
   // 옵션 기본값
   const enableSubtitles = options?.enableSubtitles ?? true;
   const config: SubtitleConfig = { ...DEFAULT_SUBTITLE_CONFIG, ...options?.subtitleConfig };
+  const backgroundTracks = options?.backgroundTracks || [];
+  const previewMix = options?.previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 };
+  const aspectRatio = options?.aspectRatio || assets[0]?.aspectRatio || '16:9';
 
   // 이미지가 있는 모든 씬 포함 (오디오 없으면 기본 3초)
   const validAssets = assets.filter(a => a.imageData);
@@ -252,6 +293,8 @@ export const generateVideo = async (
   const audioCtx = new AudioContextClass();
   const destination = audioCtx.createMediaStreamDestination();
 
+  const renderProfile = resolveRenderProfile(validAssets.length, aspectRatio);
+
   // 1. 모든 장면의 경계(startTime, endTime)를 미리 계산하여 타임라인 구축
   const preparedScenes: PreparedScene[] = [];
   let timelinePointer = 0;
@@ -265,7 +308,7 @@ export const generateVideo = async (
     // 이미지 로드 (폴백용으로 항상 필요) - 에러 핸들링 추가
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.src = `data:image/jpeg;base64,${asset.imageData}`;
+    img.src = asset.imageData.startsWith('data:') || asset.imageData.startsWith('/') || asset.imageData.startsWith('http') ? asset.imageData : `data:image/jpeg;base64,${asset.imageData}`;
     await new Promise<void>((resolve, reject) => {
       img.onload = () => {
         if (img.width === 0 || img.height === 0) {
@@ -286,16 +329,16 @@ export const generateVideo = async (
       console.warn(`[Video] 씬 ${i + 1}: ${e.message}, 플레이스홀더 사용`);
       // 플레이스홀더 이미지 생성
       const placeholderCanvas = document.createElement('canvas');
-      placeholderCanvas.width = 1280;
-      placeholderCanvas.height = 720;
+      placeholderCanvas.width = renderProfile.width;
+      placeholderCanvas.height = renderProfile.height;
       const pCtx = placeholderCanvas.getContext('2d');
       if (pCtx) {
         pCtx.fillStyle = '#1a1a2e';
-        pCtx.fillRect(0, 0, 1280, 720);
+        pCtx.fillRect(0, 0, placeholderCanvas.width, placeholderCanvas.height);
         pCtx.fillStyle = '#fff';
         pCtx.font = 'bold 48px sans-serif';
         pCtx.textAlign = 'center';
-        pCtx.fillText(`씬 ${i + 1}`, 640, 360);
+        pCtx.fillText(`씬 ${i + 1}`, placeholderCanvas.width / 2, placeholderCanvas.height / 2);
       }
       img.src = placeholderCanvas.toDataURL();
     });
@@ -369,12 +412,12 @@ export const generateVideo = async (
 
   // 2. 캔버스 및 미디어 레코더 설정
   const canvas = document.createElement('canvas');
-  canvas.width = 1280;
-  canvas.height = 720;
+  canvas.width = renderProfile.width;
+  canvas.height = renderProfile.height;
   const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) throw new Error("캔버스 초기화 실패");
 
-  const canvasStream = canvas.captureStream(30);
+  const canvasStream = canvas.captureStream(renderProfile.fps);
   const combinedStream = new MediaStream([
     ...canvasStream.getVideoTracks(),
     ...destination.stream.getAudioTracks()
@@ -386,7 +429,7 @@ export const generateVideo = async (
 
   const recorder = new MediaRecorder(combinedStream, {
     mimeType,
-    videoBitsPerSecond: 12000000 // 12Mbps 초고화질
+    videoBitsPerSecond: renderProfile.bitrate
   });
 
   const chunks: Blob[] = [];
@@ -423,23 +466,43 @@ export const generateVideo = async (
 
     if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-    onProgress("실시간 동기화 렌더링 시작 (2/3)...");
+    onProgress(`실시간 동기화 렌더링 시작 (2/3)... ${renderProfile.width}x${renderProfile.height} / ${renderProfile.fps}fps 안전 모드`);
 
     // 3. 오디오 스케줄링
     const initialDelay = 0.5; // 레코더 안정화를 위한 여유 시간 확보
     const masterStartTime = audioCtx.currentTime + initialDelay;
 
     preparedScenes.forEach(scene => {
-      // 오디오가 있는 씬만 스케줄링
       if (scene.audioBuffer) {
         const source = audioCtx.createBufferSource();
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.value = previewMix.narrationVolume ?? 1;
         source.buffer = scene.audioBuffer;
-        source.connect(destination);
-        // 렌더링 중 스피커 출력 음소거 (MP4에는 정상 포함)
+        source.connect(gainNode);
+        gainNode.connect(destination);
         source.start(masterStartTime + scene.startTime);
         source.stop(masterStartTime + scene.endTime);
       }
     });
+
+    for (const track of backgroundTracks) {
+      if (!track?.audioData) continue;
+      try {
+        const audioData = track.audioData.startsWith('data:audio') ? track.audioData.split(',')[1] : track.audioData;
+        const bgBuffer = await decodeAudio(audioData, audioCtx);
+        const source = audioCtx.createBufferSource();
+        const gainNode = audioCtx.createGain();
+        source.buffer = bgBuffer;
+        source.loop = true;
+        gainNode.gain.value = previewMix.backgroundMusicVolume ?? track.volume ?? 0.28;
+        source.connect(gainNode);
+        gainNode.connect(destination);
+        source.start(masterStartTime);
+        source.stop(masterStartTime + totalDuration + 0.5);
+      } catch (error) {
+        console.warn('[Video] 배경음 디코딩 실패:', error);
+      }
+    }
 
     // 애니메이션 영상 재생 스케줄링
     preparedScenes.forEach((scene, idx) => {
@@ -457,7 +520,10 @@ export const generateVideo = async (
     recorder.start();
 
     // 4. 고정밀 프레임 루프 (Master Clock Tracking)
-    const renderLoop = () => {
+    const minFrameInterval = 1000 / renderProfile.fps;
+    let lastFrameTs = 0;
+
+    const renderLoop = (now: number = 0) => {
       if (isFinished) return;
 
       if (abortRef?.current) {
@@ -465,6 +531,12 @@ export const generateVideo = async (
         recorder.stop();
         return;
       }
+
+      if (now - lastFrameTs < minFrameInterval) {
+        requestAnimationFrame(renderLoop);
+        return;
+      }
+      lastFrameTs = now;
 
       const currentAudioTime = audioCtx.currentTime;
       const elapsed = currentAudioTime - masterStartTime;

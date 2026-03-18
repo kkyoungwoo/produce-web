@@ -1,0 +1,18 @@
+
+  <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="100%" stop-color="#eff6ff"/>
+      </linearGradient>
+    </defs>
+    <rect width="1280" height="720" fill="url(#bg)" rx="32"/>
+    <rect x="72" y="72" width="1136" height="576" rx="28" fill="#ffffff" stroke="#dbeafe" stroke-width="3"/>
+    <text x="120" y="150" fill="#2563eb" font-size="28" font-family="Arial, sans-serif" font-weight="700">SAMPLE SCENE 03</text>
+    <text x="120" y="220" fill="#0f172a" font-size="54" font-family="Arial, sans-serif" font-weight="800">API 키가 없을 때도 흐름 확인 가능</text>
+    <foreignObject x="120" y="280" width="1040" height="250">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; font-size: 34px; line-height: 1.5; color: #334155; word-break: keep-all;">[Chorus]
+무대를 떠난 보컬은 같은 마음을 다른 표정으로 다시 부른다. 반복되는 한 문장이 영상의 중심 훅이 되고, 감정은 더 크게 열리기 시작한다.</div>
+    </foreignObject>
+    <text x="120" y="610" fill="#64748b" font-size="26" font-family="Arial, sans-serif">설정에서 이미지 API를 등록하면 이 칸이 실제 생성 이미지로 바뀝니다.</text>
+  </svg>

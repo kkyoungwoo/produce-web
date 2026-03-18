@@ -1,0 +1,112 @@
+{
+  "version": 1,
+  "generatedAt": "2026-03-18T08:17:25.276Z",
+  "root": "/mp4Creater/samples",
+  "categories": {
+    "characters": [
+      {
+        "id": "char-heroine-v1",
+        "label": "Char Heroine V1",
+        "path": "/mp4Creater/samples/characters/char-heroine-v1.svg",
+        "kind": "image",
+        "filename": "char-heroine-v1.svg",
+        "ext": ".svg",
+        "tags": [
+          "characters",
+          "char",
+          "heroine",
+          "v1"
+        ]
+      },
+      {
+        "id": "char-host-v1",
+        "label": "Char Host V1",
+        "path": "/mp4Creater/samples/characters/char-host-v1.svg",
+        "kind": "image",
+        "filename": "char-host-v1.svg",
+        "ext": ".svg",
+        "tags": [
+          "characters",
+          "char",
+          "host",
+          "v1"
+        ]
+      }
+    ],
+    "styles": [
+      {
+        "id": "style-animation-pop-v1",
+        "label": "Style Animation Pop V1",
+        "path": "/mp4Creater/samples/styles/style-animation-pop-v1.svg",
+        "kind": "image",
+        "filename": "style-animation-pop-v1.svg",
+        "ext": ".svg",
+        "tags": [
+          "styles",
+          "style",
+          "animation",
+          "pop",
+          "v1"
+        ]
+      },
+      {
+        "id": "style-beauty-soft-v1",
+        "label": "Style Beauty Soft V1",
+        "path": "/mp4Creater/samples/styles/style-beauty-soft-v1.svg",
+        "kind": "image",
+        "filename": "style-beauty-soft-v1.svg",
+        "ext": ".svg",
+        "tags": [
+          "styles",
+          "style",
+          "beauty",
+          "soft",
+          "v1"
+        ]
+      },
+      {
+        "id": "style-cinematic-night-v1",
+        "label": "Style Cinematic Night V1",
+        "path": "/mp4Creater/samples/styles/style-cinematic-night-v1.svg",
+        "kind": "image",
+        "filename": "style-cinematic-night-v1.svg",
+        "ext": ".svg",
+        "tags": [
+          "styles",
+          "style",
+          "cinematic",
+          "night",
+          "v1"
+        ]
+      },
+      {
+        "id": "style-news-clean-v1",
+        "label": "Style News Clean V1",
+        "path": "/mp4Creater/samples/styles/style-news-clean-v1.svg",
+        "kind": "image",
+        "filename": "style-news-clean-v1.svg",
+        "ext": ".svg",
+        "tags": [
+          "styles",
+          "style",
+          "news",
+          "clean",
+          "v1"
+        ]
+      }
+    ],
+    "images": [],
+    "videos": [],
+    "audio": [],
+    "thumbnails": []
+  },
+  "summary": {
+    "total": 6,
+    "characters": 2,
+    "styles": 4,
+    "images": 0,
+    "videos": 0,
+    "audio": 0,
+    "thumbnails": 0
+  }
+}

@@ -1,0 +1,21 @@
+Music video storyboard illustration, lyrical, symbolic, cinematic rhythm. Scene 2. Show the main visual idea from this narration: [Verse 1]
+무대를 떠난 보컬의 시선은 천천히 흔들리고, 몽환적인 온도의 밤이 장면마다 번진다. 전하지 못한 마음은 아직 직접 말하지 못한 채 후렴 전의 숨처럼 맴돈다. Clean composition, 16:9 wide composition, strong subject focus, no watermark, no text overlay. Keep character appearance consistent across scenes.
+
+[SELECTED CHARACTER PROMPTS]
+- 무대를 떠난 보컬: 무대를 떠난 보컬 / 주인공 / 서사를 이끄는 중심 인물
+Stylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.
+unique character design, varied outfit style, clean silhouette, based on the story mood: 몽환적인. Scene context: [Intro]
+네온 골목 위로 번지는 공기 속에서 무대를 떠난 보컬은 막차 이후 시작되는 감정의 첫 감정을 낮게 꺼낸다.
+
+[Verse 1]
+무대를 떠난 보컬의 시선은 천천히 흔들리고, 몽환적인 온도의 밤이 장면마다 번진다. 전하지 못한 마음은 아직 직접 말하지 못한 채 후렴 전의 숨처럼 맴돈다.
+
+[Chorus]
+무대를
+
+[SELECTED STYLE PROMPT]
+네온 시티팝 스타일. Stylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only. Simple anime background, clean line art, soft cel shading, 16:9 wide composition. Variation seed 35592.
+
+[STYLE LABEL] 네온 시티팝
+
+[SCENE RULE] Scene 2 must keep the selected character feeling and selected style prompt consistently.

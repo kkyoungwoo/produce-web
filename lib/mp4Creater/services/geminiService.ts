@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
-import { ScriptScene, ReferenceImages } from "../types";
+import { ContentType, ScriptScene, ReferenceImages } from "../types";
 import { SYSTEM_INSTRUCTIONS, getTrendSearchPrompt, getScriptGenerationPrompt, getFinalVisualPrompt } from "./prompts";
 import { CONFIG, GEMINI_STYLE_CATEGORIES, GeminiStyleId } from "../config";
 
@@ -250,6 +250,7 @@ const generateScriptSingle = async (
   topic: string,
   hasReferenceImage: boolean,
   sourceContext?: string | null,
+  contentType: ContentType = 'story',
   chunkInfo?: { current: number; total: number }
 ): Promise<ScriptScene[]> => {
   return retryGeminiRequest("Script Generation", async () => {
@@ -280,7 +281,7 @@ const generateScriptSingle = async (
 
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: getScriptGenerationPrompt(topic, sourceContext),
+      contents: getScriptGenerationPrompt(topic, sourceContext, contentType),
       config: {
         thinkingConfig: { thinkingBudget: 24576 },
         responseMimeType: "application/json",
@@ -321,9 +322,10 @@ const generateScriptSingle = async (
 export const generateScript = async (
   topic: string,
   hasReferenceImage: boolean,
-  sourceContext?: string | null
+  sourceContext?: string | null,
+  contentType: ContentType = 'story'
 ): Promise<ScriptScene[]> => {
-  return generateScriptSingle(topic, hasReferenceImage, sourceContext);
+  return generateScriptSingle(topic, hasReferenceImage, sourceContext, contentType);
 };
 
 /**
@@ -395,6 +397,7 @@ export const generateScriptChunked = async (
   topic: string,
   hasReferenceImage: boolean,
   sourceContext: string,
+  contentType: ContentType = 'story',
   chunkSize: number = 2500,
   onProgress?: (message: string) => void
 ): Promise<ScriptScene[]> => {
@@ -403,7 +406,7 @@ export const generateScriptChunked = async (
   // 청크 분할 기준 이하면 일반 처리
   if (inputLength <= chunkSize) {
     console.log(`[Chunked Script] 입력(${inputLength}자)이 청크 크기(${chunkSize}자) 이하. 일반 처리.`);
-    return generateScriptSingle(topic, hasReferenceImage, sourceContext);
+    return generateScriptSingle(topic, hasReferenceImage, sourceContext, contentType);
   }
 
   console.log(`[Chunked Script] ========================================`);
@@ -434,6 +437,7 @@ export const generateScriptChunked = async (
         topic,
         hasReferenceImage,
         chunkContext,
+        contentType,
         { current: i + 1, total: chunks.length }
       );
 
@@ -628,7 +632,7 @@ Ensure the entire image consistently follows this visual style.`
           config: {
             responseModalities: [Modality.IMAGE],
             imageConfig: {
-              aspectRatio: '16:9'
+              aspectRatio: scene.aspectRatio || '16:9'
             }
           }
         });

@@ -1,0 +1,21 @@
+{
+  "sceneNumber": 1,
+  "narration": "[Intro]\n네온 골목 위로 번지는 공기 속에서 무대를 떠난 보컬은 도시 야경과 이별의 후렴의 첫 감정을 낮게 꺼낸다.",
+  "visualPrompt": "Music video storyboard illustration, lyrical, symbolic, cinematic rhythm. Scene 1. Show the main visual idea from this narration: [Intro]\n네온 골목 위로 번지는 공기 속에서 무대를 떠난 보컬은 도시 야경과 이별의 후렴의 첫 감정을 낮게 꺼낸다. Clean composition, 16:9, strong subject focus, no watermark, no text overlay. Keep character appearance consistent across scenes.",
+  "targetDuration": 6.5,
+  "audioDuration": null,
+  "videoDuration": null,
+  "status": "completed",
+  "aspectRatio": "16:9",
+  "sourceMode": "sample",
+  "subtitleData": null,
+  "analysis": {
+    "composition_type": "MICRO",
+    "sentiment": "NEUTRAL"
+  },
+  "files": {
+    "imagePath": "images/scene-001-main.jpg",
+    "audioPath": null,
+    "videoPath": null
+  }
+}

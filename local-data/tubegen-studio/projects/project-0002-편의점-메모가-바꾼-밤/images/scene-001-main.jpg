@@ -1,0 +1,17 @@
+
+  <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="100%" stop-color="#eff6ff"/>
+      </linearGradient>
+    </defs>
+    <rect width="1280" height="720" fill="url(#bg)" rx="32"/>
+    <rect x="43" y="43" width="1194" height="634" rx="28" fill="#ffffff" stroke="#dbeafe" stroke-width="3"/>
+    <text x="128" y="144" fill="#2563eb" font-size="28" font-family="Arial, sans-serif" font-weight="700">SAMPLE SCENE 01 · 16:9</text>
+    <text x="128" y="230" fill="#0f172a" font-size="54" font-family="Arial, sans-serif" font-weight="800">API 키가 없을 때도 흐름 확인 가능</text>
+    <foreignObject x="128" y="302" width="1024" height="230">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; font-size: 34px; line-height: 1.5; color: #334155; word-break: keep-all;">새벽의 편의점에서 초보 창작자은 편의점 메모가 바꾼 밤의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.</div>
+    </foreignObject>
+    <text x="128" y="648" fill="#64748b" font-size="26" font-family="Arial, sans-serif">설정에서 이미지 API를 등록하면 이 칸이 실제 생성 이미지로 바뀝니다.</text>
+  </svg>

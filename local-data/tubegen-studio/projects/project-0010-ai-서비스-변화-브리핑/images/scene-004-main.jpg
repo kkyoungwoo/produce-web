@@ -1,0 +1,17 @@
+
+  <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="#ffffff"/>
+        <stop offset="100%" stop-color="#eff6ff"/>
+      </linearGradient>
+    </defs>
+    <rect width="1080" height="1920" fill="url(#bg)" rx="32"/>
+    <rect x="65" y="65" width="950" height="1790" rx="28" fill="#ffffff" stroke="#dbeafe" stroke-width="3"/>
+    <text x="108" y="384" fill="#2563eb" font-size="28" font-family="Arial, sans-serif" font-weight="700">SAMPLE SCENE 04 · 9:16</text>
+    <text x="108" y="614" fill="#0f172a" font-size="54" font-family="Arial, sans-serif" font-weight="800">API 키가 없을 때도 흐름 확인 가능</text>
+    <foreignObject x="108" y="806" width="864" height="614">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; font-size: 34px; line-height: 1.5; color: #334155; word-break: keep-all;">마지막은 핵심 요약으로 마무리 방식으로 요약한다. 시청자가 지금 무엇을 기억해야 하는지 분명하게 남기고 다음 흐름을 예상하게 만든다.</div>
+    </foreignObject>
+    <text x="108" y="1728" fill="#64748b" font-size="26" font-family="Arial, sans-serif">설정에서 이미지 API를 등록하면 이 칸이 실제 생성 이미지로 바뀝니다.</text>
+  </svg>

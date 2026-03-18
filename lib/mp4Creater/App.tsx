@@ -1,117 +1,210 @@
 'use client';
 
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Header from './components/Header';
 import StartupWizard from './components/StartupWizard';
 import SettingsDrawer from './components/SettingsDrawer';
 import InputSection from './components/InputSection';
 import ResultTable from './components/ResultTable';
 import ProjectGallery from './components/ProjectGallery';
-
+import ProviderQuickModal from './components/ProviderQuickModal';
+import { LoadingOverlay, StudioPageSkeleton } from './components/LoadingOverlay';
 import {
+  BackgroundMusicTrack,
+  CostBreakdown,
   GeneratedAsset,
   GenerationStep,
-  ScriptScene,
-  CostBreakdown,
-  ReferenceImages,
-  DEFAULT_REFERENCE_IMAGES,
+  PreviewMixSettings,
   SavedProject,
   StudioState,
+  WorkflowDraft,
 } from './types';
-
-import {
-  generateScript,
-  generateScriptChunked,
-  findTrendingTopics,
-  generateAudioForScene,
-  generateMotionPrompt,
-} from './services/geminiService';
-
-import { generateImage, getSelectedImageModel } from './services/imageService';
-import { generateAudioWithElevenLabs } from './services/elevenLabsService';
-import { generateVideo } from './services/videoService';
-import { generateVideoFromImage, getFalApiKey } from './services/falService';
-import {
-  saveProject,
-  getSavedProjects,
-  deleteProject,
-  migrateFromLocalStorage,
-} from './services/projectService';
 import {
   fetchStudioState,
   configureStorage,
   saveStudioState,
   createDefaultStudioState,
+  getCachedStudioState,
 } from './services/localFileApi';
+import {
+  getProjectById,
+  getSavedProjects,
+  deleteProject,
+  migrateFromLocalStorage,
+  updateProject,
+  upsertWorkflowProject,
+} from './services/projectService';
+import { estimateClipDuration } from './utils/storyHelpers';
+import { createInitialSceneAssetsFromDraft } from './services/sceneAssemblyService';
+import { createSampleBackgroundTrack, getDefaultPreviewMix } from './services/musicService';
+import { createDefaultWorkflowDraft, ensureWorkflowDraft } from './services/workflowDraftService';
+import { CONFIG } from './config';
 
-import { CONFIG, PRICING, formatKRW } from './config';
-import * as FileSaver from 'file-saver';
-
-const saveAs = (FileSaver as any).saveAs || (FileSaver as any).default || FileSaver;
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-type ViewMode = 'main' | 'gallery';
+function normalizeLoadedAssets(assets: GeneratedAsset[]): GeneratedAsset[] {
+  return assets.map((asset) => ({
+    ...asset,
+    targetDuration:
+      typeof asset.targetDuration === 'number'
+        ? asset.targetDuration
+        : asset.audioDuration || asset.videoDuration || estimateClipDuration(asset.narration),
+  }));
+}
 
 const App: React.FC = () => {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const basePath = useMemo(() => pathname || '/mp4Creater', [pathname]);
+  const newProjectHandledRef = useRef('');
+  const queryProjectHandledRef = useRef('');
+  const studioStateRef = useRef<StudioState | null>(null);
+  const workflowDraftSaveTimerRef = useRef<number | null>(null);
+  const pendingWorkflowDraftRef = useRef<StudioState['workflowDraft'] | null>(null);
+
   const [step, setStep] = useState<GenerationStep>(GenerationStep.IDLE);
   const [generatedData, setGeneratedData] = useState<GeneratedAsset[]>([]);
-  const [progressMessage, setProgressMessage] = useState('');
-  const [isVideoGenerating, setIsVideoGenerating] = useState(false);
-
-  const [currentReferenceImages, setCurrentReferenceImages] =
-    useState<ReferenceImages>(DEFAULT_REFERENCE_IMAGES);
-
-  const [needsKey, setNeedsKey] = useState(false);
-  const [animatingIndices, setAnimatingIndices] = useState<Set<number>>(new Set());
-
-  const [viewMode, setViewMode] = useState<ViewMode>('main');
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [studioState, setStudioState] = useState<StudioState | null>(null);
   const [showStartupWizard, setShowStartupWizard] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showApiModal, setShowApiModal] = useState(false);
+  const [apiModalTitle, setApiModalTitle] = useState('API 키 등록');
+  const [apiModalDescription, setApiModalDescription] = useState('필요한 키를 등록하면 실제 생성 품질이 올라갑니다.');
+  const [apiModalFocusField, setApiModalFocusField] = useState<'openRouter' | 'elevenLabs' | 'fal' | null>(null);
+  const [viewMode, setViewMode] = useState<'main' | 'gallery'>(searchParams?.get('view') === 'gallery' ? 'gallery' : 'main');
+  const [currentTopic, setCurrentTopic] = useState<string>('');
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [backgroundMusicTracks, setBackgroundMusicTracks] = useState<BackgroundMusicTrack[]>([]);
+  const [previewMix, setPreviewMix] = useState<PreviewMixSettings>(getDefaultPreviewMix());
+  const [animatingIndices] = useState<Set<number>>(new Set());
+  const [isExporting] = useState(false);
+  const [progressMessage, setProgressMessage] = useState('');
+  const [currentCost, setCurrentCost] = useState<CostBreakdown | null>(null);
+  const [navigationOverlay, setNavigationOverlay] = useState<{ title: string; description: string } | null>(null);
+  const autosaveTimerRef = useRef<number | null>(null);
+  const lastWorkflowDraftSignatureRef = useRef('');
 
-  const [, setCurrentTopic] = useState<string>('');
-  const [, setCurrentCost] = useState<CostBreakdown | null>(null);
+  const storageReady = Boolean(studioState?.isStorageConfigured && studioState?.storageDir?.trim());
 
-  const costRef = useRef<CostBreakdown>({
-    images: 0,
-    tts: 0,
-    videos: 0,
-    total: 0,
-    imageCount: 0,
-    ttsCharacters: 0,
-    videoCount: 0,
-  });
-
-  const usedTopicsRef = useRef<string[]>([]);
-  const assetsRef = useRef<GeneratedAsset[]>([]);
-  const isAbortedRef = useRef(false);
-  const isProcessingRef = useRef(false);
-
-  const checkApiKeyStatus = useCallback(async () => {
-    if ((window as any).aistudio) {
-      const hasKey = await (window as any).aistudio.hasSelectedApiKey();
-      setNeedsKey(!hasKey);
-      return hasKey;
-    }
-    return true;
+  const promptStorageSelection = useCallback((message?: string) => {
+    setShowStartupWizard(true);
+    setNavigationOverlay(null);
+    setProgressMessage(message || '프로젝트 폴더를 먼저 정해야 저장 파일과 프로젝트 폴더가 생성됩니다. 저장 폴더를 선택해 주세요.');
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
   }, []);
 
   useEffect(() => {
-    checkApiKeyStatus();
+    studioStateRef.current = studioState;
+  }, [studioState]);
 
+  useEffect(() => () => {
+    if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
+  }, []);
+
+  const effectiveWorkflowDraft = useMemo(() => ensureWorkflowDraft(studioState), [studioState]);
+
+  const workflowProgress = useMemo(() => {
+    const completed = effectiveWorkflowDraft?.completedSteps || { step1: false, step2: false, step3: false, step4: false };
+    const count = Object.values(completed).filter(Boolean).length;
+    return {
+      percent: Math.round((count / 4) * 100),
+      text: `워크플로우 ${count}/4 단계 완료`,
+    };
+  }, [effectiveWorkflowDraft]);
+
+
+  const selectedCharacterName = useMemo(
+    () => studioState?.characters?.find((item) => item.id === studioState.selectedCharacterId)?.name || '',
+    [studioState]
+  );
+
+  const openApiModal = useCallback((options?: {
+    title?: string;
+    description?: string;
+    focusField?: 'openRouter' | 'elevenLabs' | 'fal' | null;
+  }) => {
+    setApiModalTitle(options?.title || 'API 키 등록');
+    setApiModalDescription(options?.description || '필요한 키를 등록하면 실제 생성 품질이 올라갑니다.');
+    setApiModalFocusField(options?.focusField || null);
+    setShowApiModal(true);
+  }, []);
+
+  const refreshProjects = useCallback(async (options?: { forceSync?: boolean }) => {
+    const projects = await getSavedProjects({ forceSync: Boolean(options?.forceSync) });
+    setSavedProjects(projects);
+
+    const cachedState = getCachedStudioState();
+    if (cachedState) {
+      setStudioState(cachedState);
+      return;
+    }
+
+    try {
+      const state = await fetchStudioState({ force: Boolean(options?.forceSync) });
+      setStudioState(state);
+    } catch {
+      // local cache fallback handled in service
+    }
+  }, []);
+
+  const commitPendingWorkflowDraft = useCallback(async () => {
+    const currentState = studioStateRef.current;
+    const pendingDraft = pendingWorkflowDraftRef.current;
+    if (!currentState || !pendingDraft) return;
+
+    try {
+      const nextState = await saveStudioState({
+        ...currentState,
+        workflowDraft: pendingDraft,
+        lastContentType: pendingDraft.contentType || currentState.lastContentType || 'story',
+        updatedAt: Date.now(),
+      });
+      pendingWorkflowDraftRef.current = null;
+      setStudioState(nextState);
+    } catch (error) {
+      console.error('[mp4Creater] workflow draft save failed', error);
+      setProgressMessage('임시 저장 중 오류가 발생해 현재 브라우저 상태를 유지합니다.');
+    }
+  }, []);
+
+  const handleStartNewProject = useCallback(async (forceType?: StudioState['lastContentType']) => {
+    if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
+    pendingWorkflowDraftRef.current = null;
+
+    const currentState = studioStateRef.current || studioState || createDefaultStudioState();
+    const nextDraft = createDefaultWorkflowDraft(forceType || currentState.lastContentType || 'story');
+    const nextState = await saveStudioState({
+      ...currentState,
+      workflowDraft: nextDraft,
+      selectedCharacterId: null,
+      updatedAt: Date.now(),
+      lastContentType: nextDraft.contentType,
+    });
+    setStudioState(nextState);
+    setGeneratedData([]);
+    setCurrentTopic('');
+    setCurrentProjectId(null);
+    setBackgroundMusicTracks([]);
+    setPreviewMix(getDefaultPreviewMix());
+    setCurrentCost(null);
+    setProgressMessage('신규 프로젝트 제작 상태로 초기화했습니다.');
+    setStep(GenerationStep.IDLE);
+    setViewMode('main');
+  }, [studioState]);
+
+  useEffect(() => {
+    setViewMode(searchParams?.get('view') === 'gallery' ? 'gallery' : 'main');
+  }, [searchParams]);
+
+
+  useEffect(() => {
     (async () => {
       try {
-        const state = await fetchStudioState();
+        const state = await fetchStudioState({ force: true });
         setStudioState(state);
-        setShowStartupWizard(!state.storageDir);
-        if (!state.selectedCharacterId || state.characters.length === 0) {
-          setShowStartupWizard(true);
-        }
-
-        if (state.providers?.openRouterApiKey) {
-          localStorage.setItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY, state.providers.openRouterApiKey);
-        }
+        const shouldShowWizard = !state.isStorageConfigured || !state.storageDir?.trim();
+        setShowStartupWizard(shouldShowWizard);
       } catch {
         const fallback = createDefaultStudioState();
         setStudioState(fallback);
@@ -121,514 +214,110 @@ const App: React.FC = () => {
       await migrateFromLocalStorage();
       const projects = await getSavedProjects();
       setSavedProjects(projects);
+      const cachedState = getCachedStudioState();
+      if (cachedState) setStudioState(cachedState);
     })();
-
-    return () => {
-      isAbortedRef.current = true;
-    };
-  }, [checkApiKeyStatus]);
-
-  const refreshProjects = useCallback(async () => {
-    const projects = await getSavedProjects();
-    setSavedProjects(projects);
-    try {
-      const state = await fetchStudioState();
-      setStudioState(state);
-    } catch {}
   }, []);
 
-  const handleOpenKeySelector = async () => {
-    if ((window as any).aistudio) {
-      await (window as any).aistudio.openSelectKey();
-      setNeedsKey(false);
-    }
-  };
+  useEffect(() => {
+    const newFlag = searchParams?.get('new') || '';
+    if (!newFlag || !studioState) return;
+    const signature = `${basePath}:${newFlag}`;
+    if (newProjectHandledRef.current === signature) return;
+    newProjectHandledRef.current = signature;
 
-  const updateAssetAt = (index: number, updates: Partial<GeneratedAsset>) => {
-    if (isAbortedRef.current) return;
+    void (async () => {
+      await handleStartNewProject(studioState.lastContentType);
+      router.replace(basePath, { scroll: false });
+    })();
+  }, [searchParams, studioState, handleStartNewProject, router, basePath]);
 
-    if (assetsRef.current[index]) {
-      assetsRef.current[index] = { ...assetsRef.current[index], ...updates };
-      setGeneratedData([...assetsRef.current]);
-    }
-  };
+  useEffect(() => {
+    if (!currentProjectId) return;
+    if (!generatedData.length) return;
+    if (!storageReady) return;
+    if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = window.setTimeout(async () => {
+      await updateProject(currentProjectId, {
+        assets: generatedData,
+        backgroundMusicTracks,
+        previewMix,
+        workflowDraft: studioState?.workflowDraft || null,
+      });
+      await refreshProjects();
+      setProgressMessage('현재 프로젝트 변경사항을 자동 저장했습니다.');
+    }, 500);
 
-  const addCost = (type: 'image' | 'tts' | 'video', amount: number, count: number = 1) => {
-    if (type === 'image') {
-      costRef.current.images += amount;
-      costRef.current.imageCount += count;
-    } else if (type === 'tts') {
-      costRef.current.tts += amount;
-      costRef.current.ttsCharacters += count;
-    } else if (type === 'video') {
-      costRef.current.videos += amount;
-      costRef.current.videoCount += count;
-    }
-
-    costRef.current.total =
-      costRef.current.images + costRef.current.tts + costRef.current.videos;
-
-    setCurrentCost({ ...costRef.current });
-  };
-
-  const resetCost = () => {
-    costRef.current = {
-      images: 0,
-      tts: 0,
-      videos: 0,
-      total: 0,
-      imageCount: 0,
-      ttsCharacters: 0,
-      videoCount: 0,
+    return () => {
+      if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
-    setCurrentCost(null);
-  };
-
-  const handleAbort = () => {
-    isAbortedRef.current = true;
-    isProcessingRef.current = false;
-    setProgressMessage('🛑 작업 중단됨.');
-    setStep(GenerationStep.COMPLETED);
-  };
-
-  const handleGenerate = useCallback(
-    async (topic: string, refImgs: ReferenceImages, sourceText: string | null) => {
-      if (isProcessingRef.current) return;
-
-      isProcessingRef.current = true;
-      isAbortedRef.current = false;
-
-      setStep(GenerationStep.SCRIPTING);
-      setProgressMessage('V9.2 Ultra 엔진 부팅 중...');
-
-      try {
-        const hasKey = await checkApiKeyStatus();
-        if (!hasKey && (window as any).aistudio) {
-          await (window as any).aistudio.openSelectKey();
-        }
-
-        setGeneratedData([]);
-        assetsRef.current = [];
-        setCurrentReferenceImages(refImgs);
-        setCurrentTopic(topic);
-        resetCost();
-
-        const hasRefImages =
-          (refImgs.character?.length || 0) + (refImgs.style?.length || 0) > 0;
-
-        console.log(
-          `[App] 참조 이미지 - 캐릭터: ${refImgs.character?.length || 0}개, 스타일: ${
-            refImgs.style?.length || 0
-          }개`
-        );
-
-        let targetTopic = topic;
-
-        if (topic === 'Manual Script Input' && sourceText) {
-          setProgressMessage('대본 분석 및 시각화 설계 중...');
-        } else if (sourceText) {
-          setProgressMessage('외부 콘텐츠 분석 중...');
-          targetTopic = 'Custom Analysis Topic';
-        } else {
-          setProgressMessage('글로벌 경제 트렌드 탐색 중...');
-          const trends = await findTrendingTopics(topic, usedTopicsRef.current);
-          if (isAbortedRef.current) return;
-          targetTopic = trends[0].topic;
-          usedTopicsRef.current.push(targetTopic);
-        }
-
-        setProgressMessage('스토리보드 및 메타포 생성 중...');
-
-        const inputLength = sourceText?.length || 0;
-        const CHUNK_THRESHOLD = 3000;
-
-        let scriptScenes: ScriptScene[];
-
-        if (inputLength > CHUNK_THRESHOLD) {
-          console.log(
-            `[App] 긴 대본 감지: ${inputLength.toLocaleString()}자 → 청크 분할 처리`
-          );
-          setProgressMessage(
-            `긴 대본(${inputLength.toLocaleString()}자) 청크 분할 처리 중...`
-          );
-
-          scriptScenes = await generateScriptChunked(
-            targetTopic,
-            hasRefImages,
-            sourceText!,
-            2500,
-            setProgressMessage
-          );
-        } else {
-          scriptScenes = await generateScript(targetTopic, hasRefImages, sourceText);
-        }
-
-        if (isAbortedRef.current) return;
-
-        const initialAssets = scriptScenes.map(scene => ({
-          ...scene,
-          imageData: null,
-          audioData: null,
-          audioDuration: null,
-          subtitleData: null,
-          videoData: null,
-          videoDuration: null,
-          status: 'pending' as const,
-        }));
-
-        assetsRef.current = initialAssets;
-        setGeneratedData(initialAssets);
-        setStep(GenerationStep.ASSETS);
-
-        const runAudio = async () => {
-          const TTS_DELAY = 1500;
-          const MAX_TTS_RETRIES = 2;
-
-          for (let i = 0; i < initialAssets.length; i++) {
-            if (isAbortedRef.current) break;
-
-            setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 음성 생성 중...`);
-            let success = false;
-
-            for (let attempt = 0; attempt <= MAX_TTS_RETRIES && !success; attempt++) {
-              if (isAbortedRef.current) break;
-
-              try {
-                if (attempt > 0) {
-                  console.log(
-                    `[TTS] 씬 ${i + 1} 재시도 중... (${attempt}/${MAX_TTS_RETRIES})`
-                  );
-                  await wait(3000);
-                }
-
-                const elResult = await generateAudioWithElevenLabs(
-                  assetsRef.current[i].narration
-                );
-
-                if (isAbortedRef.current) break;
-
-                if (elResult.audioData) {
-                  updateAssetAt(i, {
-                    audioData: elResult.audioData,
-                    subtitleData: elResult.subtitleData,
-                    audioDuration: elResult.estimatedDuration,
-                  });
-
-                  const charCount = assetsRef.current[i].narration.length;
-                  addCost('tts', charCount * PRICING.TTS.perCharacter, charCount);
-                  success = true;
-
-                  console.log(`[TTS] 씬 ${i + 1} 음성 생성 완료`);
-                } else {
-                  throw new Error('ElevenLabs 응답 없음');
-                }
-              } catch (e: any) {
-                console.error(
-                  `[TTS] 씬 ${i + 1} 실패 (시도 ${attempt + 1}):`,
-                  e.message
-                );
-
-                if (e.message?.includes('429') || e.message?.includes('rate')) {
-                  await wait(5000);
-                }
-              }
-            }
-
-            if (!success && !isAbortedRef.current) {
-              try {
-                console.log(`[TTS] 씬 ${i + 1} Gemini 폴백 시도...`);
-                const fallbackAudio = await generateAudioForScene(
-                  assetsRef.current[i].narration
-                );
-                updateAssetAt(i, { audioData: fallbackAudio });
-              } catch (fallbackError) {
-                console.error(`[TTS] 씬 ${i + 1} Gemini 폴백도 실패:`, fallbackError);
-              }
-            }
-
-            if (i < initialAssets.length - 1 && !isAbortedRef.current) {
-              await wait(TTS_DELAY);
-            }
-          }
-        };
-
-        const runImages = async () => {
-          const MAX_RETRIES = 2;
-          const imageModel = getSelectedImageModel();
-          const imagePrice =
-            PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
-
-          for (let i = 0; i < initialAssets.length; i++) {
-            if (isAbortedRef.current) break;
-
-            updateAssetAt(i, { status: 'generating' });
-            let success = false;
-            let lastError: any = null;
-
-            for (let attempt = 0; attempt <= MAX_RETRIES && !success; attempt++) {
-              if (isAbortedRef.current) break;
-
-              try {
-                if (attempt > 0) {
-                  setProgressMessage(
-                    `씬 ${i + 1} 이미지 재생성 시도 중... (${attempt}/${MAX_RETRIES})`
-                  );
-                  await wait(2000);
-                }
-
-                const img = await generateImage(assetsRef.current[i], refImgs);
-                if (isAbortedRef.current) break;
-
-                if (img) {
-                  updateAssetAt(i, { imageData: img, status: 'completed' });
-                  addCost('image', imagePrice, 1);
-                  success = true;
-                } else {
-                  throw new Error('이미지 데이터가 비어있습니다');
-                }
-              } catch (e: any) {
-                lastError = e;
-                console.error(
-                  `씬 ${i + 1} 이미지 생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`,
-                  e.message
-                );
-
-                if (e.message?.includes('API key not valid') || e.status === 400) {
-                  setNeedsKey(true);
-                  break;
-                }
-              }
-            }
-
-            if (!success && !isAbortedRef.current) {
-              updateAssetAt(i, { status: 'error' });
-              console.error(`씬 ${i + 1} 이미지 생성 최종 실패:`, lastError?.message);
-            }
-
-            await wait(50);
-          }
-        };
-
-        setProgressMessage('시각 에셋 및 오디오 합성 중...');
-        await Promise.all([runAudio(), runImages()]);
-
-        if (isAbortedRef.current) return;
-
-        setStep(GenerationStep.COMPLETED);
-
-        const cost = costRef.current;
-        const costMsg = `이미지 ${cost.imageCount}장 ${formatKRW(
-          cost.images
-        )} + TTS ${cost.ttsCharacters}자 ${formatKRW(cost.tts)} = 총 ${formatKRW(
-          cost.total
-        )}`;
-
-        setProgressMessage(`생성 완료! ${costMsg}`);
-
-        try {
-          const savedProject = await saveProject(
-            targetTopic,
-            assetsRef.current,
-            undefined,
-            costRef.current
-          );
-          refreshProjects();
-          setProgressMessage(`"${savedProject.name}" 저장됨 | ${costMsg}`);
-        } catch (e) {
-          console.error('프로젝트 자동 저장 실패:', e);
-        }
-      } catch (error: any) {
-        if (!isAbortedRef.current) {
-          setStep(GenerationStep.ERROR);
-          setProgressMessage(`오류: ${error.message}`);
-        }
-      } finally {
-        isProcessingRef.current = false;
-      }
-    },
-    [checkApiKeyStatus, refreshProjects]
-  );
-
-  const handleRegenerateImage = useCallback(
-    async (idx: number) => {
-      if (isProcessingRef.current) return;
-
-      const MAX_RETRIES = 2;
-      updateAssetAt(idx, { status: 'generating' });
-      setProgressMessage(`씬 ${idx + 1} 이미지 재생성 중...`);
-
-      let success = false;
-
-      for (let attempt = 0; attempt <= MAX_RETRIES && !success; attempt++) {
-        if (isAbortedRef.current) break;
-
-        try {
-          if (attempt > 0) {
-            setProgressMessage(
-              `씬 ${idx + 1} 이미지 재생성 재시도 중... (${attempt}/${MAX_RETRIES})`
-            );
-            await wait(2000);
-          }
-
-          const img = await generateImage(
-            assetsRef.current[idx],
-            currentReferenceImages
-          );
-
-          if (img && !isAbortedRef.current) {
-            updateAssetAt(idx, { imageData: img, status: 'completed' });
-
-            const imageModel = getSelectedImageModel();
-            const imagePrice =
-              PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
-
-            addCost('image', imagePrice, 1);
-            setProgressMessage(
-              `씬 ${idx + 1} 이미지 재생성 완료! (+${formatKRW(imagePrice)})`
-            );
-            success = true;
-          } else if (!img) {
-            throw new Error('이미지 데이터가 비어있습니다');
-          }
-        } catch (e: any) {
-          console.error(
-            `씬 ${idx + 1} 재생성 실패 (시도 ${attempt + 1}/${MAX_RETRIES + 1}):`,
-            e.message
-          );
-
-          if (e.message?.includes('API key not valid') || e.status === 400) {
-            setNeedsKey(true);
-            break;
-          }
-        }
-      }
-
-      if (!success && !isAbortedRef.current) {
-        updateAssetAt(idx, { status: 'error' });
-        setProgressMessage(`씬 ${idx + 1} 이미지 생성 실패. 다시 시도해주세요.`);
-      }
-    },
-    [currentReferenceImages]
-  );
-
-  const handleGenerateAnimation = useCallback(
-    async (idx: number) => {
-      const falKey = getFalApiKey();
-
-      if (!falKey) {
-        alert(
-          'FAL API 키를 먼저 등록해주세요.\n설정 패널에서 "FAL.ai 애니메이션 엔진"을 열어 키를 입력하세요.'
-        );
-        return;
-      }
-
-      if (animatingIndices.has(idx)) return;
-
-      if (!assetsRef.current[idx]?.imageData) {
-        alert('이미지가 먼저 생성되어야 합니다.');
-        return;
-      }
-
-      try {
-        setAnimatingIndices(prev => new Set(prev).add(idx));
-        setProgressMessage(`씬 ${idx + 1} 움직임 분석 중...`);
-
-        const motionPrompt = await generateMotionPrompt(
-          assetsRef.current[idx].narration,
-          assetsRef.current[idx].visualPrompt
-        );
-
-        setProgressMessage(`씬 ${idx + 1} 영상 변환 중...`);
-
-        const videoUrl = await generateVideoFromImage(
-          assetsRef.current[idx].imageData!,
-          motionPrompt,
-          falKey
-        );
-
-        if (videoUrl) {
-          updateAssetAt(idx, {
-            videoData: videoUrl,
-            videoDuration: CONFIG.ANIMATION.VIDEO_DURATION,
-          });
-
-          addCost('video', PRICING.VIDEO.perVideo, 1);
-          setProgressMessage(
-            `씬 ${idx + 1} 영상 변환 완료! (+${formatKRW(PRICING.VIDEO.perVideo)})`
-          );
-        } else {
-          setProgressMessage(`씬 ${idx + 1} 영상 변환 실패`);
-        }
-      } catch (e: any) {
-        console.error('영상 변환 실패:', e);
-        setProgressMessage(`씬 ${idx + 1} 오류: ${e.message}`);
-      } finally {
-        setAnimatingIndices(prev => {
-          const next = new Set(prev);
-          next.delete(idx);
-          return next;
-        });
-      }
-    },
-    [animatingIndices]
-  );
-
-  const triggerVideoExport = async (enableSubtitles: boolean = true) => {
-    if (isVideoGenerating) return;
-
-    try {
-      setIsVideoGenerating(true);
-
-      const suffix = enableSubtitles ? 'sub' : 'nosub';
-      const timestamp = Date.now();
-
-      const result = await generateVideo(
-        assetsRef.current,
-        msg => setProgressMessage(`[Render] ${msg}`),
-        isAbortedRef,
-        { enableSubtitles }
-      );
-
-      if (result) {
-        saveAs(result.videoBlob, `tubegen_v92_${suffix}_${timestamp}.mp4`);
-        setProgressMessage(
-          `✨ MP4 렌더링 완료! (${enableSubtitles ? '자막 O' : '자막 X'})`
-        );
-      }
-    } catch (error: any) {
-      setProgressMessage(`렌더링 실패: ${error.message}`);
-    } finally {
-      setIsVideoGenerating(false);
-    }
-  };
+  }, [currentProjectId, generatedData, backgroundMusicTracks, previewMix, studioState?.workflowDraft, refreshProjects, storageReady]);
 
   const handleDeleteProject = async (id: string) => {
     await deleteProject(id);
     await refreshProjects();
   };
 
-  const handleLoadProject = (project: SavedProject) => {
-    const safeAssets = Array.isArray(project?.assets) ? project.assets : [];
+  const handleLoadProject = useCallback((project: SavedProject) => {
+    if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
+    pendingWorkflowDraftRef.current = null;
 
-    assetsRef.current = safeAssets;
+    const safeAssets = normalizeLoadedAssets(Array.isArray(project.assets) ? project.assets : []);
     setGeneratedData([...safeAssets]);
-    setCurrentTopic(project?.topic || project?.name || '');
+    setCurrentTopic(project.topic || project.name || '불러온 프로젝트');
+    setCurrentProjectId(project.id);
+    setBackgroundMusicTracks(project.backgroundMusicTracks || []);
+    setPreviewMix(project.previewMix || getDefaultPreviewMix());
+    setCurrentCost(project.cost || null);
     setStep(GenerationStep.COMPLETED);
-    setProgressMessage(`"${project.name}" 프로젝트 불러옴`);
+    setProgressMessage(`"${project.name}" 프로젝트를 불러왔습니다.`);
     setViewMode('main');
-  };
+
+    if (project.workflowDraft) {
+      const nextState = {
+        ...(studioStateRef.current || createDefaultStudioState()),
+        workflowDraft: project.workflowDraft,
+        lastContentType: project.workflowDraft.contentType || studioStateRef.current?.lastContentType || 'story',
+        updatedAt: Date.now(),
+      };
+      setStudioState(nextState);
+      pendingWorkflowDraftRef.current = project.workflowDraft;
+      if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
+      workflowDraftSaveTimerRef.current = window.setTimeout(() => {
+        void commitPendingWorkflowDraft();
+      }, 250);
+    }
+  }, [commitPendingWorkflowDraft]);
+
+  useEffect(() => {
+    const projectId = searchParams?.get('projectId') || '';
+    const returnTo = searchParams?.get('returnTo') || '';
+    if (!projectId || viewMode !== 'main') return;
+    const signature = `${basePath}:${projectId}:${returnTo}`;
+    if (queryProjectHandledRef.current === signature) return;
+    queryProjectHandledRef.current = signature;
+
+    void (async () => {
+      const project = await getProjectById(projectId, { forceSync: true });
+      if (!project) return;
+      handleLoadProject(project);
+      if (returnTo === 'workflow') {
+        setProgressMessage('씬 제작 화면에서 돌아온 프로젝트를 다시 불러왔습니다. 프롬프트와 화풍을 수정한 뒤 Step 4에서 다시 씬 제작으로 이동할 수 있습니다.');
+      }
+      router.replace(basePath, { scroll: false });
+    })();
+  }, [searchParams, viewMode, basePath, router, handleLoadProject]);
 
 
   const handleStartupComplete = async (payload: {
     storageDir: string;
-    characters: StudioState['characters'];
-    selectedCharacterId: string;
   }) => {
-    const configured = await configureStorage(payload.storageDir);
+    const configured = await configureStorage(payload.storageDir.trim());
     const nextState = await saveStudioState({
       ...configured,
-      characters: payload.characters,
-      selectedCharacterId: payload.selectedCharacterId,
+      characters: configured.characters || [],
+      selectedCharacterId: configured.selectedCharacterId || null,
+      isStorageConfigured: true,
     });
     setStudioState(nextState);
     setShowStartupWizard(false);
@@ -636,34 +325,172 @@ const App: React.FC = () => {
   };
 
   const handleSaveStudioState = async (partial: Partial<StudioState>) => {
+    const currentState = studioStateRef.current || createDefaultStudioState();
     const nextState = await saveStudioState({
-      ...studioState,
+      ...currentState,
       ...partial,
+      updatedAt: Date.now(),
+    });
+    setStudioState(nextState);
+    setShowStartupWizard(!nextState.isStorageConfigured || !nextState.storageDir?.trim());
+  };
+
+  const handleQuickRoutingUpdate = async (patch: Partial<StudioState['routing']>) => {
+    const currentState = studioStateRef.current;
+    if (!currentState) return;
+    const nextState = await saveStudioState({
+      ...currentState,
+      routing: {
+        ...currentState.routing,
+        ...patch,
+      },
       updatedAt: Date.now(),
     });
     setStudioState(nextState);
   };
 
-  const selectedCharacterName =
-    studioState?.characters?.find((item) => item.id === studioState.selectedCharacterId)?.name || '';
+  const handleSaveWorkflowDraft = (draftPatch: Partial<WorkflowDraft>) => {
+    const currentState = studioStateRef.current;
+    if (!currentState) return;
+
+    const baseDraft = currentState.workflowDraft || createDefaultWorkflowDraft(currentState.lastContentType || 'story');
+    const nextDraft = {
+      ...baseDraft,
+      ...draftPatch,
+      updatedAt: Date.now(),
+    };
+    const draftSignature = JSON.stringify({
+      id: nextDraft.id,
+      contentType: nextDraft.contentType,
+      aspectRatio: nextDraft.aspectRatio,
+      topic: nextDraft.topic,
+      activeStage: nextDraft.activeStage,
+      updatedAt: draftPatch.updatedAt,
+      selectedCharacterIds: nextDraft.selectedCharacterIds,
+      selectedStyleImageId: nextDraft.selectedStyleImageId,
+      script: nextDraft.script,
+      completedSteps: nextDraft.completedSteps,
+      extractedCharacters: nextDraft.extractedCharacters,
+      styleImages: nextDraft.styleImages,
+      promptTemplates: nextDraft.promptTemplates,
+      selectedPromptTemplateId: nextDraft.selectedPromptTemplateId,
+    });
+
+    if (lastWorkflowDraftSignatureRef.current === draftSignature) return;
+    lastWorkflowDraftSignatureRef.current = draftSignature;
+
+    pendingWorkflowDraftRef.current = nextDraft;
+    setStudioState((prev) => (prev ? {
+      ...prev,
+      workflowDraft: nextDraft,
+      lastContentType: nextDraft.contentType || prev.lastContentType || 'story',
+    } : prev));
+
+    if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
+    workflowDraftSaveTimerRef.current = window.setTimeout(() => {
+      void commitPendingWorkflowDraft();
+    }, 900);
+  };
+
+  const handleOpenSceneStudio = useCallback(async (draftPatch: Partial<WorkflowDraft>) => {
+    const currentState = studioStateRef.current || createDefaultStudioState();
+    if (!currentState.isStorageConfigured || !currentState.storageDir?.trim()) {
+      promptStorageSelection('저장 폴더가 정해져야 프로젝트 번호 폴더와 씬 파일을 만들 수 있습니다. 먼저 저장 폴더를 선택해 주세요.');
+      return;
+    }
+    const baseDraft = currentState.workflowDraft || createDefaultWorkflowDraft(currentState.lastContentType || 'story');
+    const nextDraft: WorkflowDraft = {
+      ...baseDraft,
+      ...draftPatch,
+      updatedAt: Date.now(),
+    };
+
+    if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
+    pendingWorkflowDraftRef.current = null;
+    setNavigationOverlay({
+      title: '씬 제작 페이지를 여는 중',
+      description: '프로젝트를 먼저 저장하고, 씬 카드는 생성 버튼을 눌렀을 때만 실제 AI 작업이 시작되도록 준비합니다.',
+    });
+
+    try {
+      const nextState = await saveStudioState({
+        ...currentState,
+        workflowDraft: nextDraft,
+        lastContentType: nextDraft.contentType || currentState.lastContentType || 'story',
+        updatedAt: Date.now(),
+      });
+      setStudioState(nextState);
+
+      const initialSceneAssets = nextDraft.script?.trim()
+        ? createInitialSceneAssetsFromDraft(nextDraft)
+        : generatedData;
+
+      const nextBackgroundTracks = backgroundMusicTracks.length ? backgroundMusicTracks : [createSampleBackgroundTrack(nextDraft)];
+      const nextPreviewMix = previewMix || getDefaultPreviewMix();
+
+      const project = await upsertWorkflowProject({
+        projectId: currentProjectId,
+        topic: nextDraft.topic || '새 프로젝트',
+        workflowDraft: nextDraft,
+        assets: initialSceneAssets,
+        cost: currentCost || undefined,
+        backgroundMusicTracks: nextBackgroundTracks,
+        previewMix: nextPreviewMix,
+      });
+
+      setGeneratedData(normalizeLoadedAssets(initialSceneAssets));
+      setBackgroundMusicTracks(nextBackgroundTracks);
+      setPreviewMix(nextPreviewMix);
+      setProgressMessage('문단별 씬 카드와 신규 배경음을 먼저 준비했습니다. 씬 제작 화면에서는 생성 버튼을 누를 때만 실제 AI 작업이 시작됩니다.');
+
+      setCurrentProjectId(project.id);
+      await refreshProjects();
+      try {
+        localStorage.removeItem(CONFIG.STORAGE_KEYS.PENDING_SCENE_AUTOSTART);
+      } catch {}
+      router.push(`${basePath}/scene-studio?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+    } catch (error) {
+      console.error('[mp4Creater] scene studio open failed', error);
+      setNavigationOverlay(null);
+      setProgressMessage('씬 제작 페이지를 여는 중 문제가 생겼습니다. 입력값을 다시 확인해 주세요.');
+    }
+  }, [backgroundMusicTracks, basePath, currentCost, currentProjectId, generatedData, previewMix, promptStorageSelection, refreshProjects, router]);
+
+  const handleNarrationChange = (index: number, narration: string) => {
+    setGeneratedData((prev) => prev.map((item, itemIndex) => itemIndex === index ? {
+      ...item,
+      narration,
+      targetDuration: Math.max(item.targetDuration || 0, estimateClipDuration(narration)),
+    } : item));
+  };
+
+  const handleDurationChange = (index: number, duration: number) => {
+    setGeneratedData((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, targetDuration: duration } : item));
+  };
+
+  if (!studioState) {
+    return <StudioPageSkeleton title="워크플로우를 불러오는 중" description="Step 1부터 Step 4까지 저장된 상태를 먼저 정리하고 있습니다." />;
+  }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <LoadingOverlay open={Boolean(navigationOverlay)} title={navigationOverlay?.title || '이동 중'} description={navigationOverlay?.description} />
       <Header
         projectCount={savedProjects.length}
         selectedCharacterName={selectedCharacterName}
         storageDir={studioState?.storageDir}
         onOpenSettings={() => setShowSettings(true)}
-        onGoMain={() => setViewMode('main')}
-        onGoGallery={() => setViewMode('gallery')}
+        onGoMain={() => { router.push(`${basePath}?new=${Date.now()}`, { scroll: false }); }}
+        onGoGallery={() => { router.push(`${basePath}?view=gallery`, { scroll: false }); }}
         viewMode={viewMode}
+        basePath={basePath}
+        currentSection={viewMode}
+        progressPercent={workflowProgress.percent}
+        progressText={workflowProgress.text}
       />
 
       {showStartupWizard && (
-        <StartupWizard
-          initialStorageDir={studioState?.storageDir}
-          onComplete={handleStartupComplete}
-        />
+        <StartupWizard initialStorageDir={studioState?.storageDir} onComplete={handleStartupComplete} />
       )}
 
       <SettingsDrawer
@@ -673,72 +500,82 @@ const App: React.FC = () => {
         onSave={handleSaveStudioState}
       />
 
-      {needsKey && (
-        <div className="bg-amber-500/10 border-b border-amber-500/20 py-2 px-4 flex items-center justify-center gap-4 animate-in fade-in slide-in-from-top-4">
-          <span className="text-amber-400 text-xs font-bold">
-            Gemini 3 Pro 엔진을 위해 API 키 설정이 필요합니다.
-          </span>
-          <button
-            onClick={handleOpenKeySelector}
-            className="px-3 py-1 bg-amber-500 text-slate-950 text-[10px] font-black rounded-lg hover:bg-amber-400 transition-colors uppercase"
-          >
-            API 키 설정
-          </button>
-        </div>
-      )}
+      <ProviderQuickModal
+        open={showApiModal}
+        studioState={studioState}
+        title={apiModalTitle}
+        description={apiModalDescription}
+        focusField={apiModalFocusField}
+        onClose={() => setShowApiModal(false)}
+        onSave={handleSaveStudioState}
+        onOpenFullSettings={() => {
+          setShowApiModal(false);
+          setShowSettings(true);
+        }}
+      />
 
       {viewMode === 'gallery' && (
         <ProjectGallery
           projects={savedProjects}
-          onBack={() => setViewMode('main')}
+          onBack={() => { router.push(basePath, { scroll: false }); }}
           onDelete={handleDeleteProject}
           onRefresh={refreshProjects}
           onLoad={handleLoadProject}
+          basePath={basePath}
         />
       )}
 
       {viewMode === 'main' && (
         <main className="py-8">
-          <InputSection onGenerate={handleGenerate} step={step} />
+          {!storageReady && (
+            <div className="mx-auto mb-6 max-w-6xl px-4">
+              <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-[0.2em] text-amber-700">저장 폴더 필요</div>
+                    <p className="mt-1 text-sm font-semibold text-amber-900">프로젝트 폴더를 정해야 번호별 프로젝트 폴더와 이미지·영상·프롬프트 파일이 함께 저장됩니다.</p>
+                  </div>
+                  <button type="button" onClick={() => setShowStartupWizard(true)} className="rounded-2xl bg-amber-600 px-4 py-3 text-sm font-black text-white hover:bg-amber-500">폴더 선택하기</button>
+                </div>
+              </div>
+            </div>
+          )}
+          <InputSection
+            step={step}
+            studioState={studioState}
+            workflowDraft={effectiveWorkflowDraft}
+            basePath={basePath}
+            onOpenSettings={() => setShowSettings(true)}
+            onOpenApiModal={(options) => openApiModal({ title: options?.title || 'API 키 빠른 등록', description: options?.description || '텍스트, 오디오, 영상 공급자 키를 빠르게 등록할 수 있습니다.', focusField: options?.focusField || null })}
+            onUpdateRouting={handleQuickRoutingUpdate}
+            onSaveWorkflowDraft={handleSaveWorkflowDraft}
+            onOpenSceneStudio={handleOpenSceneStudio}
+          />
 
-          {step !== GenerationStep.IDLE && (
-            <div className="max-w-7xl mx-auto px-4 text-center mb-12">
-              <div className="inline-flex items-center gap-4 px-6 py-3 rounded-2xl border bg-slate-900 border-slate-800 shadow-2xl">
-                {step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS ? (
-                  <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent animate-spin rounded-full" />
-                ) : (
-                  <div
-                    className={`w-2 h-2 rounded-full ${
-                      step === GenerationStep.ERROR ? 'bg-red-500' : 'bg-green-500'
-                    }`}
-                  />
-                )}
-
-                <span className="text-sm font-bold text-slate-300">
-                  {progressMessage}
-                </span>
-
-                {(step === GenerationStep.SCRIPTING ||
-                  step === GenerationStep.ASSETS) && (
-                  <button
-                    onClick={handleAbort}
-                    className="ml-2 px-3 py-1 rounded-lg bg-red-600/20 text-red-500 text-[10px] font-black uppercase tracking-widest border border-red-500/30"
-                  >
-                    Stop
-                  </button>
-                )}
+          {progressMessage && (
+            <div className="mx-auto mb-6 max-w-6xl px-4 text-center">
+              <div className="inline-flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+                <div className={`h-2.5 w-2.5 rounded-full ${step === GenerationStep.ERROR ? 'bg-red-500' : 'bg-emerald-500'}`} />
+                <span className="text-sm font-bold text-slate-700">{progressMessage}</span>
               </div>
             </div>
           )}
 
-          <ResultTable
-            data={generatedData}
-            onRegenerateImage={handleRegenerateImage}
-            onExportVideo={triggerVideoExport}
-            isExporting={isVideoGenerating}
-            animatingIndices={animatingIndices}
-            onGenerateAnimation={handleGenerateAnimation}
-          />
+          {generatedData.length > 0 && (
+            <ResultTable
+              data={generatedData}
+              onNarrationChange={handleNarrationChange}
+              onDurationChange={handleDurationChange}
+              onOpenSettings={() => setShowSettings(true)}
+              isExporting={isExporting}
+              animatingIndices={animatingIndices}
+              backgroundMusicTracks={backgroundMusicTracks}
+              previewMix={previewMix}
+              onPreviewMixChange={setPreviewMix}
+              currentTopic={currentTopic}
+              totalCost={currentCost || undefined}
+            />
+          )}
         </main>
       )}
     </div>

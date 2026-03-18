@@ -1,0 +1,43 @@
+{
+  "version": 2,
+  "description": "MP4Creater public sample manifest template",
+  "root": "/mp4Creater/samples",
+  "categories": {
+    "characters": [
+      {
+        "id": "char-heroine-v1",
+        "label": "주인공 샘플 캐릭터",
+        "path": "/mp4Creater/samples/characters/char-heroine-v1.svg",
+        "kind": "image",
+        "tags": ["character", "heroine", "lead"]
+      },
+      {
+        "id": "char-host-v1",
+        "label": "진행자 샘플 캐릭터",
+        "path": "/mp4Creater/samples/characters/char-host-v1.svg",
+        "kind": "image",
+        "tags": ["character", "host", "narrator"]
+      }
+    ],
+    "styles": [
+      {
+        "id": "style-news-clean-v1",
+        "label": "뉴스 클린 화풍",
+        "path": "/mp4Creater/samples/styles/style-news-clean-v1.svg",
+        "kind": "image",
+        "tags": ["style", "news", "clean"]
+      },
+      {
+        "id": "style-cinematic-night-v1",
+        "label": "시네마틱 야간 화풍",
+        "path": "/mp4Creater/samples/styles/style-cinematic-night-v1.svg",
+        "kind": "image",
+        "tags": ["style", "cinematic", "night"]
+      }
+    ],
+    "images": [],
+    "videos": [],
+    "audio": [],
+    "thumbnails": []
+  }
+}

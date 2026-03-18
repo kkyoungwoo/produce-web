@@ -5,6 +5,7 @@
  */
 
 import { CONFIG } from '../config';
+import { AspectRatio } from '../types';
 
 interface PixVerseVideoResponse {
   video: {
@@ -45,7 +46,8 @@ function base64ToDataUrl(base64: string, mimeType: string = 'image/png'): string
 export async function generateVideoFromImage(
   imageBase64: string,
   motionPrompt: string,
-  apiKey?: string
+  apiKey?: string,
+  aspectRatio: AspectRatio = '16:9'
 ): Promise<string | null> {
   const key = apiKey || getFalApiKey();
 
@@ -72,7 +74,7 @@ export async function generateVideoFromImage(
       prompt: motionPrompt,
       image_url: imageUrl,
       duration: 5,              // 5초 영상
-      aspect_ratio: '16:9',
+      aspect_ratio: aspectRatio,
       resolution: '720p',       // 720p 품질
       negative_prompt: 'blurry, low quality, low resolution, pixelated, noisy, grainy, distorted, static'
     };
