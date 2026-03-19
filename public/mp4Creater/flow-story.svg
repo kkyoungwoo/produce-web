@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <defs>
+    <linearGradient id="a" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="720" rx="36" fill="url(#a)"/>
+  <rect x="72" y="76" width="1056" height="568" rx="28" fill="#020617" stroke="#334155" stroke-width="3"/>
+  <text x="112" y="148" fill="#22c55e" font-family="Arial, sans-serif" font-weight="700" font-size="26">STEP 1</text>
+  <text x="112" y="208" fill="#ffffff" font-family="Arial, sans-serif" font-weight="800" font-size="56">스토리를 먼저 완성합니다</text>
+  <rect x="112" y="262" width="300" height="88" rx="18" fill="#111827" stroke="#475569"/>
+  <text x="142" y="316" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="30">장르 선택</text>
+  <rect x="434" y="262" width="300" height="88" rx="18" fill="#111827" stroke="#475569"/>
+  <text x="464" y="316" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="30">분위기 선택</text>
+  <rect x="756" y="262" width="300" height="88" rx="18" fill="#111827" stroke="#475569"/>
+  <text x="786" y="316" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="30">엔딩 톤 선택</text>
+  <foreignObject x="112" y="392" width="944" height="170">
+    <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; font-size: 30px; line-height: 1.55; color: #94a3b8;">선택값만으로도 문단형 초안을 만들고, 마음에 들면 직접 고쳐 씁니다. 이 단계의 빈 줄 하나가 나중에 영상의 한 컷이 됩니다.</div>
+  </foreignObject>
+</svg>

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#f8fafc" rx="36"/>
+  <rect x="96" y="60" width="768" height="420" rx="28" fill="#ffffff" stroke="#cbd5e1" stroke-width="4"/>
+  <rect x="118" y="84" width="724" height="80" rx="22" fill="#eff6ff"/>
+  <text x="144" y="136" fill="#1d4ed8" font-size="28" font-family="Arial, sans-serif" font-weight="700">진행자 샘플 캐릭터</text>
+  <circle cx="268" cy="258" r="74" fill="#dbeafe"/>
+  <circle cx="268" cy="240" r="44" fill="#ffffff" stroke="#93c5fd" stroke-width="6"/>
+  <path d="M214 348c18-32 36-48 54-48s36 16 54 48v76H214z" fill="#2563eb"/>
+  <rect x="400" y="206" width="362" height="20" rx="10" fill="#cbd5e1"/>
+  <rect x="400" y="250" width="310" height="20" rx="10" fill="#e2e8f0"/>
+  <rect x="400" y="294" width="340" height="20" rx="10" fill="#e2e8f0"/>
+  <rect x="400" y="356" width="184" height="54" rx="18" fill="#0f172a"/>
+  <text x="430" y="390" fill="#ffffff" font-size="20" font-family="Arial, sans-serif" font-weight="700">ANCHOR LOOK</text>
+</svg>

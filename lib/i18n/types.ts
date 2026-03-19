@@ -1,4 +1,4 @@
-export type NavKey = "home" | "about" | "services" | "contact" | "dbCleanup";
+export type NavKey = "home" | "about" | "services" | "contact" | "dbCleanup" | "mp4Creater";
 
 export type SeoItem = {
   title: string;

@@ -15,6 +15,7 @@ const ko: LocaleContent = {
     services: "데이터 보기",
     contact: "문의하기",
     dbCleanup: "DB 정리",
+    mp4Creater: "영상 생성",
   },
   store: {
     detailLabel: "자세히 보기",

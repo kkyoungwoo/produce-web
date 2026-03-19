@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <defs>
+    <linearGradient id="a" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#111827"/>
+      <stop offset="100%" stop-color="#1f2937"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="720" rx="36" fill="url(#a)"/>
+  <rect x="72" y="76" width="1056" height="568" rx="28" fill="#020617" stroke="#334155" stroke-width="3"/>
+  <text x="112" y="148" fill="#60a5fa" font-family="Arial, sans-serif" font-weight="700" font-size="26">STEP 2</text>
+  <text x="112" y="208" fill="#ffffff" font-family="Arial, sans-serif" font-weight="800" font-size="56">주인공과 비주얼을 고정합니다</text>
+  <circle cx="248" cy="390" r="88" fill="#111827" stroke="#60a5fa" stroke-width="4"/>
+  <circle cx="248" cy="354" r="14" fill="#ffffff"/>
+  <circle cx="218" cy="350" r="6" fill="#ffffff"/>
+  <circle cx="278" cy="350" r="6" fill="#ffffff"/>
+  <path d="M248 372 C228 394, 268 394, 248 372" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round"/>
+  <rect x="402" y="302" width="560" height="64" rx="16" fill="#111827" stroke="#475569"/>
+  <text x="434" y="344" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="30">의상 포인트, 색상, 소품을 고정</text>
+  <rect x="402" y="390" width="560" height="64" rx="16" fill="#111827" stroke="#475569"/>
+  <text x="434" y="432" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="30">참조 이미지가 있으면 일관성 강화</text>
+  <rect x="402" y="478" width="560" height="64" rx="16" fill="#111827" stroke="#475569"/>
+  <text x="434" y="520" fill="#e2e8f0" font-family="Arial, sans-serif" font-size="30">모델은 설정에서 나중에 교체 가능</text>
+</svg>
