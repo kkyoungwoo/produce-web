@@ -86,7 +86,21 @@ const getCompletedMinutesLabel = (project: SavedProject) => {
   return `${minutes}분`;
 };
 
-const resolveLastWorkedStep = (project: SavedProject): 1 | 2 | 3 | 4 | 5 => {
+const hasSceneStudioProgress = (project: SavedProject) => {
+  const assets = Array.isArray(project.assets) ? project.assets : [];
+  if (!assets.length) return false;
+  return assets.some((asset) => (
+    Boolean(asset.imageData)
+    || Boolean(asset.audioData)
+    || Boolean(asset.videoData)
+    || Boolean(asset.imageHistory?.length)
+    || Boolean(asset.videoHistory?.length)
+    || asset.status !== 'pending'
+  ));
+};
+
+const resolveLastWorkedStep = (project: SavedProject): 1 | 2 | 3 | 4 | 5 | 6 => {
+  if (hasSceneStudioProgress(project)) return 6;
   const draft = project.workflowDraft;
   if (!draft) return 1;
   const completed = draft.completedSteps || { step1: false, step2: false, step3: false, step4: false, step5: false };
@@ -138,6 +152,10 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   const visibleProjects = useMemo(
     () => sortedProjects.slice(0, visibleProjectCount),
     [sortedProjects, visibleProjectCount]
+  );
+  const duplicatingProject = useMemo(
+    () => (duplicatingProjectId ? sortedProjects.find((project) => project.id === duplicatingProjectId) || null : null),
+    [duplicatingProjectId, sortedProjects]
   );
   const hasMoreProjects = visibleProjectCount < sortedProjects.length;
 
@@ -455,14 +473,22 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           </div>
         ))}
         {duplicatingProjectId && (
-          <div key="skeleton-copying" className={`${CARD_HEIGHT} ${CARD_WIDTH} overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm`}>
-            <div className="h-[118px] animate-pulse bg-slate-200" />
-            <div className="space-y-2.5 p-3">
-              <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
-              <div className="h-3 w-1/2 animate-pulse rounded bg-slate-200" />
-              <div className="mt-4 grid grid-cols-3 gap-1.5">
-                <div className="col-span-2 h-7 animate-pulse rounded-xl bg-slate-200" />
-                <div className="col-span-1 h-7 animate-pulse rounded-xl bg-slate-200" />
+          <div key="skeleton-copying" className={`${CARD_HEIGHT} ${CARD_WIDTH} overflow-hidden rounded-[24px] border border-blue-200 bg-white shadow-sm`}>
+            <div className="relative h-[118px] overflow-hidden border-b border-slate-200" style={{ background: duplicatingProject ? resolveThumbnailBackground(duplicatingProject) : 'linear-gradient(135deg, #dbeafe, #bfdbfe)' }}>
+              {duplicatingProject && resolveImageSrc(resolveProjectCardThumbnail(duplicatingProject)) ? (
+                <img src={resolveImageSrc(resolveProjectCardThumbnail(duplicatingProject))} alt={`${duplicatingProject.name} 복사중`} className="h-full w-full object-cover opacity-70" />
+              ) : null}
+              <div className="absolute inset-0 bg-slate-900/18" />
+              <div className="absolute left-3 top-3 rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-black text-blue-700">복사중</div>
+              <div className="absolute inset-x-4 bottom-4">
+                <div className="truncate rounded-xl bg-slate-900/55 px-3 py-2 text-sm font-black text-white">
+                  {(duplicatingProject?.name || '프로젝트')} 복사본 생성 중
+                </div>
+              </div>
+            </div>
+            <div className="p-3">
+              <div className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-[11px] leading-5 text-blue-900">
+                현재 이 프로젝트를 복사하고 있습니다. 완료되면 카드가 바로 추가됩니다.
               </div>
             </div>
           </div>
@@ -504,12 +530,12 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                   }}
                   className={`absolute right-3 top-3 z-20 rounded-full px-2.5 py-1 text-[11px] font-black shadow-sm transition-colors ${
                     duplicatingProjectId || isInteractionLocked
-                      ? 'cursor-not-allowed bg-slate-100 text-slate-400'
+                      ? (project.id === duplicatingProjectId ? 'cursor-wait bg-blue-600 text-white' : 'cursor-not-allowed bg-slate-100 text-slate-400')
                       : 'bg-white/95 text-slate-700 hover:bg-white'
                   }`}
                   title="복사"
                 >
-                  복사
+                  {project.id === duplicatingProjectId ? '복사중...' : '복사'}
                 </button>
               ) : null}
               <div

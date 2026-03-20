@@ -1,0 +1,10 @@
+Write a clear, structured explainer script that prioritizes understanding speed. Keep definitions simple, examples concrete, and transitions smooth from point to point.
+
+[SCENE ACTIONS]
+Topic: 실수 줄이는 체크리스트 안내
+Genre: 정보 전달
+Mood: 정돈된
+Setting: 설명형 보드
+Lead: 설명자
+Conflict: 복잡도 축약
+Ending tone: 요약 정리

@@ -6,7 +6,7 @@ import Header from '../components/Header';
 import SettingsDrawer from '../components/SettingsDrawer';
 import ProviderQuickModal from '../components/ProviderQuickModal';
 import ResultTable from '../components/ResultTable';
-import { LoadingOverlay, StudioPageSkeleton } from '../components/LoadingOverlay';
+import { LoadingOverlay } from '../components/LoadingOverlay';
 import {
   AspectRatio,
   BackgroundMusicTrack,
@@ -19,6 +19,7 @@ import {
   ScriptScene,
   StudioState,
   SavedProject,
+  WorkflowDraft,
 } from '../types';
 import { createDefaultStudioState, fetchStudioState, saveStudioState, getCachedStudioState } from '../services/localFileApi';
 import { ensureWorkflowDraft } from '../services/workflowDraftService';
@@ -64,13 +65,45 @@ function mergeAiScenesIntoLocalScenes(localScenes: ScriptScene[], aiScenes?: Scr
   }));
 }
 
+function createEmptySceneAssetsFromDraft(draft: WorkflowDraft): GeneratedAsset[] {
+  return createInitialSceneAssetsFromDraft(draft).map((asset) => ({
+    ...asset,
+    imageData: null,
+    sourceMode: 'sample',
+    status: 'pending',
+    imageHistory: [],
+    videoData: null,
+    videoHistory: [],
+  }));
+}
+
+function createBootstrapStudioState(projectId: string): StudioState {
+  const cachedState = getCachedStudioState();
+  if (cachedState) return cachedState;
+
+  const cachedProject = projectId ? readProjectNavigationProject(projectId) : null;
+  if (cachedProject?.workflowDraft) {
+    return {
+      ...createDefaultStudioState(),
+      workflowDraft: cachedProject.workflowDraft,
+      projects: [cachedProject],
+      lastContentType: cachedProject.workflowDraft?.contentType || 'story',
+      storageDir: cachedProject.folderPath || '',
+      isStorageConfigured: Boolean(cachedProject.folderPath),
+      updatedAt: Date.now(),
+    };
+  }
+
+  return createDefaultStudioState();
+}
+
 const SceneStudioPage: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const basePath = useMemo(() => pathname.replace(/\/(scene-studio|step-6)$/, ''), [pathname]);
   const requestedProjectId = searchParams?.get('projectId') || '';
-  const [studioState, setStudioState] = useState<StudioState | null>(null);
+  const [studioState, setStudioState] = useState<StudioState>(() => createBootstrapStudioState(requestedProjectId));
   const [step, setStep] = useState<GenerationStep>(GenerationStep.IDLE);
   const [generatedData, setGeneratedData] = useState<GeneratedAsset[]>([]);
   const [progressMessage, setProgressMessage] = useState('');
@@ -93,7 +126,9 @@ const SceneStudioPage: React.FC = () => {
   const [navigationOverlay, setNavigationOverlay] = useState<{ title: string; description: string } | null>(null);
   const [isThumbnailGenerating, setIsThumbnailGenerating] = useState(false);
   const [isGeneratingAllVideos, setIsGeneratingAllVideos] = useState(false);
-  const [openProgressPercent, setOpenProgressPercent] = useState(14);
+  const [isPreparingPreviewVideo, setIsPreparingPreviewVideo] = useState(false);
+  const [previewVideoStatus, setPreviewVideoStatus] = useState<'idle' | 'loading' | 'ready' | 'fallback' | 'error'>('idle');
+  const [previewVideoMessage, setPreviewVideoMessage] = useState('결과보기에서 합본 영상 상태를 먼저 안내합니다.');
   const [taskProgressPercent, setTaskProgressPercent] = useState<number | null>(null);
   const [sceneProgressMap, setSceneProgressMap] = useState<Record<number, { percent: number; label: string }>>({});
   const assetsRef = useRef<GeneratedAsset[]>([]);
@@ -112,31 +147,13 @@ const SceneStudioPage: React.FC = () => {
     const cachedState = getCachedStudioState();
     if (cachedState) {
       setStudioState(cachedState);
-      if (cachedState.workflowDraft) {
-        setBackgroundMusicTracks([]);
-      }
-    } else if (requestedProjectId) {
-      const cachedProject = readProjectNavigationProject(requestedProjectId);
-      if (cachedProject?.workflowDraft) {
-        const bootstrapState = {
-          ...createDefaultStudioState(),
-          workflowDraft: cachedProject.workflowDraft,
-          projects: [cachedProject],
-          lastContentType: cachedProject.workflowDraft?.contentType || 'story',
-          storageDir: cachedProject.folderPath || '',
-          isStorageConfigured: Boolean(cachedProject.folderPath),
-          updatedAt: Date.now(),
-        };
-        setStudioState(bootstrapState);
-      }
+      if (cachedState.workflowDraft) setBackgroundMusicTracks([]);
     }
 
     (async () => {
       const state = await fetchStudioState({ force: true });
       setStudioState(state);
-      if (state.workflowDraft) {
-        setBackgroundMusicTracks([]);
-      }
+      if (state.workflowDraft) setBackgroundMusicTracks([]);
     })();
   }, [requestedProjectId]);
 
@@ -151,6 +168,19 @@ const SceneStudioPage: React.FC = () => {
   }, [draft]);
 
   const currentProjectSummary = useMemo(() => (studioState?.projects || []).find((item) => item.id === currentProjectId) || null, [studioState?.projects, currentProjectId]);
+
+  useEffect(() => {
+    if (generatedData.length) return;
+    if (!draft.script?.trim()) return;
+
+    const localAssets = createEmptySceneAssetsFromDraft(draft);
+    if (!localAssets.length) return;
+
+    assetsRef.current = localAssets;
+    setGeneratedData(localAssets);
+    setStep(GenerationStep.COMPLETED);
+    setProgressMessage((prev) => prev || '전달된 데이터로 씬 카드를 먼저 표시했습니다. 필요한 씬만 개별 생성하면 됩니다.');
+  }, [draft, generatedData.length]);
 
   const beginnerGuideItems = useMemo(() => {
     const scriptReady = Boolean(draft.script?.trim());
@@ -167,8 +197,8 @@ const SceneStudioPage: React.FC = () => {
         ? `출연자 준비 완료: ${(draft.selectedCharacterIds.length || draft.extractedCharacters.length)}명이 씬 참조 이미지로 연결됩니다.`
         : '출연자가 없어도 장면 생성은 가능하지만, 4단계에서 캐릭터 예시를 채우면 일관성이 더 좋아집니다.',
       styleReady
-        ? '화풍 선택 완료: 지금 고른 화풍이 모든 씬 이미지 스타일 기준이 됩니다.'
-        : '화풍이 아직 없습니다. 4단계에서 화풍 1개를 선택해야 프로젝트 씬 생성이 안정적으로 진행됩니다.',
+        ? '최종 화풍 선택 완료: 지금 고른 화풍이 모든 씬 이미지 스타일 기준이 됩니다. Step4 캐릭터 스타일과는 별도로 적용됩니다.'
+        : '최종 영상 화풍이 아직 없습니다. 5단계에서 화풍 1개를 선택해야 프로젝트 씬 생성이 안정적으로 진행됩니다.',
       aiAudioReady
         ? '오디오 / 자막은 실제 AI로 생성됩니다.'
         : 'ElevenLabs 키가 없으면 오디오는 건너뛰고 이미지 중심 샘플 흐름으로 빠르게 확인합니다.',
@@ -182,6 +212,11 @@ const SceneStudioPage: React.FC = () => {
     () => studioState?.characters?.find((item) => item.id === studioState.selectedCharacterId)?.name || '',
     [studioState]
   );
+
+  const selectedVideoModel = useMemo(() => {
+    const model = studioState?.routing?.videoModel || '';
+    return model.startsWith('fal-') ? model : 'fal-pixverse-v55';
+  }, [studioState?.routing?.videoModel]);
 
   const effectiveBackgroundTracks = useMemo(() => {
     const picked = backgroundMusicTracks.find((item) => item.id === activeBackgroundTrackId) || backgroundMusicTracks[0];
@@ -249,7 +284,7 @@ const SceneStudioPage: React.FC = () => {
   const applyProjectToScreen = useCallback((project: SavedProject, options?: { message?: string }) => {
     const safeAssets = Array.isArray(project.assets) && project.assets.length
       ? project.assets.map((asset) => ({ ...asset, aspectRatio: asset?.aspectRatio || project.workflowDraft?.aspectRatio || '16:9' }))
-      : (project.workflowDraft ? createInitialSceneAssetsFromDraft(project.workflowDraft) : []);
+      : (project.workflowDraft ? createEmptySceneAssetsFromDraft(project.workflowDraft) : []);
 
     assetsRef.current = safeAssets;
     setGeneratedData([...safeAssets]);
@@ -260,6 +295,12 @@ const SceneStudioPage: React.FC = () => {
     setCurrentCost(project.cost || null);
     currentCostRef.current = project.cost || { images: 0, tts: 0, videos: 0, total: 0, imageCount: 0, ttsCharacters: 0, videoCount: 0 };
     setStep(safeAssets.length ? GenerationStep.COMPLETED : GenerationStep.IDLE);
+    setIsPreparingPreviewVideo(false);
+    setFinalVideoUrl((previous) => {
+      if (previous) URL.revokeObjectURL(previous);
+      return null;
+    });
+    setFinalVideoTitle('');
     setStep4Open(false);
     setProgressMessage(options?.message || `"${project.name}" 프로젝트를 열었습니다. 씬 카드는 먼저 가볍게 보여 주고, 실제 AI 생성은 생성 버튼을 눌렀을 때만 시작합니다.`);
     rememberProjectNavigationProject(project);
@@ -324,6 +365,20 @@ const SceneStudioPage: React.FC = () => {
     setShowApiModal(false);
   };
 
+  const handleGoBackToWorkflow = useCallback(() => {
+    setNavigationOverlay({
+      title: '이전 단계로 이동하는 중',
+      description: '현재 프로젝트를 유지한 채 Step5(화풍 선택)로 돌아갑니다.',
+    });
+    if (currentProjectId) {
+      try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
+      router.push(`${basePath}/step-5?projectId=${encodeURIComponent(currentProjectId)}`, { scroll: true });
+      return;
+    }
+    try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
+    router.push(`${basePath}/step-5`, { scroll: true });
+  }, [basePath, currentProjectId, router]);
+
   const createAnotherBackgroundTrack = useCallback(() => {
     const nextTrack = createSampleBackgroundTrack(draft);
     setBackgroundMusicTracks((prev) => [nextTrack, ...prev]);
@@ -356,7 +411,6 @@ const SceneStudioPage: React.FC = () => {
     let cancelled = false;
 
     void (async () => {
-      setOpenProgressPercent(12);
       setProgressMessage('프로젝트 요약과 씬 카드를 먼저 붙이는 중...');
 
       const cachedProject = readProjectNavigationProject(projectId) || await getProjectById(projectId);
@@ -372,7 +426,6 @@ const SceneStudioPage: React.FC = () => {
           } : prev);
         }
         applyProjectToScreen(cachedProject, { message: `"${cachedProject.name}" 프로젝트를 빠르게 열었습니다. 저장본을 확인하는 동안 씬 카드는 먼저 보여 드립니다.` });
-        setOpenProgressPercent(62);
       }
 
       const project = await getProjectById(projectId, { forceSync: !cachedProject });
@@ -384,6 +437,7 @@ const SceneStudioPage: React.FC = () => {
         const sameDraft = Boolean(existingDraft
           && existingDraft.updatedAt === projectDraft.updatedAt
           && existingDraft.selectedStyleImageId === projectDraft.selectedStyleImageId
+          && existingDraft.selectedCharacterStyleId === projectDraft.selectedCharacterStyleId
           && JSON.stringify(existingDraft.selectedCharacterIds || []) === JSON.stringify(projectDraft.selectedCharacterIds || [])
           && (existingDraft.script || '') === (projectDraft.script || ''));
 
@@ -405,7 +459,6 @@ const SceneStudioPage: React.FC = () => {
       }
 
       applyProjectToScreen(project);
-      setOpenProgressPercent(100);
       clearProjectNavigationProject(projectId);
       try {
         localStorage.removeItem(CONFIG.STORAGE_KEYS.PENDING_SCENE_AUTOSTART);
@@ -418,7 +471,7 @@ const SceneStudioPage: React.FC = () => {
   }, [applyProjectToScreen, searchParams, studioState]);
 
 
-  const handleGenerate = useCallback(async (options?: { preserveExistingCards?: boolean }) => {
+  const handleGenerate = useCallback(async (options?: { preserveExistingCards?: boolean; generateAudio?: boolean }) => {
     if (isProcessingRef.current) return;
     if (!draft.script?.trim()) {
       setStep(GenerationStep.ERROR);
@@ -432,6 +485,7 @@ const SceneStudioPage: React.FC = () => {
     }
 
     const preserveExistingCards = Boolean(options?.preserveExistingCards && assetsRef.current.length);
+    const generateAudio = Boolean(options?.generateAudio);
 
     isProcessingRef.current = true;
     setIsGeneratingScenes(true);
@@ -441,7 +495,11 @@ const SceneStudioPage: React.FC = () => {
     setStep(preserveExistingCards ? GenerationStep.ASSETS : GenerationStep.SCRIPTING);
     setTaskProgressPercent(6);
     clearSceneProgress();
-    setProgressMessage(preserveExistingCards ? '기존 예시 씬 카드는 그대로 두고, 각 카드 자리에서만 새 결과를 덧입히는 중...' : '스토리를 문단별 씬으로 정리하는 중...');
+    setProgressMessage(
+      preserveExistingCards
+        ? (generateAudio ? '기존 씬 카드 기준으로 이미지와 오디오를 다시 준비하는 중...' : '기존 씬 카드 기준으로 이미지를 다시 준비하는 중...')
+        : '스토리를 문단별 씬으로 정리하는 중...'
+    );
 
     try {
       const scenes = await createScenePlan();
@@ -470,7 +528,9 @@ const SceneStudioPage: React.FC = () => {
       setStep(GenerationStep.ASSETS);
       initialAssets.forEach((_, index) => setSceneProgress(index, 8, '생성 대기 중'));
 
-      const elevenKey = studioState?.providers?.elevenLabsApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY) || '';
+      const elevenKey = generateAudio
+        ? (studioState?.providers?.elevenLabsApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY) || '')
+        : '';
 
       for (let i = 0; i < initialAssets.length; i++) {
         const currentAspectRatio = assetsRef.current[i].aspectRatio || draft.aspectRatio || '16:9';
@@ -515,7 +575,7 @@ const SceneStudioPage: React.FC = () => {
           status: 'completed',
           aspectRatio: currentAspectRatio,
         });
-        setSceneProgress(i, elevenKey ? 72 : 100, elevenKey ? '오디오 대기 중' : '씬 준비 완료');
+        setSceneProgress(i, elevenKey ? 72 : 100, elevenKey ? '오디오 대기 중' : '이미지 준비 완료');
 
         if (elevenKey) {
           setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 오디오와 자막을 준비하는 중...`);
@@ -551,7 +611,9 @@ const SceneStudioPage: React.FC = () => {
 
       setStep(GenerationStep.COMPLETED);
       setTaskProgressPercent(96);
-      setProgressMessage('씬 카드 생성이 끝났습니다. 이미지 보기 / 영상 보기에서 이전 생성본도 함께 비교할 수 있습니다.');
+      setProgressMessage(generateAudio
+        ? '씬 카드(이미지/오디오) 생성이 끝났습니다. 필요하면 씬별로 영상화를 진행해 주세요.'
+        : '씬 이미지 생성이 끝났습니다. 필요하면 씬별 또는 전체 영상 생성을 진행해 주세요.');
 
       const saved = await upsertWorkflowProject({
         projectId: currentProjectId,
@@ -626,6 +688,163 @@ const SceneStudioPage: React.FC = () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
   }, [currentProjectId, generatedData, backgroundMusicTracks, previewMix, draft, isGeneratingScenes, isThumbnailGenerating, isGeneratingAllVideos, isVideoGenerating, animatingIndices]);
+
+  const renderMergedVideo = useCallback(async (options: {
+    enableSubtitles: boolean;
+    qualityMode: 'preview' | 'final';
+    downloadFile?: boolean;
+    customTitle?: string;
+  }) => {
+    const { enableSubtitles, qualityMode, downloadFile = false, customTitle } = options;
+    if (isVideoGenerating) return null;
+
+    const renderableAssets = assetsRef.current.filter((asset) => Boolean(asset.imageData));
+    const sceneVideoCount = renderableAssets.filter((asset) => Boolean(asset.videoData)).length;
+
+    if (!renderableAssets.length) {
+      const message = '먼저 씬 이미지가 있어야 합본 미리보기를 만들 수 있습니다.';
+      setProgressMessage(message);
+      setPreviewVideoStatus('error');
+      setPreviewVideoMessage(message);
+      return null;
+    }
+
+    if (enableSubtitles && assetsRef.current.some((asset) => !asset.subtitleData && !asset.audioData)) {
+      const message = '자막 포함 출력은 오디오와 자막 데이터가 준비된 뒤에 진행할 수 있습니다.';
+      setPreviewVideoStatus('error');
+      setPreviewVideoMessage(message);
+      openApiModal({
+        title: '자막 출력에는 오디오 생성 연결이 필요합니다',
+        description: '현재 씬 중 일부는 자막용 오디오 데이터가 없어 자막이 비어 있을 수 있습니다. ElevenLabs 키를 연결하면 이 자리에서 다시 생성할 수 있습니다.',
+        focusField: 'elevenLabs',
+      });
+      return null;
+    }
+
+    const progressHandler = (message: string) => {
+      setProgressMessage(`[Render] ${message}`);
+      const percentMatch = message.match(/(\d+)%/);
+      if (percentMatch) {
+        setTaskProgressPercent(Math.max(8, Math.min(100, Number(percentMatch[1]))));
+        return;
+      }
+      if (message.includes('(1/3)')) setTaskProgressPercent(18);
+      else if (message.includes('(2/3)')) setTaskProgressPercent(52);
+      else if (message.includes('렌더링 완료')) setTaskProgressPercent(96);
+    };
+
+    const renderTitle = (fallbackLabel?: string) => (
+      customTitle
+      || (downloadFile
+        ? `${draft.topic || '프로젝트'} 최종 출력 (${enableSubtitles ? '자막 포함' : '자막 없음'})${fallbackLabel ? ` · ${fallbackLabel}` : ''}`
+        : `${draft.topic || '프로젝트'} 합본 미리보기${fallbackLabel ? ` · ${fallbackLabel}` : ''}`)
+    );
+
+    try {
+      setIsVideoGenerating(true);
+      if (!downloadFile) {
+        setIsPreparingPreviewVideo(true);
+        setFinalVideoUrl((previous) => {
+          if (previous) URL.revokeObjectURL(previous);
+          return null;
+        });
+      }
+      setTaskProgressPercent(8);
+      setPreviewVideoStatus('loading');
+
+      const primaryMessage = sceneVideoCount > 0
+        ? `준비된 씬 영상 ${sceneVideoCount}개와 이미지를 함께 합쳐 합본 영상을 만드는 중입니다.`
+        : 'AI 씬 영상이 없어도 이미지 기반 합본 영상을 만드는 중입니다.';
+      setPreviewVideoMessage(primaryMessage);
+      setProgressMessage(primaryMessage);
+
+      let result = null;
+      let usedFallback = false;
+      let usedSceneVideos = sceneVideoCount > 0;
+
+      try {
+        result = await generateVideo(
+          assetsRef.current,
+          progressHandler,
+          isAbortedRef,
+          {
+            enableSubtitles,
+            qualityMode,
+            backgroundTracks: effectiveBackgroundTracks,
+            previewMix,
+            aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
+            useSceneVideos: usedSceneVideos,
+          }
+        );
+      } catch (primaryError) {
+        console.error('[SceneStudioPage] primary merged render failed', primaryError);
+        usedFallback = true;
+        usedSceneVideos = false;
+        setTaskProgressPercent(22);
+        const fallbackMessage = '합치는 중 문제가 있어 안전 모드로 다시 시도합니다. 씬 영상 없이 이미지 기반으로 합칩니다.';
+        setPreviewVideoStatus('loading');
+        setPreviewVideoMessage(fallbackMessage);
+        setProgressMessage(fallbackMessage);
+
+        result = await generateVideo(
+          assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
+          progressHandler,
+          isAbortedRef,
+          {
+            enableSubtitles,
+            qualityMode: 'preview',
+            backgroundTracks: effectiveBackgroundTracks,
+            previewMix,
+            aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
+            useSceneVideos: false,
+          }
+        );
+      }
+
+      if (!result) {
+        const message = '합본 영상 결과를 아직 받지 못했습니다. 잠시 후 다시 시도해 주세요.';
+        setPreviewVideoStatus('error');
+        setPreviewVideoMessage(message);
+        setProgressMessage(message);
+        return null;
+      }
+
+      const suffix = enableSubtitles ? 'sub' : 'nosub';
+      setFinalVideoUrl((previous) => {
+        if (previous) URL.revokeObjectURL(previous);
+        return URL.createObjectURL(result.videoBlob);
+      });
+      setFinalVideoTitle(renderTitle(usedFallback ? '안전 모드' : undefined));
+
+      if (downloadFile) {
+        triggerBlobDownload(result.videoBlob, `mp4Creater_${suffix}_${Date.now()}.mp4`);
+      }
+
+      const successMessage = usedFallback
+        ? '안전 모드로 합본 영상을 만들었습니다. 브라우저 합치기 문제가 있어 이미지 기반으로 다시 합쳤습니다.'
+        : usedSceneVideos
+          ? `씬 영상 ${sceneVideoCount}개를 반영한 합본 영상이 준비되었습니다.`
+          : 'AI 씬 영상 없이도 이미지 기반 합본 영상이 준비되었습니다.';
+
+      setPreviewVideoStatus(usedFallback || !usedSceneVideos ? 'fallback' : 'ready');
+      setPreviewVideoMessage(successMessage);
+      setProgressMessage(downloadFile ? '합본 영상 저장이 완료되었습니다.' : '합본 영상 미리보기가 준비되었습니다.');
+      setTaskProgressPercent(100);
+
+      return result;
+    } catch (error) {
+      console.error('[SceneStudioPage] merged render failed', error);
+      const failureMessage = '브라우저에서 합본 영상을 만드는 중 문제가 발생했습니다. 다시 시도하거나 씬 수를 줄여 확인해 주세요.';
+      setPreviewVideoStatus('error');
+      setPreviewVideoMessage(failureMessage);
+      setProgressMessage(failureMessage);
+      return null;
+    } finally {
+      setIsVideoGenerating(false);
+      if (!downloadFile) setIsPreparingPreviewVideo(false);
+      window.setTimeout(() => setTaskProgressPercent(null), 1200);
+    }
+  }, [draft.aspectRatio, draft.topic, effectiveBackgroundTracks, isVideoGenerating, openApiModal, previewMix]);
 
   const handleRegenerateImage = async (index: number) => {
     updateAssetAt(index, { status: 'generating' });
@@ -704,7 +923,14 @@ const SceneStudioPage: React.FC = () => {
       setTaskProgressPercent(10);
       setSceneProgress(index, 20, '영상 프롬프트 생성');
       const motionPrompt = await generateMotionPrompt(assetsRef.current[index].narration, assetsRef.current[index].visualPrompt);
-      const videoUrl = await generateVideoFromImage(assetsRef.current[index].imageData!, motionPrompt, falKey, assetsRef.current[index].aspectRatio || draft.aspectRatio || '16:9');
+      const videoUrl = await generateVideoFromImage(
+        assetsRef.current[index].imageData!,
+        motionPrompt,
+        falKey,
+        assetsRef.current[index].aspectRatio || draft.aspectRatio || '16:9',
+        'preview',
+        selectedVideoModel,
+      );
       if (videoUrl) {
         updateAssetAt(index, {
           videoData: videoUrl,
@@ -749,7 +975,14 @@ const SceneStudioPage: React.FC = () => {
         setSceneProgress(index, 24, '영상 프롬프트 생성');
         setProgressMessage(`씬 ${order + 1}/${availableIndices.length} 전체 영상 생성 중...`);
         const motionPrompt = await generateMotionPrompt(asset.narration, asset.visualPrompt);
-        const videoUrl = await generateVideoFromImage(asset.imageData!, motionPrompt, falKey, asset.aspectRatio || draft.aspectRatio || '16:9');
+        const videoUrl = await generateVideoFromImage(
+          asset.imageData!,
+          motionPrompt,
+          falKey,
+          asset.aspectRatio || draft.aspectRatio || '16:9',
+          'preview',
+          selectedVideoModel,
+        );
         if (videoUrl) {
           updateAssetAt(index, {
             videoData: videoUrl,
@@ -767,54 +1000,25 @@ const SceneStudioPage: React.FC = () => {
       setIsGeneratingAllVideos(false);
       window.setTimeout(() => setTaskProgressPercent(null), 900);
     }
-  }, [appendVideoHistory, draft.aspectRatio, studioState, updateAssetAt]);
+  }, [appendVideoHistory, draft.aspectRatio, selectedVideoModel, studioState, updateAssetAt]);
 
   const triggerVideoExport = async (options: { enableSubtitles: boolean; qualityMode: 'preview' | 'final' }) => {
-    const { enableSubtitles, qualityMode } = options;
-    if (isVideoGenerating) return;
-    if (enableSubtitles && assetsRef.current.some((asset) => !asset.subtitleData && !asset.audioData)) {
-      openApiModal({ title: '자막 출력에는 오디오 생성 연결이 필요합니다', description: '현재 씬 중 일부는 자막용 오디오 데이터가 없어 자막이 비어 있을 수 있습니다. ElevenLabs 키를 연결하면 이 자리에서 다시 생성할 수 있습니다.', focusField: 'elevenLabs' });
-      return;
-    }
-    try {
-      setIsVideoGenerating(true);
-      setTaskProgressPercent(8);
-      const result = await generateVideo(
-        assetsRef.current,
-        (message) => {
-          setProgressMessage(`[Render] ${message}`);
-          const percentMatch = message.match(/(\d+)%/);
-          if (percentMatch) {
-            setTaskProgressPercent(Math.max(8, Math.min(100, Number(percentMatch[1]))));
-            return;
-          }
-          if (message.includes('(1/3)')) setTaskProgressPercent(18);
-          else if (message.includes('(2/3)')) setTaskProgressPercent(52);
-          else if (message.includes('렌더링 완료')) setTaskProgressPercent(96);
-        },
-        isAbortedRef,
-        {
-          enableSubtitles,
-          qualityMode,
-          backgroundTracks: effectiveBackgroundTracks,
-          previewMix,
-          aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
-        }
-      );
-      if (result) {
-        const suffix = enableSubtitles ? 'sub' : 'nosub';
-        if (finalVideoUrl) URL.revokeObjectURL(finalVideoUrl);
-        const objectUrl = URL.createObjectURL(result.videoBlob);
-        setFinalVideoUrl(objectUrl);
-        setFinalVideoTitle(`${draft.topic || '프로젝트'} 최종 출력 (${enableSubtitles ? '자막 포함' : '자막 없음'})`);
-        triggerBlobDownload(result.videoBlob, `mp4Creater_${suffix}_${Date.now()}.mp4`);
-        setTaskProgressPercent(100);
-      }
-    } finally {
-      setIsVideoGenerating(false);
-      window.setTimeout(() => setTaskProgressPercent(null), 1200);
-    }
+    await renderMergedVideo({
+      enableSubtitles: options.enableSubtitles,
+      qualityMode: options.qualityMode,
+      downloadFile: true,
+    });
   };
+
+  const handlePreparePreviewVideo = useCallback(async () => {
+    if (isPreparingPreviewVideo || isVideoGenerating) return;
+    await renderMergedVideo({
+      enableSubtitles: false,
+      qualityMode: 'preview',
+      downloadFile: false,
+      customTitle: `${draft.topic || '프로젝트'} 합본 미리보기`,
+    });
+  }, [draft.topic, isPreparingPreviewVideo, isVideoGenerating, renderMergedVideo]);
 
   const handleNarrationChange = (index: number, narration: string) => {
     updateAssetAt(index, { narration, targetDuration: Math.max(assetsRef.current[index].targetDuration || 0, estimateClipDuration(narration)) });
@@ -904,20 +1108,6 @@ const SceneStudioPage: React.FC = () => {
     }
   }, [backgroundMusicTracks, buildReferenceImages, currentProjectId, draft, generatedData, isThumbnailGenerating, previewMix, studioState?.routing?.audioModel, studioState?.routing?.imageModel]);
 
-
-  const isProjectOpening = Boolean(requestedProjectId && !currentProjectId && !generatedData.length);
-
-  if (!studioState || isProjectOpening) {
-    return (
-      <StudioPageSkeleton
-        title="씬 제작 화면을 여는 중"
-        description={progressMessage || '프로젝트 요약과 씬 카드를 먼저 안정적으로 붙이고 있습니다.'}
-        progressPercent={openProgressPercent}
-        progressLabel={isProjectOpening ? '프로젝트 카드와 씬 구성 불러오는 중' : '씬 제작 화면 준비 중'}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <LoadingOverlay open={Boolean(navigationOverlay)} title={navigationOverlay?.title || '이동 중'} description={navigationOverlay?.description} />
@@ -955,28 +1145,9 @@ const SceneStudioPage: React.FC = () => {
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">페이지 자체는 먼저 열고, 필요한 경우에만 짧게 준비 화면을 보여 줍니다. 실제 생성이 시작되면 전체 화면을 막지 않고 제작 중인 씬 카드에만 스켈레톤과 퍼센트를 표시합니다.</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setNavigationOverlay({
-                    title: '워크플로우 화면으로 돌아가는 중',
-                    description: '현재 프로젝트 상태를 유지한 채 4단계 선택 화면으로 자연스럽게 돌아갑니다.',
-                  });
-                  if (currentProjectId) {
-                    try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
-                    router.push(`${basePath}?projectId=${encodeURIComponent(currentProjectId)}&returnTo=workflow`, { scroll: true });
-                    return;
-                  }
-                  try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
-                  router.push(basePath, { scroll: true });
-                }}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-              >
-                이전으로 이동
-              </button>
               <button type="button" onClick={() => setStep4Open((prev) => !prev)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">{step4Open ? '입력 요약 접기' : '입력 요약 보기'}</button>
-              <button type="button" onClick={() => void handleGenerate()} disabled={isGeneratingScenes} className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isGeneratingScenes ? '전체 씬 생성 중...' : '전체 씬 생성'}</button>
-              <button type="button" onClick={() => void handleGenerate({ preserveExistingCards: true })} disabled={isGeneratingScenes} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">이미지 / 오디오 다시 생성</button>
+              <button type="button" onClick={() => void handleGenerate({ preserveExistingCards: true, generateAudio: false })} disabled={isGeneratingScenes} className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isGeneratingScenes ? '전체 이미지 생성 중...' : '전체 이미지 생성'}</button>
+              <button type="button" onClick={() => void handleGenerate({ preserveExistingCards: true, generateAudio: true })} disabled={isGeneratingScenes} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">이미지 + 오디오 생성</button>
               <button type="button" onClick={() => void handleGenerateAllVideos()} disabled={isGeneratingAllVideos || isGeneratingScenes} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGeneratingAllVideos ? '전체 영상 생성 중...' : '모든 씬 영상 생성'}</button>
             </div>
           </div>
@@ -988,7 +1159,7 @@ const SceneStudioPage: React.FC = () => {
                 <p className="mt-2 text-sm leading-6 text-slate-600">{draft.selectedCharacterIds.length || draft.extractedCharacters.length}명 연결됨</p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-black text-slate-900">4단계에서 고른 화풍</div>
+                <div className="text-sm font-black text-slate-900">5단계에서 고른 최종 화풍</div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">{(draft.selectedStyleImageId || draft.styleImages[0]?.id) ? '1개 준비됨' : '선택 필요'}</p>
               </div>
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1068,11 +1239,17 @@ const SceneStudioPage: React.FC = () => {
           sceneProgressMap={sceneProgressMap}
           finalVideoUrl={finalVideoUrl}
           finalVideoTitle={finalVideoTitle}
+          previewVideoStatus={previewVideoStatus}
+          previewVideoMessage={previewVideoMessage}
+          onPreparePreviewVideo={handlePreparePreviewVideo}
+          isPreparingPreviewVideo={isPreparingPreviewVideo}
           onGenerateThumbnail={handleGenerateThumbnail}
           isThumbnailGenerating={isThumbnailGenerating}
-          onGenerateAllImages={() => void handleGenerate({ preserveExistingCards: true })}
+          onGenerateAllImages={() => void handleGenerate({ preserveExistingCards: true, generateAudio: false })}
           onGenerateAllVideos={() => void handleGenerateAllVideos()}
           isGeneratingAllVideos={isGeneratingAllVideos}
+          onFooterBack={handleGoBackToWorkflow}
+          footerBackLabel="이전으로"
         />
       </main>
     </div>

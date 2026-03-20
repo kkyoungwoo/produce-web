@@ -54,6 +54,31 @@ function normalizeLoadedAssets(assets: GeneratedAsset[]): GeneratedAsset[] {
   }));
 }
 
+function createEmptySceneAssetsFromDraft(draft: WorkflowDraft): GeneratedAsset[] {
+  return createInitialSceneAssetsFromDraft(draft).map((asset) => ({
+    ...asset,
+    imageData: null,
+    sourceMode: 'sample',
+    status: 'pending',
+    imageHistory: [],
+    videoData: null,
+    videoHistory: [],
+  }));
+}
+
+function hasSceneStudioProgressFromAssets(assets?: GeneratedAsset[] | null): boolean {
+  const safeAssets = Array.isArray(assets) ? assets : [];
+  if (!safeAssets.length) return false;
+  return safeAssets.some((asset) => (
+    Boolean(asset.imageData)
+    || Boolean(asset.audioData)
+    || Boolean(asset.videoData)
+    || Boolean(asset.imageHistory?.length)
+    || Boolean(asset.videoHistory?.length)
+    || asset.status !== 'pending'
+  ));
+}
+
 const resolveAppViewMode = (params: ReturnType<typeof useSearchParams>) => {
   if (params?.get('view') === 'gallery') return 'gallery' as const;
   if (params?.get('new') || params?.get('projectId') || params?.get('returnTo')) return 'main' as const;
@@ -82,6 +107,8 @@ const mergeProjectLists = (primary: SavedProject[] = [], fallback: SavedProject[
 interface AppProps {
   routeStep?: 1 | 2 | 3 | 4 | 5 | null;
 }
+
+type WorkflowRouteStep = 1 | 2 | 3 | 4 | 5 | 6;
 
 const App: React.FC<AppProps> = ({ routeStep = null }) => {
   const router = useRouter();
@@ -148,7 +175,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     };
   }, [effectiveWorkflowDraft]);
 
-  const resolveDraftStep = useCallback((draft?: WorkflowDraft | null): 1 | 2 | 3 | 4 | 5 => {
+  const resolveDraftStep = useCallback((draft?: WorkflowDraft | null, assets?: GeneratedAsset[] | null): WorkflowRouteStep => {
+    if (hasSceneStudioProgressFromAssets(assets)) return 6;
     if (!draft) return 1;
     const completed = draft.completedSteps || { step1: false, step2: false, step3: false, step4: false, step5: false };
     if (completed.step5 || (draft.activeStage || 0) >= 5) return 5;
@@ -277,6 +305,19 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     };
     setSavedProjects((prev) => [optimisticProject, ...prev.filter((item) => item.id !== optimisticProjectId)]);
     setStudioState(pendingStateForSave);
+    setGeneratedData([]);
+    setCurrentTopic('');
+    setCurrentProjectId(optimisticProjectId);
+    setBackgroundMusicTracks([]);
+    setPreviewMix(nextPreviewMix);
+    setCurrentCost(null);
+    setStep(GenerationStep.IDLE);
+    if (navigateToStep1) {
+      router.replace(`${basePath}/step-1?projectId=${encodeURIComponent(optimisticProjectId)}`, { scroll: false });
+    } else {
+      setViewMode('main');
+    }
+
     const saveStatePromise = saveStudioState(pendingStateForSave)
       .then((nextState) => {
         setStudioState(nextState);
@@ -284,6 +325,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       .catch((error) => {
         console.warn('[mp4Creater] initial studio state save failed', error);
       });
+
     const project = await upsertWorkflowProject({
       projectId: null,
       topic,
@@ -293,21 +335,14 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       previewMix: nextPreviewMix,
     });
     void saveStatePromise;
-    setGeneratedData([]);
-    setCurrentTopic('');
     setCurrentProjectId(project.id);
-    setBackgroundMusicTracks([]);
-    setPreviewMix(nextPreviewMix);
-    setCurrentCost(null);
     setProgressMessage('새 프로젝트를 생성했고 프로젝트 보관함에도 바로 저장했습니다.');
-    setStep(GenerationStep.IDLE);
-    if (!navigateToStep1) {
-      setViewMode('main');
-    }
     rememberProjectNavigationProject(project);
     setSavedProjects((prev) => [project, ...prev.filter((item) => item.id !== project.id && item.id !== optimisticProjectId)]);
     if (navigateToStep1) {
-      router.replace(`${basePath}/step-1?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+      if (project.id !== optimisticProjectId) {
+        router.replace(`${basePath}/step-1?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+      }
     }
     void refreshProjects({ forceSync: false, silent: true });
     } catch (error) {
@@ -329,12 +364,13 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
   useEffect(() => {
     if (!routeStep) return;
+    if (searchParams?.get('projectId')) return;
     setNavigationOverlay(null);
-    const targetStep = resolveDraftStep(studioState?.workflowDraft || null);
+    const targetStep = resolveDraftStep(studioState?.workflowDraft || null, generatedData);
     if (targetStep <= routeStep) return;
     const projectQuery = currentProjectId ? `?projectId=${encodeURIComponent(currentProjectId)}` : '';
     router.replace(`${basePath}/step-${targetStep}${projectQuery}`, { scroll: false });
-  }, [routeStep, studioState?.workflowDraft, resolveDraftStep, router, basePath, currentProjectId]);
+  }, [routeStep, studioState?.workflowDraft, resolveDraftStep, router, basePath, currentProjectId, generatedData, searchParams]);
 
 
   useEffect(() => {
@@ -435,7 +471,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     if (!trimmed) return;
     const ok = await renameProject(id, trimmed);
     if (!ok) return;
-    setSavedProjects((prev) => prev.map((item) => item.id === id ? { ...item, name: trimmed, topic: trimmed } : item));
+    setSavedProjects((prev) => prev.map((item) => item.id === id ? { ...item, name: trimmed } : item));
     await refreshProjects({ forceSync: true });
   };
 
@@ -493,8 +529,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       if (returnTo === 'workflow') {
         setProgressMessage('씬 제작 화면에서 돌아온 프로젝트를 다시 불러왔습니다. 프롬프트와 화풍을 수정한 뒤 Step 4에서 다시 씬 제작으로 이동할 수 있습니다.');
       }
-      const nextStep = resolveDraftStep(project.workflowDraft || null);
-      const clearRouteStep = routeStep ? Math.max(routeStep, nextStep) : nextStep;
+      const nextStep = resolveDraftStep(project.workflowDraft || null, project.assets || []);
+      const clearRouteStep = routeStep || nextStep;
       const clearQueryPath = `${basePath}/step-${clearRouteStep}?projectId=${encodeURIComponent(project.id)}`;
       const isSameRoute = pathname === `${basePath}/step-${clearRouteStep}` && searchParams?.get('projectId') === project.id && !returnTo;
       if (isSameRoute) return;
@@ -591,7 +627,6 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         void updateProject(currentProjectId, {
           workflowDraft: nextDraft,
           topic: nextDraft.topic || currentTopic || '새 프로젝트',
-          name: (nextDraft.topic || currentTopic || '새 프로젝트').slice(0, 30),
         });
       }, 180);
     }
@@ -621,16 +656,23 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     } catch {}
 
     try {
-      const nextState = await saveStudioState({
+      const saveStatePromise = saveStudioState({
         ...currentState,
         workflowDraft: nextDraft,
         lastContentType: nextDraft.contentType || currentState.lastContentType || 'story',
         updatedAt: Date.now(),
-      });
-      setStudioState(nextState);
+      })
+        .then((nextState) => {
+          setStudioState(nextState);
+          return nextState;
+        })
+        .catch((error) => {
+          console.warn('[mp4Creater] scene studio state save failed', error);
+          return null;
+        });
 
       const initialSceneAssets = nextDraft.script?.trim()
-        ? createInitialSceneAssetsFromDraft(nextDraft)
+        ? createEmptySceneAssetsFromDraft(nextDraft)
         : generatedData;
 
       const nextBackgroundTracks = backgroundMusicTracks.length ? backgroundMusicTracks : [createSampleBackgroundTrack(nextDraft)];
@@ -653,7 +695,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
       setCurrentProjectId(project.id);
       rememberProjectNavigationProject(project);
-      await refreshProjects();
+      void saveStatePromise;
+      void refreshProjects({ silent: true });
       try {
         localStorage.removeItem(CONFIG.STORAGE_KEYS.PENDING_SCENE_AUTOSTART);
       } catch {}
@@ -759,22 +802,20 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
             basePath={basePath}
             routeStep={routeStep}
             onNavigateStep={(nextStep) => {
-              const currentDraft = studioStateRef.current?.workflowDraft || effectiveWorkflowDraft;
+              const currentDraft = pendingWorkflowDraftRef.current || studioStateRef.current?.workflowDraft || effectiveWorkflowDraft;
+              if (pendingWorkflowDraftRef.current) {
+                void commitPendingWorkflowDraft();
+              }
               if (currentProjectId && storageReady && currentDraft) {
                 void updateProject(currentProjectId, {
                   workflowDraft: currentDraft,
                   topic: currentDraft.topic || currentTopic || '???꾨줈?앺듃',
-                  name: (currentDraft.topic || currentTopic || '???꾨줈?앺듃').slice(0, 30),
                 });
               }
               const projectQuery = currentProjectId ? `?projectId=${encodeURIComponent(currentProjectId)}` : '';
               router.replace(`${basePath}/step-${nextStep}${projectQuery}`, { scroll: false });
             }}
             onGoBackFromStep1={() => {
-              if (typeof window !== 'undefined' && window.history.length > 1) {
-                router.back();
-                return;
-              }
               router.replace(`${basePath}?view=gallery`, { scroll: false });
             }}
             onOpenSettings={() => setShowSettings(true)}
@@ -793,7 +834,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
             </div>
           )}
 
-          {generatedData.length > 0 && (
+          {!routeStep && generatedData.length > 0 && (
             <ResultTable
               data={generatedData}
               onNarrationChange={handleNarrationChange}

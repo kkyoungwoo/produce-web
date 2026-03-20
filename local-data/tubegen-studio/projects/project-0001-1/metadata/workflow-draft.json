@@ -1,7 +1,114 @@
 {
-  "updatedAt": 1773931152769,
+  "id": "workflow_1774006433234",
+  "contentType": "story",
   "aspectRatio": "16:9",
+  "topic": "조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조",
+  "outputMode": "video",
+  "selections": {
+    "genre": "드라마",
+    "mood": "몰입감 있는",
+    "endingTone": "희망적인 결말",
+    "setting": "새벽의 편의점",
+    "protagonist": "초보 창작자",
+    "conflict": "잊고 있던 약속"
+  },
   "script": "",
+  "activeStage": 3,
+  "extractedCharacters": [],
+  "styleImages": [],
+  "characterImages": [],
+  "selectedCharacterIds": [],
+  "selectedCharacterStyleId": null,
+  "selectedCharacterStyleLabel": "",
+  "selectedCharacterStylePrompt": "",
   "selectedStyleImageId": null,
-  "selectedCharacterIds": []
+  "referenceImages": {
+    "character": [],
+    "style": [],
+    "characterStrength": 70,
+    "styleStrength": 70
+  },
+  "promptPack": {
+    "storyPrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\nNo draft",
+    "lyricsPrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[MUSIC VIDEO FLOW]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\nNo draft",
+    "characterPrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[CHARACTERS]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[SCRIPT]\nNo draft",
+    "scenePrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[SCENE PROMPTS]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[SCRIPT]\nNo draft",
+    "actionPrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[SCENE ACTIONS]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말",
+    "persuasionStoryPrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[RECOMMENDED PHRASES]\n첫 장면부터 감정이 바로 느껴지게 써줘.\n장면이 머릿속에 그려지도록 구체적으로 써줘.\n한 문단이 끝날 때 다음 장면이 궁금하게 이어줘."
+  },
+  "promptTemplates": [
+    {
+      "id": "builtin-core-script",
+      "name": "Core script draft",
+      "description": "Default structure for story/news flow",
+      "prompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\nNo draft",
+      "mode": "narration",
+      "builtIn": true,
+      "basePrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\nNo draft",
+      "isCustomized": false,
+      "updatedAt": 1
+    },
+    {
+      "id": "builtin-dialogue-script",
+      "name": "Dialogue draft",
+      "description": "A more conversational variation",
+      "prompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\nNo draft\n\nExtra rules:\n- Blend dialogue and narration naturally.\n- Prefer visual and concrete sentences.",
+      "mode": "dialogue",
+      "builtIn": true,
+      "basePrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\nNo draft\n\nExtra rules:\n- Blend dialogue and narration naturally.\n- Prefer visual and concrete sentences.",
+      "isCustomized": false,
+      "updatedAt": 2
+    },
+    {
+      "id": "builtin-scene-heavy",
+      "name": "Scene-heavy draft",
+      "description": "Stronger scene transitions and visual detail",
+      "prompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[SCENE PROMPTS]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[SCRIPT]\nNo draft\n\nExtra rules:\n- Start each paragraph with a visible scene shift.\n- Add concrete visual anchors.",
+      "mode": "narration",
+      "builtIn": true,
+      "basePrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[SCENE PROMPTS]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[SCRIPT]\nNo draft\n\nExtra rules:\n- Start each paragraph with a visible scene shift.\n- Add concrete visual anchors.",
+      "isCustomized": false,
+      "updatedAt": 3
+    },
+    {
+      "id": "project_prompt_builtin-core-script",
+      "name": "Core script draft (프로젝트)",
+      "description": "이 프로젝트 전용 프롬프트",
+      "prompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\nㅊㅊㄴㅁ\n[CURRENT DRAFT]\nNo draft",
+      "mode": "narration",
+      "builtIn": false,
+      "basePrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\nNo draft",
+      "isCustomized": true,
+      "updatedAt": 1774006785995
+    }
+  ],
+  "selectedPromptTemplateId": "project_prompt_builtin-core-script",
+  "promptAdditions": [],
+  "openRouterModel": "openrouter/auto",
+  "ttsProvider": "qwen3Tts",
+  "elevenLabsVoiceId": null,
+  "elevenLabsModelId": null,
+  "qwenVoicePreset": "qwen-default",
+  "qwenStylePreset": "balanced",
+  "voicePreviewAsset": null,
+  "scriptPreviewAsset": null,
+  "finalVoiceAsset": null,
+  "backgroundMusicPreview": null,
+  "finalBackgroundMusic": null,
+  "musicVideoPreview": null,
+  "finalMusicVideo": null,
+  "sampleMode": {
+    "text": true,
+    "tts": true,
+    "backgroundMusic": true,
+    "musicVideo": true
+  },
+  "completedSteps": {
+    "step1": true,
+    "step2": true,
+    "step3": false,
+    "step4": false,
+    "step5": false
+  },
+  "updatedAt": 1774006786349
 }

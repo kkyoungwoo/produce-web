@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AspectRatio,
   CharacterProfile,
+  ConstitutionAnalysisSummary,
   ContentType,
   GenerationStep,
   PromptedImageAsset,
@@ -12,9 +13,12 @@ import {
   WorkflowDraft,
   WorkflowPromptTemplate,
   DEFAULT_REFERENCE_IMAGES,
+  ReferenceLinkDraft,
+  ScriptLanguageOption,
+  ScriptSpeechStyle,
 } from '../types';
 import { IMAGE_MODELS, SCRIPT_MODEL_OPTIONS } from '../config';
-import HelpTip from './HelpTip';
+import { getCharacterSamplePreset, getStyleSamplePreset } from '../samples/presetCatalog';
 import {
   buildSelectableStoryDraft,
   normalizeStoryText,
@@ -40,8 +44,7 @@ import {
   extractCharactersFromScript,
 } from '../services/characterStudioService';
 import { composeScriptDraft } from '../services/scriptComposerService';
-import { ASPECT_RATIO_OPTIONS, getAspectRatioClass, getAspectRatioDescription } from '../utils/aspectRatio';
-import { handleHorizontalWheel, scrollContainerBy, scrollElementIntoView } from '../utils/horizontalScroll';
+import { scrollElementIntoView } from '../utils/horizontalScroll';
 import {
   CONTENT_TYPE_CARDS,
   FIELD_OPTIONS_BY_TYPE,
@@ -52,22 +55,61 @@ import {
   normalizeStage,
   STEP_META,
 } from './inputSection/constants';
-import {
-  AccordionSection,
-  ArrowButton,
-  GuidedActionButton,
-  LoadingSlide,
-  OverlayModal,
-  StepChip,
-  SummaryChip,
-} from './inputSection/ui';
+import { SummaryChip } from './inputSection/ui';
 import { arePromptTemplatesEqual } from './inputSection/helpers';
 import { StepId } from './inputSection/types';
-import Step1Panel from './inputSection/steps/Step1Panel';
-import Step2Panel from './inputSection/steps/Step2Panel';
-import Step3Panel from './inputSection/steps/Step3Panel';
-import Step4Panel from './inputSection/steps/Step4Panel';
-import Step5Panel from './inputSection/steps/Step5Panel';
+import {
+  ProcessingBadge,
+  PromptEditorModal,
+  PromptPreviewModal,
+  RouteStepFooter,
+  SampleGuideModal,
+} from './inputSection/overlays';
+import MainStepView from './inputSection/views/MainStepView';
+import RouteStepView from './inputSection/views/RouteStepView';
+
+const CHARACTER_STYLE_OPTIONS = [
+  {
+    id: 'character-realistic',
+    label: '실사형 캐릭터',
+    description: '자연스러운 얼굴 비율과 현실적인 조명, 또렷한 인물 중심 묘사',
+    prompt: 'Generate characters in a realistic human style with natural facial proportions, clean wardrobe details, grounded lighting, and believable textures while keeping a clear silhouette.',
+    accentFrom: 'from-slate-900',
+    accentTo: 'to-slate-600',
+  },
+  {
+    id: 'character-anime',
+    label: '애니형 캐릭터',
+    description: '선명한 라인과 셀 셰이딩, 감정 표현이 또렷한 애니 감성',
+    prompt: 'Generate characters in a polished anime style with expressive eyes, clean line art, cel shading, and vibrant but controlled color accents.',
+    accentFrom: 'from-fuchsia-600',
+    accentTo: 'to-violet-500',
+  },
+  {
+    id: 'character-webtoon',
+    label: '웹툰형 캐릭터',
+    description: '웹툰 컷에 잘 어울리는 또렷한 외곽선과 리듬감 있는 채색',
+    prompt: 'Generate characters in a Korean webtoon style with crisp outlines, readable silhouettes, polished facial acting, and stylish but simplified coloring.',
+    accentFrom: 'from-blue-600',
+    accentTo: 'to-cyan-500',
+  },
+  {
+    id: 'character-3d',
+    label: '3D형 캐릭터',
+    description: '입체감 있는 재질과 부드러운 조명, 장난감처럼 정리된 비율',
+    prompt: 'Generate characters in a stylized 3D illustration style with soft studio lighting, dimensional materials, and a polished cinematic finish.',
+    accentFrom: 'from-emerald-600',
+    accentTo: 'to-teal-500',
+  },
+  {
+    id: 'character-illustration',
+    label: '일러스트형 캐릭터',
+    description: '포스터처럼 깔끔한 구도와 감성적인 브러시 질감이 있는 캐릭터',
+    prompt: 'Generate characters in a premium illustration style with editorial composition, tasteful brush texture, elegant color design, and a strong silhouette.',
+    accentFrom: 'from-amber-500',
+    accentTo: 'to-orange-500',
+  },
+] as const;
 
 interface InputSectionProps {
   step: GenerationStep;
@@ -82,297 +124,6 @@ interface InputSectionProps {
   routeStep?: 1 | 2 | 3 | 4 | 5 | null;
   onNavigateStep?: (step: 1 | 2 | 3 | 4 | 5) => void;
   onGoBackFromStep1?: () => void;
-}
-
-if (false) {
-const CONTENT_TYPE_CARDS: Array<{ id: ContentType; title: string; desc: string; badge: string }> = [
-  { id: 'music_video', title: '뮤직비디오', desc: '가사, 후렴, 장면 훅 중심으로 설계합니다.', badge: 'MV' },
-  { id: 'story', title: '이야기', desc: '기승전결과 감정 흐름이 살아 있는 스토리형입니다.', badge: 'STORY' },
-  { id: 'news', title: '뉴스', desc: '브리핑 구조와 장면 정리가 또렷한 형식입니다.', badge: 'NEWS' },
-];
-
-const FIELD_OPTIONS_BY_TYPE: Record<string, Record<keyof StorySelectionState, string[]>> = {
-  music_video: {
-    genre: ['감성 드라마', '로맨스', '몽환 팝', '시네마틱 발라드', '아트 팝'],
-    mood: ['몽환적인', '감성적인', '세련된', '잔잔하게 고조되는', '네온빛의'],
-    endingTone: ['여운 있는 마무리', '다시 듣고 싶어지는 엔딩', '쓸쓸하지만 아름다운 마감', '희망적인 결말'],
-    setting: ['네온 골목', '새벽 지하철역', '비 오는 옥상', '도시 야경 도로'],
-    protagonist: ['무대를 떠난 보컬', '다시 노래하는 화자', '감정을 숨긴 연인', '새벽을 걷는 뮤지션'],
-    conflict: ['전하지 못한 마음', '다시 마주한 추억', '끝내 못한 작별', '후렴처럼 반복되는 후회'],
-  },
-  story: {
-    genre: ['드라마', '스릴러', '로맨스', '코미디', '미스터리', 'SF'],
-    mood: ['따뜻한', '서늘한', '몰입감 있는', '감성적인', '세련된'],
-    endingTone: ['여운 있는 마무리', '강한 반전', '희망적인 결말', '씁쓸한 여운'],
-    setting: ['비 오는 골목', '늦은 지하철역', '새벽의 편의점', '옥상', '사무실'],
-    protagonist: ['평범한 직장인', '초보 창작자', '무대 뒤 스태프', '조용한 관찰자'],
-    conflict: ['끝내 미뤄 온 선택', '숨기고 있던 진실', '돌아갈 수 없는 실수', '잊고 있던 약속'],
-  },
-  news: {
-    genre: ['뉴스 브리핑', '해설 리포트', '이슈 요약', '현장 리포트'],
-    mood: ['정돈된', '신뢰감 있는', '차분한', '명확한'],
-    endingTone: ['핵심 요약으로 마무리', '다음 이슈를 예고하는 엔딩', '중립적 정리'],
-    setting: ['뉴스룸 스튜디오', '도심 전경', '현장 브리핑 장소', '데이터 월 앞'],
-    protagonist: ['앵커', '현장 기자', '전문 해설자', '차분한 진행자'],
-    conflict: ['엇갈리는 해석', '데이터와 체감의 차이', '빠르게 바뀌는 상황', '확인되지 않은 소문'],
-  },
-};
-
-const STEP_META: Array<{ id: StepId; title: string; subtitle: string }> = [
-  { id: 1, title: '콘텐츠 선택', subtitle: '형식과 제작 타입' },
-  { id: 2, title: '스토리 빌더', subtitle: '주제와 선택값' },
-  { id: 3, title: '제작 대본', subtitle: '프롬프트 선택과 원문' },
-  { id: 4, title: '출연자 관리', subtitle: '카드 제작과 선택' },
-  { id: 5, title: '화풍 선택', subtitle: '스타일 선택 후 이동' },
-];
-
-const MAX_UPLOAD_FILE_COUNT = 4;
-const MAX_UPLOAD_FILE_SIZE_MB = 8;
-const MAX_CHARACTER_VARIANT_COUNT = 6;
-const MAX_STYLE_CARD_COUNT = 12;
-
-function normalizeStage(value?: number | null): StepId {
-  if (value === 2 || value === 3 || value === 4 || value === 5) return value;
-  return 1;
-}
-
-function StepChip({
-  meta,
-  isOpen,
-  completed,
-  onClick,
-}: {
-  meta: { id: StepId; title: string; subtitle: string };
-  isOpen: boolean;
-  completed: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-3xl border px-4 py-4 text-left transition-all ${
-        isOpen
-          ? 'border-blue-300 bg-blue-50 text-blue-800 shadow-sm'
-          : completed
-            ? 'border-emerald-200 bg-emerald-50/70 text-emerald-800'
-            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-      }`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-black uppercase tracking-[0.18em]">{meta.id}단계</div>
-          <div className="mt-1 text-sm font-black">{meta.title}</div>
-          <div className="mt-1 text-xs text-slate-500">{meta.subtitle}</div>
-        </div>
-        <div className="flex flex-col items-end gap-2">
-          <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${completed ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
-            {completed ? '완료' : '진행 중'}
-          </span>
-          <span className="text-xs font-bold">{isOpen ? '현재 단계' : '보기'}</span>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function AccordionSection({
-  stepId,
-  title,
-  description,
-  summary,
-  open,
-  completed,
-  onToggle,
-  children,
-  actions,
-}: {
-  stepId: StepId;
-  title: string;
-  description: string;
-  summary?: React.ReactNode;
-  open: boolean;
-  completed: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-  actions?: React.ReactNode;
-}) {
-  return (
-    <section data-step-section={`step-${stepId}`} className={`overflow-hidden rounded-[30px] border shadow-sm transition-all ${open ? 'border-blue-200 bg-blue-50/60' : 'border-slate-200 bg-white'}`}>
-      <div className="flex flex-wrap items-center justify-between gap-4 px-6 py-5">
-        <div className="min-w-0 flex-1">
-          <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">{stepId}단계</div>
-          <h2 className="mt-2 text-2xl font-black text-slate-900">{title}</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>
-          {summary && <div className="mt-3 flex flex-wrap gap-2">{summary}</div>}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {completed && <span className="rounded-full bg-emerald-100 px-3 py-1.5 text-[11px] font-black text-emerald-700">완료됨</span>}
-          {actions}
-          <button type="button" onClick={onToggle} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50">
-            {open ? '현재 단계' : '다시 보기'}
-          </button>
-        </div>
-      </div>
-      {open && <div className="border-t border-slate-200/80 bg-white px-6 py-6">{children}</div>}
-    </section>
-  );
-}
-
-function SummaryChip({ children, accent = 'slate' }: { children: React.ReactNode; accent?: 'slate' | 'blue' | 'violet' | 'emerald' }) {
-  const classes = {
-    slate: 'bg-slate-100 text-slate-700',
-    blue: 'bg-blue-50 text-blue-700',
-    violet: 'bg-violet-50 text-violet-700',
-    emerald: 'bg-emerald-50 text-emerald-700',
-  } as const;
-  return <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${classes[accent]}`}>{children}</span>;
-}
-
-function ArrowButton({
-  direction,
-  disabled,
-  onClick,
-}: {
-  direction: 'left' | 'right';
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex h-9 w-9 items-center justify-center rounded-full border text-sm font-black transition-all ${disabled ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-300' : 'border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50'}`}
-      aria-label={direction === 'left' ? '이전 이미지' : '다음 이미지'}
-    >
-      {direction === 'left' ? '←' : '→'}
-    </button>
-  );
-}
-
-function LoadingSlide({ progress, label }: { progress: number; label: string }) {
-  return (
-    <div className="flex h-full w-full flex-col justify-between rounded-2xl border border-dashed border-slate-300 bg-slate-100 p-4">
-      <div>
-        <div className="text-[11px] font-black uppercase tracking-[0.22em] text-blue-600">AI 생성 중</div>
-        <div className="mt-2 text-sm font-black text-slate-900">{label}</div>
-        <p className="mt-2 text-xs leading-5 text-slate-500">기존 이미지는 왼쪽으로 넘기고, 새 이미지는 오른쪽 슬롯에서 준비합니다.</p>
-      </div>
-      <div>
-        <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-500">
-          <span>로딩</span>
-          <span>{progress}%</span>
-        </div>
-        <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
-          <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-200" style={{ width: `${progress}%` }} />
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function GuidedActionButton({
-  children,
-  ready,
-  disabled,
-  onClick,
-  tone = 'blue',
-  className = '',
-}: {
-  children: React.ReactNode;
-  ready?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-  tone?: 'blue' | 'violet';
-  className?: string;
-}) {
-  const toneClass = tone === 'violet'
-    ? 'bg-violet-600 text-white hover:bg-violet-500'
-    : 'bg-blue-600 text-white hover:bg-blue-500';
-
-  return (
-    <div className="relative inline-flex">
-      {ready && !disabled && (
-        <div className="pointer-events-none absolute -top-11 left-1/2 z-10 -translate-x-1/2 animate-bounce">
-          <div className="inline-flex items-center gap-2 rounded-full border border-blue-200 bg-white px-3 py-1 text-[11px] font-black text-blue-700 shadow-sm">
-            <span className="text-sm">🖱️</span>
-            클릭해서 진행
-          </div>
-        </div>
-      )}
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className={`inline-flex items-center justify-center rounded-2xl px-6 py-3 text-sm font-black transition-all ${disabled ? 'cursor-not-allowed bg-slate-300 text-slate-500' : toneClass} ${className}`}
-      >
-        {children}
-      </button>
-    </div>
-  );
-}
-
-/**
- * 입력 화면에서 재사용하는 가벼운 팝업 껍데기입니다.
- * 프롬프트 수정, 샘플 안내처럼 빠르게 닫히는 작업을 한 곳에서 정리합니다.
- */
-function OverlayModal({
-  open,
-  title,
-  description,
-  onClose,
-  children,
-  footer,
-}: {
-  open: boolean;
-  title: string;
-  description?: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-}) {
-  if (!open) return null;
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-    >
-      <div className="w-full max-w-3xl rounded-[30px] border border-slate-200 bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">팝업</div>
-            <h3 className="mt-2 text-2xl font-black text-slate-900">{title}</h3>
-            {description && <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>}
-          </div>
-          <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
-        </div>
-        <div className="px-6 py-6">{children}</div>
-        {footer && <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 px-6 py-5">{footer}</div>}
-      </div>
-    </div>
-  );
-}
-
-function arePromptTemplatesEqual(a: WorkflowPromptTemplate[], b: WorkflowPromptTemplate[]) {
-  if (a === b) return true;
-  if (a.length !== b.length) return false;
-  return a.every((item, index) => {
-    const other = b[index];
-    return Boolean(other)
-      && item.id === other.id
-      && item.name === other.name
-      && item.description === other.description
-      && item.prompt === other.prompt
-      && item.mode === other.mode
-      && item.builtIn === other.builtIn
-      && item.basePrompt === other.basePrompt
-      && item.isCustomized === other.isCustomized;
-  });
-}
 }
 
 const InputSection: React.FC<InputSectionProps> = ({
@@ -414,6 +165,14 @@ const InputSection: React.FC<InputSectionProps> = ({
   });
   const initialTemplates = resolveWorkflowPromptTemplates(initialContentType, initialPromptPack, initial.promptTemplates || []);
   const initialStep1Selected = Boolean(initial.completedSteps?.step1 || initialStage > 1);
+  const initialCustomScriptSettings = initial.customScriptSettings || {
+    expectedDurationMinutes: 3,
+    speechStyle: 'yo' as ScriptSpeechStyle,
+    language: 'ko' as ScriptLanguageOption,
+    referenceText: '',
+    referenceLinks: [] as ReferenceLinkDraft[],
+    scriptModel: initial.openRouterModel || SCRIPT_MODEL_OPTIONS[0].id,
+  };
 
   const [activeStage, setActiveStage] = useState<StepId>(initialStage);
   const [openStage, setOpenStage] = useState<StepId | null>(initialStage);
@@ -432,6 +191,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [extractedCharacters, setExtractedCharacters] = useState<CharacterProfile[]>(initial.extractedCharacters || []);
   const [styleImages, setStyleImages] = useState<PromptedImageAsset[]>(initial.styleImages || []);
   const [selectedCharacterIds, setSelectedCharacterIds] = useState<string[]>(initial.selectedCharacterIds || []);
+  const [selectedCharacterStyleId, setSelectedCharacterStyleId] = useState<string | null>(initial.selectedCharacterStyleId || null);
   const [selectedStyleImageId, setSelectedStyleImageId] = useState<string | null>(initial.selectedStyleImageId || null);
   const [loadingFields, setLoadingFields] = useState<Record<string, boolean>>({});
   const [isRefreshingTopic, setIsRefreshingTopic] = useState(false);
@@ -456,9 +216,21 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [styleLoadingProgress, setStyleLoadingProgress] = useState<Record<string, number>>({});
   const [newCharacterName, setNewCharacterName] = useState('');
   const [newCharacterPrompt, setNewCharacterPrompt] = useState('');
+  const [characterUploadTargetId, setCharacterUploadTargetId] = useState<string | null>(null);
   const [step3PanelMode, setStep3PanelMode] = useState<'balanced' | 'character-focus' | 'script-focus'>('balanced');
   const [newStyleName, setNewStyleName] = useState('');
   const [newStylePrompt, setNewStylePrompt] = useState('');
+  const [customScriptDurationMinutes, setCustomScriptDurationMinutes] = useState<number>(Math.max(1, Math.min(16, Number(initialCustomScriptSettings.expectedDurationMinutes || 3))));
+  const [customScriptSpeechStyle, setCustomScriptSpeechStyle] = useState<ScriptSpeechStyle>(initialCustomScriptSettings.speechStyle || 'yo');
+  const [customScriptLanguage, setCustomScriptLanguage] = useState<ScriptLanguageOption>(initialCustomScriptSettings.language || 'ko');
+  const [customScriptReferenceText, setCustomScriptReferenceText] = useState(initialCustomScriptSettings.referenceText || '');
+  const [referenceLinks, setReferenceLinks] = useState<ReferenceLinkDraft[]>(initialCustomScriptSettings.referenceLinks || []);
+  const [scriptReferenceSuggestions, setScriptReferenceSuggestions] = useState<string[]>([]);
+  const [pendingReferenceLinkUrl, setPendingReferenceLinkUrl] = useState('');
+  const [showReferenceLinkInput, setShowReferenceLinkInput] = useState(false);
+  const [isAddingReferenceLink, setIsAddingReferenceLink] = useState(false);
+  const [selectedScriptGenerationModel, setSelectedScriptGenerationModel] = useState(initialCustomScriptSettings.scriptModel || SCRIPT_MODEL_OPTIONS[0].id);
+  const [constitutionAnalysis, setConstitutionAnalysis] = useState<ConstitutionAnalysisSummary | null>(initial.constitutionAnalysis || null);
   // 샘플 안내 모달과 프롬프트 수정 모달은 흐름을 끊지 않게 이 컴포넌트에서 직접 제어합니다.
   const [sampleGuideOpen, setSampleGuideOpen] = useState(false);
   const [promptEditorForm, setPromptEditorForm] = useState({ name: '', description: '', prompt: '' });
@@ -500,6 +272,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setExtractedCharacters(workflowDraft?.extractedCharacters || []);
     setStyleImages(workflowDraft?.styleImages || []);
     setSelectedCharacterIds(workflowDraft?.selectedCharacterIds || []);
+    setSelectedCharacterStyleId(workflowDraft?.selectedCharacterStyleId || null);
     setSelectedStyleImageId(workflowDraft?.selectedStyleImageId || null);
     setActiveStage(nextStage);
     openStageWithIntent(nextStage, false);
@@ -519,9 +292,17 @@ const InputSection: React.FC<InputSectionProps> = ({
     setNewCharacterPrompt('');
     setNewStyleName('');
     setNewStylePrompt('');
+    setCustomScriptDurationMinutes(Math.max(1, Math.min(16, Number(workflowDraft?.customScriptSettings?.expectedDurationMinutes || 3))));
+    setCustomScriptSpeechStyle(workflowDraft?.customScriptSettings?.speechStyle || 'yo');
+    setCustomScriptLanguage(workflowDraft?.customScriptSettings?.language || 'ko');
+    setCustomScriptReferenceText(workflowDraft?.customScriptSettings?.referenceText || '');
+    setReferenceLinks(Array.isArray(workflowDraft?.customScriptSettings?.referenceLinks) ? workflowDraft.customScriptSettings.referenceLinks : []);
+    setPendingReferenceLinkUrl('');
+    setShowReferenceLinkInput(false);
+    setSelectedScriptGenerationModel(workflowDraft?.customScriptSettings?.scriptModel || workflowDraft?.openRouterModel || SCRIPT_MODEL_OPTIONS[0].id);
+    setConstitutionAnalysis(workflowDraft?.constitutionAnalysis || null);
   }, [workflowDraft?.id, studioState?.lastContentType]);
 
-  const isProcessing = step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS;
   const normalizedScript = useMemo(() => normalizeStoryText(storyScript), [storyScript]);
   const sceneCount = useMemo(() => splitStoryIntoParagraphScenes(normalizedScript).length, [normalizedScript]);
 
@@ -586,10 +367,37 @@ const InputSection: React.FC<InputSectionProps> = ({
     () => extractedCharacters.filter((item) => effectiveSelectedCharacterIds.includes(item.id)),
     [effectiveSelectedCharacterIds, extractedCharacters]
   );
+  const selectedCharacterStyle = useMemo(
+    () => CHARACTER_STYLE_OPTIONS.find((item) => item.id === selectedCharacterStyleId) || null,
+    [selectedCharacterStyleId]
+  );
   const selectedStyle = useMemo(
     () => styleImages.find((item) => item.id === selectedStyleImageId) || styleImages[0] || null,
     [styleImages, selectedStyleImageId]
   );
+  const buildCharacterStyledPrompt = (prompt: string) => {
+    const trimmed = prompt.trim();
+    if (!selectedCharacterStyle) return trimmed;
+    return [`[COMMON CHARACTER STYLE] ${selectedCharacterStyle.label}`, selectedCharacterStyle.prompt, trimmed].filter(Boolean).join('\n\n');
+  };
+  const customScriptModelOptions = useMemo(() => SCRIPT_MODEL_OPTIONS.map((item) => ({ id: item.id, name: item.name })), []);
+  const combinedReferenceText = useMemo(() => {
+    const linkNotes = referenceLinks
+      .filter((item) => item.status === 'ready')
+      .map((item) => item.summary || item.sourceText || '')
+      .filter(Boolean);
+    return [customScriptReferenceText.trim(), ...linkNotes].filter(Boolean).join('\n\n');
+  }, [customScriptReferenceText, referenceLinks]);
+  const buildScriptReferenceSuggestionSet = () => {
+    const base = [
+      `${topic || '이번 주제'}의 핵심 메시지가 첫 문단에서 바로 드러나게 해 주세요.`,
+      `${selections.setting} 배경과 ${selections.mood} 분위기를 자연스럽게 반영해 주세요.`,
+      `${selections.protagonist} 관점에서 시작하고 ${selections.endingTone}으로 마무리해 주세요.`,
+      `${selections.conflict}를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.`,
+      `중간에는 실제 예시나 비유를 넣어 이해가 쉬운 대본으로 정리해 주세요.`,
+    ].filter(Boolean);
+    return [...base].sort(() => Math.random() - 0.5).slice(0, 3);
+  };
   const styleGroups = useMemo(() => {
     const groups = new Map<string, { id: string; label: string; items: PromptedImageAsset[] }>();
     (styleImages || []).forEach((item) => {
@@ -698,15 +506,17 @@ const InputSection: React.FC<InputSectionProps> = ({
     return () => window.clearTimeout(timer);
   }, [openStage, workflowDraft?.id]);
 
+  const selectedCharactersReady = selectedCharacters.every((character) => Boolean(character.selectedImageId || character.generatedImages?.[0]?.id || character.imageData));
+
   const stepCompleted = useMemo(
     () => ({
       1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
       2: Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()),
       3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length),
-      4: Boolean(selectedStyleImageId || styleImages[0]?.id),
+      4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
       5: Boolean(selectedStyleImageId || styleImages[0]?.id),
     }),
-    [hasSelectedContentType, hasSelectedAspectRatio, topic, genre, mood, endingTone, setting, protagonist, conflict, normalizedScript, selectedPromptTemplateId, selectedCharacterIds, selectedStyleImageId, styleImages]
+    [hasSelectedContentType, hasSelectedAspectRatio, topic, genre, mood, endingTone, setting, protagonist, conflict, normalizedScript, selectedPromptTemplateId, selectedCharacterIds, selectedCharacters.length, selectedCharacterStyleId, selectedCharactersReady, selectedStyleImageId, styleImages]
   );
 
   const routeStepCompleted = useMemo(
@@ -714,10 +524,27 @@ const InputSection: React.FC<InputSectionProps> = ({
       1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
       2: Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()),
       3: Boolean(normalizedScript.trim() && selectedPromptTemplateId),
-      4: Boolean(normalizedScript.trim()),
+      4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
       5: Boolean(selectedStyleImageId || styleImages[0]?.id),
     }),
-    [hasSelectedContentType, hasSelectedAspectRatio, topic, genre, mood, endingTone, setting, protagonist, conflict, normalizedScript, selectedPromptTemplateId, selectedStyleImageId, styleImages]
+    [
+      hasSelectedContentType,
+      hasSelectedAspectRatio,
+      topic,
+      genre,
+      mood,
+      endingTone,
+      setting,
+      protagonist,
+      conflict,
+      normalizedScript,
+      selectedPromptTemplateId,
+      selectedCharacters.length,
+      selectedCharacterStyleId,
+      selectedCharactersReady,
+      selectedStyleImageId,
+      styleImages,
+    ]
   );
 
   const stageStatus = useMemo(() => ({
@@ -725,7 +552,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     2: activeStage >= 3,
     3: activeStage >= 4,
     4: stepCompleted[4] && activeStage >= 4,
-    5: stepCompleted[4] && activeStage >= 4,
+    5: stepCompleted[5] && activeStage >= 5,
   }), [activeStage, stepCompleted]);
 
   const completion = useMemo(() => {
@@ -742,15 +569,21 @@ const InputSection: React.FC<InputSectionProps> = ({
       selectedPromptTemplateId
         ? '프롬프트 선택 완료: 지금 보이는 프롬프트로 바로 대본 생성이 가능합니다.'
         : '프롬프트를 하나 선택해야 AI 대본 생성 흐름이 자연스럽게 이어집니다.',
+      constitutionAnalysis
+        ? `채널 헌법 브리핑 준비 완료: 타겟 "${constitutionAnalysis.targetProfile.name}" 기준으로 제목과 구조가 정리되었습니다.`
+        : '채널 헌법 분석형 프롬프트를 선택하면 타겟, 안전성, 제목 브리핑도 함께 받을 수 있습니다.',
       selectedCharacters.length
         ? `출연자 준비 완료: ${selectedCharacters.length}명을 씬 참조 이미지로 넘길 수 있습니다.`
-        : '대본 기준 출연자 준비를 눌러 주인공/조연/나레이터 카드를 먼저 채워 주세요.',
+        : '대본 기준 출연자 준비를 눌러 주인공/조연 카드를 먼저 채워 주세요.',
+      selectedCharacterStyle
+        ? `캐릭터 스타일 선택 완료: "${selectedCharacterStyle.label}" 기준으로 출연자 이미지를 다시 생성할 수 있습니다.`
+        : '4단계에서 공통 캐릭터 스타일을 먼저 고르면 출연자 이미지 생성 흐름이 빨라집니다.',
       selectedStyle
-        ? `화풍 선택 완료: "${selectedStyle.label}"이 씬 전체 스타일로 연결됩니다.`
-        : '4단계 확인 후 5단계에서 화풍 1개를 고르면 바로 씬 제작으로 이어집니다.',
+        ? `최종 화풍 선택 완료: "${selectedStyle.label}"이 씬 전체 스타일로 연결됩니다.`
+        : '5단계에서 최종 영상 화풍 1개를 고르면 바로 씬 제작으로 이어집니다.',
     ];
     return items;
-  }, [normalizedScript, sceneCount, selectedPromptTemplateId, selectedCharacters.length, selectedStyle]);
+  }, [normalizedScript, sceneCount, selectedPromptTemplateId, selectedCharacters.length, selectedCharacterStyle, selectedStyle, constitutionAnalysis]);
 
   const canOpenStage = (stage: StepId) => stage <= activeStage;
 
@@ -769,11 +602,23 @@ const InputSection: React.FC<InputSectionProps> = ({
     styleImages,
     characterImages: extractedCharacters.flatMap((item) => item.generatedImages || []),
     selectedCharacterIds: effectiveSelectedCharacterIds,
+    selectedCharacterStyleId: selectedCharacterStyle?.id || null,
+    selectedCharacterStyleLabel: selectedCharacterStyle?.label || '',
+    selectedCharacterStylePrompt: selectedCharacterStyle?.prompt || '',
     selectedStyleImageId: selectedStyleImageId || styleImages[0]?.id || null,
     referenceImages: workflowDraft?.referenceImages || DEFAULT_REFERENCE_IMAGES,
     promptPack,
     promptTemplates: syncedPromptTemplates,
     selectedPromptTemplateId,
+    customScriptSettings: {
+      expectedDurationMinutes: customScriptDurationMinutes,
+      speechStyle: customScriptSpeechStyle,
+      language: customScriptLanguage,
+      referenceText: customScriptReferenceText,
+      referenceLinks,
+      scriptModel: selectedScriptGenerationModel,
+    },
+    constitutionAnalysis,
     completedSteps: {
       step1: stageStatus[1],
       step2: stageStatus[2],
@@ -802,8 +647,8 @@ const InputSection: React.FC<InputSectionProps> = ({
         step1: completedStage >= 1 ? Boolean(hasSelectedContentType && hasSelectedAspectRatio) : payload.completedSteps.step1,
         step2: completedStage >= 2 ? Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()) : payload.completedSteps.step2,
         step3: completedStage >= 3 ? Boolean(normalizedScript.trim() && selectedPromptTemplateId) : payload.completedSteps.step3,
-        step4: completedStage >= 4 ? Boolean(effectiveSelectedCharacterIds.length) : payload.completedSteps.step4,
-        step5: completedStage >= 5 ? Boolean(selectedStyleImageId) : payload.completedSteps.step5,
+        step4: completedStage >= 4 ? Boolean(effectiveSelectedCharacterIds.length && selectedCharacterStyleId) : payload.completedSteps.step4,
+        step5: completedStage >= 5 ? Boolean(selectedStyleImageId || styleImages[0]?.id) : payload.completedSteps.step5,
       },
     };
   };
@@ -860,7 +705,14 @@ const InputSection: React.FC<InputSectionProps> = ({
     extractedCharacters,
     styleImages,
     selectedCharacterIds,
+    selectedCharacterStyleId,
     selectedStyleImageId,
+    customScriptDurationMinutes,
+    customScriptSpeechStyle,
+    customScriptLanguage,
+    customScriptReferenceText,
+    referenceLinks,
+    selectedScriptGenerationModel,
     promptPack,
     syncedPromptTemplates,
     selectedPromptTemplateId,
@@ -967,7 +819,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       resetCharactersAndStyles();
       setActiveStage(3);
       openStageWithIntent(3);
-      setNotice('3단계를 다시 열었습니다. 캐릭터 배정부터 다시 손보고, 4단계에서 화풍을 다시 고를 수 있습니다.');
+      setNotice('3단계를 다시 열었습니다. 캐릭터 배정부터 다시 손보고, 4단계 캐릭터 설정과 5단계 화풍 선택을 다시 이어갈 수 있습니다.');
       return;
     }
 
@@ -1043,15 +895,15 @@ const InputSection: React.FC<InputSectionProps> = ({
           1: '1단계에서 먼저 제작 유형과 화면 비율을 고른 뒤 2단계로 넘어가 주세요.',
           2: '2단계에서 주제와 핵심 선택값을 채워 프롬프트 / 대본 방향을 먼저 고정해 주세요.',
           3: '3단계에서는 프롬프트를 고르고 대본을 준비해야 4단계 캐릭터 생성으로 넘어갈 수 있습니다.',
-          4: '4단계에서는 출연자 카드를 확인한 뒤 바로 5단계 화풍 선택으로 넘어갈 수 있습니다.',
-          5: '5단계에서는 화풍을 1개 선택한 뒤 프로젝트에 저장하고 씬 제작으로 넘어갈 수 있습니다.',
+          4: '4단계에서는 출연자 카드와 공통 캐릭터 스타일을 함께 확정해야 5단계 화풍 선택으로 넘어갈 수 있습니다.',
+          5: '5단계에서는 최종 영상 화풍을 1개 선택한 뒤 프로젝트에 저장하고 씬 제작으로 넘어갈 수 있습니다.',
         }
       : {
           1: '1단계에서 먼저 제작 유형과 화면 비율을 고른 뒤 2단계로 넘어가 주세요.',
           2: '2단계에서 주제와 핵심 선택값을 채워 프롬프트 / 대본 방향을 먼저 고정해 주세요.',
           3: '3단계에서 프롬프트와 대본을 만든 뒤, 대본 기준 출연자 준비와 출연자 선택까지 마쳐 주세요.',
-          4: '4단계에서는 출연자 카드를 확인하고, 5단계에서 화풍을 고른 뒤 씬 제작으로 넘어가 주세요.',
-          5: '5단계에서는 선택한 화풍을 확인한 뒤 씬 제작으로 넘어가 주세요.',
+          4: '4단계에서는 출연자 카드와 공통 캐릭터 스타일을 확정해 주세요.',
+          5: '5단계에서는 최종 영상 화풍을 확인한 뒤 씬 제작으로 넘어가 주세요.',
         };
     const completionMap = routeStep ? routeStepCompleted : stepCompleted;
 
@@ -1199,6 +1051,13 @@ const InputSection: React.FC<InputSectionProps> = ({
     void refreshTopicRecommendation();
   }, [routeStep, openStage, topicRecommendations.length, isRefreshingTopic]);
 
+  useEffect(() => {
+    const isStep3Open = routeStep ? routeStep === 3 : openStage === 3;
+    if (!isStep3Open) return;
+    if (scriptReferenceSuggestions.length) return;
+    setScriptReferenceSuggestions(buildScriptReferenceSuggestionSet());
+  }, [routeStep, openStage, topic, genre, mood, endingTone, setting, protagonist, conflict, scriptReferenceSuggestions.length]);
+
   const refreshField = async (field: keyof StorySelectionState) => {
     if (!connectionSummary.text) {
       promptTextAiSetup('현재 항목 추천은 샘플 보조 모드로 동작 중입니다. OpenRouter를 연결하면 이 자리에서 실제 AI 추천을 바로 받을 수 있습니다.');
@@ -1217,15 +1076,113 @@ const InputSection: React.FC<InputSectionProps> = ({
     const draft = buildSelectableStoryDraft({ contentType, topic, ...selections });
     setStoryScript(draft);
     setNotice(contentType === 'music_video' ? '선택값으로 가사형 샘플을 만들었습니다.' : '선택값으로 대본 초안을 만들었습니다.');
-    openOnly(3);
+    openStageWithIntent(3, false);
+  };
+
+  const refreshScriptReferenceSuggestions = () => {
+    setScriptReferenceSuggestions(buildScriptReferenceSuggestionSet());
+    setNotice('대본 참고 추천 문장을 새로 불러왔습니다. 필요한 문장을 눌러 바로 합칠 수 있습니다.');
+  };
+
+  const applyScriptReferenceSuggestion = (value: string) => {
+    const nextValue = [customScriptReferenceText.trim(), value.trim()].filter(Boolean).join('\n');
+    setCustomScriptReferenceText(nextValue);
+  };
+
+  const toggleReferenceLinkInput = () => {
+    setShowReferenceLinkInput((prev) => {
+      const next = !prev;
+      if (!next && !pendingReferenceLinkUrl.trim()) {
+        setPendingReferenceLinkUrl('');
+      }
+      return next;
+    });
+  };
+
+  const removeReferenceLink = (id: string) => {
+    setReferenceLinks((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const addReferenceLink = async () => {
+    const raw = pendingReferenceLinkUrl.trim();
+    if (!raw) return;
+
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(raw);
+    } catch {
+      setNotice('올바른 링크 주소를 입력해 주세요. http 또는 https 주소여야 합니다.');
+      return;
+    }
+
+    const host = parsedUrl.hostname.toLowerCase();
+    const kind: ReferenceLinkDraft['kind'] = host.includes('youtube.com') || host.includes('youtu.be') ? 'youtube' : 'web';
+    const draftItem: ReferenceLinkDraft = {
+      id: `reference_link_${Date.now()}`,
+      url: parsedUrl.toString(),
+      kind,
+      status: 'loading',
+      addedAt: Date.now(),
+    };
+
+    setIsAddingReferenceLink(true);
+    setReferenceLinks((prev) => [draftItem, ...prev]);
+    setPendingReferenceLinkUrl('');
+    setShowReferenceLinkInput(false);
+
+    try {
+      const response = await fetch('/api/mp4Creater/reference-extract', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: draftItem.url }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload?.error || '링크 분석에 실패했습니다.');
+
+      setReferenceLinks((prev) => prev.map((item) => item.id === draftItem.id ? {
+        ...item,
+        title: payload.title || item.url,
+        sourceText: payload.sourceText || '',
+        summary: payload.summary || '',
+        status: 'ready',
+        error: null,
+      } : item));
+      setNotice(kind === 'youtube' ? '유튜브 링크를 분석해 대본 참고자료에 추가했습니다.' : '웹사이트 글을 분석해 대본 참고자료에 추가했습니다.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '링크 분석에 실패했습니다.';
+      setReferenceLinks((prev) => prev.map((item) => item.id === draftItem.id ? { ...item, status: 'error', error: message } : item));
+      setNotice(message);
+    } finally {
+      setIsAddingReferenceLink(false);
+    }
   };
 
   const handleGenerateScriptClick = () => {
     const targetTemplate = selectedPromptTemplate || syncedPromptTemplates[0];
     if (!targetTemplate) return;
     if (!connectionSummary.text) {
-      createDraftFromSelections();
-      setNotice('AI 미연결 상태라 샘플 대본을 생성했습니다. OpenRouter 연결 시 버튼 클릭마다 새 AI 대본을 생성합니다.');
+      const sampleDraft = composeScriptDraft({
+        contentType,
+        topic,
+        selections,
+        template: targetTemplate,
+        currentScript: normalizedScript,
+        model: selectedScriptGenerationModel,
+        conversationMode: targetTemplate.mode === 'dialogue',
+        customSettings: {
+          expectedDurationMinutes: customScriptDurationMinutes,
+          speechStyle: customScriptSpeechStyle,
+          language: customScriptLanguage,
+          referenceText: combinedReferenceText,
+          referenceLinks,
+          scriptModel: selectedScriptGenerationModel,
+        },
+      });
+      void sampleDraft.then((result) => {
+        setStoryScript(result.text);
+        setConstitutionAnalysis(result.analysis || null);
+        setNotice('AI 미연결 상태라 샘플 대본을 생성했습니다. 버튼을 다시 누르면 비슷한 방향의 새 샘플 대본으로 바뀝니다.');
+      });
       return;
     }
     void generateScriptByPrompt(targetTemplate.mode === 'dialogue', targetTemplate);
@@ -1257,6 +1214,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       mode: base.mode,
       builtIn: false,
       basePrompt: base.basePrompt || base.prompt,
+      engine: base.engine || 'default',
       isCustomized: true,
       updatedAt: Date.now(),
     };
@@ -1287,12 +1245,21 @@ const InputSection: React.FC<InputSectionProps> = ({
         selections,
         template,
         currentScript: normalizedScript,
-        model: studioState?.routing?.scriptModel,
+        model: selectedScriptGenerationModel,
         conversationMode,
+        customSettings: {
+          expectedDurationMinutes: customScriptDurationMinutes,
+          speechStyle: customScriptSpeechStyle,
+          language: customScriptLanguage,
+          referenceText: combinedReferenceText,
+          referenceLinks,
+          scriptModel: selectedScriptGenerationModel,
+        },
       });
       setStoryScript(result.text);
+      setConstitutionAnalysis(result.analysis || null);
       setNotice(result.source === 'ai' ? `선택한 프롬프트 "${template.name}"로 AI 초안을 만들었습니다.` : 'API 연결이 없어 현재는 정해진 샘플 로직으로 대본을 채웠습니다. OpenRouter를 등록하면 실제 AI 생성으로 전환됩니다.');
-      openOnly(3);
+      openStageWithIntent(3, false);
     } finally {
       setIsGeneratingScript(false);
     }
@@ -1328,7 +1295,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       setExtractedCharacters(nextCharacters);
       setSelectedCharacterIds(nextSelectedIds);
       setCharacterCarouselIndices({});
-      setNotice(allowAi ? '3단계 대본 기준으로 주인공과 조연 후보를 추출했습니다. 여기서 바로 선택하고 역할을 손볼 수 있습니다.' : 'API 연결이 없어 샘플 캐릭터 후보를 채웠습니다. 선택과 역할 배정 흐름은 그대로 테스트할 수 있습니다.');
+      setNotice(allowAi ? '3단계 대본 기준으로 출연자 후보를 추출했습니다. Step4에서 캐릭터 스타일과 이미지를 바로 확정할 수 있습니다.' : 'API 연결이 없어 기본 주인공 1명과 조연 1명을 채웠습니다. Step4 흐름은 그대로 테스트할 수 있습니다.');
       return { characters: nextCharacters, selectedIds: nextSelectedIds };
     } finally {
       setIsExtracting(false);
@@ -1348,17 +1315,17 @@ const InputSection: React.FC<InputSectionProps> = ({
     setIsExtracting(true);
     try {
       const usedLabels: string[] = Array.from(new Set(styleImages.map((item) => item.groupLabel || item.label).filter(Boolean) as string[]));
-      const nextStyleCard = buildStyleRecommendations(
+      const recommendationCount = mode === 'auto' && !styleImages.length ? 10 : 4;
+      const nextStyleCards = buildStyleRecommendations(
         normalizedScript,
         contentType,
         usedLabels,
-        1,
+        recommendationCount,
         aspectRatio
-      )[0] || buildStyleRecommendations(normalizedScript, contentType, [], 1, aspectRatio)[0];
-
-      const nextStyles = nextStyleCard
-        ? (mode === 'auto' ? [nextStyleCard] : [...styleImages, nextStyleCard])
-        : styleImages;
+      );
+      const fallbackCards = buildStyleRecommendations(normalizedScript, contentType, [], recommendationCount, aspectRatio);
+      const resolvedCards = nextStyleCards.length ? nextStyleCards : fallbackCards;
+      const nextStyles = mode === 'auto' && !styleImages.length ? resolvedCards : [...styleImages, ...resolvedCards];
       const nextSelectedStyleId = selectedStyleImageId || nextStyles[0]?.id || null;
 
       if (nextStyles.length) {
@@ -1369,8 +1336,8 @@ const InputSection: React.FC<InputSectionProps> = ({
 
       setNotice(
         studioState?.providers?.openRouterApiKey
-          ? (mode === 'auto' ? '4단계용 기본 화풍 카드를 준비했습니다. 여기서 유사 화풍을 계속 추가할 수 있습니다.' : '선택한 대본 기준으로 화풍 카드 1개를 추가했습니다.')
-          : (mode === 'auto' ? 'API 연결이 없어도 4단계용 샘플 화풍 카드를 먼저 채웠습니다.' : 'AI 연결이 없어 샘플 화풍 카드 1개를 추가했습니다. OpenRouter를 연결하면 실제 추천 기반으로 계속 늘릴 수 있습니다.')
+          ? (mode === 'auto' ? '5단계용 최종 화풍 카드 10개 내외를 먼저 채웠습니다. 여기서 비교하며 고를 수 있습니다.' : '선택한 대본 기준으로 최종 화풍 카드를 추가했습니다.')
+          : (mode === 'auto' ? 'API 연결이 없어도 5단계용 샘플 화풍 카드를 먼저 채웠습니다.' : 'AI 연결이 없어 샘플 화풍 카드를 추가했습니다. OpenRouter를 연결하면 실제 추천 기반으로 계속 늘릴 수 있습니다.')
       );
     } finally {
       setIsExtracting(false);
@@ -1379,7 +1346,7 @@ const InputSection: React.FC<InputSectionProps> = ({
 
   useEffect(() => {
     const signature = `${contentType}::${topic}::${normalizedScript}::${routeStep || openStage || activeStage}`;
-    const shouldPrepareStyle = routeStep ? routeStep === 5 : openStage === 4;
+    const shouldPrepareStyle = routeStep ? routeStep === 5 : openStage === 5;
     if (!shouldPrepareStyle) return;
     if (!normalizedScript.trim()) return;
     if (styleImages.length) return;
@@ -1400,13 +1367,14 @@ const InputSection: React.FC<InputSectionProps> = ({
   }, [routeStep, openStage, normalizedScript, extractedCharacters.length, isExtracting, studioState?.providers?.openRouterApiKey]);
 
   const updateCharacterPrompt = (characterId: string, prompt: string) => {
+    const styledPrompt = buildCharacterStyledPrompt(prompt);
     setExtractedCharacters((prev) => prev.map((item) => {
       if (item.id !== characterId) return item;
       const targetImageId = item.selectedImageId || item.generatedImages?.[0]?.id || null;
       return {
         ...item,
-        prompt,
-        generatedImages: (item.generatedImages || []).map((image) => image.id === targetImageId ? { ...image, prompt } : image),
+        prompt: styledPrompt,
+        generatedImages: (item.generatedImages || []).map((image) => image.id === targetImageId ? { ...image, prompt: styledPrompt } : image),
       };
     }));
   };
@@ -1480,7 +1448,7 @@ const InputSection: React.FC<InputSectionProps> = ({
 
     const variants = createPromptVariants({
       title: character.name,
-      prompt: character.prompt || character.description,
+      prompt: buildCharacterStyledPrompt(character.prompt || character.description),
       kind: 'character',
       count: 1,
       existingCount: existingImages.length,
@@ -1500,7 +1468,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setSelectedCharacterIds((prev) => (prev.includes(character.id) ? prev : [...prev, character.id]));
     setCharacterCarouselIndices((prev) => ({ ...prev, [character.id]: pendingIndex }));
     setCharacterLoadingProgress((prev) => { const next = { ...prev }; delete next[character.id]; return next; });
-    setNotice(`${character.name} 기준 추천 카드 1장을 오른쪽 슬롯에 추가했습니다.`);
+    setNotice(`${character.name} 기준 추천 카드 1장을 오른쪽 슬롯에 추가했습니다. 새 후보는 현재 공통 캐릭터 스타일을 반영합니다.`);
   };
 
   const updateStylePrompt = (styleId: string, prompt: string) => {
@@ -1552,13 +1520,14 @@ const InputSection: React.FC<InputSectionProps> = ({
   });
 
   const createCharacterFromPrompt = (name: string, prompt: string, sourceMode: PromptedImageAsset['sourceMode'] = 'ai', imageData?: string) => {
+    const styledPrompt = buildCharacterStyledPrompt(prompt);
     const nextRole: CharacterProfile['role'] = extractedCharacters.some((item) => item.role === 'lead') ? 'support' : 'lead';
     const nextRoleLabel = sourceMode === 'upload'
       ? (nextRole === 'lead' ? '주인공 / 업로드 감성 기반 캐릭터' : '조연 / 업로드 감성 기반 캐릭터')
       : (nextRole === 'lead' ? '주인공 / 직접 추가한 캐릭터' : '조연 / 직접 추가한 캐릭터');
     const nextCharacter = createCharacterCardFromPrompt({
       name,
-      prompt,
+      prompt: styledPrompt,
       description: sourceMode === 'upload' ? '업로드 감성 기반 캐릭터' : '프롬프트 신규 캐릭터',
       imageData,
       sourceMode,
@@ -1566,6 +1535,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       roleLabel: nextRoleLabel,
       castOrder: extractedCharacters.length + 1,
     });
+    nextCharacter.visualStyle = selectedCharacterStyle?.label || nextCharacter.visualStyle;
     setExtractedCharacters((prev) => [...prev, nextCharacter]);
     setSelectedCharacterIds((prev) => [...new Set([...prev, nextCharacter.id])]);
     setCharacterCarouselIndices((prev) => ({ ...prev, [nextCharacter.id]: 0 }));
@@ -1595,7 +1565,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setNewCharacterName('');
     setNewCharacterPrompt('');
     setNotice(`${name} 출연자를 캐릭터 카드로 추가했습니다. 선택된 프롬프트와 이미지가 4단계와 씬 제작까지 그대로 이어집니다.`);
-    if (openStage !== 3) openOnly(3);
+    if (openStage !== 4) openOnly(4);
   };
 
   const createNewStyleByPrompt = () => {
@@ -1605,8 +1575,77 @@ const InputSection: React.FC<InputSectionProps> = ({
     createStyleFromPrompt(label, prompt, 'ai');
     setNewStyleName('');
     setNewStylePrompt('');
-    setNotice(`${label} 화풍 카드를 오른쪽에 추가했습니다. 선택된 화풍 프롬프트가 씬 이미지 생성에 반영됩니다.`);
-    if (openStage !== 4) openOnly(4);
+    setNotice(`${label} 화풍 카드를 추가했습니다. 이 화풍은 Step5 최종 영상 스타일 후보로 바로 반영됩니다.`);
+    if (openStage !== 5) openOnly(5);
+  };
+
+  const applyCharacterSampleFromPreset = (sampleId: string) => {
+    const preset = getCharacterSamplePreset(sampleId);
+    if (!preset) return;
+    const created = createCharacterFromPrompt(preset.name, preset.prompt, 'sample', preset.imageData);
+    setExtractedCharacters((prev) =>
+      prev.map((item) =>
+        item.id === created.id
+          ? { ...item, role: preset.role, roleLabel: preset.roleLabel, voiceHint: item.voiceHint || undefined, visualStyle: selectedCharacterStyle?.label || item.visualStyle }
+          : item
+      )
+    );
+    setNotice(`${preset.name} 샘플 캐릭터를 추가했습니다.`);
+  };
+
+  const applyCharacterSampleToCharacter = (characterId: string, sampleId: string) => {
+    const preset = getCharacterSamplePreset(sampleId);
+    if (!preset) return;
+    const styledPrompt = buildCharacterStyledPrompt(preset.prompt);
+    const sampleImage = buildPromptPreviewCard({
+      label: preset.name,
+      subtitle: preset.roleLabel,
+      prompt: styledPrompt,
+      accent: preset.role === 'lead' ? '#8b5cf6' : '#2563eb',
+      kind: 'character',
+      sourceMode: 'sample',
+    });
+    const sampleVariant = { ...sampleImage, imageData: preset.imageData, sourceMode: 'sample' as const };
+    setExtractedCharacters((prev) =>
+      prev.map((item) => {
+        if (item.id !== characterId) return item;
+        return {
+          ...item,
+          prompt: styledPrompt,
+          visualStyle: selectedCharacterStyle?.label || item.visualStyle,
+          generatedImages: [...(item.generatedImages || []), sampleVariant],
+          selectedImageId: sampleVariant.id,
+          imageData: sampleVariant.imageData,
+        };
+      })
+    );
+    setSelectedCharacterIds((prev) => (prev.includes(characterId) ? prev : [...prev, characterId]));
+    setNotice(`${preset.name} 기본 예시를 ${extractedCharacters.find((item) => item.id === characterId)?.name || '출연자'} 카드에 적용했습니다.`);
+  };
+
+  const handleCharacterUploadForId = (characterId: string) => {
+    setCharacterUploadTargetId(characterId);
+    characterUploadInputRef.current?.click();
+  };
+
+  const selectCharacterImageById = (characterId: string, imageId: string) => {
+    const targetCharacter = extractedCharacters.find((item) => item.id === characterId);
+    const targetImage = (targetCharacter?.generatedImages || []).find((image) => image.id === imageId);
+    if (!targetImage) return;
+    chooseCharacterImage(characterId, targetImage);
+  };
+
+  const handleCharacterVoiceChange = (characterId: string, voiceHint: string | null) => {
+    setExtractedCharacters((prev) =>
+      prev.map((item) => (item.id === characterId ? { ...item, voiceHint: voiceHint || undefined } : item))
+    );
+  };
+
+  const applyStyleSampleFromPreset = (sampleId: string) => {
+    const preset = getStyleSamplePreset(sampleId);
+    if (!preset) return;
+    createStyleFromPrompt(preset.label, preset.prompt, 'sample', preset.imageData);
+    setNotice(`${preset.label} 샘플 화풍을 추가했습니다.`);
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, mode: 'character' | 'style') => {
@@ -1634,7 +1673,8 @@ const InputSection: React.FC<InputSectionProps> = ({
           new Promise<PromptedImageAsset>((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => {
-              const prompt = buildUploadPrompt(file.name.replace(/\.[^.]+$/, ''), mode);
+              const basePrompt = buildUploadPrompt(file.name.replace(/\.[^.]+$/, ''), mode);
+              const prompt = mode === 'character' ? buildCharacterStyledPrompt(basePrompt) : basePrompt;
               const preview = buildPromptPreviewCard({
                 label: file.name.replace(/\.[^.]+$/, ''),
                 subtitle: mode === 'character' ? '업로드 감성 캐릭터' : '업로드 감성 화풍',
@@ -1655,20 +1695,44 @@ const InputSection: React.FC<InputSectionProps> = ({
     );
 
     if (mode === 'character') {
-      const uploadedCharacters = images.map((image, index) => createCharacterCardFromPrompt({
-        name: image.label,
-        prompt: image.prompt,
-        description: '업로드 감성 기반 캐릭터',
-        imageData: image.imageData,
-        sourceMode: 'upload',
-      }));
-      setExtractedCharacters((prev) => [...prev, ...uploadedCharacters]);
-      setSelectedCharacterIds((prev) => [...new Set([...prev, ...uploadedCharacters.map((item) => item.id)])]);
-      setCharacterCarouselIndices((prev) => ({
-        ...prev,
-        ...Object.fromEntries(uploadedCharacters.map((item) => [item.id, 0])),
-      }));
-      setNotice('업로드한 이미지를 출연자 캐릭터 카드로 추가했고, 해당 느낌의 프롬프트도 함께 저장했습니다.');
+      if (characterUploadTargetId) {
+        const targetImage = images[images.length - 1];
+        if (targetImage) {
+          setExtractedCharacters((prev) => prev.map((item) => {
+            if (item.id !== characterUploadTargetId) return item;
+            return {
+              ...item,
+              prompt: targetImage.prompt,
+              visualStyle: selectedCharacterStyle?.label || item.visualStyle,
+              generatedImages: [...(item.generatedImages || []), targetImage],
+              selectedImageId: targetImage.id,
+              imageData: targetImage.imageData,
+            };
+          }));
+          setSelectedCharacterIds((prev) => (prev.includes(characterUploadTargetId) ? prev : [...prev, characterUploadTargetId]));
+          setNotice('업로드한 이미지를 선택한 출연자 카드에 추가했고, 그 이미지를 기준으로 유사 이미지도 이어서 만들 수 있게 했습니다.');
+        }
+        setCharacterUploadTargetId(null);
+      } else {
+        const uploadedCharacters = images.map((image) => {
+          const created = createCharacterCardFromPrompt({
+            name: image.label,
+            prompt: image.prompt,
+            description: '업로드 감성 기반 캐릭터',
+            imageData: image.imageData,
+            sourceMode: 'upload',
+          });
+          created.visualStyle = selectedCharacterStyle?.label || created.visualStyle;
+          return created;
+        });
+        setExtractedCharacters((prev) => [...prev, ...uploadedCharacters]);
+        setSelectedCharacterIds((prev) => [...new Set([...prev, ...uploadedCharacters.map((item) => item.id)])]);
+        setCharacterCarouselIndices((prev) => ({
+          ...prev,
+          ...Object.fromEntries(uploadedCharacters.map((item) => [item.id, 0])),
+        }));
+        setNotice('업로드한 이미지를 출연자 캐릭터 카드로 추가했고, 해당 느낌의 프롬프트도 함께 저장했습니다.');
+      }
     } else {
       setStyleImages((prev) => [...prev, ...images]);
       const newest = images[images.length - 1];
@@ -1679,15 +1743,15 @@ const InputSection: React.FC<InputSectionProps> = ({
         ...prev,
         ...Object.fromEntries(images.map((item) => [item.groupId || item.id, 0])),
       }));
-      setNotice('업로드한 이미지를 화풍 카드로 추가했고, 해당 느낌의 프롬프트도 함께 저장했습니다.');
+      setNotice('업로드한 이미지를 Step5 최종 영상 화풍 카드로 추가했고, 해당 느낌의 프롬프트도 함께 저장했습니다.');
     }
 
     e.target.value = '';
     if (mode === 'character') {
-      if (openStage !== 3) openOnly(3);
+      if (openStage !== 4) openOnly(4);
       return;
     }
-    if (openStage !== 4) openOnly(4);
+    if (openStage !== 5) openOnly(5);
   };
 
   const updatePromptTemplate = (templateId: string, patch: Partial<WorkflowPromptTemplate>) => {
@@ -1703,6 +1767,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       prompt: source.prompt,
       mode: source.mode,
       builtIn: false,
+      engine: source.engine || 'default',
       updatedAt: Date.now(),
     };
     setPromptTemplates((prev) => [...prev, custom]);
@@ -1733,27 +1798,34 @@ const InputSection: React.FC<InputSectionProps> = ({
   ];
 
   const handleOpenSceneStudioClick = async () => {
-    const isCompleted = await completeStage(4);
+    const finalStageForSceneOpen: StepId = 5;
+    const isCompleted = await completeStage(finalStageForSceneOpen);
     if (!isCompleted) {
-      scrollStageIntoFocus(stepCompleted[3] ? 4 : 3);
+      if (routeStep && onNavigateStep) {
+        onNavigateStep(finalStageForSceneOpen as 1 | 2 | 3 | 4 | 5);
+        return;
+      }
+      scrollStageIntoFocus(stepCompleted[3] ? finalStageForSceneOpen : 3);
       return;
     }
-    setNotice('현재 선택값을 프로젝트에 추가하고 씬 제작 작업 화면으로 이동합니다. 순서는 프롬프트 / 대본 → 출연자 준비 → 출연자 / 화풍 선택 → 씬 제작입니다.');
+    const finalDraftPayload: Partial<WorkflowDraft> = {
+      ...buildDraftPayload(),
+      activeStage: finalStageForSceneOpen,
+      completedSteps: {
+        step1: true,
+        step2: true,
+        step3: true,
+        step4: true,
+        step5: true,
+      },
+    };
+    await onSaveWorkflowDraft?.(finalDraftPayload);
+    setNotice('현재 선택값을 프로젝트에 추가하고 씬 제작 작업 화면으로 이동합니다. 순서는 프롬프트 / 대본 → Step4 출연자 캐릭터 설정 → Step5 최종 영상 화풍 선택 → 씬 제작입니다.');
     try {
-      await onOpenSceneStudio?.({
-        ...buildDraftPayload(),
-        activeStage: 4,
-        completedSteps: {
-          step1: true,
-          step2: true,
-          step3: true,
-          step4: true,
-          step5: true,
-        },
-      });
+      await onOpenSceneStudio?.(finalDraftPayload);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch {
-      setNotice('씬 제작 화면으로 넘기기 전에 비어 있는 항목이 있습니다. 프롬프트 / 대본 → 출연자 준비 → 출연자 / 화풍 선택 순서로 필요한 단계로 자동 이동했습니다.');
+      setNotice('씬 제작 화면으로 넘기기 전에 비어 있는 항목이 있습니다. 프롬프트 / 대본 → Step4 출연자 캐릭터 설정 → Step5 최종 영상 화풍 선택 순서로 필요한 단계로 자동 이동했습니다.');
       scrollStageIntoFocus(stepCompleted[4] ? 4 : 3);
     }
   };
@@ -1782,8 +1854,8 @@ const InputSection: React.FC<InputSectionProps> = ({
   );
   const step4Summary = (
     <>
-      <SummaryChip accent="blue">캐릭터는 3단계에서 확정</SummaryChip>
-      <SummaryChip accent="violet">화풍 {selectedStyle?.label || '미선택'}</SummaryChip>
+      <SummaryChip accent="blue">출연자 {selectedCharacters.length}명</SummaryChip>
+      <SummaryChip accent="violet">캐릭터 스타일 {selectedCharacterStyle?.label || '미선택'}</SummaryChip>
       <SummaryChip>이미지 모델 {studioState?.routing?.imageModel || IMAGE_MODELS[0].id}</SummaryChip>
     </>
   );
@@ -1791,1569 +1863,296 @@ const InputSection: React.FC<InputSectionProps> = ({
   const previousRouteStep = footerStage > 1 ? ((footerStage - 1) as 1 | 2 | 3 | 4 | 5) : null;
   const nextRouteStep = footerStage < 5 ? ((footerStage + 1) as 1 | 2 | 3 | 4 | 5) : null;
   if (routeStep) {
-    const currentRouteStep = routeStep as 1 | 2 | 3 | 4 | 5;
-    const renderRouteContent = () => {
-      if (currentRouteStep === 1) {
-        return (
-          <Step1Panel
-            contentType={contentType}
-            aspectRatio={aspectRatio}
-            hasSelectedContentType={hasSelectedContentType}
-            hasSelectedAspectRatio={hasSelectedAspectRatio}
-            onSelectContentType={(value) => {
-              if (contentType === value && hasSelectedContentType) {
-                setHasSelectedContentType(false);
-                return;
-              }
-              const defaults = FIELD_OPTIONS_BY_TYPE[value];
-              setContentType(value);
-              setHasSelectedContentType(true);
-              setTopic(getTopicSuggestion(value, ''));
-              setStoryScript('');
-              setGenre(defaults.genre[0]);
-              setMood(defaults.mood[0]);
-              setEndingTone(defaults.endingTone[0]);
-              setSetting(defaults.setting[0]);
-              setProtagonist(defaults.protagonist[0]);
-              setConflict(defaults.conflict[0]);
-              setExtractedCharacters([]);
-              setStyleImages([]);
-              setSelectedCharacterIds([]);
-              setSelectedStyleImageId(null);
-            }}
-            onSelectAspectRatio={(value) => {
-              if (aspectRatio === value && hasSelectedAspectRatio) {
-                setHasSelectedAspectRatio(false);
-                return;
-              }
-              setAspectRatio(value);
-              setHasSelectedAspectRatio(true);
-            }}
-          />
-        );
-      }
-
-      if (currentRouteStep === 2) {
-        return (
-          <Step2Panel
-            topic={topic}
-            isRefreshingTopic={isRefreshingTopic}
-            isInitialLoadingRecommendations={isRefreshingTopic && topicRecommendations.length === 0}
-            topicRecommendations={topicRecommendations}
-            onTopicChange={setTopic}
-            onRefreshTopic={() => { void refreshTopicRecommendation(); }}
-            onSelectTopicRecommendation={(value) => setTopic(value)}
-          />
-        );
-      }
-
-      if (currentRouteStep === 3) {
-        return (
-          <Step3Panel
-            isGeneratingScript={isGeneratingScript}
-            sceneCount={sceneCount}
-            storyScript={storyScript}
-            onGenerateScript={handleGenerateScriptClick}
-            onViewPrompt={() => {
-              const projectTemplate = ensureProjectPromptTemplate();
-              const targetTemplate = projectTemplate || selectedPromptTemplate || syncedPromptTemplates[0] || null;
-              if (!targetTemplate) {
-                setNotice('표시할 프롬프트가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.');
-                return;
-              }
-              setPromptPreviewDraft(targetTemplate.prompt || '');
-              setPromptPreviewId(targetTemplate.id);
-            }}
-            onStoryScriptChange={setStoryScript}
-          />
-        );
-      }
-
-      if (currentRouteStep === 4) {
-        return (
-          <Step4Panel
-            extractedCharacters={extractedCharacters}
-            selectedCharacterIds={selectedCharacterIds}
-            newCharacterName={newCharacterName}
-            newCharacterPrompt={newCharacterPrompt}
-            isExtracting={isExtracting}
-            onHydrateCharacters={(forceSample) => {
-              void hydrateCharactersForScript(forceSample ? { forceSample: true } : { preserveSelection: true });
-            }}
-            onUploadClick={() => characterUploadInputRef.current?.click()}
-            onCreateCharacter={createNewCharacterByPrompt}
-            onToggleCharacter={toggleCharacterSelection}
-            onCreateVariants={(character) => { void createCharacterVariants(character); }}
-            onNewCharacterName={setNewCharacterName}
-            onNewCharacterPrompt={setNewCharacterPrompt}
-            uploadInput={<input ref={characterUploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void handleUpload(e, 'character')} />}
-          />
-        );
-      }
-
-      if (currentRouteStep === 5) {
-        return (
-          <Step5Panel
-            styleGroups={styleGroups}
-            selectedStyleImageId={selectedStyleImageId}
-            newStyleName={newStyleName}
-            newStylePrompt={newStylePrompt}
-            isExtracting={isExtracting}
-            onEnsureStyleRecommendations={() => { void ensureStyleRecommendations('manual'); }}
-            onCreateStyle={createNewStyleByPrompt}
-            onSelectStyle={setSelectedStyleImageId}
-            onStyleNameChange={setNewStyleName}
-            onStylePromptChange={setNewStylePrompt}
-          />
-        );
-      }
-
-      if (currentRouteStep === 1) {
-        const quickConceptCards: Array<{ key: string; title: string; desc: string; value: ContentType }> = [
-          { key: 'music_video', title: '뮤직비디오', desc: '음악 중심 영상 제작', value: 'music_video' },
-          { key: 'story', title: '이야기', desc: '스토리텔링 중심 구성', value: 'story' },
-          { key: 'news', title: '뉴스', desc: '브리핑/리포트 톤', value: 'news' },
-          { key: 'info_delivery', title: '정보 전달', desc: '설명형 전달 콘텐츠', value: 'info_delivery' },
-        ];
-        return (
-          <div className="space-y-6">
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-black text-slate-900">무엇을 만들까요?</h2>
-              <div className="mt-4 grid gap-4 lg:grid-cols-4">
-                {quickConceptCards.map((card) => {
-                  const active = hasSelectedContentType && contentType === card.value;
-                  return (
-                    <button
-                      key={card.key}
-                      type="button"
-                      onClick={() => {
-                        if (contentType === card.value && hasSelectedContentType) {
-                          setHasSelectedContentType(false);
-                          return;
-                        }
-                        const defaults = FIELD_OPTIONS_BY_TYPE[card.value];
-                        setContentType(card.value);
-                        setHasSelectedContentType(true);
-                        setTopic(getTopicSuggestion(card.value, ''));
-                        setStoryScript('');
-                        setGenre(defaults.genre[0]);
-                        setMood(defaults.mood[0]);
-                        setEndingTone(defaults.endingTone[0]);
-                        setSetting(defaults.setting[0]);
-                        setProtagonist(defaults.protagonist[0]);
-                        setConflict(defaults.conflict[0]);
-                        setExtractedCharacters([]);
-                        setStyleImages([]);
-                        setSelectedCharacterIds([]);
-                        setSelectedStyleImageId(null);
-                      }}
-                      className={`rounded-[24px] border p-5 text-left transition-all ${active ? 'border-blue-300 bg-blue-50 shadow-sm' : 'border-slate-200 bg-slate-50 hover:bg-white'}`}
-                    >
-                      <div className="mt-1 text-xl font-black text-slate-900">{card.title}</div>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">{card.desc}</p>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-black text-slate-900">화면 비율</h2>
-              <p className="mt-2 text-sm text-slate-500">16:9, 1:1, 9:16</p>
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                {ASPECT_RATIO_OPTIONS.map((option) => {
-                  const active = hasSelectedAspectRatio && aspectRatio === option.id;
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      onClick={() => {
-                        if (aspectRatio === option.id && hasSelectedAspectRatio) {
-                          setHasSelectedAspectRatio(false);
-                          return;
-                        }
-                        setAspectRatio(option.id);
-                        setHasSelectedAspectRatio(true);
-                      }}
-                      className={`rounded-[24px] border p-4 text-left transition-all ${active ? 'border-blue-300 bg-blue-50 shadow-sm' : 'border-slate-200 bg-slate-50 hover:bg-white'}`}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-lg font-black text-slate-900">{option.title}</div>
-                        </div>
-                        <div className={`overflow-hidden rounded-2xl border bg-slate-100 p-2 ${active ? 'border-blue-200' : 'border-slate-200'}`}>
-                          <div className={`${getAspectRatioClass(option.id)} w-16 rounded-xl ${active ? 'bg-blue-200/80' : 'bg-slate-200'}`} />
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </section>
-          </div>
-        );
-      }
-
-      if (currentRouteStep === 2) {
-        return (
-          <div className="space-y-6">
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <label className="text-sm font-black text-slate-900">콘텐츠 주제</label>
-                <button type="button" onClick={() => { void refreshTopicRecommendation(); }} disabled={isRefreshingTopic} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
-                  {isRefreshingTopic ? '추천 중...' : '주제 새로고침'}
-                </button>
-              </div>
-              <input
-                value={topic}
-                onChange={(e) => setTopic(e.target.value)}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400"
-                placeholder="예: 네온 야경 아래 다시 시작하는 사랑"
-              />
-              <div className="mt-4 space-y-2">
-                <div className="text-xs font-black text-slate-600">추천 주제</div>
-                <div className="flex flex-col gap-2">
-                  {topicRecommendations.map((item, index) => (
-                    <button
-                      key={`route-step2-topic-${index}-${item}`}
-                      type="button"
-                      onClick={() => setTopic(item)}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-white"
-                    >
-                      {item}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </section>
-
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              <div className="rounded-[28px] border border-slate-200 bg-white p-4 text-xs text-slate-500 shadow-sm md:col-span-2 xl:col-span-3">
-                2단계에서는 콘텐츠 주제만 입력합니다. 장르/분위기/엔딩톤/배경/주인공/갈등은 기본 설정값으로 유지되고 이후 프롬프트에 자동 반영됩니다.
-              </div>
-              {false ? fieldConfigs.map((field) => (
-                <div key={field.key} className="rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="mb-2 flex items-center justify-between gap-2">
-                    <label className="text-sm font-black text-slate-900">{field.label}</label>
-                    <button type="button" onClick={() => refreshField(field.key)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50">
-                      {loadingFields[field.key] ? '불러오는 중...' : '추천'}
-                    </button>
-                  </div>
-                  <input
-                    list={`story-field-${field.key}`}
-                    value={field.value}
-                    onChange={(e) => field.setter(e.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-400"
-                  />
-                  <datalist id={`story-field-${field.key}`}>
-                    {FIELD_OPTIONS_BY_TYPE[contentType][field.key].map((item) => (
-                      <option key={item} value={item} />
-                    ))}
-                  </datalist>
-                </div>
-              )) : null}
-            </section>
-          </div>
-        );
-      }
-
-      if (currentRouteStep === 3) {
-        return (
-          <div className="space-y-6">
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-wrap gap-3">
-                {syncedPromptTemplates.map((template) => (
-                  <button
-                    key={template.id}
-                    type="button"
-                    onClick={() => focusPromptTemplate(template.id)}
-                    className={`rounded-2xl px-4 py-3 text-sm font-black transition ${selectedPromptTemplateId === template.id ? 'bg-violet-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-                  >
-                    {template.name}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button type="button" onClick={handleGenerateScriptClick} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500">
-                  {isGeneratingScript ? '대본 생성 중...' : '대본 생성'}
-                </button>
-                <button type="button" onClick={createDraftFromSelections} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                  샘플 대본 채우기
-                </button>
-              </div>
-            </section>
-
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h2 className="text-xl font-black text-slate-900">최종 대본</h2>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">{sceneCount}문단</span>
-              </div>
-              <textarea
-                value={storyScript}
-                onChange={(e) => setStoryScript(e.target.value)}
-                className="min-h-[420px] w-full rounded-3xl border border-slate-200 bg-slate-50 px-5 py-5 text-sm leading-7 text-slate-900 outline-none transition focus:border-blue-400"
-                placeholder="여기에 최종 대본을 입력하거나 생성해 주세요."
-              />
-            </section>
-          </div>
-        );
-      }
-
-      if (currentRouteStep === 4) {
-        return (
-          <div className="space-y-6">
-            <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => void hydrateCharactersForScript({ preserveSelection: true })} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500">
-                  {isExtracting ? '준비 중...' : '대본 기준 출연자 준비'}
-                </button>
-                <button type="button" onClick={() => void hydrateCharactersForScript({ forceSample: true })} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                  샘플로 채우기
-                </button>
-                <button type="button" onClick={() => characterUploadInputRef.current?.click()} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                  이미지 업로드
-                </button>
-                <input ref={characterUploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void handleUpload(e, 'character')} />
-              </div>
-
-              <div className="mt-4 grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:grid-cols-[0.75fr_1.25fr_auto]">
-                <input value={newCharacterName} onChange={(e) => setNewCharacterName(e.target.value)} placeholder="출연자 이름" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400" />
-                <textarea value={newCharacterPrompt} onChange={(e) => setNewCharacterPrompt(e.target.value)} placeholder="출연자 설명 또는 프롬프트" className="min-h-[90px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400" />
-                <div className="flex items-center justify-center">
-                  <button type="button" onClick={createNewCharacterByPrompt} className="rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500">출연자 추가</button>
-                </div>
-              </div>
-            </section>
-
-            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {extractedCharacters.map((character) => {
-                const active = selectedCharacterIds.includes(character.id);
-                const selectedImage = (character.generatedImages || []).find((image) => image.id === character.selectedImageId) || character.generatedImages?.[0] || null;
-                return (
-                  <div key={character.id} className={`rounded-[24px] border p-4 shadow-sm ${active ? 'border-violet-300 bg-violet-50/60' : 'border-slate-200 bg-white'}`}>
-                    <div className="flex items-start gap-3">
-                      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-                        {selectedImage?.imageData ? (
-                          <img src={selectedImage.imageData} alt={character.name} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-xs font-black text-slate-400">없음</div>
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-black text-slate-900">{character.name}</div>
-                        <div className="mt-1 text-xs text-slate-500">{character.role === 'lead' ? '주인공' : character.role === 'narrator' ? '나레이터' : '조연'}</div>
-                        <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-500">{selectedImage?.prompt || character.prompt || character.description || '프롬프트 없음'}</p>
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button type="button" onClick={() => toggleCharacterSelection(character.id)} className={`rounded-xl px-3 py-2 text-xs font-black ${active ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                        {active ? '선택 해제' : '선택'}
-                      </button>
-                      <button type="button" onClick={() => void createCharacterVariants(character)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
-                        추천 +1
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </section>
-          </div>
-        );
-      }
-
-      return (
-        <div className="space-y-6">
-          <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl font-black text-slate-900">화풍 선택</h2>
-              <button type="button" onClick={() => void ensureStyleRecommendations('manual')} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500">
-                {isExtracting ? '생성 중...' : '추천 화풍 추가'}
-              </button>
-            </div>
-            <div className="mt-4 grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 lg:grid-cols-[0.8fr_1.2fr_auto]">
-              <input value={newStyleName} onChange={(e) => setNewStyleName(e.target.value)} placeholder="신규 화풍 이름" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400" />
-              <textarea value={newStylePrompt} onChange={(e) => setNewStylePrompt(e.target.value)} placeholder="프롬프트로 신규 화풍을 추가할 수 있습니다." className="min-h-[90px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400" />
-              <div className="flex items-center justify-center">
-                <button type="button" onClick={createNewStyleByPrompt} className="rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500">화풍 생성</button>
-              </div>
-            </div>
-          </section>
-
-          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {styleGroups.map((group) => {
-              const currentCard = group.items.find((item) => item.id === selectedStyleImageId) || group.items[0] || null;
-              return (
-                <div key={group.id} className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-                    <img src={currentCard?.imageData || '/mp4Creater/flow-render.svg'} alt={currentCard?.label || group.label} className="aspect-square w-full object-cover" />
-                  </div>
-                  <div className="mt-3 text-sm font-black text-slate-900">{group.label || currentCard?.label || '화풍'}</div>
-                  <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-500">{currentCard?.prompt || '화풍 프롬프트가 여기에 표시됩니다.'}</p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {group.items.map((item) => (
-                      <button key={item.id} type="button" onClick={() => setSelectedStyleImageId(item.id)} className={`rounded-xl px-3 py-2 text-xs font-black ${item.id === selectedStyleImageId ? 'bg-violet-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                        {item.id === selectedStyleImageId ? '선택됨' : '선택'}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </section>
-        </div>
-      );
-    };
-
     return (
-      <div className="mx-auto my-6 w-full max-w-[1520px] px-4 pb-32 sm:px-6 lg:px-8">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-          <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">{currentRouteStep}단계</div>
-          <h1 className="mt-2 text-2xl font-black text-slate-900">{STEP_META[currentRouteStep - 1]?.title}</h1>
-          <p className="mt-2 text-sm leading-6 text-slate-600">{STEP_META[currentRouteStep - 1]?.subtitle}</p>
-        </div>
-        {notice && (
-          <div className="mt-6 rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm leading-6 text-blue-900 shadow-sm">
-            {notice}
-          </div>
-        )}
-        <div className="mt-6">{renderRouteContent()}</div>
-        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">
-          <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-3 py-3 shadow-xl shadow-slate-200/70 backdrop-blur-md">
-            <button
-              type="button"
-              onClick={() => {
-                if (previousRouteStep) {
-                  void moveRouteStep(previousRouteStep);
-                  return;
-                }
-                goBackFromStep1();
-              }}
-              className="min-w-[120px] rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-            >
-              돌아가기
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (currentRouteStep === 5) {
-                  void handleOpenSceneStudioClick();
-                  return;
-                }
-                if (nextRouteStep) {
-                  void completeStage(currentRouteStep, nextRouteStep as StepId);
-                }
-              }}
-              disabled={!routeStepCompleted[currentRouteStep]}
-              className="min-w-[140px] rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
-            >
-              {currentRouteStep === 5 ? '프로젝트에 저장하고 씬 제작으로' : '다음으로'}
-            </button>
-          </div>
-        </div>
-
-        <OverlayModal
-          open={Boolean(promptPreviewId)}
-          title={syncedPromptTemplates.find((item) => item.id === promptPreviewId)?.name || '프롬프트 보기'}
-          description={syncedPromptTemplates.find((item) => item.id === promptPreviewId)?.description || '선택한 프롬프트 본문을 팝업에서 크게 확인합니다.'}
-          onClose={() => setPromptPreviewId(null)}
-          footer={(
-            <>
-              {promptPreviewId && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const target = syncedPromptTemplates.find((item) => item.id === promptPreviewId);
-                    if (!target) return;
-                    updatePromptTemplate(target.id, { prompt: promptPreviewDraft });
-                    setNotice('프롬프트 수정이 저장되었습니다. 대본생성 시 바로 반영됩니다.');
-                  }}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                >
-                  이 프롬프트 수정
-                </button>
-              )}
-              <button type="button" onClick={() => setPromptPreviewId(null)} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500">
-                닫기
-              </button>
-            </>
-          )}
-        >
-          <textarea
-            value={promptPreviewDraft || syncedPromptTemplates.find((item) => item.id === promptPreviewId)?.prompt || selectedPromptTemplate?.prompt || ''}
-            onChange={(event) => setPromptPreviewDraft(event.target.value)}
-            className="min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-700 outline-none"
-            placeholder="프롬프트를 불러오는 중입니다."
-          />
-        </OverlayModal>
-      </div>
+      <RouteStepView
+        vm={{
+          routeStep,
+          contentType,
+          aspectRatio,
+          hasSelectedContentType,
+          hasSelectedAspectRatio,
+          setHasSelectedContentType,
+          setContentType,
+          setTopic,
+          setStoryScript,
+          setGenre,
+          setMood,
+          setEndingTone,
+          setSetting,
+          setProtagonist,
+          setConflict,
+          setExtractedCharacters,
+          setStyleImages,
+          setSelectedCharacterIds,
+          setSelectedCharacterStyleId,
+          setSelectedStyleImageId,
+          setAspectRatio,
+          setHasSelectedAspectRatio,
+          topic,
+          isRefreshingTopic,
+          topicRecommendations,
+          refreshTopicRecommendation,
+          isGeneratingScript,
+          sceneCount,
+          storyScript,
+          handleGenerateScriptClick,
+          ensureProjectPromptTemplate,
+          selectedPromptTemplate,
+          syncedPromptTemplates,
+          setNotice,
+          setPromptPreviewDraft,
+          setPromptPreviewId,
+          extractedCharacters,
+          selectedCharacterIds,
+          selectedCharacterStyleId,
+          characterStyleOptions: CHARACTER_STYLE_OPTIONS,
+          isExtracting,
+          hydrateCharactersForScript,
+          handleCharacterUploadForId,
+          characterUploadInputRef,
+          applyCharacterSampleToCharacter,
+          toggleCharacterSelection,
+          selectCharacterImageById,
+          handleCharacterVoiceChange,
+          updateCharacterPrompt,
+          createCharacterVariants,
+          handleUpload,
+          styleGroups,
+          selectedStyleImageId,
+          newStyleName,
+          newStylePrompt,
+          ensureStyleRecommendations,
+          createNewStyleByPrompt,
+          createStyleVariants,
+          applyStyleSampleFromPreset,
+          setNewStyleName,
+          setNewStylePrompt,
+          customScriptDurationMinutes,
+          customScriptSpeechStyle,
+          customScriptLanguage,
+          customScriptReferenceText,
+          scriptReferenceSuggestions,
+          referenceLinks,
+          pendingReferenceLinkUrl,
+          showReferenceLinkInput,
+          isAddingReferenceLink,
+          selectedScriptGenerationModel,
+          customScriptModelOptions,
+          constitutionAnalysis,
+          selectedPromptTemplateName: selectedPromptTemplate?.name || '',
+          selectedPromptTemplateEngine: selectedPromptTemplate?.engine || 'default',
+          setCustomScriptDurationMinutes,
+          setCustomScriptSpeechStyle,
+          setCustomScriptLanguage,
+          setCustomScriptReferenceText,
+          applyScriptReferenceSuggestion,
+          refreshScriptReferenceSuggestions,
+          setPendingReferenceLinkUrl,
+          toggleReferenceLinkInput,
+          addReferenceLink,
+          removeReferenceLink,
+          setSelectedScriptGenerationModel,
+          previousRouteStep,
+          moveRouteStep,
+          goBackFromStep1,
+          nextRouteStep,
+          completeStage,
+          routeStepCompleted,
+          handleOpenSceneStudioClick,
+          notice,
+          promptPreviewId,
+          promptPreviewDraft,
+          updatePromptTemplate,
+        }}
+      />
     );
   }
 
   return (
     <div className="mx-auto my-6 w-full max-w-[1520px] px-4 sm:px-6 lg:px-8">
-      <div className={`${routeStep ? 'hidden ' : ''}overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm`}>
-        <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 px-6 py-8 text-white md:px-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="max-w-3xl">
-              <div className="inline-flex rounded-full bg-white/10 px-3 py-1 text-[11px] font-black uppercase tracking-[0.22em] text-blue-100">제작 흐름</div>
-              <h1 className="mt-4 text-3xl font-black tracking-tight md:text-5xl">한 화면에서 1단계부터 캐릭터 / 화풍 선택까지</h1>
-              <p className="mt-4 text-sm leading-7 text-slate-200 md:text-base">
-                제작 버튼은 항상 신규 프로젝트로 시작하고, 프로젝트 페이지의 저장 파일을 누르면 씬 제작으로 바로 이어지도록 흐름을 정리했습니다.
-              </p>
-            </div>
+      <MainStepView
+        vm={{
+          routeStep,
+          completion,
+          notice,
+          openStage,
+          activeStage,
+          toggleStage,
+          stageStatus,
+          step1Summary,
+          step2Summary,
+          step3Summary,
+          step4Summary,
+          step3GuideItems,
+          contentType,
+          hasSelectedContentType,
+          hasSelectedAspectRatio,
+          aspectRatio,
+          setHasSelectedContentType,
+          setContentType,
+          setTopic,
+          setStoryScript,
+          setGenre,
+          setMood,
+          setEndingTone,
+          setSetting,
+          setProtagonist,
+          setConflict,
+          setExtractedCharacters,
+          setStyleImages,
+          setSelectedCharacterIds,
+          setSelectedStyleImageId,
+          setHasSelectedAspectRatio,
+          setAspectRatio,
+          topic,
+          isRefreshingTopic,
+          refreshTopicRecommendation,
+          topicRecommendations,
+          fieldConfigs,
+          refreshField,
+          loadingFields,
+          selectedPromptTemplate,
+          selectedPromptTemplateId,
+          syncedPromptTemplates,
+          focusPromptTemplate,
+          openPromptEditor,
+          deleteCustomPromptTemplate,
+          addCustomPromptTemplate,
+          handleGenerateScriptClick,
+          createDraftFromSelections,
+          isGeneratingScript,
+          ensureProjectPromptTemplate,
+          setPromptPreviewDraft,
+          setPromptPreviewId,
+          storyScript,
+          sceneCount,
+          selectedCharacters,
+          selectedStyle,
+          connectionSummary,
+          selectedScriptModel,
+          selectedImageModel,
+          onOpenApiModal,
+          hydrateCharactersForScript,
+          isExtracting,
+          characterUploadInputRef,
+          handleUpload,
+          newCharacterName,
+          setNewCharacterName,
+          newCharacterPrompt,
+          setNewCharacterPrompt,
+          createNewCharacterByPrompt,
+          extractedCharacters,
+          characterStripRef,
+          characterCarouselIndices,
+          setCharacterCarouselIndices,
+          characterLoadingProgress,
+          chooseCharacterImage,
+          toggleCharacterSelection,
+          createCharacterVariants,
+          expandedCharacterEditorId,
+          setExpandedCharacterEditorId,
+          updateCharacterName,
+          updateCharacterPrompt,
+          updateCharacterRole,
+          updateCharacterRoleLabel,
+          removeCharacter,
+          selectedCharacterIds,
+          ensureStyleRecommendations,
+          newStyleName,
+          setNewStyleName,
+          newStylePrompt,
+          setNewStylePrompt,
+          createNewStyleByPrompt,
+          styleGroups,
+          styleStripRef,
+          styleCarouselIndices,
+          setStyleCarouselIndices,
+          styleLoadingProgress,
+          createStyleVariants,
+          expandedStyleEditorId,
+          setExpandedStyleEditorId,
+          updateStylePrompt,
+          stepCompleted,
+          handleOpenSceneStudioClick,
+          visibleStepIds,
+          setCharacterLoadingProgress,
+          setStyleLoadingProgress,
+          autoRecommendSignatureRef,
+          setPromptTemplates,
+          setSelectedPromptTemplateId,
+          setPromptDetailId,
+          setNotice,
+          completeStage,
+          openExampleGuide,
+          normalizedScript,
+          setShowPromptPack,
+          showPromptPack,
+          onUpdateRouting,
+          textModelReady,
+          step3PanelMode,
+          setStep3PanelMode,
+          activePromptSlide,
+          selectedPromptIndex,
+          generateScriptByPrompt,
+          promptDetailTemplate,
+          promptPack,
+          onOpenSettings,
+          studioState,
+          imageModelReady,
+          openStageWithIntent,
+          step4CharacterStripRef,
+          styleUploadInputRef,
+          selectedStyleImageId,
+        }}
+      />
 
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
-              <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-100">연결 상태</div>
-                <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-bold">
-                  <span className={`rounded-full px-3 py-1.5 ${connectionSummary.text ? 'bg-emerald-400/20 text-emerald-100' : 'bg-white/10 text-slate-200'}`}>텍스트 AI {connectionSummary.text ? '연결됨' : '임시 추천'}</span>
-                  <span className={`rounded-full px-3 py-1.5 ${connectionSummary.audio ? 'bg-emerald-400/20 text-emerald-100' : 'bg-white/10 text-slate-200'}`}>TTS {connectionSummary.audio ? '연결됨' : '미등록'}</span>
-                  <span className={`rounded-full px-3 py-1.5 ${connectionSummary.video ? 'bg-emerald-400/20 text-emerald-100' : 'bg-white/10 text-slate-200'}`}>영상 {connectionSummary.video ? '연결됨' : '미등록'}</span>
-                </div>
-              </div>
-              <div className="rounded-3xl border border-white/10 bg-white/10 p-4 backdrop-blur-sm">
-                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-100">진행률</div>
-                <div className="mt-2 text-2xl font-black">{completion.total}%</div>
-                <div className="mt-3 h-2 rounded-full bg-white/10">
-                  <div className="h-2 rounded-full bg-cyan-300" style={{ width: `${completion.total}%` }} />
-                </div>
-                <p className="mt-3 text-xs leading-5 text-slate-200">남은 입력 {completion.remaining}% · 선택된 캐릭터 {selectedCharacters.length}명 · 화풍 {selectedStyle ? 1 : 0}개</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      <RouteStepFooter
+        routeStep={routeStep}
+        previousRouteStep={previousRouteStep}
+        footerStage={footerStage}
+        nextRouteStep={nextRouteStep}
+        routeStepCompleted={routeStepCompleted}
+        stepCompleted={stepCompleted}
+        onMoveRouteStep={moveRouteStep}
+        onOpenSceneStudio={() => handleOpenSceneStudioClick()}
+        onCompleteStage={(from, to) => { void completeStage(from, to); }}
+      />
 
-        <div className="border-t border-slate-200 bg-slate-50/80 px-6 py-5 md:px-8">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            {STEP_META.filter((meta) => visibleStepIds.includes(meta.id)).map((meta) => (
-              <StepChip
-                key={meta.id}
-                meta={meta}
-                isOpen={openStage === meta.id}
-                completed={stageStatus[meta.id]}
-                onClick={() => toggleStage(meta.id)}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {notice && (
-        <div className="mt-6 rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm leading-6 text-blue-900 shadow-sm">
-          {notice}
-        </div>
-      )}
-
-      <div className={`${routeStep ? 'hidden ' : ''}mt-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm`}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.22em] text-blue-600">순서 가이드</div>
-            <h2 className="mt-2 text-2xl font-black text-slate-900">처음 쓰는 사용자도 길을 잃지 않도록</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">1단계부터 4단계까지는 아래 순서대로 진행하면 됩니다. 비어 있는 항목이 있으면 씬 제작으로 넘어가기 전에 해당 단계로 다시 안내합니다.</p>
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">현재 진행률 {completion.total}%</div>
-        </div>
-        <div className="mt-5 grid gap-3 lg:grid-cols-4">
-          <div className={`rounded-[22px] border p-4 ${stepCompleted[1] ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-            <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">1단계</div>
-            <div className="mt-2 text-base font-black text-slate-900">프롬프트 / 제작 방향 정하기</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">콘텐츠 유형, 화면 비율, 주제와 선택값을 채워 전체 방향을 먼저 고정합니다.</p>
-          </div>
-          <div className={`rounded-[22px] border p-4 ${stepCompleted[2] ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-            <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">2단계</div>
-            <div className="mt-2 text-base font-black text-slate-900">대본 만들기</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">선택한 프롬프트로 대본 초안을 만들고, 씬 기준이 되는 문단 구조를 정리합니다.</p>
-          </div>
-          <div className={`rounded-[22px] border p-4 ${stepCompleted[3] ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-            <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">3단계</div>
-            <div className="mt-2 text-base font-black text-slate-900">대본 기준 출연자 준비</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">주인공과 조연 후보를 대본에서 뽑고, 실제 출연자로 쓸 인물을 선택합니다. 현재 {selectedCharacters.length}명 선택됨.</p>
-          </div>
-          <div className={`rounded-[22px] border p-4 ${stepCompleted[4] ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'}`}>
-            <div className="text-xs font-black uppercase tracking-[0.18em] text-slate-500">4단계</div>
-            <div className="mt-2 text-base font-black text-slate-900">출연자 / 화풍 확정 후 씬 제작</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">출연자 선택은 자동 보정되고, 화풍은 첫 카드가 기본으로 이어집니다. 현재 화풍 {selectedStyle ? '선택됨' : '미선택'}.</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 space-y-6">
-        <AccordionSection
-          stepId={1}
-          title="무엇을 만들지 선택"
-          description="유형을 고르면 추천값, 프롬프트 구조, 샘플 대본 형식이 함께 바뀝니다."
-          summary={step1Summary}
-          open={openStage === 1}
-          completed={stageStatus[1]}
-          onToggle={() => toggleStage(1)}
-          actions={<HelpTip title="첫 단계가 흐름을 바꿉니다">뮤직비디오는 가사 블록 중심, 스토리는 서사 문단 중심, 뉴스는 브리핑 문단 중심으로 다음 단계가 자동 조정됩니다.</HelpTip>}
-        >
-          <div className="grid gap-4 lg:grid-cols-3">
-            {CONTENT_TYPE_CARDS.map((card) => {
-              const active = hasSelectedContentType && contentType === card.id;
-              return (
-                <button
-                  key={card.id}
-                  type="button"
-                  onClick={() => {
-                    if (contentType === card.id && hasSelectedContentType) {
-                      setHasSelectedContentType(false);
-                      return;
-                    }
-                    const defaults = FIELD_OPTIONS_BY_TYPE[card.id];
-                    const nextTopic = getTopicSuggestion(card.id, '');
-                    setContentType(card.id);
-                    setHasSelectedContentType(true);
-                    setTopic(nextTopic);
-                    setStoryScript('');
-                    setGenre(defaults.genre[0]);
-                    setMood(defaults.mood[0]);
-                    setEndingTone(defaults.endingTone[0]);
-                    setSetting(defaults.setting[0]);
-                    setProtagonist(defaults.protagonist[0]);
-                    setConflict(defaults.conflict[0]);
-                    setExtractedCharacters([]);
-                    setStyleImages([]);
-                    setSelectedCharacterIds([]);
-                    setSelectedStyleImageId(null);
-                    setCharacterCarouselIndices({});
-                    setCharacterLoadingProgress({});
-                    setStyleCarouselIndices({});
-                    setStyleLoadingProgress({});
-                    autoRecommendSignatureRef.current = '';
-                    const nextSelections = {
-                      genre: defaults.genre[0],
-                      mood: defaults.mood[0],
-                      endingTone: defaults.endingTone[0],
-                      setting: defaults.setting[0],
-                      protagonist: defaults.protagonist[0],
-                      conflict: defaults.conflict[0],
-                    };
-                    const nextPromptPack = buildWorkflowPromptPack({
-                      contentType: card.id,
-                      topic: nextTopic,
-                      selections: nextSelections,
-                      script: '',
-                    });
-                    const nextTemplates = resolveWorkflowPromptTemplates(card.id, nextPromptPack, []);
-                    const coreTemplate = nextTemplates.find((item) => item.id === 'builtin-core-script') || nextTemplates[0];
-                    if (coreTemplate) {
-                      const projectTemplateId = `project_prompt_${coreTemplate.id}`;
-                      const projectTemplate: WorkflowPromptTemplate = {
-                        ...coreTemplate,
-                        id: projectTemplateId,
-                        name: `${coreTemplate.name} (프로젝트)`,
-                        description: '이 프로젝트 전용 프롬프트',
-                        builtIn: false,
-                        isCustomized: true,
-                        updatedAt: Date.now(),
-                      };
-                      const mergedTemplates = [...nextTemplates.filter((item) => item.id !== projectTemplateId), projectTemplate];
-                      setPromptTemplates(mergedTemplates);
-                      setSelectedPromptTemplateId(projectTemplateId);
-                      setPromptDetailId(projectTemplateId);
-                    }
-                    setNotice(card.id === 'music_video' ? '뮤직비디오 모드로 전환했습니다. 1단계 완료 버튼을 누르면 2단계로 넘어갑니다.' : '콘텐츠 유형을 변경했습니다. 1단계 완료 버튼으로 다음 단계로 진행해 주세요.');
-                  }}
-                  className={`rounded-[28px] border p-5 text-left transition-all ${active ? 'border-blue-300 bg-blue-50 shadow-sm' : 'border-slate-200 bg-slate-50 hover:bg-white'}`}
-                >
-                  <div className="inline-flex rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-600 shadow-sm">{card.badge}</div>
-                  <div className="mt-4 text-xl font-black text-slate-900">{card.title}</div>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{card.desc}</p>
-                  <div className="mt-4 text-xs font-bold text-blue-700">선택 완료</div>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-6 rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">씬 사이즈</div>
-                <h3 className="mt-2 text-xl font-black text-slate-900">생성 비율 선택</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">1단계에서 고른 비율이 추천 카드, 씬 생성, 씬 미리보기까지 그대로 이어집니다.</p>
-              </div>
-              <SummaryChip accent="blue">현재 {hasSelectedAspectRatio ? aspectRatio : '미선택'}</SummaryChip>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              {ASPECT_RATIO_OPTIONS.map((option) => {
-                const active = hasSelectedAspectRatio && aspectRatio === option.id;
-                return (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => {
-                      if (aspectRatio === option.id && hasSelectedAspectRatio) {
-                        setHasSelectedAspectRatio(false);
-                        return;
-                      }
-                      setAspectRatio(option.id);
-                      setHasSelectedAspectRatio(true);
-                    }}
-                    className={`rounded-[24px] border p-4 text-left transition-all ${active ? 'border-blue-300 bg-blue-50 shadow-sm' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-lg font-black text-slate-900">{option.title}</div>
-                        <div className="mt-2 text-sm leading-6 text-slate-600">{option.description}</div>
-                      </div>
-                      <div className={`overflow-hidden rounded-2xl border bg-slate-100 p-2 ${active ? 'border-blue-200' : 'border-slate-200'}`}>
-                        <div className={`${getAspectRatioClass(option.id)} w-16 rounded-xl ${active ? 'bg-blue-200/80' : 'bg-slate-200'}`} />
-                      </div>
-                    </div>
-                    <div className="mt-4 text-xs font-bold text-slate-500">{getAspectRatioDescription(option.id)}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-
-
-          <div className="mt-5 flex justify-center pt-8">
-            <GuidedActionButton ready={stepCompleted[1]} onClick={() => void completeStage(1, 2)}>
-              1단계 완료하고 2단계로
-            </GuidedActionButton>
-          </div>
-        </AccordionSection>
-
-        {visibleStepIds.includes(2) && (
-        <AccordionSection
-          stepId={2}
-          title="스토리 빌더"
-          description="예시로 채우기를 중심으로 빠르게 골격을 만든 뒤, 필요하면 항목별 AI 추천만 보조로 사용합니다."
-          summary={step2Summary}
-          open={openStage === 2}
-          completed={stageStatus[2]}
-          onToggle={() => toggleStage(2)}
-          actions={(
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={openExampleGuide} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                예시로 채우기
-              </button>
-              <button type="button" onClick={createDraftFromSelections} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                선택값으로 초안 만들기
-              </button>
-            </div>
-          )}
-        >
-          <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <label className="text-sm font-black text-slate-900">콘텐츠 주제</label>
-              <button type="button" onClick={() => { void refreshTopicRecommendation(); }} disabled={isRefreshingTopic} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
-                {isRefreshingTopic ? '추천 중...' : '주제 새로고침'}
-              </button>
-            </div>
-            <input
-              value={topic}
-              onChange={(e) => setTopic(e.target.value)}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400"
-              placeholder="예: 새벽 네온 아래 다시 시작되는 후렴, 막차에서 시작된 반전, 도시 재개발 핵심 브리핑"
-            />
-            <div className="mt-4 space-y-2">
-              <div className="text-xs font-black text-slate-600">추천 주제</div>
-              <div className="flex flex-col gap-2">
-                {isRefreshingTopic && topicRecommendations.length === 0 ? (
-                  Array.from({ length: 5 }).map((_, index) => (
-                    <div key={`accordion-step2-topic-skeleton-${index}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2">
-                      <div className="h-4 w-[82%] animate-pulse rounded bg-slate-200" />
-                    </div>
-                  ))
-                ) : (
-                  topicRecommendations.map((item, index) => (
-                    <button
-                      key={`accordion-step2-topic-${index}-${item}`}
-                      type="button"
-                      onClick={() => setTopic(item)}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-slate-50"
-                    >
-                      {item}
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500 md:col-span-2 xl:col-span-3">
-              2단계에서는 콘텐츠 주제만 입력합니다. 장르/분위기/엔딩톤/배경/주인공/갈등 항목은 숨김 처리되었습니다.
-            </div>
-            {false ? fieldConfigs.map((field) => (
-              <div key={field.key} className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <label className="text-sm font-black text-slate-900">{field.label}</label>
-                  <button type="button" onClick={() => refreshField(field.key)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] font-bold text-slate-600 hover:bg-slate-50">
-                    {loadingFields[field.key] ? '삽입 중...' : 'AI 추천'}
-                  </button>
-                </div>
-                <input
-                  list={`story-field-${field.key}`}
-                  value={field.value}
-                  onChange={(e) => field.setter(e.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-400"
-                />
-                <datalist id={`story-field-${field.key}`}>
-                  {FIELD_OPTIONS_BY_TYPE[contentType][field.key].map((item) => (
-                    <option key={item} value={item} />
-                  ))}
-                </datalist>
-                <div className="mt-3 text-xs font-bold text-slate-500">현재 선택: {field.value}</div>
-              </div>
-            )) : null}
-          </div>
-
-          <div className="mt-5 flex justify-center pt-8">
-            <GuidedActionButton ready={stepCompleted[2]} disabled={!stepCompleted[2]} onClick={() => void completeStage(2, 3)}>
-              2단계 완료하고 3단계로
-            </GuidedActionButton>
-          </div>
-        </AccordionSection>
-        )}
-
-        {visibleStepIds.includes(3) && (
-        <AccordionSection
-          stepId={3}
-          title={contentType === 'music_video' ? '제작 가사 / 뮤비 대본' : '제작 대본'}
-          description="프롬프트를 좌우로 넘겨 확인한 뒤 생성하기 버튼으로 바로 대본을 만듭니다. 프롬프트 상세와 높이를 맞춰 같은 눈높이에서 검토할 수 있게 정리했습니다."
-          summary={step3Summary}
-          open={openStage === 3}
-          completed={stageStatus[3]}
-          onToggle={() => toggleStage(3)}
-          actions={(
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setStoryScript(normalizedScript)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                문단 정리
-              </button>
-              <button type="button" onClick={addCustomPromptTemplate} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                새 프롬프트 추가
-              </button>
-              <button type="button" onClick={() => setShowPromptPack((prev) => !prev)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                {showPromptPack ? '기본 프롬프트 닫기' : '기본 프롬프트 보기'}
-              </button>
-            </div>
-          )}
-        >
-          <div className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">텍스트 모델</div>
-              <div className="mt-2 text-sm font-black text-slate-900">대본 생성 모델</div>
-              <select value={selectedScriptModel} onChange={(e) => onUpdateRouting?.({ scriptModel: e.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-400">
-                {SCRIPT_MODEL_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-              <p className={`mt-2 text-xs leading-5 ${textModelReady ? 'text-emerald-700' : 'text-amber-700'}`}>
-                {textModelReady ? '선택한 프롬프트에서 바로 AI 대본 생성이 가능합니다.' : 'OpenRouter 연결 전에는 안전한 샘플 생성 로직으로 동작합니다.'}
-              </p>
-            </div>
-            <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-black uppercase tracking-[0.18em] text-violet-600">원고 현황</div>
-              <div className="mt-2 text-sm font-black text-slate-900">현재 입력된 대본</div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{sceneCount}문단 · {normalizedScript.trim().length}자</p>
-              <p className="mt-2 text-xs leading-5 text-slate-500">프롬프트는 아래 캐러셀에서 넘겨 보고, 생성 버튼으로 바로 반영합니다.</p>
-            </div>
-          </div>
-
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-            <div>
-              <div className="text-xs font-black uppercase tracking-[0.18em] text-violet-600">3단계 작업 집중 보기</div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">PC에서는 5:5 균형 또는 집중 보기 1:9 비율로 바로 전환됩니다. 작업 중인 영역을 더 크게 보고, 나머지 영역은 좁고 짧게 접어 흐름을 잃지 않게 했습니다.</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              {[
-                ['balanced', '5:5 균형'],
-                ['script-focus', '대본 크게'],
-                ['character-focus', '캐릭터 크게'],
-              ].map(([mode, label]) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setStep3PanelMode(mode as 'balanced' | 'script-focus' | 'character-focus')}
-                  className={`rounded-2xl px-4 py-3 text-sm font-black transition ${step3PanelMode === mode ? 'bg-violet-600 text-white shadow-sm' : 'border border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="mb-5 rounded-[24px] border border-violet-200 bg-violet-50/70 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-black uppercase tracking-[0.18em] text-violet-700">초보자 진행 가이드</div>
-                <div className="mt-2 text-sm font-black text-slate-900">지금 해야 할 순서</div>
-              </div>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-violet-700">3단계 집중 체크</span>
-            </div>
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              {step3GuideItems.map((item, index) => (
-                <div key={`step3-guide-${index}`} className="rounded-2xl border border-violet-100 bg-white px-4 py-3 text-sm leading-6 text-slate-700">
-                  <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-xs font-black text-white">{index + 1}</span>
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className={`space-y-5 ${step3PanelMode === 'character-focus' ? 'opacity-70' : ''}`}>
-              <div className="flex min-h-[560px] flex-col rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-black uppercase tracking-[0.24em] text-violet-600">프롬프트 선택</div>
-                    <h3 className="mt-2 text-2xl font-black text-slate-900">좌우로 넘기며 프롬프트 확인</h3>
-                  </div>
-                  <SummaryChip accent="violet">{activePromptSlide?.name || '미선택'}</SummaryChip>
-                </div>
-
-                <div className="mt-5 flex flex-1 flex-col rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-                  {activePromptSlide ? (
-                    <>
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <ArrowButton
-                            direction="left"
-                            disabled={selectedPromptIndex <= 0}
-                            onClick={() => {
-                              const target = syncedPromptTemplates[Math.max(selectedPromptIndex - 1, 0)];
-                              if (target) focusPromptTemplate(target.id);
-                            }}
-                          />
-                          <ArrowButton
-                            direction="right"
-                            disabled={selectedPromptIndex >= syncedPromptTemplates.length - 1}
-                            onClick={() => {
-                              const target = syncedPromptTemplates[Math.min(selectedPromptIndex + 1, syncedPromptTemplates.length - 1)];
-                              if (target) focusPromptTemplate(target.id);
-                            }}
-                          />
-                          <span className="rounded-full bg-slate-100 px-3 py-2 text-xs font-black text-slate-600">{syncedPromptTemplates.length ? `${selectedPromptIndex + 1} / ${syncedPromptTemplates.length}` : '0 / 0'}</span>
-                        </div>
-                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-black ${activePromptSlide.mode === 'dialogue' ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>{activePromptSlide.mode === 'dialogue' ? '대화형' : '기본형'}</span>
-                      </div>
-
-                      <div className={`mt-4 rounded-[24px] border p-4 ${activePromptSlide.id === selectedPromptTemplateId ? 'border-violet-300 bg-violet-50/60' : 'border-slate-200 bg-white'}`}>
-                        <div className="text-lg font-black text-slate-900">{activePromptSlide.name}</div>
-                        <p className="mt-2 text-sm leading-6 text-slate-600">{activePromptSlide.description}</p>
-                        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                          <p className="line-clamp-4 whitespace-pre-wrap text-xs leading-6 text-slate-600">{activePromptSlide.prompt}</p>
-                        </div>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <button type="button" onClick={() => setPromptPreviewId(activePromptSlide.id)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                            프롬프트 보기
-                          </button>
-                          <button type="button" onClick={() => void generateScriptByPrompt(activePromptSlide.mode === 'dialogue', activePromptSlide)} disabled={isGeneratingScript} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500">
-                            {isGeneratingScript && activePromptSlide.id === selectedPromptTemplateId ? '생성 중...' : '이 프롬프트로 생성하기'}
-                          </button>
-                          <button type="button" onClick={() => openPromptEditor(activePromptSlide.id)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                            프롬프트 수정
-                          </button>
-                          {!activePromptSlide.builtIn && (
-                            <button type="button" onClick={() => deleteCustomPromptTemplate(activePromptSlide.id)} className="rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm font-bold text-rose-700 hover:bg-rose-50">
-                              삭제
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex flex-1 items-center justify-center rounded-[24px] border border-dashed border-slate-300 bg-white p-6 text-center text-sm leading-6 text-slate-500">
-                      프롬프트가 아직 없습니다. 새 프롬프트를 추가해 주세요.
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              <div className={`rounded-[28px] border bg-white p-5 shadow-sm transition-all duration-300 ${step3PanelMode === 'script-focus' ? 'border-blue-300 ring-2 ring-blue-200 lg:sticky lg:top-24' : 'border-blue-100'} ${step3PanelMode === 'character-focus' ? 'max-h-[320px] overflow-hidden' : ''}`}>
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">최종 대본</div>
-                    <div className="mt-2 text-xl font-black text-slate-900">문단별 씬 기준으로 크게 수정</div>
-                  </div>
-                  <SummaryChip accent="blue">{sceneCount}문단</SummaryChip>
-                </div>
-
-                <div className={`grid gap-4 xl:items-stretch ${step3PanelMode === 'balanced' ? 'lg:grid-cols-2' : step3PanelMode === 'script-focus' ? 'lg:grid-cols-[minmax(0,9fr)_minmax(260px,1fr)]' : 'lg:grid-cols-[minmax(260px,1fr)_minmax(0,9fr)]'}`}>
-                  <div>
-                    <textarea
-                      value={storyScript}
-                      onChange={(e) => setStoryScript(e.target.value)}
-                      className={`w-full rounded-3xl border border-slate-200 bg-slate-50 px-5 py-5 text-sm leading-7 text-slate-900 outline-none transition focus:border-blue-400 ${step3PanelMode === 'script-focus' ? 'min-h-[78vh]' : 'min-h-[460px]'}` }
-                      placeholder={contentType === 'music_video' ? '[Intro]\n짧은 도입 가사\n\n[Verse 1]\n첫 번째 벌스 가사\n\n[Chorus]\n후렴 가사' : '여기에 최종 대본을 입력하세요. 문단 단위로 나누면 씬 생성에 유리합니다.'}
-                    />
-                    <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-                      <span className="rounded-full bg-white px-3 py-1">블록 / 문단 수 {sceneCount}</span>
-                      <span className="rounded-full bg-white px-3 py-1">글자 수 {normalizedScript.trim().length}</span>
-                      <span className={`rounded-full px-3 py-1 ${normalizedScript.trim() ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{normalizedScript.trim() ? '원고 준비됨' : '원고 비어 있음'}</span>
-                    </div>
-                  </div>
-
-                  <div className={`rounded-[24px] border border-slate-200 bg-slate-50 p-4 transition-all duration-300 ${step3PanelMode === 'character-focus' ? 'min-h-[78vh] ring-2 ring-violet-200 lg:sticky lg:top-24' : 'min-h-[460px]'} ${step3PanelMode === 'script-focus' ? 'max-h-[420px] overflow-hidden opacity-75' : ''}`}>
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">3단계 출연자 관리</div>
-                        <div className="mt-2 text-lg font-black text-slate-900">주인공 / 조연 / 나레이터 카드 제작</div>
-                        <p className="mt-2 text-xs leading-5 text-slate-500">화풍 카드와 같은 방식으로 각 출연자마다 이미지 카드 가족을 만들고, 마음에 들 때까지 각자 반복 생성할 수 있게 맞췄습니다. 여기서 선택한 카드가 4단계와 씬 제작 참조 이미지로 그대로 넘어갑니다.</p>
-                      </div>
-                      <SummaryChip accent="violet">선택 {selectedCharacters.length}명 / 전체 {extractedCharacters.length}명</SummaryChip>
-                    </div>
-
-                    {normalizedScript.trim() ? (
-                      <>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          <button type="button" onClick={() => void hydrateCharactersForScript({ preserveSelection: true })} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500">
-                            {isExtracting ? '준비 중...' : '대본 기준 출연자 준비'}
-                          </button>
-                          <button type="button" onClick={() => void hydrateCharactersForScript({ forceSample: true })} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                            샘플로 테스트
-                          </button>
-                          <button type="button" onClick={() => characterUploadInputRef.current?.click()} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                            캐릭터 업로드
-                          </button>
-                          <input ref={characterUploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void handleUpload(e, 'character')} />
-                          {!connectionSummary.text && (
-                            <button type="button" onClick={() => onOpenApiModal?.({ title: '캐릭터 추출 정확도를 높이려면 텍스트 AI를 연결하세요', description: 'OpenRouter를 연결하면 대본에서 인물과 역할을 더 정확하게 추출합니다. 연결 전에는 샘플 카드로 전체 흐름을 확인할 수 있습니다.', focusField: 'openRouter' })} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                              API 연결
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="mt-4 grid gap-3 rounded-[24px] border border-slate-200 bg-white p-4 lg:grid-cols-[0.75fr_1.25fr_auto]">
-                          <input value={newCharacterName} onChange={(e) => setNewCharacterName(e.target.value)} placeholder="신규 출연자 이름" className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400" />
-                          <textarea value={newCharacterPrompt} onChange={(e) => setNewCharacterPrompt(e.target.value)} placeholder="프롬프트로 신규 출연자 생성. 비워두면 현재 대본과 설정으로 자동 작성합니다." className="min-h-[90px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400" />
-                          <div className="flex items-center justify-center">
-                            <button type="button" onClick={createNewCharacterByPrompt} className="rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500">출연자 추가</button>
-                          </div>
-                        </div>
-
-                        <div className="mt-4 flex items-center justify-between gap-3">
-                          <div className="text-xs font-bold text-slate-500">지금은 {step3PanelMode === 'character-focus' ? '캐릭터 집중 보기 9칸 / 대본 1칸' : step3PanelMode === 'script-focus' ? '대본 집중 보기 9칸 / 캐릭터 1칸' : '5:5 균형'} 모드입니다. PC에서는 좌우 비율이 즉시 바뀌고, 카드 영역은 화면 밖으로 새지 않게 숨겼습니다.</div>
-                          <div className="flex items-center gap-2">
-                            <ArrowButton direction="left" disabled={!extractedCharacters.length} onClick={() => scrollContainerBy(characterStripRef.current, 'left', 360)} />
-                            <ArrowButton direction="right" disabled={!extractedCharacters.length} onClick={() => scrollContainerBy(characterStripRef.current, 'right', 360)} />
-                          </div>
-                        </div>
-
-                        <div className="relative mt-4 overflow-hidden rounded-[28px] border border-slate-200 bg-slate-50/60 p-2">
-                          <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-slate-50 via-slate-50/90 to-transparent" />
-                          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-slate-50 via-slate-50/90 to-transparent" />
-                          <div ref={characterStripRef} onWheel={(event) => handleHorizontalWheel(event, 0.9)} className="flex snap-x snap-mandatory gap-3 overflow-x-hidden scroll-smooth px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                          {extractedCharacters.length ? extractedCharacters.map((character, characterIndex) => {
-                            const slides = character.generatedImages || [];
-                            const loadingProgress = characterLoadingProgress[character.id];
-                            const slideCount = slides.length + (loadingProgress !== undefined ? 1 : 0);
-                            const activeIndex = Math.min(Math.max(characterCarouselIndices[character.id] || 0, 0), Math.max(slideCount - 1, 0));
-                            const currentRealSlide = activeIndex < slides.length ? slides[activeIndex] : null;
-                            const active = selectedCharacterIds.includes(character.id);
-                            const currentPrompt = character.prompt || currentRealSlide?.prompt || '';
-                            return (
-                              <div key={`step3-character-${character.id}`} data-character-card-id={character.id} className={`shrink-0 snap-start rounded-[24px] border p-3 shadow-sm transition-all duration-300 ${step3PanelMode === 'character-focus' ? 'w-[min(84vw,460px)]' : step3PanelMode === 'balanced' ? 'w-[min(44vw,340px)]' : 'w-[min(26vw,290px)]'} ${active ? 'border-violet-300 bg-violet-50/60 ring-2 ring-violet-100' : 'border-slate-200 bg-white'}`}>
-                                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-                                  <div className="flex transition-transform duration-500" style={{ transform: `translateX(-${activeIndex * 100}%)` }}>
-                                    {slides.map((image) => (
-                                      <button key={image.id} type="button" onClick={() => chooseCharacterImage(character.id, image)} className="w-full shrink-0 text-left">
-                                        <img src={image.imageData || '/mp4Creater/flow-character.svg'} alt={image.label} className="aspect-square w-full object-cover" />
-                                      </button>
-                                    ))}
-                                    {loadingProgress !== undefined && (
-                                      <div className="w-full shrink-0 p-3">
-                                        <div className="aspect-square">
-                                          <LoadingSlide progress={loadingProgress} label={`${character.name} 새 캐릭터 준비`} />
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-
-                                <div className="mt-3 flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <ArrowButton direction="left" disabled={activeIndex <= 0} onClick={() => setCharacterCarouselIndices((prev) => ({ ...prev, [character.id]: Math.max((prev[character.id] || 0) - 1, 0) }))} />
-                                    <ArrowButton direction="right" disabled={activeIndex >= Math.max(slideCount - 1, 0)} onClick={() => setCharacterCarouselIndices((prev) => ({ ...prev, [character.id]: Math.min((prev[character.id] || 0) + 1, Math.max(slideCount - 1, 0)) }))} />
-                                  </div>
-                                  <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-500">{slideCount ? `${Math.min(activeIndex + 1, slideCount)} / ${slideCount}` : '1 / 1'}</span>
-                                </div>
-
-                                <div className="mt-3 flex items-start justify-between gap-2">
-                                  <div className="min-w-0">
-                                    <div className="truncate text-sm font-black text-slate-900">{character.name}</div>
-                                    <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{currentRealSlide?.sourceMode === 'upload' ? '업로드 출연자 카드' : currentRealSlide?.sourceMode === 'sample' ? '샘플 출연자 카드' : 'AI 추천 출연자 유사안'}</div>
-                                  </div>
-                                  <span className={`rounded-full px-2 py-1 text-[10px] font-black ${active ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{active ? '선택' : '대기'}</span>
-                                </div>
-
-                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                                  <input value={character.name} onChange={(e) => updateCharacterName(character.id, e.target.value)} placeholder="출연자 이름" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs font-black text-slate-900 outline-none focus:border-violet-400" />
-                                  <input value={character.roleLabel || ''} onChange={(e) => updateCharacterRoleLabel(character.id, e.target.value)} placeholder="역할 설명" className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700 outline-none focus:border-violet-400" />
-                                </div>
-
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  {([['lead', '주인공'], ['support', '조연'], ['narrator', '나레이터']] as const).map(([roleValue, roleLabel]) => (
-                                    <button
-                                      key={`${character.id}-${roleValue}`}
-                                      type="button"
-                                      onClick={() => updateCharacterRole(character.id, roleValue)}
-                                      className={`rounded-full px-3 py-1.5 text-[11px] font-black ${character.role === roleValue ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                                    >
-                                      {roleLabel}
-                                    </button>
-                                  ))}
-                                </div>
-
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  {currentRealSlide && (
-                                    <button type="button" onClick={() => chooseCharacterImage(character.id, currentRealSlide)} className={`rounded-xl px-3 py-2 text-xs font-black ${active && currentRealSlide.id === character.selectedImageId ? 'bg-violet-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
-                                      {active && currentRealSlide.id === character.selectedImageId ? '이 카드 사용 중' : '이 카드 선택'}
-                                    </button>
-                                  )}
-                                  <button type="button" onClick={() => toggleCharacterSelection(character.id)} className={`rounded-xl px-3 py-2 text-xs font-black ${active ? 'bg-slate-900 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                                    {active ? '출연자 선택 해제' : '출연자로 선택'}
-                                  </button>
-                                  <button type="button" disabled={loadingProgress !== undefined} onClick={() => void createCharacterVariants(character)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">
-                                    {loadingProgress !== undefined ? '생성 중...' : '추천 +1'}
-                                  </button>
-                                  <button type="button" onClick={() => setExpandedCharacterEditorId(expandedCharacterEditorId === character.id ? null : character.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
-                                    {expandedCharacterEditorId === character.id ? '고급 닫기' : '고급'}
-                                  </button>
-                                  <button type="button" onClick={() => removeCharacter(character.id)} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-700 hover:bg-rose-50">
-                                    제거
-                                  </button>
-                                </div>
-
-                                {expandedCharacterEditorId === character.id && (
-                                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                                    <textarea value={currentPrompt} onChange={(e) => updateCharacterPrompt(character.id, e.target.value)} className="min-h-[120px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs leading-6 text-slate-700 outline-none focus:border-violet-400" />
-                                  </div>
-                                )}
-
-                                <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
-                                  출연 순서 {character.castOrder || characterIndex + 1} · 선택한 카드의 이미지와 프롬프트가 4단계 / 씬 제작 참조로 이어집니다.
-                                </div>
-                              </div>
-                            );
-                          }) : (
-                            <div className="w-full rounded-[22px] border border-dashed border-slate-300 bg-white p-5 text-sm leading-6 text-slate-500">
-                              대본을 만든 뒤 위 버튼을 누르면 주인공과 조연 후보가 여기에 채워집니다. 직접 추가, 업로드, 반복 생성으로 전체 출연진을 이 자리에서 바로 관리할 수 있습니다.
-                            </div>
-                          )}
-                          </div>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="mt-4 flex min-h-[260px] items-center justify-center rounded-[22px] border border-dashed border-slate-300 bg-white p-6 text-center text-sm leading-6 text-slate-500">
-                        최종 대본이 준비되면 이 자리에서 전체 출연자 카드 제작과 선택 컴포넌트가 열립니다. 먼저 왼쪽 대본을 입력하거나 생성해 주세요.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-center pt-8">
-                <GuidedActionButton tone="violet" ready={stepCompleted[3]} disabled={!stepCompleted[3]} onClick={() => void completeStage(3, 4)}>
-                  3단계 완료하고 4단계로
-                </GuidedActionButton>
-              </div>
-            </div>
-
-            {showPromptPack && (
-              <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">기본 프롬프트 팩</div>
-                    <div className="mt-2 text-lg font-black text-slate-900">팝업으로 보지 않아도 되는 기본 프롬프트 묶음</div>
-                  </div>
-                  {promptDetailTemplate && (
-                    <button type="button" onClick={() => setPromptPreviewId(promptDetailTemplate.id)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                      현재 선택 프롬프트 크게 보기
-                    </button>
-                  )}
-                </div>
-                <div className="mt-4 grid gap-3 lg:grid-cols-2">
-                  {[
-                    ['스토리 프롬프트', promptPack.storyPrompt],
-                    ['가사 / 메타 프롬프트', promptPack.lyricsPrompt],
-                    ['캐릭터 추출 프롬프트', promptPack.characterPrompt],
-                    ['씬 이미지 프롬프트', promptPack.scenePrompt],
-                    ['행동 프롬프트', promptPack.actionPrompt],
-                    ['설득 10원칙 적용 프롬프트', promptPack.persuasionStoryPrompt],
-                  ].map(([title, value]) => (
-                    <div key={String(title)} className="rounded-2xl border border-slate-200 bg-white p-4">
-                      <div className="text-sm font-black text-slate-900">{title}</div>
-                      <textarea readOnly value={String(value)} className="mt-3 min-h-[140px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-700 outline-none" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-        </AccordionSection>
-        )}
-
-        {visibleStepIds.includes(4) && (
-        <AccordionSection
-          stepId={4}
-          title="화풍 선택과 씬 제작 이동"
-          description="캐릭터 선택은 3단계에서 끝내고, 여기서는 화풍만 고른 뒤 바로 씬 제작 작업 화면으로 이동합니다. 선택한 스타일 프롬프트가 그대로 프로젝트 씬 생성에 반영됩니다."
-          summary={step4Summary}
-          open={openStage === 4}
-          completed={stageStatus[4]}
-          onToggle={() => toggleStage(4)}
-          actions={(
-            <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => onOpenApiModal?.({ title: '지금 필요한 API 키 등록', description: '현재 단계에서 가장 바로 체감되는 건 OpenRouter입니다. 연결하면 캐릭터 추천과 화풍 추천, 대본 생성 품질이 즉시 올라갑니다.', focusField: 'openRouter' })} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                API 빠른 등록
-              </button>
-              <button type="button" onClick={() => void ensureStyleRecommendations('manual')} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500">
-                {isExtracting ? '추천 생성 중...' : '화풍 추천 1개 추가'}
-              </button>
-              <button type="button" onClick={onOpenSettings} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                설정 / 모델 / 폴더
-              </button>
-            </div>
-          )}
-        >
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
-              <div className="text-sm font-black text-slate-900">이미지 모델</div>
-              <select value={studioState?.routing?.imageModel || IMAGE_MODELS[0].id} onChange={(e) => onUpdateRouting?.({ imageModel: e.target.value })} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-400">
-                {IMAGE_MODELS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-              </select>
-              <p className={`mt-2 text-xs leading-5 ${imageModelReady ? 'text-emerald-700' : 'text-amber-700'}`}>
-                {imageModelReady ? '선택한 캐릭터와 화풍 프롬프트를 기준으로 이미지 생성에 반영됩니다.' : '모델 연결 전에도 샘플 카드로 흐름 검증이 가능합니다.'}
-              </p>
-            </div>
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
-              <div className="text-sm font-black text-slate-900">3단계 확정 캐릭터</div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{selectedCharacters.length}명 · 여기서는 선택을 바꾸지 않고 요약만 보여 줍니다.</p>
-            </div>
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-4">
-              <div className="text-sm font-black text-slate-900">선택된 화풍</div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{selectedStyle ? '1개 준비됨' : '선택 필요'}</p>
-            </div>
-          </div>
-
-          <div className="mt-6 space-y-6">
-            <section className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">출연자 요약</div>
-                  <h3 className="mt-2 text-xl font-black text-slate-900">씬 이미지에 이어질 출연자 카드</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">3단계에서 확정한 캐릭터의 현재 선택 이미지와 프롬프트가 4단계 이후 씬 이미지 프롬프트에 그대로 묶여 들어갑니다. 마음에 들지 않으면 3단계에서 추천 +1로 계속 다시 뽑을 수 있습니다.</p>
-                </div>
-                <button type="button" onClick={() => openStageWithIntent(3)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                  3단계 다시 열기
-                </button>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <div className="text-xs font-bold text-slate-500">확인용으로만 작게 보여 줍니다. 한 줄에 5개 기준으로 보고, 아래로 길어지지 않게 좌우 버튼으로만 이동합니다.</div>
-                <div className="flex items-center gap-2">
-                  <ArrowButton direction="left" disabled={!selectedCharacters.length} onClick={() => scrollContainerBy(step4CharacterStripRef.current, 'left', 320)} />
-                  <ArrowButton direction="right" disabled={!selectedCharacters.length} onClick={() => scrollContainerBy(step4CharacterStripRef.current, 'right', 320)} />
-                </div>
-              </div>
-
-              <div className="relative mt-4 overflow-hidden rounded-[24px] border border-slate-200 bg-white p-2">
-                <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-white via-white/90 to-transparent" />
-                <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-white via-white/90 to-transparent" />
-                <div ref={step4CharacterStripRef} onWheel={(event) => handleHorizontalWheel(event, 0.9)} className="flex snap-x snap-mandatory gap-3 overflow-x-hidden scroll-smooth px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {selectedCharacters.map((character) => {
-                    const selectedImage = (character.generatedImages || []).find((image) => image.id === character.selectedImageId) || character.generatedImages?.[0] || null;
-                    return (
-                      <div key={`step4-character-${character.id}`} data-step4-character-id={character.id} className="w-[min(19vw,212px)] min-w-[168px] shrink-0 snap-start overflow-hidden rounded-[20px] border border-slate-200 bg-slate-50">
-                        <div className="flex items-center gap-3 p-3">
-                          <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-slate-200">
-                            {selectedImage?.imageData ? (
-                              <img src={selectedImage.imageData} alt={character.name} className="h-full w-full object-cover" />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center text-[10px] font-black text-slate-500">없음</div>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-black text-slate-900">{character.name}</div>
-                            <div className="mt-1 text-[11px] text-slate-500">{character.roleLabel || (character.role === 'lead' ? '주인공' : character.role === 'narrator' ? '나레이터' : '조연')}</div>
-                            <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-slate-500">{selectedImage?.prompt || character.prompt || character.description || '선택 프롬프트 없음'}</p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {!selectedCharacters.length && (
-                    <div className="w-full rounded-[24px] border border-dashed border-slate-300 bg-white p-8 text-center text-sm leading-6 text-slate-500">
-                      아직 선택된 출연자가 없습니다. 3단계에서 주인공, 조연, 나레이터를 추가하고 대표 이미지를 고른 뒤 다시 오면 씬 프롬프트에 연결됩니다.
-                    </div>
-                  )}
-                </div>
-              </div>
-            </section>
-            <section className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="text-xs font-black uppercase tracking-[0.24em] text-violet-600">화풍 박스</div>
-                  <h3 className="mt-2 text-xl font-black text-slate-900">스타일 카드</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">각 화풍은 하나의 카드 가족으로 관리하고, 추천 버튼을 누르면 그 카드 안에 유사한 화풍 변형이 계속 쌓이도록 캐릭터 박스와 같은 로직으로 맞췄습니다.</p>
-                </div>
-                <SummaryChip accent="violet">{selectedStyle?.groupLabel || selectedStyle?.label || '선택 필요'}</SummaryChip>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <div className="text-xs font-bold text-slate-500">선택된 화풍 카드의 현재 슬라이드 프롬프트가 씬 전체 스타일 프롬프트로 그대로 연결됩니다.</div>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" onClick={() => styleUploadInputRef.current?.click()} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">화풍 업로드</button>
-                  <input ref={styleUploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void handleUpload(e, 'style')} />
-                </div>
-              </div>
-
-              <div className="mt-4 grid gap-3 rounded-[24px] border border-slate-200 bg-white p-4 lg:grid-cols-[0.8fr_1.2fr_auto]">
-                <input value={newStyleName} onChange={(e) => setNewStyleName(e.target.value)} placeholder="신규 화풍 이름" className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400" />
-                <textarea value={newStylePrompt} onChange={(e) => setNewStylePrompt(e.target.value)} placeholder="프롬프트로 신규 화풍 생성. 비워두면 현재 스토리 느낌으로 자동 작성합니다." className="min-h-[90px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400" />
-                <div className="flex items-center justify-center">
-                  <button type="button" onClick={createNewStyleByPrompt} className="rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500">신규 화풍 생성</button>
-                </div>
-              </div>
-
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <div className="text-xs font-bold text-slate-500">카드 줄은 화면 안에서만 이동하도록 숨김 처리했고, 바깥 화살표로 카드 가족을 넘길 수 있습니다. 카드 안쪽 화살표는 같은 화풍의 유사안을 이동합니다.</div>
-                <div className="flex items-center gap-2">
-                  <ArrowButton direction="left" disabled={!styleGroups.length} onClick={() => scrollContainerBy(styleStripRef.current, 'left', 360)} />
-                  <ArrowButton direction="right" disabled={!styleGroups.length} onClick={() => scrollContainerBy(styleStripRef.current, 'right', 360)} />
-                </div>
-              </div>
-
-              <div className="relative mt-4 overflow-hidden rounded-[28px] border border-slate-200 bg-slate-50/60 p-2">
-                <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-slate-50 via-slate-50/90 to-transparent" />
-                <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-slate-50 via-slate-50/90 to-transparent" />
-                <div ref={styleStripRef} onWheel={(event) => handleHorizontalWheel(event, 0.9)} className="flex snap-x snap-mandatory gap-3 overflow-x-hidden scroll-smooth px-1 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {styleGroups.map((group) => {
-                  const slides = group.items;
-                  const loadingProgress = styleLoadingProgress[group.id];
-                  const slideCount = slides.length + (loadingProgress !== undefined ? 1 : 0);
-                  const activeIndex = Math.min(Math.max(styleCarouselIndices[group.id] || 0, 0), Math.max(slideCount - 1, 0));
-                  const currentRealSlide = activeIndex < slides.length ? slides[activeIndex] : null;
-                  const selected = group.items.some((item) => item.id === selectedStyleImageId);
-                  const groupTitle = group.label || currentRealSlide?.label || '화풍';
-                  return (
-                    <div key={group.id} data-style-group-id={group.id} className={`w-[min(82vw,328px)] shrink-0 snap-start rounded-[20px] border p-3 shadow-sm transition-all duration-300 ${selected ? 'border-violet-300 bg-violet-50/60' : 'border-slate-200 bg-white'}`}>
-                      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-                        <div className="flex transition-transform duration-500" style={{ transform: `translateX(-${activeIndex * 100}%)` }}>
-                          {slides.map((styleCard) => (
-                            <button key={styleCard.id} type="button" onClick={() => setSelectedStyleImageId(styleCard.id)} className="w-full shrink-0 text-left">
-                              <img src={styleCard.imageData || '/mp4Creater/flow-render.svg'} alt={styleCard.label} className="aspect-square w-full object-cover" />
-                            </button>
-                          ))}
-                          {loadingProgress !== undefined && (
-                            <div className="w-full shrink-0 p-3">
-                              <div className="aspect-square">
-                                <LoadingSlide progress={loadingProgress} label={`${groupTitle} 새 화풍 준비`} />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <ArrowButton direction="left" disabled={activeIndex <= 0} onClick={() => setStyleCarouselIndices((prev) => ({ ...prev, [group.id]: Math.max((prev[group.id] || 0) - 1, 0) }))} />
-                          <ArrowButton direction="right" disabled={activeIndex >= Math.max(slideCount - 1, 0)} onClick={() => setStyleCarouselIndices((prev) => ({ ...prev, [group.id]: Math.min((prev[group.id] || 0) + 1, Math.max(slideCount - 1, 0)) }))} />
-                        </div>
-                        <span className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-slate-500">{slideCount ? `${Math.min(activeIndex + 1, slideCount)} / ${slideCount}` : '1 / 1'}</span>
-                      </div>
-
-                      <div className="mt-3 flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-black text-slate-900">{groupTitle}</div>
-                          <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{currentRealSlide?.sourceMode === 'upload' ? '업로드 화풍 기반' : currentRealSlide?.sourceMode === 'sample' ? '샘플 화풍' : 'AI 추천 화풍 유사안'}</div>
-                        </div>
-                        <span className={`rounded-full px-2 py-1 text-[10px] font-black ${selected ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{selected ? '선택' : '대기'}</span>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {currentRealSlide && (
-                          <button type="button" onClick={() => setSelectedStyleImageId(currentRealSlide.id)} className={`rounded-xl px-3 py-2 text-xs font-black ${selected && currentRealSlide.id === selectedStyleImageId ? 'bg-violet-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>
-                            {selected && currentRealSlide.id === selectedStyleImageId ? '선택됨' : '이 화풍 선택'}
-                          </button>
-                        )}
-                        <button type="button" disabled={loadingProgress !== undefined || !currentRealSlide} onClick={() => currentRealSlide && void createStyleVariants(currentRealSlide)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">
-                          {loadingProgress !== undefined ? '생성 중...' : '추천 +1'}
-                        </button>
-                        {currentRealSlide && (
-                          <button type="button" onClick={() => setExpandedStyleEditorId(expandedStyleEditorId === currentRealSlide.id ? null : currentRealSlide.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">
-                            {expandedStyleEditorId === currentRealSlide.id ? '고급 닫기' : '고급'}
-                          </button>
-                        )}
-                      </div>
-
-                      {currentRealSlide && expandedStyleEditorId === currentRealSlide.id && (
-                        <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                          <textarea value={currentRealSlide.prompt} onChange={(e) => updateStylePrompt(currentRealSlide.id, e.target.value)} className="min-h-[96px] w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-xs leading-6 text-slate-700 outline-none focus:border-violet-400" />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-
-                {!styleGroups.length && (
-                  <div className="w-full rounded-[24px] border border-dashed border-slate-300 bg-white p-8 text-center text-sm leading-6 text-slate-500">
-                    3단계 대본과 선택 프롬프트를 준비한 뒤 추천 생성 버튼을 누르면 화풍 카드가 채워집니다. 업로드한 이미지에서도 바로 화풍 프롬프트를 저장할 수 있습니다.
-                  </div>
-                )}
-                </div>
-              </div>
-            </section>
-
-            <div className="rounded-[28px] border border-slate-200 bg-slate-50 p-5">
-              <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">다음 단계</div>
-              <h3 className="mt-2 text-2xl font-black text-slate-900">씬 제작 시작</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">4단계를 마치면 현재 선택값을 프로젝트에 자동 추가하고, 바로 프로젝트 기준 씬 제작 화면으로 이동합니다.</p>
-              <div className="mt-4 flex justify-center pt-8">
-                <GuidedActionButton ready={stepCompleted[4]} disabled={!stepCompleted[4]} onClick={() => void handleOpenSceneStudioClick()} className="px-6 py-4 text-base">
-                  4단계 완료 후 프로젝트에 추가하고 씬 제작 열기
-                </GuidedActionButton>
-              </div>
-            </div>
-          </div>
-        </AccordionSection>
-        )}
-      </div>
-
-      {routeStep && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">
-          <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-3 py-3 shadow-xl shadow-slate-200/70 backdrop-blur-md">
-            <button
-              type="button"
-              onClick={() => {
-                if (!previousRouteStep) return;
-                void moveRouteStep(previousRouteStep);
-              }}
-              disabled={!previousRouteStep}
-              className="min-w-[120px] rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-            >
-              이전으로
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (footerStage === 5) {
-                  void handleOpenSceneStudioClick();
-                  return;
-                }
-                if (nextRouteStep) {
-                  void completeStage(footerStage, nextRouteStep as StepId);
-                }
-              }}
-              disabled={!(routeStep ? routeStepCompleted[footerStage] : stepCompleted[footerStage])}
-              className="min-w-[140px] rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
-            >
-              {footerStage === 5 ? '프로젝트에 저장하고 씬 제작으로' : '다음으로'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* 샘플 안내와 프롬프트 수정은 본문을 밀어내지 않도록 팝업으로 처리합니다. */}
-      <OverlayModal
+      <SampleGuideModal
         open={sampleGuideOpen}
-        title="예시는 현재 샘플 데이터로 동작합니다"
-        description="지금은 API 연결이 없어 정해진 예시만 채워집니다. 아래에서 OpenRouter를 바로 등록하거나, 샘플로 즉시 계속 진행할 수 있습니다."
         onClose={() => setSampleGuideOpen(false)}
-        footer={(
-          <>
-            <button type="button" onClick={() => setSampleGuideOpen(false)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
-            <button
-              type="button"
-              onClick={() => {
-                setSampleGuideOpen(false);
-                onOpenApiModal?.({
-                  title: '지금 바로 필요한 OpenRouter 키 등록',
-                  description: '텍스트 생성, 스토리 추천, 캐릭터 / 화풍 추천 품질을 한 번에 올리는 가장 빠른 연결입니다.',
-                  focusField: 'openRouter',
-                });
-              }}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-            >
-              OpenRouter 등록
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                fillSample();
-                setSampleGuideOpen(false);
-              }}
-              className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-500"
-            >
-              샘플로 계속 진행
-            </button>
-          </>
-        )}
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-black text-slate-900">현재 동작 방식</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">연결 전에는 장르, 분위기, 배경, 대본 예시가 미리 준비된 안전한 샘플 데이터로 채워집니다.</p>
-          </div>
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-black text-slate-900">키를 등록하면 바뀌는 점</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">선택한 프롬프트 기준 실제 AI 대본 생성과 더 자연스러운 추천 문구를 바로 사용할 수 있습니다.</p>
-          </div>
-        </div>
-      </OverlayModal>
+        onOpenApiModal={onOpenApiModal}
+        onContinueWithSample={fillSample}
+      />
 
-      <OverlayModal
-        open={Boolean(promptPreviewId)}
-        title={syncedPromptTemplates.find((item) => item.id === promptPreviewId)?.name || '프롬프트 보기'}
-        description={syncedPromptTemplates.find((item) => item.id === promptPreviewId)?.description || '선택한 프롬프트 본문을 팝업에서 크게 확인합니다.'}
+      <PromptPreviewModal
+        promptPreviewId={promptPreviewId}
+        templates={syncedPromptTemplates}
+        draft={promptPreviewDraft || syncedPromptTemplates.find((item) => item.id === promptPreviewId)?.prompt || selectedPromptTemplate?.prompt || ''}
         onClose={() => setPromptPreviewId(null)}
-        footer={(
-          <>
-            {promptPreviewId && (
-              <button type="button" onClick={() => { const target = syncedPromptTemplates.find((item) => item.id === promptPreviewId); if (!target) return; updatePromptTemplate(target.id, { prompt: promptPreviewDraft }); setNotice('프롬프트 수정이 저장되었습니다. 대본생성 시 바로 반영됩니다.'); }} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                이 프롬프트 수정
-              </button>
-            )}
-            <button type="button" onClick={() => setPromptPreviewId(null)} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500">
-              닫기
-            </button>
-          </>
-        )}
-      >
-        <textarea
-          value={promptPreviewDraft || syncedPromptTemplates.find((item) => item.id === promptPreviewId)?.prompt || selectedPromptTemplate?.prompt || ''}
-          onChange={(event) => setPromptPreviewDraft(event.target.value)}
-          className="min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-700 outline-none"
-          placeholder="프롬프트를 불러오는 중입니다."
-        />
-      </OverlayModal>
+        onSaveEdit={() => {
+          const target = syncedPromptTemplates.find((item) => item.id === promptPreviewId);
+          if (!target) return;
+          updatePromptTemplate(target.id, { prompt: promptPreviewDraft });
+          setNotice('프롬프트 수정이 저장되었습니다. 대본생성 시 바로 반영됩니다.');
+          setPromptPreviewId(null);
+        }}
+        onDraftChange={setPromptPreviewDraft}
+      />
 
-      <OverlayModal
-        open={Boolean(editingPromptId)}
-        title="프롬프트 수정"
-        description="이 팝업에서 이름, 설명, 본문 프롬프트를 수정하면 선택한 템플릿에 바로 저장됩니다."
+      <PromptEditorModal
+        editingPromptId={editingPromptId}
+        prompt={promptEditorForm.prompt}
         onClose={() => setEditingPromptId(null)}
-        footer={(
-          <>
-            <button type="button" onClick={() => setEditingPromptId(null)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">취소</button>
-            <button type="button" onClick={savePromptEditor} className="rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500">수정 저장</button>
-          </>
-        )}
-      >
-        <div className="space-y-4">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
-            프롬프트 이름/설명은 유지되고, 본문 텍스트만 수정됩니다.
-          </div>
-          <textarea value={promptEditorForm.prompt} onChange={(e) => setPromptEditorForm((prev) => ({ ...prev, prompt: e.target.value }))} className="min-h-[360px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 outline-none focus:border-violet-400" placeholder="프롬프트 본문" />
-        </div>
-      </OverlayModal>
+        onSave={savePromptEditor}
+        onPromptChange={(value) => setPromptEditorForm((prev) => ({ ...prev, prompt: value }))}
+      />
 
-      {isProcessing && (
-        <div className="pointer-events-none fixed bottom-5 right-5 z-40 w-[300px] rounded-[28px] border border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">진행 중</div>
-              <div className="mt-1 text-lg font-black text-slate-900">현재 생성 작업이 실행 중입니다</div>
-            </div>
-            <div className="text-2xl">🎬</div>
-          </div>
-          <p className="mt-3 text-xs leading-5 text-slate-600">작업 중에도 Step 카드 구조와 저장 상태는 유지됩니다.</p>
-        </div>
-      )}
+      <ProcessingBadge step={step} />
     </div>
   );
 };
 
 export default InputSection;
+
+

@@ -10,6 +10,8 @@ import { downloadSrt } from '../services/srtService';
 import HelpTip from './HelpTip';
 import { blobFromDataValue, extensionFromMime, triggerSequentialDownloads } from '../utils/downloadHelpers';
 
+type PreviewVideoStatus = 'idle' | 'loading' | 'ready' | 'fallback' | 'error';
+
 interface ResultTableProps {
   data: GeneratedAsset[];
   onRegenerateImage?: (index: number) => void;
@@ -37,11 +39,17 @@ interface ResultTableProps {
   sceneProgressMap?: Record<number, { percent: number; label: string }>;
   finalVideoUrl?: string | null;
   finalVideoTitle?: string;
+  onPreparePreviewVideo?: () => void | Promise<void>;
+  isPreparingPreviewVideo?: boolean;
   onGenerateThumbnail?: () => void | Promise<void>;
   isThumbnailGenerating?: boolean;
   onGenerateAllImages?: () => void | Promise<void>;
   onGenerateAllVideos?: () => void | Promise<void>;
   isGeneratingAllVideos?: boolean;
+  previewVideoStatus?: PreviewVideoStatus;
+  previewVideoMessage?: string;
+  onFooterBack?: () => void;
+  footerBackLabel?: string;
 }
 
 const formatSeconds = (value?: number | null) => (typeof value === 'number' ? `${value.toFixed(1)}초` : '-');
@@ -205,11 +213,17 @@ const ResultTable: React.FC<ResultTableProps> = ({
   sceneProgressMap,
   finalVideoUrl,
   finalVideoTitle,
+  onPreparePreviewVideo,
+  isPreparingPreviewVideo,
   onGenerateThumbnail,
   isThumbnailGenerating,
   onGenerateAllImages,
   onGenerateAllVideos,
   isGeneratingAllVideos,
+  previewVideoStatus = 'idle',
+  previewVideoMessage = '',
+  onFooterBack,
+  footerBackLabel,
 }) => {
   const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -248,6 +262,21 @@ const ResultTable: React.FC<ResultTableProps> = ({
   }), [animatingIndices, data, sceneProgressMap]);
 
   const displayedScenes = useMemo(() => data.slice(0, 6), [data]);
+
+  const previewVideoTone = useMemo(() => {
+    switch (previewVideoStatus) {
+      case 'loading':
+        return { badge: '합본 준비 중', badgeClass: 'bg-amber-100 text-amber-700', panelClass: 'border-amber-200 bg-amber-50' };
+      case 'ready':
+        return { badge: '합본 완료', badgeClass: 'bg-emerald-100 text-emerald-700', panelClass: 'border-emerald-200 bg-emerald-50' };
+      case 'fallback':
+        return { badge: '안전 모드', badgeClass: 'bg-blue-100 text-blue-700', panelClass: 'border-blue-200 bg-blue-50' };
+      case 'error':
+        return { badge: '확인 필요', badgeClass: 'bg-rose-100 text-rose-700', panelClass: 'border-rose-200 bg-rose-50' };
+      default:
+        return { badge: '대기 중', badgeClass: 'bg-slate-100 text-slate-700', panelClass: 'border-slate-200 bg-slate-50' };
+    }
+  }, [previewVideoStatus]);
 
   const allImageSources = useMemo(() => {
     const set = new Set<string>();
@@ -305,6 +334,17 @@ const ResultTable: React.FC<ResultTableProps> = ({
       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, 120);
   }, [activeSceneIndex, isGenerating]);
+
+  useEffect(() => {
+    if (!previewOpen) return;
+    if (finalOutputMode !== 'video') return;
+    if (finalVideoUrl) return;
+    if (!onPreparePreviewVideo) return;
+    if (isPreparingPreviewVideo) return;
+    void onPreparePreviewVideo();
+  }, [finalOutputMode, finalVideoUrl, isPreparingPreviewVideo, onPreparePreviewVideo, previewOpen]);
+
+  const shouldShowFooter = !previewOpen;
 
   if (!data.length) {
     return (
@@ -365,17 +405,23 @@ const ResultTable: React.FC<ResultTableProps> = ({
           )}
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <button onClick={() => setPreviewOpen(true)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white hover:bg-slate-800">
+            <button
+              onClick={() => {
+                setFinalOutputMode('video');
+                setPreviewOpen(true);
+              }}
+              className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white hover:bg-slate-800"
+            >
               전체 미리보기
             </button>
             {onGenerateAllImages && (
               <button onClick={() => void onGenerateAllImages?.()} disabled={isGenerating} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">
-                {isGenerating ? '이미지 생성 중...' : '이미지 한 번에 만들기'}
+                {isGenerating ? '이미지 생성 중...' : '전체 이미지 생성'}
               </button>
             )}
             {onGenerateAllVideos && (
               <button onClick={() => void onGenerateAllVideos?.()} disabled={Boolean(isGeneratingAllVideos) || isGenerating} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">
-                {isGeneratingAllVideos ? '영상 생성 중...' : '영상 한 번에 만들기'}
+                {isGeneratingAllVideos ? '영상 생성 중...' : '모든 씬 영상 생성'}
               </button>
             )}
             <button onClick={() => exportAssetsToZip(data, 'mp4Creater_storyboard')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
@@ -409,7 +455,14 @@ const ResultTable: React.FC<ResultTableProps> = ({
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
           <span>씬 카드 {displayedScenes.length}/{data.length}</span>
           {data.length > 6 && (
-            <button type="button" onClick={() => setPreviewOpen(true)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">
+            <button
+              type="button"
+              onClick={() => {
+                setFinalOutputMode('video');
+                setPreviewOpen(true);
+              }}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+            >
               더보기(+{data.length - 6})
             </button>
           )}
@@ -442,21 +495,6 @@ const ResultTable: React.FC<ResultTableProps> = ({
           </div>
         )}
       </div>
-
-      {finalVideoUrl && finalOutputMode === 'video' && (
-        <div className="mt-6 overflow-hidden rounded-[28px] border border-emerald-200 bg-white shadow-sm">
-          <div className="border-b border-emerald-100 bg-emerald-50/70 px-5 py-4">
-            <div className="text-xs font-black uppercase tracking-[0.24em] text-emerald-600">최종 출력 결과</div>
-            <h3 className="mt-2 text-xl font-black text-slate-900">{finalVideoTitle || '합쳐진 최종 영상'}</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">렌더링이 끝난 합쳐진 영상을 바로 확인할 수 있습니다. 아래 플레이어는 현재 브라우저 세션 결과를 보여줍니다.</p>
-          </div>
-          <div className="p-5">
-            <video controls className="w-full rounded-[24px] border border-slate-200 bg-slate-950">
-              <source src={finalVideoUrl} type="video/mp4" />
-            </video>
-          </div>
-        </div>
-      )}
 
       {(mainBgm || onPreviewMixChange) && (
         <div className="mt-6 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -775,8 +813,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
       )}
 
       {previewOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 p-3 sm:items-center sm:p-6" onClick={() => setPreviewOpen(false)}>
-          <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-3 sm:p-6" onClick={() => setPreviewOpen(false)}>
+          <div className="mx-auto flex w-full max-w-6xl flex-col rounded-[32px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:px-6">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600">웹 미리보기</div>
@@ -785,6 +823,99 @@ const ResultTable: React.FC<ResultTableProps> = ({
               </div>
               <button type="button" onClick={() => setPreviewOpen(false)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
             </div>
+
+            <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">씬 작업 도구</div>
+                  <h4 className="mt-2 text-lg font-black text-slate-900">{currentTopic || '프로젝트'} 씬 카드</h4>
+                  <p className="mt-1 text-sm leading-6 text-slate-600">장면 편집은 작업 화면에서 진행하고, 최종 확인은 결과 미리보기에서 먼저 검토합니다.</p>
+                </div>
+                <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                  <span className="rounded-full bg-white px-3 py-2">씬 {data.length}개</span>
+                  <span className="rounded-full bg-white px-3 py-2">이미지 {summary.imageCount}개</span>
+                  <span className="rounded-full bg-white px-3 py-2">오디오 {summary.audioCount}개</span>
+                  <span className="rounded-full bg-white px-3 py-2">영상 {summary.videoCount}개</span>
+                </div>
+              </div>
+              {(progressMessage || activeOverallProgress !== null) && (
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
+                  <div className="text-sm font-bold text-slate-700">{progressMessage || '현재 작업 상태'}</div>
+                  {activeOverallProgress !== null && (
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
+                        <span>{progressLabel || '현재 작업 진행률'}</span>
+                        <span>{activeOverallProgress}%</span>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${activeOverallProgress}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {finalOutputMode === 'video' && (
+              <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
+                <div className={`rounded-2xl border p-4 ${previewVideoTone.panelClass}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">합본 영상 상태</div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span className={`rounded-full px-3 py-1 text-xs font-black ${previewVideoTone.badgeClass}`}>{previewVideoTone.badge}</span>
+                        {finalVideoUrl && <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">즉시 재생 가능</span>}
+                      </div>
+                    </div>
+                    {onPreparePreviewVideo && (
+                      <button
+                        type="button"
+                        onClick={() => void onPreparePreviewVideo()}
+                        disabled={isPreparingPreviewVideo}
+                        className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        {isPreparingPreviewVideo ? '합본 영상 생성 중...' : '합본 영상 다시 시도'}
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="mt-3 text-sm leading-6 text-slate-700">
+                    {previewVideoMessage || (finalVideoUrl ? '합본 영상이 준비되었습니다.' : '결과보기를 열면 여기에서 합본 영상 상태를 먼저 안내합니다.')}
+                  </p>
+
+                  {activeOverallProgress !== null && (previewVideoStatus === 'loading' || isPreparingPreviewVideo) && (
+                    <div className="mt-3 rounded-2xl border border-white/70 bg-white/70 p-3">
+                      <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
+                        <span>{progressLabel || '합본 영상 생성 진행률'}</span>
+                        <span>{activeOverallProgress}%</span>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
+                        <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${activeOverallProgress}%` }} />
+                      </div>
+                    </div>
+                  )}
+
+                  {finalVideoUrl ? (
+                    <div className="mt-4 space-y-3">
+                      <div className="text-sm font-bold text-slate-700">{finalVideoTitle || '결과 미리보기'}</div>
+                      <video controls className="w-full rounded-2xl border border-slate-200 bg-slate-950">
+                        <source src={finalVideoUrl} type="video/mp4" />
+                      </video>
+                    </div>
+                  ) : (
+                    <div className="mt-4 rounded-2xl border border-dashed border-white/80 bg-white/70 p-4">
+                      <div className="flex items-center gap-3">
+                        {(previewVideoStatus === 'loading' || isPreparingPreviewVideo) && <span className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />}
+                        <div className="text-sm font-black text-slate-900">
+                          {previewVideoStatus === 'error' ? '합본 영상을 아직 만들지 못했습니다.' : '합본 영상 준비 중입니다.'}
+                        </div>
+                      </div>
+                      <p className="mt-2 text-xs leading-5 text-slate-500">AI 씬 영상이 없더라도 이미지 기반 합본을 먼저 시도합니다. 브라우저 합치기가 불안정하면 안전 모드로 다시 시도합니다.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="grid gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:grid-cols-4 sm:px-6">
               <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -814,7 +945,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <button type="button" onClick={() => void onGenerateThumbnail?.()} disabled={isThumbnailGenerating} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500">{isThumbnailGenerating ? '썸네일 생성 중...' : 'AI 썸네일 생성'}</button>
               )}
               {onGenerateAllImages && (
-                <button type="button" onClick={() => void onGenerateAllImages?.()} disabled={isGenerating} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGenerating ? '전체 생성 중...' : '모든 씬 다시 생성'}</button>
+                <button type="button" onClick={() => void onGenerateAllImages?.()} disabled={isGenerating} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGenerating ? '전체 생성 중...' : '전체 이미지 생성'}</button>
               )}
               {onGenerateAllVideos && (
                 <button type="button" onClick={() => void onGenerateAllVideos?.()} disabled={Boolean(isGeneratingAllVideos) || isGenerating} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGeneratingAllVideos ? '모든 영상 생성 중...' : '모든 씬 영상 생성'}</button>
@@ -833,7 +964,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
               )}
             </div>
 
-            <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
+            <div className="px-5 py-5 sm:px-6">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
                 {data.map((row, index) => (
                   <div key={`preview-${row.sceneNumber}-${index}`} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
@@ -858,16 +989,19 @@ const ResultTable: React.FC<ResultTableProps> = ({
                         <div className="flex flex-wrap items-center gap-2">
                           <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">씬 {row.sceneNumber}</span>
                           <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">{formatSeconds(row.targetDuration)}</span>
+                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${row.videoData ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                            {row.videoData ? '씬 영상 있음' : '이미지 기반'}
+                          </span>
                         </div>
-                        <p className="text-sm leading-7 text-slate-700 md:line-clamp-5">{row.narration}</p>
+                        <div className="rounded-2xl border border-slate-200 bg-white p-3">
+                          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">결과 카드</div>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">문단 텍스트는 결과보기에서 숨기고, 장면 결과만 빠르게 검토하도록 단순화했습니다.</p>
+                        </div>
                         {row.audioData && (
                           <audio controls className="w-full">
                             <source src={resolveNarrationAudioSrc(row.audioData)} type="audio/mpeg" />
                           </audio>
                         )}
-                        <div className="flex flex-wrap gap-2">
-                          <button type="button" onClick={() => void downloadScenePackage(row)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">이 문단 다운로드</button>
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -878,13 +1012,31 @@ const ResultTable: React.FC<ResultTableProps> = ({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={() => setPreviewOpen(true)}
-        className="fixed bottom-5 right-5 z-40 rounded-full bg-slate-900 px-5 py-4 text-sm font-black text-white shadow-2xl hover:bg-slate-800"
-      >
-        결과 미리보기
-      </button>
+      {shouldShowFooter && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">
+          <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-3 py-3 shadow-xl shadow-slate-200/70 backdrop-blur-md">
+            {onFooterBack && (
+              <button
+                type="button"
+                onClick={onFooterBack}
+                className="min-w-[120px] rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              >
+                {footerBackLabel || '이전으로'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setFinalOutputMode('video');
+                setPreviewOpen(true);
+              }}
+              className="min-w-[140px] rounded-full bg-slate-900 px-6 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+            >
+              결과 미리보기
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

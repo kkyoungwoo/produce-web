@@ -1,7 +1,7 @@
 'use client';
 
-import SceneStudioPage from '@/lib/mp4Creater/pages/SceneStudioPage';
+import Step6Page from '@/lib/mp4Creater/components/inputSection/steps/Step6Page';
 
 export default function Mp4CreaterStep6Page() {
-  return <SceneStudioPage />;
+  return <Step6Page />;
 }

@@ -455,7 +455,6 @@ export async function upsertWorkflowProject(options: {
 }): Promise<SavedProject> {
   const safeTopic = options.topic?.trim() || '새 프로젝트';
   const patch = {
-    name: `${safeTopic.slice(0, 30)}${safeTopic.length > 30 ? '...' : ''}`,
     topic: safeTopic,
     assets: Array.isArray(options.assets) ? options.assets.map((asset) => ({ ...asset })) : [],
     cost: options.cost,
@@ -479,7 +478,7 @@ export async function upsertWorkflowProject(options: {
   return saveProject(
     safeTopic,
     patch.assets || [],
-    patch.name,
+    `${safeTopic.slice(0, 30)}${safeTopic.length > 30 ? '...' : ''}`,
     options.cost,
     {
       backgroundMusicTracks: options.backgroundMusicTracks || [],
@@ -599,7 +598,7 @@ export async function renameProject(id: string, newName: string): Promise<boolea
   const trimmed = newName.trim();
   if (!trimmed) return false;
   const current = await getSavedProjects();
-  const next = current.map((project) => project.id === id ? { ...project, name: trimmed, topic: trimmed } : project);
+  const next = current.map((project) => project.id === id ? { ...project, name: trimmed } : project);
   await syncProjectsAcrossStorage(next, { immediateStudioSync: true });
   return true;
 }

@@ -9,6 +9,27 @@ interface PixVerseVideoResponse {
   seed?: number;
 }
 
+type FalVideoModelConfig = {
+  endpoint: string;
+  previewResolution: '480p' | '720p';
+  finalResolution: '480p' | '720p' | '1080p';
+};
+
+const DEFAULT_FAL_VIDEO_MODEL = 'fal-pixverse-v55';
+
+const FAL_VIDEO_MODEL_CONFIGS: Record<string, FalVideoModelConfig> = {
+  'fal-pixverse-v55': {
+    endpoint: 'https://fal.run/fal-ai/pixverse/v5.5/image-to-video',
+    previewResolution: '480p',
+    finalResolution: '720p',
+  },
+  'fal-pixverse-v55-quick': {
+    endpoint: 'https://fal.run/fal-ai/pixverse/v5.5/image-to-video',
+    previewResolution: '480p',
+    finalResolution: '480p',
+  },
+};
+
 export function getFalApiKey(): string | null {
   return process.env.FAL_API_KEY || localStorage.getItem(CONFIG.STORAGE_KEYS.FAL_API_KEY);
 }
@@ -26,9 +47,11 @@ export async function generateVideoFromImage(
   motionPrompt: string,
   apiKey?: string,
   aspectRatio: AspectRatio = '16:9',
-  qualityMode: 'preview' | 'final' = 'preview'
+  qualityMode: 'preview' | 'final' = 'preview',
+  videoModel: string = DEFAULT_FAL_VIDEO_MODEL,
 ): Promise<string | null> {
   const key = apiKey || getFalApiKey();
+  const modelConfig = FAL_VIDEO_MODEL_CONFIGS[videoModel] || FAL_VIDEO_MODEL_CONFIGS[DEFAULT_FAL_VIDEO_MODEL];
 
   if (!key) {
     console.warn('[FAL] API key is not configured.');
@@ -55,11 +78,11 @@ export async function generateVideoFromImage(
       image_url: imageUrl,
       duration: 5,
       aspect_ratio: aspectRatio,
-      resolution: qualityMode === 'final' ? '720p' : '480p',
+      resolution: qualityMode === 'final' ? modelConfig.finalResolution : modelConfig.previewResolution,
       negative_prompt: 'blurry, low quality, low resolution, pixelated, noisy, grainy, distorted, static',
     };
 
-    const response = await fetch('https://fal.run/fal-ai/pixverse/v5.5/image-to-video', {
+    const response = await fetch(modelConfig.endpoint, {
       method: 'POST',
       headers: {
         Authorization: `Key ${key}`,
@@ -139,7 +162,8 @@ export async function fetchVideoAsBase64(videoUrl: string): Promise<string | nul
 export async function batchGenerateVideos(
   assets: Array<{ imageData: string; visualPrompt: string }>,
   apiKey?: string,
-  onProgress?: (index: number, total: number) => void
+  onProgress?: (index: number, total: number) => void,
+  videoModel: string = DEFAULT_FAL_VIDEO_MODEL,
 ): Promise<(string | null)[]> {
   const results: (string | null)[] = [];
   const key = apiKey || getFalApiKey() || undefined;
@@ -150,7 +174,10 @@ export async function batchGenerateVideos(
     const videoUrl = await generateVideoFromImage(
       assets[i].imageData,
       assets[i].visualPrompt,
-      key
+      key,
+      '16:9',
+      'preview',
+      videoModel,
     );
     results.push(videoUrl);
 

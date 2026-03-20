@@ -238,6 +238,73 @@ export interface WorkflowPromptPack {
 }
 
 export type WorkflowPromptTemplateMode = 'narration' | 'dialogue';
+export type WorkflowPromptTemplateEngine = 'default' | 'channel_constitution_v32';
+
+export interface ConstitutionTargetProfile {
+  name: string;
+  identity: string;
+  interests: string[];
+  tone: string;
+}
+
+export interface ConstitutionSafetyReview {
+  grade: 'safe' | 'danger';
+  details: string;
+  decision: string;
+}
+
+export interface ConstitutionMonetizationReview {
+  grade: 'green' | 'yellow' | 'red';
+  details: string;
+  solution: string;
+}
+
+export interface ConstitutionStructureSelection {
+  id: string;
+  reason: string;
+}
+
+export interface ConstitutionKeywordPair {
+  ko: string;
+  en: string;
+}
+
+export interface ConstitutionAnalysisSummary {
+  targetProfile: ConstitutionTargetProfile;
+  safetyReview: ConstitutionSafetyReview;
+  monetizationReview: ConstitutionMonetizationReview;
+  selectedStructure: ConstitutionStructureSelection;
+  titles: string[];
+  keywords: ConstitutionKeywordPair[];
+  source: 'ai' | 'sample';
+  updatedAt: number;
+}
+
+export type ScriptSpeechStyle = 'yo' | 'da' | 'random';
+export type ScriptLanguageOption = 'ko' | 'en' | 'ja' | 'zh' | 'vi' | 'mn' | 'th' | 'uz';
+export type ReferenceLinkKind = 'youtube' | 'web';
+
+export interface ReferenceLinkDraft {
+  id: string;
+  url: string;
+  kind: ReferenceLinkKind;
+  title?: string;
+  sourceText?: string;
+  summary?: string;
+  status: 'idle' | 'loading' | 'ready' | 'error';
+  error?: string | null;
+  addedAt: number;
+}
+
+export interface CustomScriptSettings {
+  expectedDurationMinutes: number;
+  speechStyle: ScriptSpeechStyle;
+  language: ScriptLanguageOption;
+  referenceText: string;
+  referenceLinks: ReferenceLinkDraft[];
+  scriptModel?: string;
+}
+
 
 export interface WorkflowPromptTemplate {
   id: string;
@@ -245,6 +312,7 @@ export interface WorkflowPromptTemplate {
   description: string;
   prompt: string;
   mode: WorkflowPromptTemplateMode;
+  engine?: WorkflowPromptTemplateEngine;
   builtIn?: boolean;
   basePrompt?: string;
   isCustomized?: boolean;
@@ -264,12 +332,17 @@ export interface WorkflowDraft {
   styleImages: PromptedImageAsset[];
   characterImages: PromptedImageAsset[];
   selectedCharacterIds: string[];
+  selectedCharacterStyleId?: string | null;
+  selectedCharacterStyleLabel?: string;
+  selectedCharacterStylePrompt?: string;
   selectedStyleImageId: string | null;
   referenceImages: ReferenceImages;
   promptPack: WorkflowPromptPack;
   promptTemplates: WorkflowPromptTemplate[];
   selectedPromptTemplateId: string | null;
   promptAdditions: string[];
+  customScriptSettings?: CustomScriptSettings;
+  constitutionAnalysis?: ConstitutionAnalysisSummary | null;
   openRouterModel?: string;
   ttsProvider?: 'qwen3Tts' | 'elevenLabs';
   elevenLabsVoiceId?: string | null;

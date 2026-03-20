@@ -173,10 +173,10 @@ function makeCharacter(options: {
 }
 
 function fallbackCharacters(script: string, selections: StorySelectionState): CharacterProfile[] {
-  const castTarget = desiredCastCount(script);
   const leadName = selections.protagonist?.trim() || '주인공';
-  const supports = extractSupportNames(script).slice(0, Math.max(1, castTarget - 1));
-  const cast: CharacterProfile[] = [
+  const supportKeyword = extractSupportNames(script)[0] || '조연';
+
+  return [
     makeCharacter({
       name: leadName,
       role: 'lead',
@@ -185,40 +185,17 @@ function fallbackCharacters(script: string, selections: StorySelectionState): Ch
       styleHint: selections.mood,
       castOrder: 1,
     }),
+    makeCharacter({
+      name: supportKeyword,
+      role: 'support',
+      roleLabel: supportKeyword === '앵커' || supportKeyword === '기자'
+        ? `${supportKeyword} / 진행과 설명을 맡는 조연`
+        : '조연 / 주인공의 흐름을 받쳐 주는 인물',
+      script,
+      styleHint: selections.mood,
+      castOrder: 2,
+    }),
   ];
-
-  supports.forEach((keyword, index) => {
-    cast.push(
-      makeCharacter({
-        name: keyword,
-        role: 'support',
-        roleLabel: keyword === '앵커' || keyword === '기자'
-          ? `${keyword} / 진행과 설명을 맡는 조연`
-          : `조연 ${index + 1} / ${keyword} 역할로 긴장과 감정을 보강하는 인물`,
-        script,
-        styleHint: selections.mood,
-        castOrder: index + 2,
-      })
-    );
-  });
-
-  while (cast.length < castTarget) {
-    const nextOrder = cast.length + 1;
-    cast.push(
-      makeCharacter({
-        name: cast.length === castTarget - 1 ? '나레이터' : `조연 ${nextOrder - 1}`,
-        role: cast.length === castTarget - 1 ? 'narrator' : 'support',
-        roleLabel: cast.length === castTarget - 1
-          ? '나레이터 / 장면 해설과 흐름 연결'
-          : `조연 ${nextOrder - 1} / 주인공의 선택을 비추는 상대 인물`,
-        script,
-        styleHint: selections.mood,
-        castOrder: nextOrder,
-      })
-    );
-  }
-
-  return cast;
 }
 
 export async function extractCharactersFromScript(options: {
@@ -281,20 +258,29 @@ export function buildStyleRecommendations(
 ): PromptedImageAsset[] {
   const seed = hashCode(script || contentType);
   const palettes = [
-    ['네온 시티팝', '#8b5cf6'],
-    ['미니멀 만화영화', '#2563eb'],
-    ['파스텔 애니메이션', '#ec4899'],
-    ['클린 뉴스 스튜디오', '#0f766e'],
+    ['감성 일러스트풍', '#8b5cf6'],
+    ['시네마틱풍', '#0f172a'],
+    ['수채화풍', '#06b6d4'],
+    ['웹툰풍', '#2563eb'],
+    ['애니메이션풍', '#ec4899'],
+    ['동화풍', '#16a34a'],
+    ['미니멀 아트풍', '#f59e0b'],
+    ['네온 시티팝풍', '#7c3aed'],
+    ['빈티지 포스터풍', '#b45309'],
+    ['클린 뉴스 그래픽풍', '#0f766e'],
+    ['몽환 판타지풍', '#9333ea'],
+    ['하이패션 에디토리얼풍', '#be185d'],
   ] as const;
 
   const filtered = palettes.filter(([label]) => !excludeLabels.includes(label));
-  const picked = (filtered.length ? filtered : palettes).slice(0, Math.max(1, limit));
+  const fallbackPool = filtered.length ? filtered : palettes;
+  const picked = fallbackPool.slice(0, Math.max(1, limit));
 
   return picked.map(([label, accent], index) => {
-    const prompt = `${label} 스타일. ${BASE_STYLE_TEXT} Simple anime background, clean line art, soft cel shading, ${getAspectRatioPrompt(aspectRatio)}. Variation seed ${seed + index + excludeLabels.length}.`;
+    const prompt = `${label}. Create a cohesive full-scene visual style for the final video. Keep background direction, composition rhythm, lighting logic, color palette, texture density, and rendering finish consistent across scenes. ${getAspectRatioPrompt(aspectRatio)}. Variation seed ${seed + index + excludeLabels.length}. Story context: ${(script || contentType).slice(0, 220)}.`;
     return buildPromptPreviewCard({
       label,
-      subtitle: contentType === 'news' || contentType === 'info_delivery' ? 'AI 추천 정보형 화풍' : 'AI 추천 화풍',
+      subtitle: contentType === 'news' || contentType === 'info_delivery' ? '최종 영상용 정보형 화풍' : '최종 영상용 비주얼 화풍',
       prompt,
       accent,
       kind: 'style',

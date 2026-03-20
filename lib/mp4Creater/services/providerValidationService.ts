@@ -1,4 +1,4 @@
-export type ProviderValidationKind = 'openRouter' | 'elevenLabs';
+export type ProviderValidationKind = 'openRouter' | 'elevenLabs' | 'fal';
 
 export interface ProviderValidationResult {
   ok: boolean;
@@ -63,6 +63,53 @@ async function validateElevenLabs(apiKey: string): Promise<ProviderValidationRes
   };
 }
 
+async function validateFal(apiKey: string): Promise<ProviderValidationResult> {
+  const response = await fetch('https://fal.run/fal-ai/pixverse/v5.5/image-to-video', {
+    method: 'POST',
+    headers: {
+      Authorization: `Key ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt: 'connection-test',
+      image_url: 'https://example.com/invalid.png',
+      duration: 5,
+      aspect_ratio: '16:9',
+      resolution: '480p',
+    }),
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    return {
+      ok: false,
+      tone: 'error',
+      message: buildFailureMessage(response.status, 'FAL'),
+    };
+  }
+
+  if (response.status === 402 || response.status === 429) {
+    return {
+      ok: false,
+      tone: 'error',
+      message: buildFailureMessage(response.status, 'FAL'),
+    };
+  }
+
+  if (response.ok || response.status === 400 || response.status === 422) {
+    return {
+      ok: true,
+      tone: 'success',
+      message: 'FAL API 연결 응답을 확인했습니다.',
+    };
+  }
+
+  return {
+    ok: false,
+    tone: 'error',
+    message: buildFailureMessage(response.status, 'FAL'),
+  };
+}
+
 export async function validateProviderConnection(
   kind: ProviderValidationKind,
   apiKey: string
@@ -78,7 +125,8 @@ export async function validateProviderConnection(
 
   try {
     if (kind === 'openRouter') return await validateOpenRouter(trimmed);
-    return await validateElevenLabs(trimmed);
+    if (kind === 'elevenLabs') return await validateElevenLabs(trimmed);
+    return await validateFal(trimmed);
   } catch {
     return {
       ok: false,

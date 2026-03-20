@@ -1,0 +1,157 @@
+{
+  "id": "project_1774008342623_uoe64d",
+  "name": "시장 변화 핵심 정리",
+  "createdAt": 1774008342623,
+  "topic": "시장 변화 핵심 정리",
+  "projectNumber": 3,
+  "lastSavedAt": 1774008352021,
+  "settings": {
+    "imageModel": "gemini-2.5-flash-image",
+    "outputMode": "video",
+    "elevenLabsModel": "eleven_multilingual_v2"
+  },
+  "assets": [],
+  "thumbnail": null,
+  "thumbnailTitle": null,
+  "thumbnailPrompt": null,
+  "thumbnailHistory": [],
+  "selectedThumbnailId": null,
+  "backgroundMusicTracks": [],
+  "previewMix": {
+    "narrationVolume": 1,
+    "backgroundMusicVolume": 0.28
+  },
+  "workflowDraft": {
+    "id": "workflow_1774008342622",
+    "contentType": "news",
+    "aspectRatio": "1:1",
+    "topic": "시장 변화 핵심 정리",
+    "outputMode": "video",
+    "selections": {
+      "genre": "뉴스 브리핑",
+      "mood": "정확함",
+      "endingTone": "핵심 요약",
+      "setting": "스튜디오",
+      "protagonist": "앵커",
+      "conflict": "상반된 해석"
+    },
+    "script": "",
+    "activeStage": 2,
+    "extractedCharacters": [],
+    "styleImages": [],
+    "characterImages": [],
+    "selectedCharacterIds": [],
+    "selectedCharacterStyleId": null,
+    "selectedCharacterStyleLabel": "",
+    "selectedCharacterStylePrompt": "",
+    "selectedStyleImageId": null,
+    "referenceImages": {
+      "character": [],
+      "style": [],
+      "characterStrength": 70,
+      "styleStrength": 70
+    },
+    "promptPack": {
+      "storyPrompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[INPUT]\nTopic: 시장 변화 핵심 정리\nGenre: 뉴스 브리핑\nMood: 정확함\nSetting: 스튜디오\nLead: 앵커\nConflict: 상반된 해석\nEnding tone: 핵심 요약\n\n[CURRENT DRAFT]\nNo draft",
+      "lyricsPrompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[MUSIC VIDEO FLOW]\nTopic: 시장 변화 핵심 정리\nGenre: 뉴스 브리핑\nMood: 정확함\nSetting: 스튜디오\nLead: 앵커\nConflict: 상반된 해석\nEnding tone: 핵심 요약\n\n[CURRENT DRAFT]\nNo draft",
+      "characterPrompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[CHARACTERS]\nTopic: 시장 변화 핵심 정리\nGenre: 뉴스 브리핑\nMood: 정확함\nSetting: 스튜디오\nLead: 앵커\nConflict: 상반된 해석\nEnding tone: 핵심 요약\n\n[SCRIPT]\nNo draft",
+      "scenePrompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[SCENE PROMPTS]\nTopic: 시장 변화 핵심 정리\nGenre: 뉴스 브리핑\nMood: 정확함\nSetting: 스튜디오\nLead: 앵커\nConflict: 상반된 해석\nEnding tone: 핵심 요약\n\n[SCRIPT]\nNo draft",
+      "actionPrompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[SCENE ACTIONS]\nTopic: 시장 변화 핵심 정리\nGenre: 뉴스 브리핑\nMood: 정확함\nSetting: 스튜디오\nLead: 앵커\nConflict: 상반된 해석\nEnding tone: 핵심 요약",
+      "persuasionStoryPrompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[RECOMMENDED PHRASES]\n핵심 요점을 첫 문단에서 바로 알려줘.\n정보와 해설이 구분되게 정리해줘.\n마지막에는 한 줄 요약으로 정리해줘."
+    },
+    "promptTemplates": [
+      {
+        "id": "builtin-core-script",
+        "name": "Core script draft",
+        "description": "Default structure for story/news flow",
+        "prompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[INPUT]\nTopic: 시장 변화 핵심 정리\nGenre: 뉴스 브리핑\nMood: 정확함\nSetting: 스튜디오\nLead: 앵커\nConflict: 상반된 해석\nEnding tone: 핵심 요약\n\n[CURRENT DRAFT]\nNo draft",
+        "mode": "narration",
+        "builtIn": true,
+        "basePrompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[INPUT]\nTopic: 시장 변화 핵심 정리\nGenre: 뉴스 브리핑\nMood: 정확함\nSetting: 스튜디오\nLead: 앵커\nConflict: 상반된 해석\nEnding tone: 핵심 요약\n\n[CURRENT DRAFT]\nNo draft",
+        "isCustomized": false,
+        "updatedAt": 1
+      },
+      {
+        "id": "builtin-dialogue-script",
+        "name": "Dialogue draft",
+        "description": "A more conversational variation",
+        "prompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[INPUT]\nTopic: 시장 변화 핵심 정리\nGenre: 뉴스 브리핑\nMood: 정확함\nSetting: 스튜디오\nLead: 앵커\nConflict: 상반된 해석\nEnding tone: 핵심 요약\n\n[CURRENT DRAFT]\nNo draft\n\nExtra rules:\n- Blend dialogue and narration naturally.\n- Prefer visual and concrete sentences.",
+        "mode": "dialogue",
+        "builtIn": true,
+        "basePrompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[INPUT]\nTopic: 시장 변화 핵심 정리\nGenre: 뉴스 브리핑\nMood: 정확함\nSetting: 스튜디오\nLead: 앵커\nConflict: 상반된 해석\nEnding tone: 핵심 요약\n\n[CURRENT DRAFT]\nNo draft\n\nExtra rules:\n- Blend dialogue and narration naturally.\n- Prefer visual and concrete sentences.",
+        "isCustomized": false,
+        "updatedAt": 2
+      },
+      {
+        "id": "builtin-scene-heavy",
+        "name": "Scene-heavy draft",
+        "description": "Stronger scene transitions and visual detail",
+        "prompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[SCENE PROMPTS]\nTopic: 시장 변화 핵심 정리\nGenre: 뉴스 브리핑\nMood: 정확함\nSetting: 스튜디오\nLead: 앵커\nConflict: 상반된 해석\nEnding tone: 핵심 요약\n\n[SCRIPT]\nNo draft\n\nExtra rules:\n- Start each paragraph with a visible scene shift.\n- Add concrete visual anchors.",
+        "mode": "narration",
+        "builtIn": true,
+        "basePrompt": "뉴스 브리핑과 해설이 자연스럽게 이어지는 대본을 만든다. 핵심 요점, 배경, 정리 순서를 지킨다.\n\n[SCENE PROMPTS]\nTopic: 시장 변화 핵심 정리\nGenre: 뉴스 브리핑\nMood: 정확함\nSetting: 스튜디오\nLead: 앵커\nConflict: 상반된 해석\nEnding tone: 핵심 요약\n\n[SCRIPT]\nNo draft\n\nExtra rules:\n- Start each paragraph with a visible scene shift.\n- Add concrete visual anchors.",
+        "isCustomized": false,
+        "updatedAt": 3
+      }
+    ],
+    "selectedPromptTemplateId": "builtin-core-script",
+    "promptAdditions": [],
+    "customScriptSettings": {
+      "expectedDurationMinutes": 3,
+      "speechStyle": "yo",
+      "language": "ko",
+      "referenceText": ""
+    },
+    "scriptReferenceLinks": [],
+    "openRouterModel": "openrouter/auto",
+    "ttsProvider": "qwen3Tts",
+    "elevenLabsVoiceId": null,
+    "elevenLabsModelId": null,
+    "qwenVoicePreset": "qwen-default",
+    "qwenStylePreset": "balanced",
+    "voicePreviewAsset": null,
+    "scriptPreviewAsset": null,
+    "finalVoiceAsset": null,
+    "backgroundMusicPreview": null,
+    "finalBackgroundMusic": null,
+    "musicVideoPreview": null,
+    "finalMusicVideo": null,
+    "sampleMode": {
+      "text": true,
+      "tts": true,
+      "backgroundMusic": true,
+      "musicVideo": true
+    },
+    "completedSteps": {
+      "step1": true,
+      "step2": false,
+      "step3": false,
+      "step4": false,
+      "step5": false
+    },
+    "updatedAt": 1774008350017
+  },
+  "voicePreviewAsset": null,
+  "scriptPreviewAsset": null,
+  "finalVoiceAsset": null,
+  "backgroundMusicPreview": null,
+  "finalBackgroundMusic": null,
+  "musicVideoPreview": null,
+  "finalMusicVideo": null,
+  "folderName": "project-0003-project",
+  "folderPath": "local-data/tubegen-studio/projects/project-0003-project",
+  "summary": {
+    "id": "project_1774008342623_uoe64d",
+    "name": "시장 변화 핵심 정리",
+    "topic": "시장 변화 핵심 정리",
+    "projectNumber": 3,
+    "folderName": "project-0003-project",
+    "createdAt": 1774008342623,
+    "lastSavedAt": 1774008352021,
+    "assetCount": 0,
+    "imageCount": 0,
+    "videoCount": 0,
+    "audioCount": 0,
+    "thumbnailPath": null
+  }
+}

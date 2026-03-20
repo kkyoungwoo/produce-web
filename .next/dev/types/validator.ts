@@ -218,6 +218,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../../app/api/mp4Creater/reference-extract/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/reference-extract">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/reference-extract/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../../app/api/public-data/archhub-collect/route.ts
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/public-data/archhub-collect">> = Specific

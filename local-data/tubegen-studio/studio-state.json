@@ -3,7 +3,7 @@
   "storageDir": "./local-data/tubegen-studio",
   "isStorageConfigured": true,
   "configuredAt": 1773821046360,
-  "updatedAt": 1773931380462,
+  "updatedAt": 1774008351947,
   "selectedCharacterId": null,
   "characters": [],
   "routing": {
@@ -13,9 +13,9 @@
     "motionPromptModel": "openrouter/auto",
     "imageProvider": "gemini",
     "imageModel": "gemini-2.5-flash-image",
-    "audioProvider": "elevenlabs",
+    "audioProvider": "qwen3Tts",
     "audioModel": "eleven_flash_v2_5",
-    "videoProvider": "fal",
+    "videoProvider": "sample",
     "videoModel": "pixverse/v5.5",
     "ttsNarratorId": "adam",
     "backgroundMusicModel": "sample-news-v1",
@@ -39,15 +39,15 @@
   },
   "projects": [
     {
-      "id": "project_1773931274960_anbya9",
-      "name": "프로젝트(1)",
-      "topic": "프로젝트(1)",
-      "createdAt": 1773931274960,
-      "lastSavedAt": 1773931380955,
-      "projectNumber": 2,
-      "folderName": "project-0002-1",
-      "folderPath": "local-data/tubegen-studio/projects/project-0002-1",
-      "thumbnail": "",
+      "id": "project_1774008342623_uoe64d",
+      "name": "시장 변화 핵심 정리",
+      "topic": "시장 변화 핵심 정리",
+      "createdAt": 1774008342623,
+      "lastSavedAt": 1774008352021,
+      "projectNumber": 3,
+      "folderName": "project-0003-project",
+      "folderPath": "local-data/tubegen-studio/projects/project-0003-project",
+      "thumbnail": null,
       "thumbnailTitle": null,
       "selectedThumbnailId": null,
       "assetCount": 0,
@@ -55,15 +55,40 @@
       "videoCount": 0,
       "audioCount": 0,
       "workflowDraft": {
-        "updatedAt": 1773931277075,
-        "aspectRatio": "16:9",
-        "script": "새벽의 편의점에서 초보 창작자은 프로젝트(1)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.",
-        "selectedStyleImageId": "prompted_1773931267952_19k5pr",
+        "updatedAt": 1774008350017,
+        "aspectRatio": "1:1",
+        "script": "",
+        "selectedStyleImageId": null,
+        "selectedCharacterIds": []
+      },
+      "assets": [],
+      "backgroundMusicTracks": [],
+      "thumbnailHistory": []
+    },
+    {
+      "id": "project_1774007935314_i380iu",
+      "name": "실수 줄이는 체크리스트 안내",
+      "topic": "실수 줄이는 체크리스트 안내",
+      "createdAt": 1774007935314,
+      "lastSavedAt": 1774008352022,
+      "projectNumber": 2,
+      "folderName": "project-0002-2",
+      "folderPath": "local-data/tubegen-studio/projects/project-0002-2",
+      "thumbnail": null,
+      "thumbnailTitle": null,
+      "selectedThumbnailId": null,
+      "assetCount": 0,
+      "imageCount": 0,
+      "videoCount": 0,
+      "audioCount": 0,
+      "workflowDraft": {
+        "updatedAt": 1774008094458,
+        "aspectRatio": "9:16",
+        "script": "이 대본은 약 16분 분량을 목표로 합니다. 주제는 실수 줄이는 체크리스트 안내이고 분위기는 정돈된, 배경은 설명형 보드입니다.\n\n참고 내용은 [직접 입력 참고]\n마지막 문단은 요약 정리 느낌으로 정리하고 바로 행\n- 실수 줄이는 체크리스트 안내의 문제를 시작 5초 안에 보이도록 도입을 강하게 잡아 주세요.\n- 중간에는 설명자가 복잡도 축약을 체감하는 실제 상황을 1개 넣어 주세요.\n- 마지막 문단은 요약 정리 느낌으로 정리하고 바로 행동할 한 줄을 남겨 주세요.\n- 한국어 기준으로 작성하고, 문장 말투는 장면에 맞게 자연스럽게 섞어 주세요.\n- 문단마다 한 장면씩 보이도록 불필요한 설명은 줄이고 핵심만 남겨 주세요.\n\n[추가 지시]\n마지막 문단은 요약 정리 느낌으로 정리하고 바로 행동할 한 줄을 남겨 주세요.\n문단마다 한 장면씩 보이도록 불필요한 설명은 줄이고 핵심만 남겨 주세요.\n실수 줄이는 체크리스트 안내의 문제를 시작 5초 안에 보이도록 도입을 강하게 잡아 주세요.\n중간에는 설명자가 복잡도 축약을 체감하는 실제 상황을 1개 넣어 주세요.\n한국어 기준으로 작성하고, 문장 말투는 장면에 맞게 자연스럽게 섞어 주세요.를 자연스럽게 섞어 반영해 주세요.\n\n문장 말투는 장면마다 자연스럽게 바꿔 줍니다. 설명형 보드 배경이 장면마다 보이도록 시각 단서를 반복합니다.\n\n이어지는 장면에서는 현재 상황과 배경이 차례로 설명되고, 복잡도 축약이 왜 논점이 되는지 시청자가 한 번에 이해할 수 있게 연결한다.\n\n중간 장면에서는 서로 다른 시각이나 데이터가 부딪히며 이슈의 핵심 긴장이 드러난다. 설명자은 복잡한 내용을 흐트러지지 않게 정돈해 전달한다.\n\n마지막은 요약 정리 방식으로 요약한다. 시청자가 지금 무엇을 기억해야 하는지 분명하게 남기고 다음 흐름을 예상하게 만든다.\n\n마지막은 요약 정리 방식으로 요약한다. 시청자가 지금 무엇을 기억해야 하는지 분명하게 남기고 다음 흐름을 예상하게 만든다.\n\n설명형 보드에서 설명자은 실수 줄이는 체크리스트 안내의 핵심을 먼저 짚으며, 이번 이슈가 왜 중요한지 정돈된 톤으로 정리한다.\n\n이어지는 장면에서는 현재 상황과 배경이 차례로 설명되고, 복잡도 축약이 왜 논점이 되는지 시청자가 한 번에 이해할 수 있게 연결한다.\n\n중간 장면에서는 서로 다른 시각이나 데이터가 부딪히며 이슈의 핵심 긴장이 드러난다. 설명자은 복잡한 내용을 흐트러지지 않게 정돈해 전달한다.\n\n마지막은 요약 정리 방식으로 요약한다. 시청자가 지금 무엇을 기억해야 하는지 분명하게 남기고 다음 흐름을 예상하게 만든다.\n\n설명형 보드에서 설명자은 실수 줄이는 체크리스트 안내의 핵심을 먼저 짚으며, 이번 이슈가 왜 중요한지 정돈된 톤으로 정리한다.\n\n이어지는 장면에서는 현재 상황과 배경이 차례로 설명되고, 복잡도 축약이 왜 논점이 되는지 시청자가 한 번에 이해할 수 있게 연결한다.\n\n중간 장면에서는 서로 다른 시각이나 데이터가 부딪히며 이슈의 핵심 긴장이 드러난다. 설명자은 복잡한 내용을 흐트러지지 않게 정돈해 전달한다.\n\n설명형 보드에서 설명자은 실수 줄이는 체크리스트 안내의 핵심을 먼저 짚으며, 이번 이슈가 왜 중요한지 정돈된 톤으로 정리한다.",
+        "selectedStyleImageId": null,
         "selectedCharacterIds": [
-          "char_1773931218599_8bk1ru",
-          "char_1773931218599_gp8uoo",
-          "char_1773931218599_c8g7sp",
-          "char_manual_1773931245206_d0hfj7"
+          "char_1774008093541_hf9z8e",
+          "char_1774008093541_w17ww3"
         ]
       },
       "assets": [],
@@ -71,11 +96,11 @@
       "thumbnailHistory": []
     },
     {
-      "id": "project_1773931153196_j0d4qa",
+      "id": "project_1774006433235_s6j0ip",
       "name": "프로젝트(1)",
-      "topic": "프로젝트(1)",
-      "createdAt": 1773931153196,
-      "lastSavedAt": 1773931380955,
+      "topic": "조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조",
+      "createdAt": 1774006433235,
+      "lastSavedAt": 1774008352022,
       "projectNumber": 1,
       "folderName": "project-0001-1",
       "folderPath": "local-data/tubegen-studio/projects/project-0001-1",
@@ -87,7 +112,7 @@
       "videoCount": 0,
       "audioCount": 0,
       "workflowDraft": {
-        "updatedAt": 1773931152769,
+        "updatedAt": 1774006786349,
         "aspectRatio": "16:9",
         "script": "",
         "selectedStyleImageId": null,
@@ -100,28 +125,38 @@
   ],
   "projectIndex": [
     {
-      "id": "project_1773931274960_anbya9",
-      "name": "프로젝트(1)",
-      "topic": "프로젝트(1)",
-      "createdAt": 1773931274960,
-      "lastSavedAt": 1773931380955,
-      "projectNumber": 2,
-      "folderName": "project-0002-1",
-      "folderPath": "local-data/tubegen-studio/projects/project-0002-1"
+      "id": "project_1774008342623_uoe64d",
+      "name": "시장 변화 핵심 정리",
+      "topic": "시장 변화 핵심 정리",
+      "createdAt": 1774008342623,
+      "lastSavedAt": 1774008352021,
+      "projectNumber": 3,
+      "folderName": "project-0003-project",
+      "folderPath": "local-data/tubegen-studio/projects/project-0003-project"
     },
     {
-      "id": "project_1773931153196_j0d4qa",
+      "id": "project_1774007935314_i380iu",
+      "name": "실수 줄이는 체크리스트 안내",
+      "topic": "실수 줄이는 체크리스트 안내",
+      "createdAt": 1774007935314,
+      "lastSavedAt": 1774008352022,
+      "projectNumber": 2,
+      "folderName": "project-0002-2",
+      "folderPath": "local-data/tubegen-studio/projects/project-0002-2"
+    },
+    {
+      "id": "project_1774006433235_s6j0ip",
       "name": "프로젝트(1)",
-      "topic": "프로젝트(1)",
-      "createdAt": 1773931153196,
-      "lastSavedAt": 1773931380955,
+      "topic": "조용한 골목의 작은 선택으로 관계가 달라지는 인물 중심 구성 기반으로 한 직관적 반전 구조",
+      "createdAt": 1774006433235,
+      "lastSavedAt": 1774008352022,
       "projectNumber": 1,
       "folderName": "project-0001-1",
       "folderPath": "local-data/tubegen-studio/projects/project-0001-1"
     }
   ],
   "workflowDraft": {
-    "id": "workflow_1773931380254",
+    "id": "workflow_1774008342622",
     "contentType": "story",
     "aspectRatio": "16:9",
     "topic": "프로젝트(2)",
@@ -140,6 +175,9 @@
     "styleImages": [],
     "characterImages": [],
     "selectedCharacterIds": [],
+    "selectedCharacterStyleId": null,
+    "selectedCharacterStyleLabel": "",
+    "selectedCharacterStylePrompt": "",
     "selectedStyleImageId": null,
     "referenceImages": {
       "character": [],
@@ -192,6 +230,13 @@
     ],
     "selectedPromptTemplateId": null,
     "promptAdditions": [],
+    "customScriptSettings": {
+      "expectedDurationMinutes": 3,
+      "speechStyle": "yo",
+      "language": "ko",
+      "referenceText": ""
+    },
+    "scriptReferenceLinks": [],
     "openRouterModel": "openrouter/auto",
     "ttsProvider": "qwen3Tts",
     "elevenLabsVoiceId": null,
@@ -218,7 +263,7 @@
       "step4": false,
       "step5": false
     },
-    "updatedAt": 1773931380254
+    "updatedAt": 1774008342622
   },
   "agentProfile": {
     "name": "나만의 기본 제작 에이전트",

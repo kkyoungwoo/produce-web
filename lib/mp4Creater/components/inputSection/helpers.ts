@@ -13,6 +13,7 @@ export function arePromptTemplatesEqual(a: WorkflowPromptTemplate[], b: Workflow
       && item.mode === other.mode
       && item.builtIn === other.builtIn
       && item.basePrompt === other.basePrompt
+      && item.engine === other.engine
       && item.isCustomized === other.isCustomized;
   });
 }

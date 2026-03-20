@@ -1,0 +1,9 @@
+설명자 / 주인공 / 서사를 이끄는 중심 인물
+Stylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.
+unique character design, varied outfit style, clean silhouette, based on the story mood: 정돈된. Scene context: 이 대본은 약 16분 분량을 목표로 합니다. 주제는 실수 줄이는 체크리스트 안내이고 분위기는 정돈된, 배경은 설명형 보드입니다.
+
+참고 내용은 [직접 입력 참고]
+마지막 문단은 요약 정리 느낌으로 정리하고 바로 행
+- 실수 줄이는 체크리스트 안내의 문제를 시작 5초 안에 보이도록 도입을 강하게 잡아 주세요.
+- 중간에는 설명자가 복잡도 축약을 체감하는 실제 상황을 1개 넣어 주세요.
+- 마지

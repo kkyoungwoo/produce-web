@@ -4,6 +4,12 @@ import {
   WorkflowPromptPack,
   WorkflowPromptTemplate,
 } from '../types';
+import {
+  buildChannelConstitutionPrompt,
+  CHANNEL_CONSTITUTION_ENGINE,
+  CHANNEL_CONSTITUTION_TEMPLATE_ID,
+  supportsChannelConstitutionTemplate,
+} from '../prompts/channelConstitutionPrompts';
 import { getPromptRegistry } from './promptRegistryService';
 
 function buildBaseSummary(topic: string, selections: StorySelectionState) {
@@ -50,18 +56,36 @@ export function createBuiltInWorkflowPromptTemplates(
   promptPack: WorkflowPromptPack
 ): WorkflowPromptTemplate[] {
   const isMusic = contentType === 'music_video';
+  const templates: WorkflowPromptTemplate[] = [];
 
-  return [
+  if (supportsChannelConstitutionTemplate(contentType)) {
+    const constitutionPrompt = buildChannelConstitutionPrompt({ contentType, promptPack });
+    templates.push({
+      id: CHANNEL_CONSTITUTION_TEMPLATE_ID,
+      name: '채널 헌법 v32 분석형',
+      description: '타겟팅, 안전성, 제목 설계까지 함께 정리하는 유튜브 분석형 대본 템플릿',
+      prompt: constitutionPrompt,
+      mode: 'narration',
+      engine: CHANNEL_CONSTITUTION_ENGINE,
+      builtIn: true,
+      basePrompt: constitutionPrompt,
+      isCustomized: false,
+      updatedAt: 1,
+    });
+  }
+
+  templates.push(
     {
       id: 'builtin-core-script',
       name: isMusic ? 'Core music-video draft' : 'Core script draft',
       description: isMusic ? 'Default structure for a music-video flow' : 'Default structure for story/news flow',
       prompt: isMusic ? promptPack.lyricsPrompt : promptPack.storyPrompt,
       mode: 'narration',
+      engine: 'default',
       builtIn: true,
       basePrompt: isMusic ? promptPack.lyricsPrompt : promptPack.storyPrompt,
       isCustomized: false,
-      updatedAt: 1,
+      updatedAt: 2,
     },
     {
       id: 'builtin-dialogue-script',
@@ -69,10 +93,11 @@ export function createBuiltInWorkflowPromptTemplates(
       description: 'A more conversational variation',
       prompt: `${promptPack.storyPrompt}\n\nExtra rules:\n- Blend dialogue and narration naturally.\n- Prefer visual and concrete sentences.`,
       mode: 'dialogue',
+      engine: 'default',
       builtIn: true,
       basePrompt: `${promptPack.storyPrompt}\n\nExtra rules:\n- Blend dialogue and narration naturally.\n- Prefer visual and concrete sentences.`,
       isCustomized: false,
-      updatedAt: 2,
+      updatedAt: 3,
     },
     {
       id: 'builtin-scene-heavy',
@@ -80,12 +105,15 @@ export function createBuiltInWorkflowPromptTemplates(
       description: 'Stronger scene transitions and visual detail',
       prompt: `${promptPack.scenePrompt}\n\nExtra rules:\n- Start each paragraph with a visible scene shift.\n- Add concrete visual anchors.`,
       mode: 'narration',
+      engine: 'default',
       builtIn: true,
       basePrompt: `${promptPack.scenePrompt}\n\nExtra rules:\n- Start each paragraph with a visible scene shift.\n- Add concrete visual anchors.`,
       isCustomized: false,
-      updatedAt: 3,
-    },
-  ];
+      updatedAt: 4,
+    }
+  );
+
+  return templates;
 }
 
 export function resolveWorkflowPromptTemplates(
@@ -105,6 +133,7 @@ export function resolveWorkflowPromptTemplates(
         name: saved.name,
         description: saved.description,
         prompt: saved.prompt,
+        engine: saved.engine || builtIn.engine || 'default',
         updatedAt: saved.updatedAt || builtIn.updatedAt,
         isCustomized: true,
       };
@@ -113,6 +142,7 @@ export function resolveWorkflowPromptTemplates(
       ...builtIn,
       name: saved.name || builtIn.name,
       description: saved.description || builtIn.description,
+      engine: saved.engine || builtIn.engine || 'default',
       updatedAt: saved.updatedAt || builtIn.updatedAt,
     };
   });

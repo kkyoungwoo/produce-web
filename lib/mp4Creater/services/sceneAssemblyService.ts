@@ -47,6 +47,8 @@ export function buildSelectedPromptContextFromDraft(draft: WorkflowDraft) {
 
   return {
     characterPromptBlock,
+    characterStylePrompt: draft.selectedCharacterStylePrompt || '',
+    characterStyleLabel: draft.selectedCharacterStyleLabel || '',
     stylePrompt: selectedStyle?.prompt || '',
     styleLabel: selectedStyle?.groupLabel || selectedStyle?.label || '',
     promptTemplateName: selectedPromptTemplate?.name || '',

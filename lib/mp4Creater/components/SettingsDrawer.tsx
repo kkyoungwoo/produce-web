@@ -35,6 +35,11 @@ const OPENROUTER_FALLBACK_MODELS: OpenRouterModelItem[] = [
   { id: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' },
 ];
 
+const STEP6_VIDEO_MODEL_OPTIONS = [
+  { id: 'fal-pixverse-v55', name: 'FAL PixVerse v5.5 (표준)' },
+  { id: 'fal-pixverse-v55-quick', name: 'FAL PixVerse v5.5 (빠른)' },
+] as const;
+
 const cardClass = 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm';
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400';
 const isElevenLabsBgmModel = (modelId?: string | null) => (modelId || '').startsWith('elevenlabs');
@@ -45,10 +50,12 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const [providerValues, setProviderValues] = useState({
     openRouterApiKey: '',
     elevenLabsApiKey: '',
+    falApiKey: '',
   });
   const [showSecrets, setShowSecrets] = useState({
     openRouterApiKey: false,
     elevenLabsApiKey: false,
+    falApiKey: false,
   });
   const [routing, setRouting] = useState<StudioState['routing']>({
     scriptModel: 'openrouter/auto',
@@ -98,6 +105,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setProviderValues({
       openRouterApiKey: studioState.providers.openRouterApiKey || '',
       elevenLabsApiKey: studioState.providers.elevenLabsApiKey || '',
+      falApiKey: studioState.providers.falApiKey || '',
     });
     setRouting((prev) => ({ ...prev, ...studioState.routing }));
     setPickedFolderLabel('');
@@ -118,6 +126,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setShowSecrets({
       openRouterApiKey: false,
       elevenLabsApiKey: false,
+      falApiKey: false,
     });
   }, [open, studioState]);
 
@@ -376,9 +385,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setPickedFolderLabel(picked.selectedLabel);
   };
 
-  const runProviderCheck = useCallback(async (field: 'openRouterApiKey' | 'elevenLabsApiKey') => {
+  const runProviderCheck = useCallback(async (field: 'openRouterApiKey' | 'elevenLabsApiKey' | 'falApiKey') => {
     const value = providerValues[field]?.trim() || '';
-    const kind = field === 'openRouterApiKey' ? 'openRouter' : 'elevenLabs';
+    const kind = field === 'openRouterApiKey' ? 'openRouter' : field === 'elevenLabsApiKey' ? 'elevenLabs' : 'fal';
     setIsCheckingProviders((prev) => ({ ...prev, [field]: true }));
     try {
       const result = await validateProviderConnection(kind, value);
@@ -392,9 +401,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const handleSave = async () => {
     if (!studioState) return;
     const hasElevenLabsKey = Boolean(providerValues.elevenLabsApiKey.trim());
+    const hasFalKey = Boolean(providerValues.falApiKey.trim());
     const wantsElevenTts = isPaidMode && routing.ttsProvider === 'elevenLabs' && hasElevenLabsKey;
     const wantsElevenBgm = isPaidMode && routing.backgroundMusicProvider === 'elevenLabs' && hasElevenLabsKey;
-    const wantsElevenVideo = isPaidMode && routing.videoProvider === 'elevenLabs' && hasElevenLabsKey;
+    const wantsElevenVideo = hasFalKey || (isPaidMode && routing.videoProvider === 'elevenLabs' && hasElevenLabsKey);
     const wantsElevenMusicVideo = isPaidMode && routing.musicVideoProvider === 'elevenLabs' && hasElevenLabsKey;
     const normalizedRouting = {
       ...routing,
@@ -413,6 +423,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
         ...studioState.providers,
         openRouterApiKey: providerValues.openRouterApiKey.trim(),
         elevenLabsApiKey: providerValues.elevenLabsApiKey.trim(),
+        falApiKey: providerValues.falApiKey.trim(),
       },
       routing: {
         ...studioState.routing,
@@ -423,6 +434,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   };
 
   if (!open || !studioState) return null;
+
+  const advancedApiLocked = !isPaidMode;
+  const openRouterModelOptions = filteredModels.length ? filteredModels : openRouterModels;
+  const promptModelValue = routing.sceneModel || routing.imagePromptModel || routing.motionPromptModel || 'openrouter/auto';
 
   return (
     <div
@@ -458,10 +473,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">API 연결</h3>
-                <p className="mt-1 text-xs text-slate-600">텍스트는 OpenRouter, 음성은 ElevenLabs를 기준으로 연결합니다.</p>
+                <p className="mt-1 text-xs text-slate-600">텍스트(OpenRouter), 음성(ElevenLabs), 영상(FAL.AI) 키를 연결합니다.</p>
               </div>
             </div>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-black text-slate-900">OpenRouter API 키</div>
                 <div className="mt-3 flex items-center gap-2">
@@ -515,6 +530,35 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 </div>
                 <button type="button" onClick={() => void runProviderCheck('elevenLabsApiKey')} disabled={!providerValues.elevenLabsApiKey.trim() || isCheckingProviders.elevenLabsApiKey} className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400">{isCheckingProviders.elevenLabsApiKey ? '확인 중...' : '연결 확인'}</button>
                 {providerFeedback.elevenLabsApiKey?.message ? <p className="mt-2 text-xs text-slate-500">{providerFeedback.elevenLabsApiKey.message}</p> : null}
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs font-black text-slate-900">FAL.AI API 키</div>
+                <div className="mt-1 text-[11px] text-slate-500">Step6 씬 영상 생성에 사용합니다.</div>
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    type={showSecrets.falApiKey ? 'text' : 'password'}
+                    value={providerValues.falApiKey}
+                    onChange={(e) => setProviderValues((prev) => ({ ...prev, falApiKey: e.target.value }))}
+                    className={inputClass}
+                    placeholder="fal_key_..."
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecrets((prev) => ({ ...prev, falApiKey: !prev.falApiKey }))}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                    aria-label={showSecrets.falApiKey ? 'API 키 숨기기' : 'API 키 보기'}
+                    title={showSecrets.falApiKey ? '숨기기' : '보기'}
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M1 12c2.8-4.5 6.5-7 11-7s8.2 2.5 11 7c-2.8 4.5-6.5 7-11 7s-8.2-2.5-11-7z" />
+                      <circle cx="12" cy="12" r="3" />
+                      {showSecrets.falApiKey ? <path d="M3 3l18 18" /> : null}
+                    </svg>
+                  </button>
+                </div>
+                <button type="button" onClick={() => void runProviderCheck('falApiKey')} disabled={!providerValues.falApiKey.trim() || isCheckingProviders.falApiKey} className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400">{isCheckingProviders.falApiKey ? '확인 중...' : '연결 확인'}</button>
+                {providerFeedback.falApiKey?.message ? <p className="mt-2 text-xs text-slate-500">{providerFeedback.falApiKey.message}</p> : null}
+                <p className="mt-2 text-xs text-slate-500">키를 저장하면 Step6에서 선택한 영상 모델로 생성을 실행합니다.</p>
               </div>
             </div>
           </section>
@@ -595,6 +639,84 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 {isElevenLabsBgmModel(routing.backgroundMusicModel) && !providerValues.elevenLabsApiKey.trim() ? (
                   <p className="mt-2 text-xs text-amber-600">선택한 배경 음악 모델은 API 연결이 필요합니다. API 등록 후 다시 시도해 주세요.</p>
                 ) : null}
+              </div>
+            </div>
+          </section>
+
+          <section className={cardClass}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900">고급 API 선택</h3>
+                <p className="mt-1 text-xs text-slate-600">유료모드에서 OpenRouter 모델(대본/프롬프트)과 Step6 영상 생성 모델(FAL)을 세부 선택합니다.</p>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-[11px] font-black ${advancedApiLocked ? 'bg-slate-100 text-slate-500' : 'bg-blue-50 text-blue-700'}`}>
+                {advancedApiLocked ? '유료모드 필요' : '활성화됨'}
+              </span>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs font-black text-slate-900">OpenRouter 모델 검색</div>
+                <input
+                  value={openRouterQuery}
+                  onChange={(e) => setOpenRouterQuery(e.target.value)}
+                  disabled={advancedApiLocked}
+                  placeholder="모델 ID 또는 이름 검색"
+                  className={`${inputClass} mt-2 disabled:bg-slate-100 disabled:text-slate-400`}
+                />
+
+                <label className="mt-3 block">
+                  <div className="mb-1 text-xs font-bold text-slate-700">대본 생성 모델</div>
+                  <select
+                    value={routing.scriptModel || routing.textModel || 'openrouter/auto'}
+                    onChange={(e) => setRouting((prev) => ({ ...prev, scriptModel: e.target.value, textModel: e.target.value }))}
+                    disabled={advancedApiLocked}
+                    className={`${inputClass} disabled:bg-slate-100 disabled:text-slate-400`}
+                  >
+                    {openRouterModelOptions.map((item) => <option key={`script-${item.id}`} value={item.id}>{item.name}</option>)}
+                  </select>
+                </label>
+
+                <label className="mt-2 block">
+                  <div className="mb-1 text-xs font-bold text-slate-700">프롬프트 생성 모델</div>
+                  <select
+                    value={promptModelValue}
+                    onChange={(e) => setRouting((prev) => ({
+                      ...prev,
+                      sceneModel: e.target.value,
+                      imagePromptModel: e.target.value,
+                      motionPromptModel: e.target.value,
+                    }))}
+                    disabled={advancedApiLocked}
+                    className={`${inputClass} disabled:bg-slate-100 disabled:text-slate-400`}
+                  >
+                    {openRouterModelOptions.map((item) => <option key={`prompt-${item.id}`} value={item.id}>{item.name}</option>)}
+                  </select>
+                </label>
+
+                <p className="mt-2 text-xs text-slate-500">OpenRouter 키가 연결되어야 실제 모델 호출이 적용됩니다.</p>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs font-black text-slate-900">Step6 영상 생성 모델</div>
+                <label className="mt-2 block">
+                  <div className="mb-1 text-xs font-bold text-slate-700">영상 모델</div>
+                  <select
+                    value={routing.videoModel || 'fal-pixverse-v55'}
+                    onChange={(e) => setRouting((prev) => ({ ...prev, videoModel: e.target.value, videoProvider: 'elevenLabs' }))}
+                    disabled={advancedApiLocked}
+                    className={`${inputClass} disabled:bg-slate-100 disabled:text-slate-400`}
+                  >
+                    {STEP6_VIDEO_MODEL_OPTIONS.map((item) => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
+                </label>
+                {!providerValues.falApiKey.trim() ? (
+                  <p className="mt-2 text-xs text-amber-600">영상 생성에는 FAL.AI API 키가 필요합니다. 위에서 키를 등록해 주세요.</p>
+                ) : (
+                  <p className="mt-2 text-xs text-slate-500">선택 모델은 Step6의 씬 영상 생성/전체 씬 영상 생성에 즉시 반영됩니다.</p>
+                )}
               </div>
             </div>
           </section>
