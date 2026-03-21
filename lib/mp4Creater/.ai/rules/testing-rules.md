@@ -3,32 +3,36 @@
 ## 기본 검증
 - `npm run lint`
 - 가능하면 `npm run build`
+- 가능하면 `npx tsc --noEmit --pretty false`
 
 ## mp4Creater 수동 검증 최소 세트
 1. `/mp4Creater` 진입 시 초기 화면이 깨지지 않는지
-2. 신규 프로젝트 시작 후 step 진행이 가능한지
+2. 신규 프로젝트 시작 후 Step 진행이 가능한지
 3. API 키가 없어도 샘플/폴백 안내가 보이는지
 4. 프로젝트 저장/불러오기/autosave가 유지되는지
-5. `step-6` 진입 후 이미지/오디오/영상 생성 버튼 흐름이 끊기지 않는지 (`scene-studio`는 redirect 경로)
-6. 최종 렌더링 또는 샘플 영상 미리보기가 동작하는지
+5. `step-6` 진입 후 이미지/오디오/영상 생성 버튼 흐름이 끊기지 않는지 (`scene-studio`는 redirect/보조 경로)
+6. `thumbnail-studio` 진입 후 썸네일 생성/선택 흐름이 끊기지 않는지
 7. 저장 폴더 정보가 의도치 않게 초기화되지 않는지
 
-## 2026-03-20 추가 회귀 검증 (필수)
-1. `/ko/mp4Creater?view=main` 접속 시 gallery로 리다이렉트되는지
-2. `제작하기` 클릭 후 로딩 잠금이 걸리고 프로젝트가 1개만 생성되는지
-3. 생성 직후 `/step-1?projectId=...`로 이동하는지 (중간 설명 페이지 없이)
-4. Step 이동 시 URL에 `projectId`가 유지되는지
-5. 새로고침 후 마지막 작업 단계로 복원되는지
-6. 상세보기 진입 시 프로젝트의 마지막 진행 단계로 열리는지
-7. 최종 씬 제작 진입이 `step-6`으로 열리는지
-8. Step2 추천 주제가 초기 1회 + "주제 새로고침" 클릭 시에만 바뀌는지
-9. Step3 "프롬프트 보기" 모달이 열리고 수정 저장이 실제 대본 생성에 반영되는지
-10. 프로젝트 복사 중 다른 카드 액션이 잠기고, 중복 클릭 시 안내 모달이 뜨는지
+## Step 3~5 / Thumbnail Studio 회귀 검증 (필수)
+1. Step 3에서 대본 입력 후 출연자 미선택 상태로 `다음으로`를 누르면 출연자 선택 섹션으로 스크롤되는지
+2. Step 4에서 캐릭터 느낌 카드 클릭 시 화면 상단으로 스크롤되는지
+3. 이미 캐릭터 느낌이 저장된 프로젝트를 다시 열면 Step 3 다음 클릭 시 Step 4 출연자별 제작 영역으로 이어지는지
+4. Step 4 캐릭터 후보 UI에서 `+` 카드가 첫 칸에 있는지
+5. 새 캐릭터 이미지 생성 시 새 카드가 오른쪽에 추가되고, 포인트가 새 카드 쪽으로 이동하는지
+6. 좌우 화살표로 캐릭터 후보를 이동하며 선택할 수 있는지
+7. Step 5 화풍 선택 시 새로고침처럼 보이는 무한 effect/깜빡임이 없는지
+8. Project Gallery에서 프로젝트 이름 hover/focus/click 시 이름 위치에 `이름 변경` affordance가 보이는지
+9. Project Gallery의 `썸네일 제작` 버튼이 `thumbnail-studio` 전용 페이지로 이동하는지
+10. Thumbnail Studio에서 배경/주인공/썸네일 문구를 수정해 여러 개 생성할 수 있는지
+11. Thumbnail Studio에서 최종 선택한 썸네일이 프로젝트 저장소 카드 대표 썸네일로 보이는지
+12. 갤러리 진입/상세 진입/뒤로가기에서 브라우저 히스토리가 자연스럽게 동작하는지
 
 ## hydration/콘솔 에러 확인
 - `In HTML, <button> cannot be a descendant of <button>` 오류가 없는지
 - SSR/CSR 텍스트/속성 mismatch 경고가 없는지
 - `Math.random()/Date.now()`로 인한 렌더 불일치가 없는지
+- Step 5, Gallery, Thumbnail Studio에서 effect 루프 경고가 없는지
 
 ## `videoService.ts` 수정 시 추가 확인
 - 씬 수가 적을 때/많을 때 렌더 프로파일이 무리 없는지
@@ -47,6 +51,7 @@
 - `projects/project-0001-*` 구조 생성 여부
 - 프로젝트 번호가 UI와 폴더 이름에 동일하게 반영되는지
 - 프로젝트별 `project.json`, `metadata/`, `prompts/`, `images/`, `videos/`, `audio/`, `thumbnails/`, `characters/`, `styles/` 저장 여부
+- `thumbnail`, `thumbnailTitle`, `thumbnailPrompt`, `thumbnailHistory`, `selectedThumbnailId` 저장 여부
 - IndexedDB 백업 유지 여부
 - 새 프로젝트 / 기존 프로젝트 / query 기반 로드 흐름
 - `storageDir` 미설정 상태에서 저장 시도 시 폴더 선택 안내가 뜨는지

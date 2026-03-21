@@ -1,97 +1,101 @@
 # mp4Creater Development Guide
 
-## 1. 이번 기준에서 먼저 확인할 것
-
-필수 파일
-- `lib/mp4Creater/App.tsx`
+## 먼저 확인할 파일
 - `lib/mp4Creater/components/InputSection.tsx`
+- `lib/mp4Creater/components/ProjectGallery.tsx`
+- `lib/mp4Creater/components/ResultTable.tsx`
 - `lib/mp4Creater/pages/SceneStudioPage.tsx`
-- `lib/mp4Creater/services/workflowDraftService.ts`
-- `lib/mp4Creater/services/projectService.ts`
-- `lib/mp4Creater/services/thumbnailService.ts`
+- `lib/mp4Creater/pages/ThumbnailStudioPage.tsx`
+- `lib/mp4Creater/services/geminiService.ts`
+- `lib/mp4Creater/services/imageService.ts`
 - `lib/mp4Creater/services/sceneAssemblyService.ts`
-- `lib/mp4Creater/types.ts`
+- `lib/mp4Creater/services/thumbnailService.ts`
+- `lib/mp4Creater/services/exportService.ts`
+- `lib/mp4Creater/services/falService.ts`
+- `lib/mp4Creater/services/workflowPromptBuilder.ts`
+- `lib/mp4Creater/services/workflowDraftService.ts`
 
-## 2. Step 동작 규칙
+## Step 규칙
+### Step 1
+- 콘셉트는 `뮤직비디오 / 이야기 / 영화 / 정보 전달` 4개입니다.
+- 내부 값은 `music_video / story / news / info_delivery`를 사용합니다.
+- 콘셉트를 바꾸면 프로젝트 프롬프트도 해당 콘셉트 기본 프롬프트로 다시 시작해야 합니다.
 
 ### Step 2
-- 추천문장 클릭 시 `나의 콘텐츠 주제` 입력값이 즉시 바뀌어야 합니다.
-- 표시 전용 텍스트가 아니라 실제 state/draft 값이어야 합니다.
+- 주제 입력과 생성 옵션만 다룹니다.
+- 다음 버튼은 정상 상태라면 한 번 클릭으로 Step 3으로 넘어가야 합니다.
 
 ### Step 3
-- 순서 고정: 프롬프트 선택 → 추천 문구 추가 → 최종 대본 생성
-- 추천 문구는 `promptAdditions`로 누적 저장됩니다.
-- 중복 문구는 자동으로 막아 순서/상태 흔들림을 줄입니다.
+- 프롬프트 확인 → 대본 생성/수정 → 출연자 선택 순서를 유지합니다.
+- 출연자 카드는 토글 방식입니다.
+- 재추출 시 기존 선택 출연자는 이름/역할 기준으로 가능한 한 보존합니다.
+- 대본이 이미 있는데 출연자를 선택하지 않은 상태에서 `다음으로`를 누르면, 출연자 선택 영역으로 스크롤하며 자연스럽게 다음 행동을 안내해야 합니다.
 
 ### Step 4
-- Step 3 최종 대본 완료 전에는 캐릭터 카드 UI를 노출하지 않습니다.
-- 주인공/조연/나레이터 역할이 모두 준비되어야 Step 5 진행이 가능합니다.
+- Step3에서 선택한 출연자만 표시합니다.
+- 캐릭터 느낌 카드를 누르면 화면 상단으로 스크롤합니다.
+- 이미 캐릭터 느낌이 저장된 프로젝트는 Step 3에서 Step 4의 출연자별 제작 영역으로 바로 이어져야 합니다.
+- 각 선택 출연자는 대표 이미지가 있어야 다음 단계로 넘어갑니다.
+- 캐릭터 후보 UI는 다음 원칙을 유지합니다.
+  - `+` 이미지 생성 카드가 첫 번째
+  - 새 생성본은 오른쪽으로 누적
+  - 좌우 화살표는 카드 좌우에서 후보 탐색용으로 동작
+  - 새 생성 직후 새 카드가 보이는 방향으로 포인트 이동
+  - `재생성`은 현재 이미지와 비슷한 느낌 유지
 
 ### Step 5
-- 추천 화풍과 커스텀 화풍은 하나의 리스트 안에서 관리합니다.
-- 추천 +1은 기존 그룹 내부에 추가되어 리스트 순서와 선택 상태를 유지합니다.
-- 완료 즉시 Scene Studio로 이동합니다.
+- 스타일 선택 후 상태 동기화가 반복 루프를 만들지 않아야 합니다.
+- 새로고침처럼 보이는 재마운트/깜빡임이 생기면 state effect 조건을 먼저 점검합니다.
 
-## 3. autosave / 복원 규칙
+### Step 6 / Scene Studio
+- 최종 씬 제작은 `step-6`이 기준 경로입니다.
+- `scene-studio`는 레거시 또는 보조 진입으로 취급합니다.
+- 씬은 문단 단위로 생성합니다.
+- 문단별 프롬프트는 서로 이어져 보여야 하므로, 이전/다음 문단 문맥을 포함해 조립하는 쪽을 우선합니다.
+- 영상이 없더라도 이미지/오디오/자막만으로 작업을 계속할 수 있어야 합니다.
 
-- 입력 중 저장은 debounce 기반으로 처리합니다.
-- Step 이동/핵심 액션(씬 제작 진입, 썸네일 선택/생성)에서는 즉시 저장을 병행합니다.
-- 프로젝트 재열기 시 아래 값이 복원되어야 합니다.
-  - 주제, 프롬프트, 추천 문구 추가, 최종 대본
-  - 캐릭터/화풍 선택
-  - 썸네일 이력 및 현재 선택
-  - 씬 자산/배경음/믹스/비용
+### Thumbnail Studio
+- 별도 페이지에서 프로젝트의 대본, 선택 캐릭터 이미지, 화풍을 기준으로 썸네일을 생성합니다.
+- 사용자는 배경, 주인공, 썸네일 문구를 수정할 수 있어야 합니다.
+- 썸네일 프롬프트는 대본 외에도 `genre`, `conflict`, `endingTone`, 프로젝트 프롬프트 맥락을 직접 반영해야 합니다.
+- 최종 선택한 썸네일은 프로젝트 저장소 카드 대표 썸네일로 반영돼야 합니다.
 
-## 4. 썸네일 처리 규칙
+## 생성/비용 규칙
+- 초안 단계에서는 토큰 절감을 위해 샘플/저부하 이미지 흐름을 허용합니다.
+- 샘플 결과는 반드시 `sample`로 기록하고, AI 결과와 비용 계산을 섞지 않습니다.
+- 고화질 생성은 최종 출력 시점에만 선택적으로 사용합니다.
+- 최종 출력 품질은 `preview`(저화질) / `final`(고화질) 두 모드를 유지합니다.
+- 이미지 생성 모델, 텍스트 모델, 영상 모델이 비어 있으면 가능한 fallback을 먼저 시도하되, 사용자를 속이는 가짜 AI 성공 상태는 만들지 않습니다.
 
-프로젝트 목록 표시 우선순위
-1. 마지막 생성 썸네일
-2. 첫 번째 씬 이미지
-3. fallback
+## 프롬프트 규칙
+- 모든 Step 값은 최종 영상 프롬프트와 썸네일 프롬프트에 최대한 직접 연결합니다.
+- `music_video`, `story`, `news(영화)`, `info_delivery` 각각의 차이가 실제 scene prompt에서 드러나야 합니다.
+- 특히 `info_delivery`는 이야기형 prompt 재사용으로 끝내지 말고, 설명형/비교형/콜아웃 중심 구성을 유지합니다.
+- `sceneAssemblyService.ts`를 건드릴 때는 연속성, 동일 인물 유지, 배경 유지, 무드 유지 규칙이 깨지지 않는지 먼저 점검합니다.
 
-Scene Studio 내 썸네일
-- 여러 번 생성 가능
-- 생성 이력 확인 가능
-- 현재 선택 썸네일 구분 가능
-- 프롬프트/스타일 문구를 사용자가 수정 가능
+## CapCut 내보내기 규칙
+- 결과 영역에는 `CapCut으로 보내기` 흐름을 유지합니다.
+- 내보내기 ZIP에는 최소 다음 항목이 있어야 합니다.
+  - `timeline_ready/` 문단별 타임라인용 클립
+  - `scenes/scene_001/ ...` 문단별 원본 자산
+  - `subtitles/project_subtitles.srt`
+  - `timeline_import_guide.csv`
+  - `manifest.json`
+  - `README.txt`
+  - `capcut_links.txt`
+- 브라우저에서 CapCut 데스크톱 설치 여부를 신뢰성 있게 판별하거나, 데스크톱 앱에 외부 프로젝트를 자동 임포트하는 방식은 전제로 두지 않습니다.
+- 가능한 범위는 ZIP 저장 + CapCut 편집기 열기 + 초보자용 가져오기 안내까지입니다.
 
-## 5. Scene Studio 성능 규칙
-
-- 진입 직후 텍스트/핵심 메타를 먼저 보여 줍니다.
-- 이미지는 카드 영역에서 자동 생성하며, 전체 화면 블로킹 로딩을 피합니다.
-- 로딩은 씬 단위로 분리하고 퍼센트를 표시합니다.
-- 이력/대용량 미디어는 카드 단위 접근으로 필요 시점에 확인합니다.
-
-## 6. 안정성 가이드
-
-- 리스트 key는 고정 ID를 사용하고, 재정렬을 최소화합니다.
-- 추천 버튼 클릭 시 전체 배열 재생성으로 선택 상태가 흔들리지 않게 합니다.
-- 저장 실패 시 현재 메모리 상태를 유지하고 재시도 가능한 메시지를 남깁니다.
-- 모든 코드/문서는 UTF-8로 유지하고 한글 깨짐을 금지합니다.
-
-## 7. 검증 체크리스트
-
-명령
-- `npx tsc --noEmit`
-- `npm run lint`
-
-수동
-- Step 1~5 흐름이 끊기지 않고 Scene Studio로 자동 이동하는지
-- Step 2 추천문장 클릭 즉시 반영/복원 여부
-- Step 3 추천 문구 추가 후 대본 생성 반영 여부
-- Step 4 카드 노출 게이트(대본 완료 전 비노출) 여부
-- Scene Studio 진입 시 텍스트 선노출 + 이미지 영역만 로딩 + 퍼센트 표시 여부
-- 썸네일 다회 생성/이력/선택 및 프로젝트 목록 우선순위 표시 여부
-
-## 2026-03 quick rules
-- Do not block createMp4 when API keys are missing.
-- Keep sample mode usable from start to finish.
-- Store OpenRouter model, TTS provider, preview/final audio references, BGM, and music-video references in workflow/project state.
-- Prefer OpenRouter for text and ElevenLabs/qwen3-tts for audio flows.
-
-## 2026-03-20 update (route/save/perf)
-- `?view=main`은 폐기 경로이며 gallery로 리다이렉트됩니다.
-- 최종 씬 제작은 `step-6`이 정식 경로입니다.
-- Step URL에는 `projectId`를 유지해 단계 이동/새로고침 시 문맥을 복원합니다.
-- 신규 생성은 optimistic UI를 먼저 반영하고 저장 결과로 교체합니다.
-- 생성/복사/삭제 중복 클릭 잠금과 스켈레톤 피드백을 유지합니다.
+## 검증
+- 콘셉트 변경 후 프롬프트 초기화 여부
+- Step 2/3 다음 버튼 1회 동작 여부
+- Step 3 출연자 선택 안내 스크롤 여부
+- Step 4 캐릭터 느낌 선택 후 상단 스크롤 여부
+- Step 4 새 캐릭터 생성 후 새 카드 포커스 이동 여부
+- Step 5 선택 시 새로고침 루프/깜빡임 여부
+- 문단별 씬 프롬프트에 장르/분위기/배경/갈등/결말 톤이 반영되는지 확인
+- 샘플 이미지 생성 시 `sourceMode: sample`로 기록되는지 확인
+- Thumbnail Studio에서 여러 썸네일 생성/선택 후 갤러리 대표 썸네일 반영 여부
+- 최종 출력 품질 `preview/final` 선택 동작 여부
+- 영상이 없는 프로젝트도 CapCut ZIP 생성 가능 여부
+- CapCut ZIP 안에 씬 순서와 자막 파일이 빠짐없이 들어가는지 확인

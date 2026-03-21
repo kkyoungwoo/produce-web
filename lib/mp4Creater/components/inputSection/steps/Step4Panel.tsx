@@ -54,12 +54,6 @@ function buildSampleStylePreview(id: string, label: string, description: string)
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
-function getCharacterPreview(character: CharacterProfile) {
-  return (character.generatedImages || []).find((item) => item.id === character.selectedImageId)
-    || character.generatedImages?.[0]
-    || null;
-}
-
 interface Step4PanelProps {
   extractedCharacters: CharacterProfile[];
   selectedCharacterIds: string[];
@@ -74,7 +68,7 @@ interface Step4PanelProps {
   onToggleCharacter: (id: string) => void;
   onSelectCharacterImage: (characterId: string, imageId: string) => void;
   onCharacterPromptChange: (characterId: string, prompt: string) => void;
-  onCreateVariants: (character: CharacterProfile) => void;
+  onCreateVariants: (character: CharacterProfile, options?: { note?: string; sourceLabel?: string }) => void;
   uploadInput: React.ReactNode;
 }
 
@@ -89,16 +83,13 @@ export default function Step4Panel({
   onSelectCharacterStyle,
   onUploadCharacterImage,
   onUploadNewCharacterImage,
-  onToggleCharacter,
   onSelectCharacterImage,
-  onCharacterPromptChange,
   onCreateVariants,
   uploadInput,
 }: Step4PanelProps) {
   const [localStage, setLocalStage] = useState<'style' | 'workspace'>(selectedCharacterStyleId ? 'workspace' : 'style');
-  const [activeCharacterId, setActiveCharacterId] = useState<string | null>(selectedCharacterIds[0] || null);
-  const stripRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef<{ startX: number; startScrollLeft: number; active: boolean }>({ startX: 0, startScrollLeft: 0, active: false });
+  const stripRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const previousImageCountRef = useRef<Record<string, number>>({});
 
   const selectedStyle = useMemo(
     () => characterStyleOptions.find((item) => item.id === selectedCharacterStyleId) || null,
@@ -108,12 +99,8 @@ export default function Step4Panel({
     () => extractedCharacters.filter((item) => selectedCharacterIds.includes(item.id)),
     [extractedCharacters, selectedCharacterIds]
   );
-  const activeCharacter = useMemo(
-    () => selectedCharacters.find((item) => item.id === activeCharacterId) || selectedCharacters[0] || null,
-    [selectedCharacters, activeCharacterId]
-  );
   const resolvedCount = useMemo(
-    () => selectedCharacters.filter((item) => Boolean(item.selectedImageId || item.generatedImages?.[0]?.id || item.imageData)).length,
+    () => selectedCharacters.filter((item) => Boolean(item.selectedImageId)).length,
     [selectedCharacters]
   );
 
@@ -122,41 +109,31 @@ export default function Step4Panel({
   }, [selectedCharacterStyleId]);
 
   useEffect(() => {
-    if (!selectedCharacters.length) {
-      setActiveCharacterId(null);
-      return;
-    }
-    if (!activeCharacterId || !selectedCharacters.some((item) => item.id === activeCharacterId)) {
-      setActiveCharacterId(selectedCharacters[0].id);
-    }
-  }, [activeCharacterId, selectedCharacters]);
+    selectedCharacters.forEach((character) => {
+      const currentCount = (character.generatedImages || []).length;
+      const previousCount = previousImageCountRef.current[character.id] || 0;
+      if (currentCount > previousCount) {
+        const strip = stripRefs.current[character.id];
+        const newestCard = strip?.querySelector<HTMLElement>(`[data-character-image-card="${character.generatedImages?.[currentCount - 1]?.id || ''}"]`);
+        newestCard?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+      previousImageCountRef.current[character.id] = currentCount;
+    });
+  }, [selectedCharacters]);
 
-  const scrollStripBy = (direction: 'left' | 'right') => {
-    const container = stripRef.current;
+  const scrollStripBy = (characterId: string, direction: 'left' | 'right') => {
+    const container = stripRefs.current[characterId];
     if (!container) return;
     const amount = Math.max(220, Math.floor(container.clientWidth * 0.72));
     container.scrollBy({ left: direction === 'right' ? amount : -amount, behavior: 'smooth' });
   };
 
-  const startDrag = (clientX: number) => {
-    const container = stripRef.current;
-    if (!container) return;
-    dragStateRef.current = {
-      startX: clientX,
-      startScrollLeft: container.scrollLeft,
-      active: true,
-    };
-  };
-
-  const moveDrag = (clientX: number) => {
-    const container = stripRef.current;
-    if (!container || !dragStateRef.current.active) return;
-    const delta = clientX - dragStateRef.current.startX;
-    container.scrollLeft = dragStateRef.current.startScrollLeft - delta;
-  };
-
-  const endDrag = () => {
-    dragStateRef.current.active = false;
+  const moveToWorkspace = (styleId: string) => {
+    onSelectCharacterStyle(styleId);
+    setLocalStage('workspace');
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
   };
 
   return (
@@ -167,7 +144,7 @@ export default function Step4Panel({
             <div>
               <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">캐릭터 느낌 선택</div>
               <h2 className="mt-2 text-xl font-black text-slate-900">먼저 캐릭터 느낌을 고르면 Step4 작업 화면이 열립니다</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">여기서 고른 느낌은 출연자별 캐릭터 생성의 공통 기준이 됩니다. 선택 후에는 출연자마다 이미지를 계속 만들고, 여러 장 중 대표 이미지를 확정할 수 있습니다.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">여기서 고른 느낌은 출연자별 캐릭터 생성의 공통 기준이 됩니다. 선택 후에는 출연자마다 후보 이미지를 만들고, 직접 1장씩 선택해야 다음 단계로 넘어갈 수 있습니다.</p>
             </div>
           </div>
 
@@ -178,10 +155,7 @@ export default function Step4Panel({
                 <button
                   key={style.id}
                   type="button"
-                  onClick={() => {
-                    onSelectCharacterStyle(style.id);
-                    setLocalStage('workspace');
-                  }}
+                  onClick={() => moveToWorkspace(style.id)}
                   className={`overflow-hidden rounded-[24px] border text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'}`}
                 >
                   <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
@@ -193,9 +167,7 @@ export default function Step4Panel({
                     <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">{style.description}</p>
                     <div className="mt-3 flex items-center justify-between">
                       <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">공통 적용</span>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${selected ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                        {selected ? '선택됨' : '선택'}
-                      </span>
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${selected ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{selected ? '선택됨' : '선택하기'}</span>
                     </div>
                   </div>
                 </button>
@@ -210,10 +182,10 @@ export default function Step4Panel({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">출연자별 캐릭터 제작</div>
-              <h2 className="mt-2 text-xl font-black text-slate-900">선택된 출연자 이미지만 만들고 대표 이미지를 확정해 주세요</h2>
+              <h2 className="mt-2 text-xl font-black text-slate-900">이미지 후보 히스토리에서 출연자마다 대표 이미지 1장씩 직접 선택해 주세요</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 현재 느낌은 <span className="font-black text-slate-900">{selectedStyle?.label || '미선택'}</span>입니다.
-                선택된 출연자 {selectedCharacters.length}명 중 {resolvedCount}명이 대표 이미지를 가진 상태입니다.
+                선택된 출연자 {selectedCharacters.length}명 중 {resolvedCount}명이 대표 이미지를 선택했습니다.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -234,10 +206,10 @@ export default function Step4Panel({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Step3 선택 출연자</div>
-                <div className="mt-1 text-sm font-black text-slate-900">여기서는 Step3에서 선택한 출연자만 이미지 제작 대상으로 표시됩니다</div>
+                <div className="mt-1 text-sm font-black text-slate-900">Step3에서 고른 출연자만 여기서 이미지 후보를 만들고 선택합니다</div>
               </div>
               <div className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600">
-                총 {selectedCharacterIds.length}명 작업 중
+                대표 이미지 선택 {resolvedCount}/{selectedCharacterIds.length}
               </div>
             </div>
           </div>
@@ -250,157 +222,113 @@ export default function Step4Panel({
           )}
 
           {!!selectedCharacters.length && (
-            <>
-              <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">선택된 출연자</div>
-                    <div className="mt-1 text-sm font-black text-slate-900">이미지 위 카드를 눌러 현재 편집할 출연자를 바꿉니다</div>
-                  </div>
-                  <div className="text-xs font-semibold text-slate-500">모든 선택 출연자가 대표 이미지를 가져야 다음 단계로 이동됩니다</div>
-                </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {selectedCharacters.map((character) => {
-                    const active = character.id === activeCharacter?.id;
-                    const preview = getCharacterPreview(character);
-                    const resolved = Boolean(character.selectedImageId || character.generatedImages?.[0]?.id || character.imageData);
-                    return (
-                      <button
-                        key={character.id}
-                        type="button"
-                        onClick={() => setActiveCharacterId(character.id)}
-                        className={`overflow-hidden rounded-[22px] border text-left transition ${active ? 'border-blue-400 bg-blue-50 ring-2 ring-blue-200' : 'border-slate-200 bg-white hover:border-slate-300'}`}
-                      >
-                        <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
-                          {preview ? (
-                            <img src={preview.imageData} alt={character.name} className="aspect-square w-full object-cover" />
-                          ) : (
-                            <div className="flex aspect-square w-full items-center justify-center text-4xl font-black text-slate-300">{character.name.slice(0, 1)}</div>
-                          )}
-                        </div>
-                        <div className="p-3">
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <div className="truncate text-sm font-black text-slate-900">{character.name}</div>
-                              <div className="mt-1 truncate text-[11px] text-slate-500">후보 {(character.generatedImages || []).length}장</div>
-                            </div>
-                            {active && <span className="rounded-full bg-blue-600 px-2 py-1 text-[10px] font-black text-white">편집중</span>}
-                          </div>
-                          <div className={`mt-3 inline-flex rounded-full px-2 py-1 text-[10px] font-black ${resolved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {resolved ? '대표 이미지 준비됨' : '이미지 선택 필요'}
-                          </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {activeCharacter && (
-                <div className="mt-5 grid gap-5 xl:grid-cols-[1.02fr_0.98fr]">
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+            <div className="mt-5 space-y-4">
+              {selectedCharacters.map((character) => {
+                const images = character.generatedImages || [];
+                const isGenerating = characterLoadingProgress[character.id] !== undefined;
+                const hasSelectedImage = Boolean(character.selectedImageId);
+                const progress = characterLoadingProgress[character.id] || 0;
+                return (
+                  <div key={character.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">현재 편집 중</div>
-                        <div className="mt-1 text-lg font-black text-slate-900">{activeCharacter.name}</div>
-                        <div className="mt-1 text-xs text-slate-500">{activeCharacter.roleLabel || (activeCharacter.role === 'lead' ? '주인공' : activeCharacter.role === 'support' ? '조연' : '출연자')} · {selectedStyle?.label || '스타일 미선택'}</div>
+                        <div className="text-lg font-black text-slate-900">{character.name}</div>
+                        <div className="mt-1 text-xs text-slate-500">{character.roleLabel || (character.role === 'lead' ? '주인공' : character.role === 'support' ? '조연' : '출연자')} · 후보 {images.length}장</div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap items-center justify-end gap-2">
                         <button
                           type="button"
-                          onClick={() => onCreateVariants(activeCharacter)}
-                          disabled={characterLoadingProgress[activeCharacter.id] !== undefined}
-                          className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500"
+                          onClick={() => onUploadCharacterImage(character.id)}
+                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-slate-50"
                         >
-                          {characterLoadingProgress[activeCharacter.id] !== undefined ? '이미지 생성 중...' : '이미지 생성'}
+                          이 출연자 이미지등록
                         </button>
-                        <button type="button" onClick={() => onUploadCharacterImage(activeCharacter.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">
-                          이 출연자 이미지 등록
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 overflow-hidden rounded-[24px] border border-slate-200 bg-white">
-                      {(getCharacterPreview(activeCharacter)?.imageData || activeCharacter.imageData) ? (
-                        <img
-                          src={getCharacterPreview(activeCharacter)?.imageData || activeCharacter.imageData || '/mp4Creater/flow-character.svg'}
-                          alt={activeCharacter.name}
-                          className="aspect-square w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex aspect-square w-full flex-col items-center justify-center bg-slate-100 px-6 text-center text-sm leading-6 text-slate-500">
-                          아직 이미지가 없습니다. 현재 느낌으로 이미지를 생성하거나 직접 등록해 주세요.
+                        <div className={`rounded-full px-3 py-1.5 text-xs font-black ${hasSelectedImage ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {hasSelectedImage ? '대표 이미지 선택 완료' : '대표 이미지 선택 필요'}
                         </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 rounded-[20px] border border-slate-200 bg-white p-4">
-                      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{activeCharacter.name} 프롬프트</div>
-                      <textarea
-                        value={activeCharacter.prompt || ''}
-                        onChange={(event) => onCharacterPromptChange(activeCharacter.id, event.target.value)}
-                        placeholder="이 출연자를 어떤 분위기로 만들지 간단히 조정하세요. 수정 후 이미지 생성 시 바로 반영됩니다."
-                        className="mt-2 min-h-[150px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <div>
-                        <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">이미지 후보 히스토리</div>
-                        <div className="mt-1 text-sm font-black text-slate-900">이전 사진까지 좌우로 넘겨 보며 대표 이미지를 고릅니다</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <button type="button" onClick={() => scrollStripBy('left')} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">←</button>
-                        <button type="button" onClick={() => scrollStripBy('right')} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">→</button>
                       </div>
                     </div>
 
-                    {(activeCharacter.generatedImages || []).length > 0 ? (
-                      <div
-                        ref={stripRef}
-                        className="mt-4 flex gap-3 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                        onMouseDown={(event) => startDrag(event.clientX)}
-                        onMouseMove={(event) => moveDrag(event.clientX)}
-                        onMouseUp={endDrag}
-                        onMouseLeave={endDrag}
-                        onTouchStart={(event) => startDrag(event.touches[0]?.clientX || 0)}
-                        onTouchMove={(event) => moveDrag(event.touches[0]?.clientX || 0)}
-                        onTouchEnd={endDrag}
+                    <div className="mt-4 flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => scrollStripBy(character.id, 'left')}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-black text-slate-700 transition hover:bg-slate-50"
+                        aria-label={`${character.name} 후보 왼쪽으로`}
                       >
-                        {(activeCharacter.generatedImages || []).map((image, index) => {
-                          const selected = image.id === activeCharacter.selectedImageId || (!activeCharacter.selectedImageId && index === 0);
+                        ←
+                      </button>
+
+                      <div
+                        ref={(node) => {
+                          stripRefs.current[character.id] = node;
+                        }}
+                        className="flex min-w-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto pb-2"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onCreateVariants(character)}
+                          disabled={isGenerating}
+                          className="flex aspect-[4/5] w-[220px] shrink-0 snap-start flex-col items-center justify-center rounded-[22px] border border-dashed border-violet-300 bg-violet-50 px-5 text-center shadow-sm transition hover:border-violet-400 hover:bg-violet-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100"
+                        >
+                          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-white text-3xl font-black text-violet-600 shadow-sm">+</div>
+                          <div className="mt-4 text-sm font-black text-slate-900">{isGenerating ? '이미지 생성 중...' : '이미지 생성'}</div>
+                          <p className="mt-2 text-xs leading-5 text-slate-600">
+                            {isGenerating ? `새 후보를 만드는 중입니다. ${progress}%` : '첫 카드는 생성 버튼입니다. 새 후보는 오른쪽으로 차곡차곡 추가됩니다.'}
+                          </p>
+                        </button>
+
+                        {images.map((image) => {
+                          const selected = image.id === character.selectedImageId;
                           return (
                             <button
                               key={image.id}
                               type="button"
-                              onClick={() => onSelectCharacterImage(activeCharacter.id, image.id)}
-                              className={`min-w-[180px] max-w-[180px] shrink-0 rounded-2xl border bg-white p-2 text-left ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:border-slate-300'}`}
+                              data-character-image-card={image.id}
+                              onClick={() => onSelectCharacterImage(character.id, image.id)}
+                              className={`w-[220px] shrink-0 snap-start overflow-hidden rounded-[22px] border bg-white text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'}`}
                             >
-                              <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                                <img src={image.imageData} alt={image.label} className="aspect-square w-full object-cover" draggable={false} />
-                              </div>
-                              <div className="mt-2 flex items-center justify-between gap-2">
-                                <div>
-                                  <div className="truncate text-[11px] font-black text-slate-800">후보 {index + 1}</div>
-                                  <div className="mt-1 text-[10px] text-slate-500">{image.sourceMode === 'upload' ? '직접 등록' : image.sourceMode === 'sample' ? '샘플' : '생성 이미지'}</div>
+                              <img src={image.imageData} alt={image.label} className="aspect-[4/5] w-full object-cover" />
+                              <div className="p-3">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-black text-slate-900">{image.label}</div>
+                                    <div className="mt-1 text-[11px] text-slate-500">{selected ? '현재 선택된 이미지' : '카드를 클릭하면 대표 이미지로 선택됩니다'}</div>
+                                  </div>
+                                  <span className={`rounded-full px-2 py-1 text-[10px] font-black ${selected ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{selected ? '선택됨' : '카드 클릭 선택'}</span>
                                 </div>
-                                {selected && <span className="rounded-full bg-violet-600 px-2 py-1 text-[10px] font-black text-white">선택됨</span>}
+                                <div className="mt-3">
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      onCreateVariants(character, { sourceLabel: image.label, note: 'Generate a near-match alternative based on this selected reference.' });
+                                    }}
+                                    disabled={isGenerating}
+                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
+                                  >
+                                    비슷하게 재생성
+                                  </button>
+                                </div>
                               </div>
                             </button>
                           );
                         })}
                       </div>
-                    ) : (
-                      <div className="mt-4 rounded-[20px] border border-dashed border-slate-300 bg-white px-5 py-8 text-center text-sm leading-6 text-slate-500">
-                        아직 저장된 후보 이미지가 없습니다. 지금 느낌으로 이미지를 생성하거나 직접 등록해 주세요.
-                      </div>
-                    )}
+
+                      <button
+                        type="button"
+                        onClick={() => scrollStripBy(character.id, 'right')}
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-black text-slate-700 transition hover:bg-slate-50"
+                        aria-label={`${character.name} 후보 오른쪽으로`}
+                      >
+                        →
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </>
+                );
+              })}
+            </div>
           )}
         </section>
       )}

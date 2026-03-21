@@ -374,7 +374,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
       if (navigateToStep1) {
         setViewMode('main');
-        router.replace(`${basePath}/step-1?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+        router.push(`${basePath}/step-1?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
       } else {
         void refreshProjects({ silent: true });
       }
@@ -907,11 +907,11 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
               }
               const projectQuery = currentProjectId ? `?projectId=${encodeURIComponent(currentProjectId)}` : '';
               try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
-              router.replace(`${basePath}/step-${nextStep}${projectQuery}`, { scroll: false });
+              router.push(`${basePath}/step-${nextStep}${projectQuery}`, { scroll: false });
             }}
             onGoBackFromStep1={() => {
               try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
-              router.replace(`${basePath}?view=gallery`, { scroll: false });
+              router.push(`${basePath}?view=gallery`, { scroll: false });
             }}
             onOpenSettings={() => setShowSettings(true)}
             onOpenApiModal={(options) => openApiModal({ title: options?.title || 'API 키 빠른 등록', description: options?.description || '텍스트, 오디오, 영상 공급자 키를 빠르게 등록할 수 있습니다.', focusField: options?.focusField || null })}

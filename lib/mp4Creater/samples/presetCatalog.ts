@@ -52,19 +52,19 @@ export const STYLE_SAMPLE_PRESETS: StyleSamplePreset[] = [
   {
     id: 'style-animation',
     label: '애니메이션 느낌',
-    prompt: 'Animation style, cel shading, vivid colors.',
+    prompt: 'Animation style for full-scene video look, crisp cel shading, bright key light, saturated accent colors, readable silhouettes, playful motion energy, clean background depth.',
     imageData: '/mp4Creater/samples/styles/style-animation-v1.svg',
   },
   {
     id: 'style-korean-real',
     label: '실사 한국 느낌',
-    prompt: 'Korean realistic visual style, cinematic lighting.',
+    prompt: 'Korean cinematic realism for full-scene storytelling, natural skin tone, soft contrast, emotionally grounded composition, practical lighting, polished drama mood, restrained color grade.',
     imageData: '/mp4Creater/samples/styles/style-korean-real-v1.svg',
   },
   {
     id: 'style-sketch',
     label: '스케치 느낌',
-    prompt: 'Sketch style, pencil strokes and paper texture.',
+    prompt: 'Hand-drawn sketch storyboard style, visible pencil strokes, paper grain, loose shading blocks, planning-board composition, monochrome base with selective accent color, previsualization mood.',
     imageData: '/mp4Creater/samples/styles/style-sketch-v1.svg',
   },
 ];

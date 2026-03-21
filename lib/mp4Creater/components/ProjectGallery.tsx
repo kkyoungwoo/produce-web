@@ -52,13 +52,17 @@ const resolveImageSrc = (value?: string | null) => {
 
 const resolveProjectCardThumbnail = (project: SavedProject) => {
   const history = Array.isArray(project.thumbnailHistory) ? project.thumbnailHistory : [];
+  const selectedThumbnail = history.find((item) => item.id === project.selectedThumbnailId && item.imageData);
+  if (selectedThumbnail?.imageData) return selectedThumbnail.imageData;
+  if (project.thumbnail) return project.thumbnail;
+
   const latestGeneratedThumbnail = [...history].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))[0];
   if (latestGeneratedThumbnail?.imageData) return latestGeneratedThumbnail.imageData;
 
   const firstSceneImage = project.assets?.find((asset) => asset.imageData)?.imageData;
   if (firstSceneImage) return firstSceneImage;
 
-  return project.thumbnail || '';
+  return '';
 };
 
 const getSeededHue = (seed: string) => {
@@ -185,7 +189,17 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
       window.scrollTo({ top: 0, behavior: 'auto' });
     } catch {}
     const targetStep = resolveLastWorkedStep(project);
-    router.replace(`${basePath}/step-${targetStep}?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+    router.push(`${basePath}/step-${targetStep}?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+  };
+
+  const openProjectThumbnailStudio = (project: SavedProject) => {
+    if (isInteractionLocked) return;
+    rememberProjectNavigationProject(project);
+    onLoad?.(project);
+    try {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    } catch {}
+    router.push(`${basePath}/thumbnail-studio?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
   };
 
   const openCreateProject = () => {
@@ -337,7 +351,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           )}
           <div className="absolute inset-0 bg-slate-900/12" />
 
-          <label className="absolute left-3 top-3 z-20 inline-flex cursor-pointer items-center gap-2 rounded-full bg-white/95 px-2.5 py-1.5 text-[11px] font-black text-slate-700 shadow-sm">
+          <label className="absolute left-3 top-3 z-20 inline-flex cursor-pointer items-center gap-2 rounded-full px-2.5 py-1.5 text-[11px] font-black text-slate-700 shadow-sm">
             <input
               type="checkbox"
               checked={isChecked}
@@ -346,7 +360,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
               className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               aria-label={`${project.name} 선택`}
             />
-            선택
+            {typeof project.projectNumber === 'number' ? <span className="rounded-full px-2.5 py-1 font-bold text-slate-600">#{project.projectNumber}</span> : null}
           </label>
 
           {completedMinutes ? (
@@ -369,15 +383,23 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
             </button>
           ) : null}
 
-          <button
-            type="button"
-            onClick={() => openProjectScene(project)}
-            className="absolute inset-0 flex items-center justify-center px-4 text-center"
-          >
-            <span className="rounded-xl bg-slate-900/38 px-3 py-2 text-base font-black text-white backdrop-blur-[1.5px]">
-              {project.name}
-            </span>
-          </button>
+          <div className="absolute inset-0 flex items-center justify-center px-4 text-center">
+            <div className="relative max-w-full">
+              <button
+                type="button"
+                disabled={isInteractionLocked || !onRenameProject}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openRenameModal(project);
+                }}
+                className="group/project-name relative rounded-xl bg-slate-900/38 px-3 py-2 text-base font-black text-white backdrop-blur-[1.5px] transition disabled:cursor-not-allowed disabled:opacity-70"
+                aria-label={`${project.name} 이름 변경`}
+              >
+                <span className="block transition-opacity group-hover/project-name:opacity-0 group-focus-visible/project-name:opacity-0">{project.name}</span>
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center whitespace-nowrap rounded-xl bg-slate-900/54 px-3 py-2 text-sm font-black text-white opacity-0 transition-opacity group-hover/project-name:opacity-100 group-focus-visible/project-name:opacity-100">이름 변경</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="space-y-3 p-3">
@@ -386,7 +408,6 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
             <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
               {project.workflowDraft?.script ? <span className="rounded-full bg-violet-50 px-2.5 py-1 font-bold text-violet-700">대본 포함</span> : null}
               {totalCost !== undefined ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700">{formatKRW(totalCost)}</span> : null}
-              {typeof project.projectNumber === 'number' ? <span className="rounded-full bg-slate-100 px-2.5 py-1 font-bold text-slate-600">#{project.projectNumber}</span> : null}
             </div>
           </div>
 
@@ -397,15 +418,15 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
               onClick={() => openProjectScene(project)}
               className="col-span-2 rounded-xl bg-blue-600 px-2 py-2 text-[11px] font-black text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
             >
-              제작하기
+              상세 보기
             </button>
             <button
               type="button"
-              disabled={isInteractionLocked || !onRenameProject}
-              onClick={() => openRenameModal(project)}
+              disabled={isInteractionLocked}
+              onClick={() => openProjectThumbnailStudio(project)}
               className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-black text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
             >
-              이름
+              썸네일 제작
             </button>
           </div>
         </div>
@@ -432,6 +453,26 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+
+            {hasSelection ? (
+              <button
+                type="button"
+                onClick={handleExportSelected}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+              >
+                내보내기 ({selectedProjectIds.length})
+              </button>
+            ) : null}
+                        {hasSelection ? (
+              <button
+                type="button"
+                disabled={isInteractionLocked}
+                onClick={() => void handleBulkDelete()}
+                className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-black text-red-700 shadow-sm transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                삭제 ({selectedProjectIds.length})
+              </button>
+            ) : null}
             {sortedProjects.length > 0 ? (
               <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
                 <input
@@ -443,35 +484,13 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                 전체 선택
               </label>
             ) : null}
-
-            <button
+                        <button
               type="button"
               onClick={handleImportClick}
               className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
             >
               가져오기
             </button>
-
-            {hasSelection ? (
-              <button
-                type="button"
-                onClick={handleExportSelected}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-              >
-                내보내기 ({selectedProjectIds.length})
-              </button>
-            ) : null}
-
-            {hasSelection ? (
-              <button
-                type="button"
-                disabled={isInteractionLocked}
-                onClick={() => void handleBulkDelete()}
-                className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-black text-red-700 shadow-sm transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-              >
-                삭제 ({selectedProjectIds.length})
-              </button>
-            ) : null}
           </div>
         </div>
       </div>

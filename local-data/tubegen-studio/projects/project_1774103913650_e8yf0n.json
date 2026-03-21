@@ -1,0 +1,155 @@
+{
+  "id": "project_1774103913650_e8yf0n",
+  "name": "프로젝트(3)",
+  "createdAt": 1774103913650,
+  "topic": "프로젝트(3)",
+  "projectNumber": 4,
+  "lastSavedAt": 1774103916632,
+  "settings": {
+    "imageModel": "gemini-2.5-flash-image",
+    "outputMode": "video",
+    "elevenLabsModel": "eleven_multilingual_v2"
+  },
+  "assets": [],
+  "thumbnail": null,
+  "thumbnailTitle": null,
+  "thumbnailPrompt": null,
+  "thumbnailHistory": [],
+  "selectedThumbnailId": null,
+  "backgroundMusicTracks": [],
+  "previewMix": {
+    "narrationVolume": 1,
+    "backgroundMusicVolume": 0.28
+  },
+  "workflowDraft": {
+    "id": "workflow_1774103913649",
+    "contentType": "story",
+    "aspectRatio": "16:9",
+    "topic": "프로젝트(3)",
+    "outputMode": "video",
+    "selections": {
+      "genre": "드라마",
+      "mood": "몰입감 있는",
+      "endingTone": "희망적인 결말",
+      "setting": "새벽의 편의점",
+      "protagonist": "초보 창작자",
+      "conflict": "잊고 있던 약속"
+    },
+    "script": "",
+    "activeStage": 1,
+    "extractedCharacters": [],
+    "styleImages": [],
+    "characterImages": [],
+    "selectedCharacterIds": [],
+    "selectedCharacterStyleId": null,
+    "selectedCharacterStyleLabel": "",
+    "selectedCharacterStylePrompt": "",
+    "selectedStyleImageId": null,
+    "referenceImages": {
+      "character": [],
+      "style": [],
+      "characterStrength": 70,
+      "styleStrength": 70
+    },
+    "promptPack": {
+      "storyPrompt": "",
+      "lyricsPrompt": "",
+      "characterPrompt": "",
+      "scenePrompt": "",
+      "actionPrompt": "",
+      "persuasionStoryPrompt": ""
+    },
+    "promptTemplates": [
+      {
+        "id": "builtin-core-script",
+        "name": "이야기 기본 프롬프트",
+        "description": "이야기 콘셉트에 맞는 기본 대본 프롬프트",
+        "prompt": "",
+        "mode": "narration",
+        "engine": "default",
+        "builtIn": true,
+        "isCustomized": false,
+        "updatedAt": 1
+      },
+      {
+        "id": "builtin-dialogue-script",
+        "name": "이야기 대화형 프롬프트",
+        "description": "대화와 내레이션을 함께 쓰는 변형 프롬프트",
+        "prompt": "",
+        "mode": "dialogue",
+        "engine": "default",
+        "builtIn": true,
+        "isCustomized": false,
+        "updatedAt": 2
+      },
+      {
+        "id": "builtin-scene-heavy",
+        "name": "이야기 장면 강조 프롬프트",
+        "description": "장면 전환과 시각 요소를 더 강조하는 변형 프롬프트",
+        "prompt": "",
+        "mode": "narration",
+        "engine": "default",
+        "builtIn": true,
+        "isCustomized": false,
+        "updatedAt": 3
+      },
+      {
+        "id": "builtin-channel-constitution-v32",
+        "name": "이야기 구조 분석 프롬프트",
+        "description": "채널 헌법 규칙을 함께 적용하는 고정 구조 프롬프트",
+        "prompt": "",
+        "mode": "narration",
+        "engine": "channel_constitution_v32",
+        "builtIn": true,
+        "isCustomized": false,
+        "updatedAt": 4
+      }
+    ],
+    "selectedPromptTemplateId": "builtin-core-script",
+    "promptAdditions": [],
+    "customScriptSettings": {
+      "expectedDurationMinutes": 3,
+      "speechStyle": "default",
+      "language": "ko",
+      "referenceText": "",
+      "referenceLinks": [],
+      "scriptModel": "openrouter/auto"
+    },
+    "constitutionAnalysis": null,
+    "openRouterModel": "openrouter/auto",
+    "ttsProvider": "qwen3Tts",
+    "elevenLabsVoiceId": null,
+    "elevenLabsModelId": null,
+    "heygenVoiceId": null,
+    "qwenVoicePreset": "qwen-default",
+    "qwenStylePreset": "balanced",
+    "voicePreviewAsset": null,
+    "scriptPreviewAsset": null,
+    "finalVoiceAsset": null,
+    "backgroundMusicPreview": null,
+    "finalBackgroundMusic": null,
+    "musicVideoPreview": null,
+    "finalMusicVideo": null,
+    "sampleMode": {
+      "text": true,
+      "tts": true,
+      "backgroundMusic": true,
+      "musicVideo": true
+    },
+    "completedSteps": {
+      "step1": false,
+      "step2": false,
+      "step3": false,
+      "step4": false,
+      "step5": false
+    },
+    "updatedAt": 1774103916450
+  },
+  "voicePreviewAsset": null,
+  "scriptPreviewAsset": null,
+  "finalVoiceAsset": null,
+  "backgroundMusicPreview": null,
+  "finalBackgroundMusic": null,
+  "musicVideoPreview": null,
+  "finalMusicVideo": null
+}

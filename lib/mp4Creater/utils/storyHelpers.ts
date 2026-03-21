@@ -51,15 +51,26 @@ export function buildSelectableStoryDraft(options: StoryDraftOptions): string {
   if (options.contentType === 'music_video') {
     return normalizeStoryText([
       `[Intro]
-${setting} 위로 번지는 공기 속에서 ${protagonist}은 ${topic}의 첫 감정을 낮게 꺼낸다.`,
+${setting} 위로 젖은 불빛이 내려와
+${topic}의 첫 문장이 입술 끝에 맴돌아`,
       `[Verse 1]
-${protagonist}의 시선은 천천히 흔들리고, ${options.mood} 온도의 밤이 장면마다 번진다. ${conflict}은 아직 직접 말하지 못한 채 후렴 전의 숨처럼 맴돈다.`,
+${protagonist}의 걸음마다 ${options.mood} 밤이 번지고
+말하지 못한 ${conflict}만 박자처럼 남아
+멈춘 줄 알았던 마음이 다시 눈을 뜨고
+같은 거리를 걸어도 오늘은 다르게 울려`,
       `[Chorus]
-${protagonist}은 같은 마음을 다른 표정으로 다시 부른다. 반복되는 한 문장이 영상의 중심 훅이 되고, 감정은 더 크게 열리기 시작한다.`,
+나는 너를 다시 불러, 후렴처럼 크게 불러
+사라진 줄 알았던 장면을 다시 살려
+끝난 줄 알았던 이 밤도 아직 노래가 돼
+${options.endingTone} 기분까지 안고 끝까지 갈래`,
       `[Verse 2]
-리듬이 올라가듯 작은 단서와 움직임이 쌓이며, 화면은 더 선명한 상징과 대비를 만든다. 숨기고 있던 감정이 결국 노래의 중심으로 올라온다.`,
+젖은 창문 너머로 뒤늦은 진심이 번지고
+숨겨 둔 표정들이 한 줄씩 멜로디가 돼
+돌아설 수 있었던 순간도 천천히 지나가고
+이제는 미뤄 둔 마음까지 전부 따라와`,
       `[Outro]
-마지막 장면은 ${options.endingTone} 느낌으로 남긴다. 모든 답을 다 말하지 않아도, ${protagonist}의 잔향이 다음 재생을 부르게 만든다.`,
+마지막 불빛 아래서도 나는 멈추지 않아
+남겨 둔 한마디까지 오늘의 노래로 안아`,
     ].join('\n\n'));
   }
 

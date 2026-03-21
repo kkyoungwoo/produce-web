@@ -7,6 +7,22 @@
 - 생성/복사/삭제 후 불필요한 강제 재동기화를 줄여 체감 반응 속도를 개선했습니다.
 - 초기 `local-data/tubegen-studio/studio-state.json`을 빈 상태로 재정리했습니다.
 
+## 추가 반영 사항 (최신 동작 기준 문서 동기화)
+- Step 1~5에서 정한 값이 최종 씬 프롬프트와 썸네일 프롬프트까지 직접 이어지도록 구조를 정리했습니다.
+- 문단 단위 씬 제작 기준을 강화해, 이전/다음 문단 맥락을 반영하는 연속형 scene prompt 조립 흐름을 반영했습니다.
+- `info_delivery` 전용 scene prompt profile을 별도로 두는 구조를 문서에 반영했습니다.
+- 샘플/저부하 이미지 흐름과 실제 AI 생성 흐름의 `sourceMode` 구분 원칙을 문서에 반영했습니다.
+- 최종 출력 품질을 `preview` / `final`로 다루는 흐름과, 영상이 없어도 이미지/오디오/자막 기반 후반 작업을 이어갈 수 있는 구조를 정리했습니다.
+- CapCut 작업 패키지 export 구조를 문서에 반영했습니다.
+  - `timeline_ready/`
+  - `scenes/scene_001/...`
+  - `subtitles/project_subtitles.srt`
+  - `timeline_import_guide.csv`
+  - `manifest.json`
+  - `README.txt`
+  - `capcut_links.txt`
+- 브라우저에서 CapCut 데스크톱 설치 여부 확인 및 외부 프로젝트 자동 임포트는 전제로 두지 않고, ZIP 저장 + 편집기 열기 + 가져오기 안내를 기준 흐름으로 정리했습니다.
+
 ## 수정 파일
 - `app/api/local-storage/_shared.ts`
 - `lib/mp4Creater/App.tsx`
@@ -17,6 +33,7 @@
 - `lib/mp4Creater/pages/SceneStudioPage.tsx`
 - `lib/mp4Creater/services/localFileApi.ts`
 - `lib/mp4Creater/ARCHITECTURE.md`
+- `lib/mp4Creater/DEVELOPMENT_GUIDE.md`
 - `MP4CREATER_PROJECT_STORAGE_RULES.md`
 - `local-data/tubegen-studio/studio-state.json`
 

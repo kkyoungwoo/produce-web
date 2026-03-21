@@ -10,6 +10,7 @@ import {
 } from '../types';
 import {
   buildWorkflowPromptPack,
+  getDefaultWorkflowPromptTemplateId,
   resolveWorkflowPromptTemplates,
 } from './workflowPromptBuilder';
 
@@ -78,7 +79,7 @@ export function createDefaultWorkflowDraft(contentType: ContentType = 'story', o
     referenceImages: { ...DEFAULT_REFERENCE_IMAGES },
     promptPack,
     promptTemplates,
-    selectedPromptTemplateId: null,
+    selectedPromptTemplateId: getDefaultWorkflowPromptTemplateId(contentType),
     promptAdditions: [],
     customScriptSettings: {
       expectedDurationMinutes: 3,
@@ -202,7 +203,7 @@ export function ensureWorkflowDraft(studioState?: StudioState | null): WorkflowD
     selectedPromptTemplateId:
       promptTemplates.some((item) => item.id === existing.selectedPromptTemplateId)
         ? existing.selectedPromptTemplateId
-        : null,
+        : getDefaultWorkflowPromptTemplateId(contentType),
     openRouterModel: existing.openRouterModel || existing.selectedPromptTemplateId || 'openrouter/auto',
     ttsProvider: existing.ttsProvider || 'qwen3Tts',
     heygenVoiceId: existing.heygenVoiceId || null,
@@ -237,8 +238,8 @@ export function buildWorkflowDraftPatch(draft: Partial<WorkflowDraft> & {
     promptTemplates,
     selectedPromptTemplateId:
       promptTemplates.some((item) => item.id === draft.selectedPromptTemplateId)
-        ? draft.selectedPromptTemplateId || null
-        : null,
+        ? draft.selectedPromptTemplateId || getDefaultWorkflowPromptTemplateId(draft.contentType)
+        : getDefaultWorkflowPromptTemplateId(draft.contentType),
     updatedAt: Date.now(),
   };
 }

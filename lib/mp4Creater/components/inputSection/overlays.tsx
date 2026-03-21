@@ -30,6 +30,8 @@ export function RouteStepFooter({
 }: RouteStepFooterProps) {
   if (!routeStep) return null;
 
+  const isStageReady = routeStep ? routeStepCompleted[footerStage] : stepCompleted[footerStage];
+
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">
       <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-3 py-3 shadow-xl shadow-slate-200/70 backdrop-blur-md">
@@ -51,12 +53,18 @@ export function RouteStepFooter({
               void onOpenSceneStudio();
               return;
             }
-            if (nextRouteStep) {
-              void onCompleteStage(footerStage, nextRouteStep);
+            if (!nextRouteStep) return;
+            if (typeof window !== 'undefined') {
+              window.requestAnimationFrame(() => {
+                void onCompleteStage(footerStage, nextRouteStep);
+              });
+              return;
             }
+            void onCompleteStage(footerStage, nextRouteStep);
           }}
-          disabled={isOpeningSceneStudio || !(routeStep ? routeStepCompleted[footerStage] : stepCompleted[footerStage])}
-          className="min-w-[140px] rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
+          disabled={isOpeningSceneStudio}
+          aria-disabled={!isStageReady}
+          className={`min-w-[140px] rounded-full px-6 py-3 text-sm font-black transition ${isStageReady ? 'bg-blue-600 text-white hover:bg-blue-500' : 'border border-slate-200 bg-slate-200 text-slate-600 hover:bg-slate-300'} disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100`}
         >
           {footerStage === 5 ? (isOpeningSceneStudio ? '이동 중...' : '영상 제작하기') : '다음으로'}
         </button>

@@ -12,6 +12,23 @@ import {
 } from '../prompts/channelConstitutionPrompts';
 import { getPromptRegistry } from './promptRegistryService';
 
+const WORKFLOW_TEMPLATE_IDS = {
+  core: 'builtin-core-script',
+  dialogue: 'builtin-dialogue-script',
+  sceneHeavy: 'builtin-scene-heavy',
+} as const;
+
+function getContentTypePromptLabel(contentType: ContentType) {
+  if (contentType === 'music_video') return '뮤직비디오';
+  if (contentType === 'news') return '영화';
+  if (contentType === 'info_delivery') return '정보 전달';
+  return '이야기';
+}
+
+export function getDefaultWorkflowPromptTemplateId(_contentType: ContentType) {
+  return WORKFLOW_TEMPLATE_IDS.core;
+}
+
 function buildBaseSummary(topic: string, selections: StorySelectionState) {
   return [
     `Topic: ${topic || 'Untitled'}`,
@@ -21,6 +38,62 @@ function buildBaseSummary(topic: string, selections: StorySelectionState) {
     `Lead: ${selections.protagonist}`,
     `Conflict: ${selections.conflict}`,
     `Ending tone: ${selections.endingTone}`,
+  ].join('\n');
+}
+
+function buildConceptOutputGuide(contentType: ContentType) {
+  if (contentType === 'music_video') {
+    return [
+      '[출력 규칙]',
+      '- 결과는 설명문이 아니라 실제로 부를 수 있는 가사형 텍스트로 작성한다.',
+      '- [Intro], [Verse 1], [Chorus], [Verse 2], [Outro] 같은 블록 제목을 유지한다.',
+      '- 각 블록 안에는 짧은 가사 줄을 2~4줄 배치한다.',
+      '- 감정, 반복 훅, 후렴 포인트가 분명하게 들리도록 쓴다.',
+      '',
+      '[최종 예시]',
+      '[Intro]',
+      '젖은 새벽 끝에 네 이름이 번져 와',
+      '멈춘 줄 알았던 심장이 다시 박자를 타',
+      '',
+      '[Chorus]',
+      '나는 너를 다시 불러, 후렴처럼 다시 불러',
+      '오늘의 밤이 끝나도 이 장면은 남아',
+    ].join('\n');
+  }
+
+  if (contentType === 'news') {
+    return [
+      '[출력 규칙]',
+      '- 결과는 영화처럼 장면이 보이는 시네마틱 문단형 대본으로 작성한다.',
+      '- 각 문단은 새 장면처럼 읽혀야 하며 감정과 행동이 함께 보여야 한다.',
+      '- 설명만 나열하지 말고 화면이 그려지는 문장으로 쓴다.',
+      '',
+      '[최종 예시]',
+      '젖은 골목 끝에 선 주인공은 오래전 약속의 흔적을 다시 발견한다. 네온은 흔들리고, 표정은 대답보다 먼저 무너진다.',
+    ].join('\n');
+  }
+
+  if (contentType === 'info_delivery') {
+    return [
+      '[출력 규칙]',
+      '- 결과는 정보 전달용 문단형 대본으로 작성한다.',
+      '- 첫 문단에서 핵심 질문 또는 핵심 맥락을 바로 제시한다.',
+      '- 중간 문단은 순서, 예시, 숫자, 비교가 보이게 정리한다.',
+      '- 마지막 문단은 요약과 다음 행동으로 마무리한다.',
+      '',
+      '[최종 예시]',
+      '오늘은 왜 이 변화가 중요한지부터 짚고 시작한다. 먼저 일정과 비용을 보고, 그다음 실제 생활비 체감이 어디서 달라지는지 예시로 확인한다.',
+    ].join('\n');
+  }
+
+  return [
+    '[출력 규칙]',
+    '- 결과는 이야기형 문단 대본으로 작성한다.',
+    '- 각 문단은 다음 장면이 궁금해지도록 감정과 사건을 함께 전개한다.',
+    '- 설명보다 장면과 행동이 먼저 보이게 쓴다.',
+    '',
+    '[최종 예시]',
+    '편의점 문이 닫히기 직전, 주인공은 끝내 보내지 못한 메시지를 다시 열어 본다. 작은 숨 한 번이 오늘 밤의 방향을 바꾼다.',
   ].join('\n');
 }
 
@@ -34,12 +107,55 @@ export function buildWorkflowPromptPack(options: {
   const summary = buildBaseSummary(options.topic, options.selections);
   const currentDraft = options.script?.trim() || 'No draft';
 
-  const storyPrompt = `${bundle.story}\n\n[INPUT]\n${summary}\n\n[CURRENT DRAFT]\n${currentDraft}`;
-  const lyricsPrompt = `${bundle.story}\n\n[MUSIC VIDEO FLOW]\n${summary}\n\n[CURRENT DRAFT]\n${currentDraft}`;
-  const characterPrompt = `${bundle.story}\n\n[CHARACTERS]\n${summary}\n\n[SCRIPT]\n${currentDraft}`;
-  const scenePrompt = `${bundle.story}\n\n[SCENE PROMPTS]\n${summary}\n\n[SCRIPT]\n${currentDraft}`;
-  const actionPrompt = `${bundle.story}\n\n[SCENE ACTIONS]\n${summary}`;
-  const persuasionStoryPrompt = `${bundle.story}\n\n[RECOMMENDED PHRASES]\n${bundle.recommendations.join('\n')}`;
+  const outputGuide = buildConceptOutputGuide(options.contentType);
+  const storyPrompt = `${bundle.story}
+
+${outputGuide}
+
+[INPUT]
+${summary}
+
+[CURRENT DRAFT]
+${currentDraft}`;
+  const lyricsPrompt = `${bundle.story}
+
+${buildConceptOutputGuide('music_video')}
+
+[MUSIC VIDEO FLOW]
+${summary}
+
+[CURRENT DRAFT]
+${currentDraft}`;
+  const characterPrompt = `${bundle.story}
+
+${outputGuide}
+
+[CHARACTERS]
+${summary}
+
+[SCRIPT]
+${currentDraft}`;
+  const scenePrompt = `${bundle.story}
+
+${outputGuide}
+
+[SCENE PROMPTS]
+${summary}
+
+[SCRIPT]
+${currentDraft}`;
+  const actionPrompt = `${bundle.story}
+
+${outputGuide}
+
+[SCENE ACTIONS]
+${summary}`;
+  const persuasionStoryPrompt = `${bundle.story}
+
+${outputGuide}
+
+[RECOMMENDED PHRASES]
+${bundle.recommendations.join('\n')}`;
 
   return {
     storyPrompt,
@@ -55,63 +171,73 @@ export function createBuiltInWorkflowPromptTemplates(
   contentType: ContentType,
   promptPack: WorkflowPromptPack
 ): WorkflowPromptTemplate[] {
+  const conceptLabel = getContentTypePromptLabel(contentType);
   const isMusic = contentType === 'music_video';
-  const templates: WorkflowPromptTemplate[] = [];
+  const corePrompt = isMusic ? promptPack.lyricsPrompt : promptPack.storyPrompt;
+  const dialoguePrompt = `${promptPack.storyPrompt}
+
+추가 규칙:
+- 대화와 내레이션을 자연스럽게 섞어주세요.
+- 시각적이고 구체적인 문장을 우선해주세요.`;
+  const sceneHeavyPrompt = `${promptPack.scenePrompt}
+
+추가 규칙:
+- 각 문단은 눈에 보이는 장면 전환으로 시작해주세요.
+- 구체적인 시각적 포인트를 추가해주세요.`;
+  const templates: WorkflowPromptTemplate[] = [
+    {
+      id: WORKFLOW_TEMPLATE_IDS.core,
+      name: `${conceptLabel} 기본 프롬프트`,
+      description: `${conceptLabel} 콘셉트에 맞는 기본 대본 프롬프트`,
+      prompt: corePrompt,
+      mode: 'narration',
+      engine: 'default',
+      builtIn: true,
+      basePrompt: corePrompt,
+      isCustomized: false,
+      updatedAt: 1,
+    },
+    {
+      id: WORKFLOW_TEMPLATE_IDS.dialogue,
+      name: `${conceptLabel} 대화형 프롬프트`,
+      description: '대화와 내레이션을 함께 쓰는 변형 프롬프트',
+      prompt: dialoguePrompt,
+      mode: 'dialogue',
+      engine: 'default',
+      builtIn: true,
+      basePrompt: dialoguePrompt,
+      isCustomized: false,
+      updatedAt: 2,
+    },
+    {
+      id: WORKFLOW_TEMPLATE_IDS.sceneHeavy,
+      name: `${conceptLabel} 장면 강조 프롬프트`,
+      description: '장면 전환과 시각 요소를 더 강조하는 변형 프롬프트',
+      prompt: sceneHeavyPrompt,
+      mode: 'narration',
+      engine: 'default',
+      builtIn: true,
+      basePrompt: sceneHeavyPrompt,
+      isCustomized: false,
+      updatedAt: 3,
+    },
+  ];
 
   if (supportsChannelConstitutionTemplate(contentType)) {
     const constitutionPrompt = buildChannelConstitutionPrompt({ contentType, promptPack });
     templates.push({
       id: CHANNEL_CONSTITUTION_TEMPLATE_ID,
-      name: '채널 헌법 v32 분석형',
-      description: '타겟팅, 안전성, 제목 설계까지 함께 정리하는 유튜브 분석형 대본 템플릿',
+      name: `${conceptLabel} 구조 분석 프롬프트`,
+      description: '채널 헌법 규칙을 함께 적용하는 고정 구조 프롬프트',
       prompt: constitutionPrompt,
       mode: 'narration',
       engine: CHANNEL_CONSTITUTION_ENGINE,
       builtIn: true,
       basePrompt: constitutionPrompt,
       isCustomized: false,
-      updatedAt: 1,
+      updatedAt: 4,
     });
   }
-
-  templates.push(
-    {
-      id: 'builtin-core-script',
-      name: isMusic ? 'Core music-video draft' : 'Core script draft',
-      description: isMusic ? 'Default structure for a music-video flow' : 'Default structure for story/news flow',
-      prompt: isMusic ? promptPack.lyricsPrompt : promptPack.storyPrompt,
-      mode: 'narration',
-      engine: 'default',
-      builtIn: true,
-      basePrompt: isMusic ? promptPack.lyricsPrompt : promptPack.storyPrompt,
-      isCustomized: false,
-      updatedAt: 2,
-    },
-    {
-      id: 'builtin-dialogue-script',
-      name: 'Dialogue draft',
-      description: 'A more conversational variation',
-      prompt: `${promptPack.storyPrompt}\n\nExtra rules:\n- Blend dialogue and narration naturally.\n- Prefer visual and concrete sentences.`,
-      mode: 'dialogue',
-      engine: 'default',
-      builtIn: true,
-      basePrompt: `${promptPack.storyPrompt}\n\nExtra rules:\n- Blend dialogue and narration naturally.\n- Prefer visual and concrete sentences.`,
-      isCustomized: false,
-      updatedAt: 3,
-    },
-    {
-      id: 'builtin-scene-heavy',
-      name: 'Scene-heavy draft',
-      description: 'Stronger scene transitions and visual detail',
-      prompt: `${promptPack.scenePrompt}\n\nExtra rules:\n- Start each paragraph with a visible scene shift.\n- Add concrete visual anchors.`,
-      mode: 'narration',
-      engine: 'default',
-      builtIn: true,
-      basePrompt: `${promptPack.scenePrompt}\n\nExtra rules:\n- Start each paragraph with a visible scene shift.\n- Add concrete visual anchors.`,
-      isCustomized: false,
-      updatedAt: 4,
-    }
-  );
 
   return templates;
 }

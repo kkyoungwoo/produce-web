@@ -10,7 +10,9 @@
 - `app/[locale]/mp4Creater/step-6/page.tsx`
   - 최종 씬 제작 페이지(정식 경로)
 - `app/[locale]/mp4Creater/scene-studio/page.tsx`
-  - 레거시 경로, `step-6`으로 리다이렉트
+  - 레거시 경로, `step-6`과 호환되는 보조 진입/리다이렉트
+- `app/[locale]/mp4Creater/thumbnail-studio/page.tsx`
+  - 프로젝트 대표 썸네일 제작 전용 페이지
 
 ### 메인 허브
 - `lib/mp4Creater/App.tsx`
@@ -34,6 +36,7 @@
 ### 페이지
 - `lib/mp4Creater/pages/SceneStudioPage.tsx`
 - `lib/mp4Creater/pages/CharacterStudioPage.tsx`
+- `lib/mp4Creater/pages/ThumbnailStudioPage.tsx`
 
 ### 상태/저장
 - `lib/mp4Creater/services/localFileApi.ts`
@@ -51,6 +54,7 @@
 - `lib/mp4Creater/services/geminiService.ts`
 - `lib/mp4Creater/services/openRouterService.ts`
 - `lib/mp4Creater/services/imageService.ts`
+- `lib/mp4Creater/services/thumbnailService.ts`
 - `lib/mp4Creater/services/elevenLabsService.ts`
 - `lib/mp4Creater/services/falService.ts`
 - `lib/mp4Creater/services/videoService.ts`

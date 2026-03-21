@@ -1,7 +1,6 @@
 import React from 'react';
 import { StepId } from '../types';
-import { FIELD_OPTIONS_BY_TYPE, STEP_META } from '../constants';
-import { getTopicSuggestion } from '../../../services/storyRecommendationService';
+import { STEP_META } from '../constants';
 import { OverlayModal } from '../ui';
 import Step1Panel from '../steps/Step1Panel';
 import Step2Panel from '../steps/Step2Panel';
@@ -30,6 +29,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
     setStyleImages,
     setSelectedCharacterIds,
     setSelectedCharacterStyleId,
+    applyContentTypeSelection,
     setSelectedStyleImageId,
     setAspectRatio,
     setHasSelectedAspectRatio,
@@ -41,6 +41,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
     sceneCount,
     storyScript,
     handleGenerateScriptClick,
+    extendScriptByChars,
     ensureProjectPromptTemplate,
     selectedPromptTemplate,
     syncedPromptTemplates,
@@ -145,22 +146,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
               setHasSelectedContentType(false);
               return;
             }
-            const defaults = FIELD_OPTIONS_BY_TYPE[value];
-            setContentType(value);
-            setHasSelectedContentType(true);
-            setTopic(getTopicSuggestion(value, ''));
-            setStoryScript('');
-            setGenre(defaults.genre[0]);
-            setMood(defaults.mood[0]);
-            setEndingTone(defaults.endingTone[0]);
-            setSetting(defaults.setting[0]);
-            setProtagonist(defaults.protagonist[0]);
-            setConflict(defaults.conflict[0]);
-            setExtractedCharacters([]);
-            setStyleImages([]);
-            setSelectedCharacterIds([]);
-            setSelectedCharacterStyleId(null);
-            setSelectedStyleImageId(null);
+            applyContentTypeSelection(value);
           }}
           onSelectAspectRatio={(value) => {
             if (aspectRatio === value && hasSelectedAspectRatio) {
@@ -197,6 +183,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
     if (currentRouteStep === 3) {
       return (
         <Step3Panel
+          contentType={contentType}
           isGeneratingScript={isGeneratingScript}
           sceneCount={sceneCount}
           storyScript={storyScript}
@@ -212,6 +199,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
           selectedPromptTemplateName={selectedPromptTemplateName}
           selectedPromptTemplateEngine={selectedPromptTemplateEngine}
           onGenerateScript={handleGenerateScriptClick}
+          onExpandScript={(chars) => { void extendScriptByChars(chars); }}
           onViewPrompt={() => {
             const targetTemplate = selectedPromptTemplate || syncedPromptTemplates[0] || null;
             if (!targetTemplate) {
@@ -273,7 +261,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
           onToggleCharacter={toggleCharacterSelection}
           onSelectCharacterImage={selectCharacterImageById}
           onCharacterPromptChange={updateCharacterPrompt}
-          onCreateVariants={(character) => { void createCharacterVariants(character); }}
+          onCreateVariants={(character, options) => { void createCharacterVariants(character, options); }}
           uploadInput={<input ref={characterUploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void handleUpload(e, 'character')} />}
         />
       );
@@ -336,8 +324,8 @@ export default function RouteStepView({ vm }: { vm: any }) {
                 void completeStage(currentRouteStep, nextRouteStep as StepId);
               }
             }}
-            disabled={!routeStepCompleted[currentRouteStep]}
-            className="min-w-[140px] rounded-full bg-blue-600 px-6 py-3 text-sm font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
+            disabled={currentRouteStep !== 3 && !routeStepCompleted[currentRouteStep]}
+            className={`min-w-[140px] rounded-full px-6 py-3 text-sm font-black transition ${routeStepCompleted[currentRouteStep] ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-slate-300 text-slate-100 hover:bg-slate-300'} disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100`}
           >
             {currentRouteStep === 5 ? '영상 제작하기' : '다음으로'}
           </button>

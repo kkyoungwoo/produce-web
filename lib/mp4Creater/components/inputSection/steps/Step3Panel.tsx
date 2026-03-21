@@ -37,6 +37,7 @@ interface Step3PanelProps {
   newCharacterName: string;
   newCharacterPrompt: string;
   onGenerateScript: () => void;
+  onExpandScript: (chars: number) => void;
   onViewPrompt: () => void;
   onStoryScriptChange: (value: string) => void;
   onSaveStoryScript: () => void;
@@ -85,6 +86,7 @@ export default function Step3Panel({
   activeVoicePreviewCharacterId,
   voicePreviewMessage,
   onGenerateScript,
+  onExpandScript,
   onViewPrompt,
   onStoryScriptChange,
   onSaveStoryScript,
@@ -104,24 +106,9 @@ export default function Step3Panel({
   const [manualCharacterDescription, setManualCharacterDescription] = useState('');
   const selectedCount = selectedCharacterIds.length;
   const isMusicVideo = contentType === 'music_video';
+  const scriptCharacterCount = Array.from(storyScript || '').length;
   const canSubmitManualCharacter = manualCharacterName.trim().length > 0 && manualCharacterPosition.trim().length > 0 && manualCharacterDescription.trim().length > 0;
   const currentRoleLabel = useMemo(() => manualCharacterPosition.trim() || '포지션', [manualCharacterPosition]);
-  const modelGuideItems = [
-    {
-      id: 'free',
-      label: '무료 확인',
-      title: 'API 연결 전에는 샘플 흐름으로 테스트',
-      description: 'OpenRouter 키가 없으면 실제 과금 없이 샘플 대본으로 단계 흐름만 확인합니다.',
-      tone: 'border-emerald-200 bg-emerald-50 text-emerald-800',
-    },
-    {
-      id: 'paid',
-      label: '유료 실생성',
-      title: '모델 선택 시 실제 AI 대본 생성',
-      description: '아래 모델 목록은 실제 AI 호출용입니다. 생성 결과는 문단별 영상 대본으로 정리됩니다.',
-      tone: 'border-violet-200 bg-violet-50 text-violet-800',
-    },
-  ] as const;
 
   useEffect(() => {
     if (isGeneratingScript) {
@@ -140,60 +127,43 @@ export default function Step3Panel({
     <>
       <div className="space-y-6">
         <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">AI 대본 생성</div>
-              <div className="mt-2 text-sm text-slate-600">프롬프트를 확인한 뒤 모델을 선택하고 바로 대본을 생성할 수 있습니다.</div>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-black">
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">현재 프롬프트 · {selectedPromptTemplateName || '미선택'}</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={onViewPrompt}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-            >
-              프롬프트 보기
-            </button>
-          </div>
 
-          <div className="mt-5 grid gap-3 md:grid-cols-2">
-            {modelGuideItems.map((item) => (
-              <div key={item.id} className={`rounded-[22px] border px-4 py-3 ${item.tone}`}>
-                <div className="text-[11px] font-black uppercase tracking-[0.18em]">{item.label}</div>
-                <div className="mt-2 text-sm font-black">{item.title}</div>
-                <p className="mt-1 text-xs leading-5 opacity-90">{item.description}</p>
-              </div>
-            ))}
-          </div>
+<div className="flex items-center justify-between gap-4">
+  <div className="text-[20px] font-black uppercase text-violet-900 whitespace-nowrap">
+    AI 설정
+  </div>
 
-          <div className="mt-3 rounded-[24px] border border-violet-100 bg-white p-4">
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-violet-700">AI 설정 및 생성</div>
-            <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <div className="min-w-0 flex-1">
-                <div className="text-sm font-black text-slate-900">대본 생성 모델</div>
-                <select
-                  value={selectedScriptModel}
-                  onChange={(e) => onScriptModelChange(e.target.value)}
-                  className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400"
-                >
-                  {scriptModelOptions.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}{item.id === 'sample-script' ? ' · 무료' : ' · 유료'}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={onGenerateScript}
-                disabled={isGeneratingScript}
-                className="rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500"
-              >
-                {isGeneratingScript ? '대본 생성 중...' : '대본 생성'}
-              </button>
-            </div>
-          </div>
+  <div className="flex flex-row flex-nowrap items-center gap-3 overflow-x-auto">
+    <select
+      value={selectedScriptModel}
+      onChange={(e) => onScriptModelChange(e.target.value)}
+      className="shrink-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400"
+    >
+      {scriptModelOptions.map((item) => (
+        <option key={item.id} value={item.id}>
+          {item.name}{item.id === 'sample-script' ? ' · 무료' : ' · 유료'}
+        </option>
+      ))}
+    </select>
+
+    <button
+      type="button"
+      onClick={onViewPrompt}
+      className="shrink-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+    >
+      프롬프트 보기
+    </button>
+
+    <button
+      type="button"
+      onClick={onGenerateScript}
+      disabled={isGeneratingScript}
+      className="shrink-0 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500"
+    >
+      {isGeneratingScript ? '대본 생성 중...' : '대본 생성'}
+    </button>
+  </div>
+</div>
         </section>
 
         <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -202,26 +172,43 @@ export default function Step3Panel({
               <h2 className="text-xl font-black text-slate-900">최종 대본</h2>
               <p className="mt-1 text-sm leading-6 text-slate-500">대본 생성 후 자동으로 출연자를 다시 정리합니다. 직접 수정할 때는 저장하기를 눌러 다시 반영하세요.</p>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">{sceneCount}문단</span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">{scriptCharacterCount}자</span>
               {storyScript.trim() ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isEditingScript) {
-                      onSaveStoryScript();
-                      setIsEditingScript(false);
-                      return;
-                    }
-                    setIsEditingScript(true);
-                  }}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                >
-                  {isEditingScript ? (isHydratingCharacters ? '저장 중...' : '저장하기') : '수정하기'}
-                </button>
+                <>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {[500, 1000, 2000].map((count) => (
+                      <button
+                        key={count}
+                        type="button"
+                        onClick={() => onExpandScript(count)}
+                        disabled={isGeneratingScript}
+                        className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-black text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        +{count}자
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isEditingScript) {
+                        onSaveStoryScript();
+                        setIsEditingScript(false);
+                        return;
+                      }
+                      setIsEditingScript(true);
+                    }}
+                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                  >
+                    {isEditingScript ? (isHydratingCharacters ? '저장 중...' : '저장하기') : '수정하기'}
+                  </button>
+                </>
               ) : null}
             </div>
           </div>
+          {storyScript.trim() ? <p className="mb-3 text-xs leading-6 text-slate-500">짧게 느껴지면 +500자, +1000자, +2000자로 현재 대본을 이어서 확장할 수 있습니다. 새로 생성하지 않고 지금 텍스트 뒤를 자연스럽게 이어갑니다.</p> : null}
           <textarea
             value={storyScript}
             onChange={(e) => onStoryScriptChange(e.target.value)}
@@ -231,7 +218,7 @@ export default function Step3Panel({
           />
         </section>
 
-        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <section data-step3-cast-section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">출연자 선택</div>
@@ -257,7 +244,7 @@ export default function Step3Panel({
 
           {extractedCharacters.length > 0 && !selectedCount ? (
             <div className="mt-4 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-800">
-              출연자를 1명 이상 선택해야 다음 단계로 넘어갈 수 있습니다. 자동 추출 후에도 기본 선택은 하지 않습니다.
+              출연자를 1명 이상 선택해야 다음 단계로 넘어갈 수 있습니다. 자동 추출 후에도 기본 선택은 하지 않습니다. 대본을 다 쓴 뒤 다음으로를 누르면 이 구역으로 다시 안내됩니다.
             </div>
           ) : null}
 
@@ -306,9 +293,16 @@ export default function Step3Panel({
                         >
                           삭제
                         </button>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${selected ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-500'}`}>
-                          {selected ? '선택됨' : '미선택'}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onCharacterToggle(character.id);
+                          }}
+                          className={`rounded-full px-3 py-1.5 text-[11px] font-black transition ${selected ? 'bg-blue-600 text-white hover:bg-blue-500' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'}`}
+                        >
+                          {selected ? '출연자 선택됨' : '출연자 선택하기'}
+                        </button>
                       </div>
                     </div>
 

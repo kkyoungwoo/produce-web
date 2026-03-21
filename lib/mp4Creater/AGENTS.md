@@ -5,104 +5,54 @@
 필요한 파일만 읽고, 작은 범위로 수정하고, 검증까지 끝내는 것을 기본으로 합니다.
 
 ## 시작 순서
-1. `CLAUDE.md`
-2. `lib/mp4Creater/.ai/current-task.md`
-3. `lib/mp4Creater/.ai/rules/edit-rules.md`
-4. `lib/mp4Creater/.ai/rules/testing-rules.md`
-5. `lib/mp4Creater/.ai/rules/sample-asset-rules.md`
-6. 필요 시 `lib/mp4Creater/ARCHITECTURE.md`
-7. 필요 시 `lib/mp4Creater/.ai/context/*`
+1. 루트 `AGENTS.md`
+2. 루트 `CLAUDE.md`
+3. `lib/mp4Creater/.ai/current-task.md`
+4. `lib/mp4Creater/.ai/rules/edit-rules.md`
+5. `lib/mp4Creater/.ai/rules/testing-rules.md`
+6. `lib/mp4Creater/.ai/rules/sample-asset-rules.md`
+7. 필요 시 `lib/mp4Creater/ARCHITECTURE.md`
+8. 필요 시 `lib/mp4Creater/.ai/context/*`
 
-## 프롬프트 운영 규칙
-- 사용자의 작성 언어는 한국어 기본으로 유지합니다.
-- AI로 보내는 프롬프트는 전송 직전에 영어로 번역합니다.
-- 번역 레이어는 `lib/mp4Creater/services/promptTranslationService.ts`를 사용합니다.
-- 같은 문장은 캐시를 재사용해 토큰 낭비를 줄입니다.
-- 자막 분리, TTS 본문, 원문 그대로 비교해야 하는 입력은 번역하지 않습니다.
+## 현재 Step 기준 (v3 문서 기준)
+1. Step 1: 콘셉트와 화면 비율 선택
+   - 콘셉트는 `뮤직비디오 / 이야기 / 영화 / 정보 전달` 4개입니다.
+   - 내부 타입은 `music_video / story / news / info_delivery`를 사용합니다.
+   - 콘셉트를 바꾸면 프로젝트 프롬프트는 해당 콘셉트 기본 프롬프트로 재초기화합니다.
+2. Step 2: 주제 입력과 생성 옵션 정리
+3. Step 3: 프롬프트 확인 → 대본 생성/수정 → 출연자 선택
+   - 대본이 채워진 상태에서 출연자 미선택으로 `다음으로`를 누르면, Step 4로 튀지 않고 출연자 선택 영역으로 스크롤 이동하며 안내합니다.
+4. Step 4: 캐릭터 느낌 선택 → 선택 출연자별 대표 캐릭터 확정
+   - 캐릭터 느낌 카드를 누르면 화면 상단으로 스크롤을 올립니다.
+   - 이미 캐릭터 느낌이 저장돼 있는 프로젝트를 다시 열면, Step 3에서 `다음으로` 시 Step 4의 출연자별 제작 영역으로 바로 이어집니다.
+   - 캐릭터 후보 카드에서는 `+` 생성 카드가 맨 앞에 있고, 새 생성본은 오른쪽으로 누적됩니다.
+   - 좌우 화살표로 후보를 오가며 고를 수 있어야 하고, 새 이미지 생성 직후에는 새로 생긴 후보 쪽으로 포인트가 이동해야 합니다.
+   - `재생성`은 완전 다른 캐릭터가 아니라 현재 이미지와 비슷한 느낌을 유지하는 방향을 뜻합니다.
+5. Step 5: 최종 영상 화풍 선택
+   - 불필요한 상태 동기화 루프로 새로고침처럼 보이는 현상이 없어야 합니다.
+6. Step 6: Scene Studio 진입
+   - 최종 씬 제작은 `step-6`이 정식 경로이고, `scene-studio`는 레거시/보조 진입으로만 취급합니다.
+7. 부가 제작: `thumbnail-studio`
+   - 프로젝트에 저장된 대본, 선택 캐릭터 이미지, 화풍을 바탕으로 썸네일을 여러 개 생성합니다.
+   - 배경 / 주인공 / 썸네일 문구를 사용자가 조정할 수 있어야 하며, 문구는 직접 수정 가능합니다.
+   - 최종 선택한 썸네일은 프로젝트 저장소 카드의 대표 썸네일로 반영됩니다.
 
-## 작업 유형별 읽기 순서
-### A. Step/UI 흐름 변경
-1. `lib/mp4Creater/.ai/context/change-map.md`
-2. `lib/mp4Creater/App.tsx`
-3. `lib/mp4Creater/components/InputSection.tsx`
-4. `lib/mp4Creater/agents/stepAgentRegistry.ts`
-5. `lib/mp4Creater/prompts/workflow-agents/*`
-6. `lib/mp4Creater/services/workflowDraftService.ts`
-7. `lib/mp4Creater/types.ts`
+## 구현 체크포인트
+- Step 1 콘셉트 변경 시 기존 프로젝트 프롬프트 수정본을 유지하지 않습니다.
+- Step 2/3 라우트 이동은 한 번 클릭으로 다음 단계로 넘어가야 합니다.
+- Step 3 선택 출연자는 Step 4에서 그대로 이어져야 합니다.
+- Step 4에서는 선택된 출연자만 이미지 제작 대상으로 표시합니다.
+- 프로젝트 저장소에서 이름 변경은 별도 하단 버튼이 아니라 **프로젝트 이름 위치의 hover/focus/click affordance**로 보여야 합니다.
+- 프로젝트 저장소의 `썸네일 제작`은 전용 페이지 진입 버튼으로 유지합니다.
+- 브라우저 뒤로가기는 내부 `이전으로` 버튼과 충돌하지 않도록 `push` 기반 이동 흐름을 우선 확인합니다.
 
-### B. Prompt/Provider 변경
-1. `lib/mp4Creater/services/workflowPromptBuilder.ts`
-2. `lib/mp4Creater/services/scriptComposerService.ts`
-3. `lib/mp4Creater/services/promptTranslationService.ts`
-4. `lib/mp4Creater/services/geminiService.ts`
-5. `lib/mp4Creater/services/openRouterService.ts`
-6. `lib/mp4Creater/services/falService.ts`
-7. `lib/mp4Creater/types.ts`
-
-### C. 저장/프로젝트 열기 변경
-1. `MP4CREATER_PROJECT_STORAGE_RULES.md`
-2. `lib/mp4Creater/services/localFileApi.ts`
-3. `lib/mp4Creater/services/projectService.ts`
-4. `app/api/local-storage/_shared.ts`
-5. `app/api/local-storage/state/route.ts`
-
-## 작업 수칙
-- 현재 작업 범위를 먼저 확인합니다.
-- 범위 밖의 대규모 리팩터링은 하지 않습니다.
-- API 미연결 상태에서도 샘플/폴백 흐름은 항상 유지합니다.
-- `types.ts`를 바꾸면 연관 서비스와 컴포넌트를 함께 점검합니다.
-- 프롬프트 번역 규칙을 새 AI 호출부에도 같은 방식으로 적용합니다.
-- 기능이 바뀌면 관련 MD를 같은 변경에서 바로 갱신합니다.
-- 과거 설명용 MD, 구버전 가이드, 중복 참고문서는 남겨두지 않고 삭제하거나 최신 문서로 통합합니다.
-
-## 자주 보는 파일
+## 먼저 볼 파일
 - `lib/mp4Creater/components/InputSection.tsx`
+- `lib/mp4Creater/components/inputSection/views/RouteStepView.tsx`
+- `lib/mp4Creater/components/inputSection/steps/Step3Panel.tsx`
+- `lib/mp4Creater/components/inputSection/steps/Step4Panel.tsx`
+- `lib/mp4Creater/components/inputSection/steps/Step5Panel.tsx`
+- `lib/mp4Creater/components/ProjectGallery.tsx`
 - `lib/mp4Creater/pages/SceneStudioPage.tsx`
-- `lib/mp4Creater/services/scriptComposerService.ts`
-- `lib/mp4Creater/services/geminiService.ts`
-- `lib/mp4Creater/services/falService.ts`
-- `lib/mp4Creater/services/promptTranslationService.ts`
-- `lib/mp4Creater/services/videoService.ts`
-
-## 현재 Step 기준 (최신)
-1. Step 1: 초기 설정
-2. Step 2: 콘텐츠 주제 입력 + 추천문장 클릭 즉시 반영
-3. Step 3: 프롬프트 선택 → 추천 문구 추가 → 최종 대본 생성
-4. Step 4: 최종 대본 완료 후 캐릭터 카드(주인공/조연/나레이터) 제작
-5. Step 5: 화풍 선택
-6. 완료 즉시: Scene Studio 자동 진입 (별도 "씬 제작 열기" 단계 없음)
-
-## 구현 체크포인트 (최신)
-- Step 하단 다음 버튼은 PC/모바일 모두 중앙 정렬로 유지합니다.
-- Step 2 추천문장 클릭은 참고 표시가 아니라 `topic` 실제 값 변경이어야 합니다.
-- Step 3 추천 문구는 표시용이 아니라 `promptAdditions`에 실제 누적되어야 합니다.
-- 캐릭터 카드 UI는 Step 3 최종 대본 준비 전에는 노출하지 않습니다.
-- 화풍 추천/추가 시 기존 선택 상태와 리스트 순서가 흔들리지 않게 key/state를 고정합니다.
-- autosave는 입력 중 debounce, 단계 전환/핵심 액션 시 즉시 저장을 같이 사용합니다.
-- 프로젝트 카드 썸네일은 `마지막 생성 썸네일 → 첫 이미지 → fallback` 우선순위를 따릅니다.
-- Scene Studio는 텍스트/메타 먼저 렌더하고, 이미지는 영역 단위 로딩 + 퍼센트 표시로 진행합니다.
-
-## 검증
-- `npx tsc --noEmit`
-- `npm run build`
-- 필요 시 실제 Step 이동과 씬 제작 동선 수동 확인
-
-## 2026-03 provider update
-- Text AI: OpenRouter only
-- Premium voice/audio: ElevenLabs
-- Default free TTS: qwen3-tts label with internal sample/browser fallback
-- No API key is treated as normal sample mode
-- Prompt bundles are split by content type under `lib/mp4Creater/prompts/*`
-
-## 2026-03-20 continuity snapshot (필독)
-- 기본 진입 뷰는 `?view=gallery`입니다. `?view=main`은 더 이상 사용하지 않으며, 서버에서 gallery로 리다이렉트됩니다.
-- 워크플로우 라우트는 `step-1`~`step-5`, 최종 씬 제작은 `step-6`이 기준입니다.
-- `scene-studio` 경로는 레거시 호환 리다이렉트로만 유지합니다.
-- Step 이동 URL에는 가능한 한 `projectId`를 유지합니다. (`/step-n?projectId=...`)
-- 신규 프로젝트 생성은 낙관적 UI(optimistic insert) 후 실제 저장 결과로 치환합니다.
-- 생성 직후 Step1 이동 시 프로젝트가 실제로 1개만 생성되어야 하며 중복 생성은 회귀 버그로 취급합니다.
-- Step 데이터는 draft 저장 + project 저장이 함께 돌아가야 하며, 이동 중에도 데이터 유실이 없어야 합니다.
-- Step2 추천 주제는 "초기 1회 + 새로고침 버튼 클릭 시"만 갱신합니다.
-- Step3 프롬프트 보기는 모달로 열려야 하며, 프로젝트 전용 프롬프트를 확인/수정할 수 있어야 합니다.
-- Gallery 카드 상호작용(생성/복사/삭제)은 중복 클릭 잠금, 스켈레톤, 빠른 정렬 갱신을 유지합니다.
-- hydration 회귀 방지: `button` 중첩 금지, SSR/CSR 비결정적 값(`Math.random`, 시간, 브라우저 전용 분기) 주의.
+- `lib/mp4Creater/pages/ThumbnailStudioPage.tsx`
+- `lib/mp4Creater/services/thumbnailService.ts`

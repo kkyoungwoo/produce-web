@@ -108,12 +108,16 @@ export async function generateVideoFromImage(
 
 async function uploadImageToFal(imageBase64: string, apiKey: string): Promise<string | null> {
   try {
-    const binaryString = atob(imageBase64);
+    const normalized = imageBase64.trim();
+    const dataMatch = normalized.match(/^data:(.*?);base64,(.*)$/);
+    const mimeType = dataMatch?.[1] || 'image/png';
+    const rawBase64 = dataMatch?.[2] || normalized;
+    const binaryString = atob(rawBase64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
-    const blob = new Blob([bytes], { type: 'image/png' });
+    const blob = new Blob([bytes], { type: mimeType });
 
     const formData = new FormData();
     formData.append('file', blob, 'image.png');

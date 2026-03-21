@@ -31,6 +31,7 @@ import {
 } from '../services/storyRecommendationService';
 import {
   buildWorkflowPromptPack,
+  getDefaultWorkflowPromptTemplateId,
   getSelectedWorkflowPromptTemplate,
   resolveWorkflowPromptTemplates,
 } from '../services/workflowPromptBuilder';
@@ -254,7 +255,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [notice, setNotice] = useState('');
   const [promptTemplates, setPromptTemplates] = useState<WorkflowPromptTemplate[]>(initialTemplates);
   const initialTemplateId = initial.selectedPromptTemplateId
-    || (initial.completedSteps?.step3 || initialStage > 3 ? (initialTemplates[0]?.id || null) : null);
+    || getDefaultWorkflowPromptTemplateId(initialContentType);
   const [selectedPromptTemplateId, setSelectedPromptTemplateId] = useState<string | null>(initialTemplateId);
   const [promptDetailId, setPromptDetailId] = useState<string | null>(initialTemplateId);
   const [editingPromptId, setEditingPromptId] = useState<string | null>(null);
@@ -337,8 +338,8 @@ const InputSection: React.FC<InputSectionProps> = ({
     openStageWithIntent(nextStage, false);
     setPromptTemplates(nextTemplates);
     const resolvedTemplateId = nextTemplates.some((item) => item.id === workflowDraft?.selectedPromptTemplateId)
-      ? (workflowDraft?.selectedPromptTemplateId || null)
-      : (workflowDraft?.completedSteps?.step3 || nextStage > 3 ? (nextTemplates[0]?.id || null) : null);
+      ? (workflowDraft?.selectedPromptTemplateId || getDefaultWorkflowPromptTemplateId(nextType))
+      : getDefaultWorkflowPromptTemplateId(nextType);
     setSelectedPromptTemplateId(resolvedTemplateId);
     setPromptDetailId(resolvedTemplateId);
     setEditingPromptId((prev) => prev);
@@ -704,24 +705,60 @@ const InputSection: React.FC<InputSectionProps> = ({
     return () => window.clearTimeout(timer);
   }, [openStage, workflowDraft?.id]);
 
-  const selectedCharactersReady = selectedCharacters.every((character) => Boolean(character.selectedImageId || character.generatedImages?.[0]?.id || character.imageData));
+  const selectedCharactersReady = selectedCharacters.every((character) => Boolean(character.selectedImageId));
+  const selectedCharactersHaveVoiceSelection = useMemo(() => {
+    if (contentType === 'music_video') return true;
+    if (!selectedCharacters.length) return false;
+    return selectedCharacters.every((character) => {
+      const provider = character.voiceProvider;
+      if (!provider) return false;
+      if (provider === 'project-default') return true;
+      if (provider === 'qwen3Tts') return Boolean(character.voiceId || character.voiceHint || 'qwen-default');
+      if (provider === 'elevenLabs') {
+        return Boolean(
+          character.voiceId
+          || character.voiceHint
+          || selectedProjectElevenVoice?.voice_id
+          || studioState?.routing?.elevenLabsVoiceId
+          || workflowDraft?.elevenLabsVoiceId
+          || CONFIG.DEFAULT_VOICE_ID
+        );
+      }
+      return Boolean(
+        character.voiceId
+        || character.voiceHint
+        || selectedProjectHeyGenVoice?.voice_id
+        || studioState?.routing?.heygenVoiceId
+        || workflowDraft?.heygenVoiceId
+      );
+    });
+  }, [
+    contentType,
+    selectedCharacters,
+    selectedProjectElevenVoice?.voice_id,
+    selectedProjectHeyGenVoice?.voice_id,
+    studioState?.routing?.elevenLabsVoiceId,
+    studioState?.routing?.heygenVoiceId,
+    workflowDraft?.elevenLabsVoiceId,
+    workflowDraft?.heygenVoiceId,
+  ]);
 
   const stepCompleted = useMemo(
     () => ({
       1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
       2: Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()),
-      3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length),
+      3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
       4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
       5: Boolean(selectedStyleImageId || styleImages[0]?.id),
     }),
-    [hasSelectedContentType, hasSelectedAspectRatio, topic, genre, mood, endingTone, setting, protagonist, conflict, normalizedScript, selectedPromptTemplateId, selectedCharacterIds, selectedCharacters.length, selectedCharacterStyleId, selectedCharactersReady, selectedStyleImageId, styleImages]
+    [hasSelectedContentType, hasSelectedAspectRatio, topic, genre, mood, endingTone, setting, protagonist, conflict, normalizedScript, selectedPromptTemplateId, selectedCharacterIds, selectedCharactersHaveVoiceSelection, selectedCharacters.length, selectedCharacterStyleId, selectedCharactersReady, selectedStyleImageId, styleImages]
   );
 
   const routeStepCompleted = useMemo(
     () => ({
       1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
       2: Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()),
-      3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length),
+      3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
       4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
       5: Boolean(selectedStyleImageId || styleImages[0]?.id),
     }),
@@ -738,6 +775,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       normalizedScript,
       selectedPromptTemplateId,
       selectedCharacterIds,
+      selectedCharactersHaveVoiceSelection,
       selectedCharacters.length,
       selectedCharacterStyleId,
       selectedCharactersReady,
@@ -919,6 +957,46 @@ const InputSection: React.FC<InputSectionProps> = ({
     onSaveWorkflowDraft,
   ]);
 
+  const buildDefaultSelectionsForContentType = (nextContentType: ContentType) => {
+    const defaults = FIELD_OPTIONS_BY_TYPE[nextContentType];
+    return {
+      genre: defaults.genre[0],
+      mood: defaults.mood[0],
+      endingTone: defaults.endingTone[0],
+      setting: defaults.setting[0],
+      protagonist: defaults.protagonist[0],
+      conflict: defaults.conflict[0],
+    };
+  };
+
+  const applyContentTypeSelection = (nextContentType: ContentType) => {
+    const nextSelections = buildDefaultSelectionsForContentType(nextContentType);
+    const nextPromptPack = buildWorkflowPromptPack({ contentType: nextContentType, topic: '', selections: nextSelections, script: '' });
+    const nextTemplates = resolveWorkflowPromptTemplates(nextContentType, nextPromptPack, []);
+    const defaultTemplateId = getDefaultWorkflowPromptTemplateId(nextContentType);
+
+    setContentType(nextContentType);
+    setHasSelectedContentType(true);
+    setTopic(getTopicSuggestion(nextContentType, ''));
+    setStoryScript('');
+    setGenre(nextSelections.genre);
+    setMood(nextSelections.mood);
+    setEndingTone(nextSelections.endingTone);
+    setSetting(nextSelections.setting);
+    setProtagonist(nextSelections.protagonist);
+    setConflict(nextSelections.conflict);
+    setConstitutionAnalysis(null);
+    setPromptTemplates(nextTemplates);
+    setSelectedPromptTemplateId(defaultTemplateId);
+    setPromptDetailId(defaultTemplateId);
+    setEditingPromptId(null);
+    setPromptPreviewId(null);
+    setPromptPreviewDraft('');
+    setScriptReferenceSuggestions([]);
+    setSelectedCharacterStyleId(null);
+    resetCharactersAndStyles();
+  };
+
   const resetCharactersAndStyles = () => {
     setExtractedCharacters([]);
     setStyleImages([]);
@@ -976,17 +1054,10 @@ const InputSection: React.FC<InputSectionProps> = ({
     }
 
     if (stage === 1) {
-      const defaults = FIELD_OPTIONS_BY_TYPE[contentType];
-      const nextSelections = {
-        genre: defaults.genre[0],
-        mood: defaults.mood[0],
-        endingTone: defaults.endingTone[0],
-        setting: defaults.setting[0],
-        protagonist: defaults.protagonist[0],
-        conflict: defaults.conflict[0],
-      };
+      const nextSelections = buildDefaultSelectionsForContentType(contentType);
       const nextPromptPack = buildWorkflowPromptPack({ contentType, topic: '', selections: nextSelections, script: '' });
       const nextTemplates = resolveWorkflowPromptTemplates(contentType, nextPromptPack, []);
+      const defaultTemplateId = getDefaultWorkflowPromptTemplateId(contentType);
       setTopic(getTopicSuggestion(contentType, ''));
       setStoryScript('');
       setGenre(nextSelections.genre);
@@ -996,8 +1067,8 @@ const InputSection: React.FC<InputSectionProps> = ({
       setProtagonist(nextSelections.protagonist);
       setConflict(nextSelections.conflict);
       setPromptTemplates(nextTemplates);
-      setSelectedPromptTemplateId(nextTemplates[0]?.id || null);
-      setPromptDetailId(nextTemplates[0]?.id || null);
+      setSelectedPromptTemplateId(defaultTemplateId);
+      setPromptDetailId(defaultTemplateId);
       resetCharactersAndStyles();
       setActiveStage(1);
       openStageWithIntent(1);
@@ -1039,6 +1110,18 @@ const InputSection: React.FC<InputSectionProps> = ({
       const target = document.querySelector<HTMLElement>(`[data-step-section="step-${stage}"]`);
       if (!target) {
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+      const top = Math.max(0, window.scrollY + target.getBoundingClientRect().top - 12);
+      window.scrollTo({ top, behavior: 'smooth' });
+    });
+  };
+
+  const scrollToStep3CastSelection = () => {
+    window.requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>('[data-step3-cast-section]');
+      if (!target) {
+        scrollStageIntoFocus(3);
         return;
       }
       const top = Math.max(0, window.scrollY + target.getBoundingClientRect().top - 12);
@@ -1107,6 +1190,18 @@ const InputSection: React.FC<InputSectionProps> = ({
     const completionMap = routeStep ? routeStepCompleted : stepCompleted;
 
     if (!completionMap[stage]) {
+      if (stage === 3 && normalizedScript.trim() && !selectedCharacterIds.length) {
+        setNotice('대본은 준비되었습니다. 아래 출연자 선택에서 Step4로 넘길 출연자를 1명 이상 골라 주세요. 선택 위치까지 바로 내려갑니다.');
+        openOnly(3);
+        scrollToStep3CastSelection();
+        return false;
+      }
+      if (stage === 3 && normalizedScript.trim() && selectedCharacterIds.length && !selectedCharactersHaveVoiceSelection) {
+        setNotice('선택한 출연자의 TTS 설정을 먼저 골라 주세요. 출연자 카드 위치까지 바로 이동합니다.');
+        openOnly(3);
+        scrollToStep3CastSelection();
+        return false;
+      }
       setNotice(messages[stage]);
       openOnly(stage);
       scrollStageIntoFocus(stage);
@@ -1129,6 +1224,10 @@ const InputSection: React.FC<InputSectionProps> = ({
         await onSaveWorkflowDraft(buildNavigationDraftPayload(stage, nextStage, hydrationOverrides));
       }
       setNotice(`${stage}단계 완료. ${nextStage}단계로 이동합니다.`);
+      if (routeStep) {
+        onNavigateStep?.(nextStage as 1 | 2 | 3 | 4 | 5);
+        return true;
+      }
       setActiveStage((prev) => Math.max(prev, nextActiveStage) as StepId);
       openStageWithIntent(nextActiveStage);
       onNavigateStep?.(nextStage as 1 | 2 | 3 | 4 | 5);
@@ -1287,6 +1386,20 @@ const InputSection: React.FC<InputSectionProps> = ({
   }, [routeStep, openStage, topic, genre, mood, endingTone, setting, protagonist, conflict, scriptReferenceSuggestions.length]);
 
   useEffect(() => {
+    if (contentType === 'music_video') return;
+    if (!selectedCharacterIds.length) return;
+    setExtractedCharacters((prev) => {
+      let changed = false;
+      const next = prev.map((item) => {
+        if (!selectedCharacterIds.includes(item.id) || item.voiceProvider) return item;
+        changed = true;
+        return { ...item, ...buildCharacterVoicePatch('project-default') };
+      });
+      return changed ? next : prev;
+    });
+  }, [contentType, selectedCharacterIds.join('::')]);
+
+  useEffect(() => {
     const isStep3Open = routeStep ? routeStep === 3 : openStage === 3;
     if (!isStep3Open) return;
     if (!extractedCharacters.length) return;
@@ -1421,11 +1534,59 @@ const InputSection: React.FC<InputSectionProps> = ({
         setStoryScript(result.text);
         setConstitutionAnalysis(result.analysis || null);
         await hydrateCharactersFromScriptText(result.text, { preserveSelection: true });
-        setNotice('AI 미연결 상태라 샘플 대본을 생성했습니다. 버튼을 다시 누르면 비슷한 방향의 새 샘플 대본으로 바뀝니다.');
+        setNotice(contentType === 'music_video' ? '뮤직비디오 프롬프트를 반영한 가사형 대본을 생성했습니다.' : '선택한 프롬프트를 반영한 대본을 생성했습니다.');
       });
       return;
     }
     void generateScriptByPrompt(targetTemplate.mode === 'dialogue', targetTemplate);
+  };
+
+
+  const extendScriptByChars = async (chars: number) => {
+    const targetTemplate = selectedPromptTemplate || syncedPromptTemplates[0];
+    if (!targetTemplate) return;
+    if (!normalizedScript.trim()) {
+      setNotice('먼저 대본을 생성하거나 직접 입력한 뒤 확장해 주세요.');
+      openOnly(3);
+      return;
+    }
+    if (!connectionSummary.text) {
+      promptTextAiSetup('현재 대본 확장은 샘플 보조 모드도 지원합니다. OpenRouter를 연결하면 지금 작성된 대본을 더 자연스럽게 이어서 확장할 수 있습니다.');
+    }
+    focusPromptTemplate(targetTemplate.id);
+    setIsGeneratingScript(true);
+    try {
+      const result = await composeScriptDraft({
+        contentType,
+        topic,
+        selections,
+        template: targetTemplate,
+        currentScript: normalizedScript,
+        model: selectedScriptGenerationModel,
+        conversationMode: targetTemplate.mode === 'dialogue',
+        generationIntent: 'expand',
+        expandByChars: chars,
+        customSettings: {
+          expectedDurationMinutes: customScriptDurationMinutes,
+          speechStyle: customScriptSpeechStyle,
+          language: customScriptLanguage,
+          referenceText: combinedReferenceText,
+          referenceLinks,
+          scriptModel: selectedScriptGenerationModel,
+        },
+      });
+      setStoryScript(result.text);
+      setConstitutionAnalysis(result.analysis || null);
+      await hydrateCharactersFromScriptText(result.text, { preserveSelection: true });
+      setNotice(result.source === 'ai'
+        ? `현재 대본을 약 ${chars}자 확장했습니다. 기존 내용을 유지한 채 뒤를 자연스럽게 이어 붙였습니다.`
+        : contentType === 'music_video'
+          ? `샘플 보조 모드로 현재 가사를 약 ${chars}자 확장했습니다. 기존 블록 뒤에 새 가사 블록을 이어 붙였습니다.`
+          : `샘플 보조 모드로 현재 대본을 약 ${chars}자 확장했습니다. 기존 문단 뒤에 새 문단을 이어 붙였습니다.`);
+      openStageWithIntent(3, false);
+    } finally {
+      setIsGeneratingScript(false);
+    }
   };
 
   const ensureProjectPromptTemplate = () => {
@@ -1533,13 +1694,32 @@ const InputSection: React.FC<InputSectionProps> = ({
         allowAi,
       });
 
-      const preservedIds = options?.preserveSelection ? selectedCharacterIds.filter((id) => nextCharacters.some((item) => item.id === id)) : [];
+      const normalizedCharacterKey = (character: CharacterProfile) => `${(character.name || '').trim().toLowerCase()}::${character.role || ''}`;
+      const previouslySelectedKeys = options?.preserveSelection
+        ? new Set(
+            extractedCharacters
+              .filter((item) => selectedCharacterIds.includes(item.id))
+              .map((item) => normalizedCharacterKey(item))
+              .filter(Boolean)
+          )
+        : new Set<string>();
+      const preservedIds = options?.preserveSelection
+        ? nextCharacters
+            .filter((item) => previouslySelectedKeys.has(normalizedCharacterKey(item)))
+            .map((item) => item.id)
+        : [];
       const nextSelectedIds = preservedIds.length ? preservedIds : [];
-      setExtractedCharacters(nextCharacters);
+      const normalizedCharacters = nextCharacters.map((item) => ({
+        ...item,
+        ...(contentType === 'music_video' || !nextSelectedIds.includes(item.id) ? {} : buildCharacterVoicePatch('project-default')),
+        selectedImageId: null,
+        imageData: null,
+      }));
+      setExtractedCharacters(normalizedCharacters);
       setSelectedCharacterIds(nextSelectedIds);
       setCharacterCarouselIndices({});
       setNotice(allowAi ? '3단계 대본 기준으로 출연자 후보를 다시 불러왔습니다. Step4에서는 선택된 출연자 이미지에만 집중하면 됩니다.' : 'API 연결이 없어 기본 주인공 1명과 조연 1명을 채웠습니다. Step4 흐름은 그대로 테스트할 수 있습니다.');
-      return { characters: nextCharacters, selectedIds: nextSelectedIds };
+      return { characters: normalizedCharacters, selectedIds: nextSelectedIds };
     } finally {
       setIsExtracting(false);
     }
@@ -1562,7 +1742,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setIsExtracting(true);
     try {
       const usedLabels: string[] = Array.from(new Set(styleImages.map((item) => item.groupLabel || item.label).filter(Boolean) as string[]));
-      const recommendationCount = mode === 'auto' && !styleImages.length ? 10 : 4;
+      const recommendationCount = mode === 'auto' && !styleImages.length ? 10 : 8;
       const nextStyleCards = buildStyleRecommendations(
         normalizedScript,
         contentType,
@@ -1669,20 +1849,17 @@ const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const toggleCharacterSelection = (characterId: string) => {
-    let blockedRemoval = false;
     setSelectedCharacterIds((prev) => {
       if (!prev.includes(characterId)) {
         return [...new Set([...prev, characterId])];
       }
-      if (prev.length <= 1) {
-        blockedRemoval = true;
-        return prev;
-      }
       return prev.filter((id) => id !== characterId);
     });
-    if (blockedRemoval) {
-      setNotice('출연자는 최소 1명 이상 선택되어 있어야 합니다. 마지막 선택 출연자는 해제할 수 없습니다.');
-    }
+    if (contentType === 'music_video') return;
+    setExtractedCharacters((prev) => prev.map((item) => {
+      if (item.id !== characterId || item.voiceProvider) return item;
+      return { ...item, ...buildCharacterVoicePatch('project-default') };
+    }));
   };
 
   const chooseCharacterImage = (characterId: string, image: PromptedImageAsset) => {
@@ -1694,7 +1871,10 @@ const InputSection: React.FC<InputSectionProps> = ({
     setCharacterCarouselIndices((prev) => ({ ...prev, [characterId]: nextIndex }));
   };
 
-  const createCharacterVariants = async (character: CharacterProfile) => {
+  const createCharacterVariants = async (
+    character: CharacterProfile,
+    options?: { note?: string; sourceLabel?: string }
+  ) => {
     const existingImages = character.generatedImages || [];
     if (characterLoadingProgress[character.id] !== undefined) return;
     if (existingImages.length >= MAX_CHARACTER_VARIANT_COUNT) {
@@ -1706,9 +1886,15 @@ const InputSection: React.FC<InputSectionProps> = ({
     setCharacterCarouselIndices((prev) => ({ ...prev, [character.id]: pendingIndex }));
     await simulateProgress((value: number) => setCharacterLoadingProgress((prev) => ({ ...prev, [character.id]: value })));
 
+    const variationHints = [
+      options?.sourceLabel ? `Reference candidate: ${options.sourceLabel}` : '',
+      options?.sourceLabel ? 'Keep the same character identity, face mood, hairstyle family, outfit direction, lighting tone, and silhouette as closely as possible.' : '',
+      options?.note?.trim() ? `Change request: ${options.note.trim()}` : '',
+    ].filter(Boolean).join('\n');
+
     const variants = createPromptVariants({
       title: character.name,
-      prompt: buildCharacterStyledPrompt(character.prompt || character.description),
+      prompt: [buildCharacterStyledPrompt(character.prompt || character.description), variationHints].filter(Boolean).join('\n\n'),
       kind: 'character',
       count: 1,
       existingCount: existingImages.length,
@@ -1719,8 +1905,8 @@ const InputSection: React.FC<InputSectionProps> = ({
           ? {
               ...item,
               generatedImages: [...(item.generatedImages || []), ...variants],
-              selectedImageId: variants[0]?.id || item.selectedImageId,
-              imageData: variants[0]?.imageData || item.imageData,
+              selectedImageId: item.selectedImageId || null,
+              imageData: item.imageData || null,
             }
           : item
       )
@@ -1728,7 +1914,11 @@ const InputSection: React.FC<InputSectionProps> = ({
     setSelectedCharacterIds((prev) => (prev.includes(character.id) ? prev : [...prev, character.id]));
     setCharacterCarouselIndices((prev) => ({ ...prev, [character.id]: pendingIndex }));
     setCharacterLoadingProgress((prev) => { const next = { ...prev }; delete next[character.id]; return next; });
-    setNotice(`${character.name} 기준 추천 카드 1장을 오른쪽 슬롯에 추가했습니다. 새 후보는 현재 공통 캐릭터 스타일을 반영합니다.`);
+    setNotice(
+      options?.note?.trim() || options?.sourceLabel
+        ? `${character.name} 기준으로 요청한 느낌을 반영한 새 후보 1장을 추가했습니다.`
+        : `${character.name} 기준 추천 카드 1장을 오른쪽 슬롯에 추가했습니다. 새 후보는 현재 공통 캐릭터 스타일을 반영합니다.`
+    );
   };
 
   const updateStylePrompt = (styleId: string, prompt: string) => {
@@ -1795,7 +1985,12 @@ const InputSection: React.FC<InputSectionProps> = ({
       roleLabel: nextRoleLabel,
       castOrder: extractedCharacters.length + 1,
     });
+    if (contentType !== 'music_video') {
+      Object.assign(nextCharacter, buildCharacterVoicePatch('project-default'));
+    }
     nextCharacter.visualStyle = selectedCharacterStyle?.label || nextCharacter.visualStyle;
+    nextCharacter.selectedImageId = null;
+    nextCharacter.imageData = null;
     setExtractedCharacters((prev) => [...prev, nextCharacter]);
     setSelectedCharacterIds((prev) => [...new Set([...prev, nextCharacter.id])]);
     setCharacterCarouselIndices((prev) => ({ ...prev, [nextCharacter.id]: 0 }));
@@ -1855,7 +2050,12 @@ const InputSection: React.FC<InputSectionProps> = ({
       roleLabel: trimmedPosition,
       castOrder: extractedCharacters.length + 1,
     });
+    if (contentType !== 'music_video') {
+      Object.assign(nextCharacter, buildCharacterVoicePatch('project-default'));
+    }
     nextCharacter.visualStyle = selectedCharacterStyle?.label || nextCharacter.visualStyle;
+    nextCharacter.selectedImageId = null;
+    nextCharacter.imageData = null;
     setExtractedCharacters((prev) => [...prev, nextCharacter]);
     setSelectedCharacterIds((prev) => [...new Set([...prev, nextCharacter.id])]);
     setCharacterCarouselIndices((prev) => ({ ...prev, [nextCharacter.id]: 0 }));
@@ -1908,8 +2108,8 @@ const InputSection: React.FC<InputSectionProps> = ({
           prompt: styledPrompt,
           visualStyle: selectedCharacterStyle?.label || item.visualStyle,
           generatedImages: [...(item.generatedImages || []), sampleVariant],
-          selectedImageId: sampleVariant.id,
-          imageData: sampleVariant.imageData,
+          selectedImageId: item.selectedImageId || null,
+          imageData: item.imageData || null,
         };
       })
     );
@@ -2145,6 +2345,8 @@ const InputSection: React.FC<InputSectionProps> = ({
             sourceMode: 'upload',
           });
           created.visualStyle = selectedCharacterStyle?.label || created.visualStyle;
+          created.selectedImageId = null;
+          created.imageData = null;
           return created;
         });
         setExtractedCharacters((prev) => [...prev, ...uploadedCharacters]);
@@ -2203,8 +2405,9 @@ const InputSection: React.FC<InputSectionProps> = ({
     const target = syncedPromptTemplates.find((item) => item.id === templateId);
     if (!target || target.builtIn) return;
     setPromptTemplates((prev) => prev.filter((item) => item.id !== templateId));
-    setSelectedPromptTemplateId('builtin-core-script');
-    setPromptDetailId('builtin-core-script');
+    const defaultTemplateId = getDefaultWorkflowPromptTemplateId(contentType);
+    setSelectedPromptTemplateId(defaultTemplateId);
+    setPromptDetailId(defaultTemplateId);
     setEditingPromptId(null);
     setNotice('커스텀 프롬프트를 삭제했습니다.');
   };
@@ -2307,6 +2510,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           setSelectedCharacterIds,
           setSelectedCharacterStyleId,
           setSelectedStyleImageId,
+          applyContentTypeSelection,
           setAspectRatio,
           setHasSelectedAspectRatio,
           topic,
@@ -2317,6 +2521,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           sceneCount,
           storyScript,
           handleGenerateScriptClick,
+          extendScriptByChars,
           ensureProjectPromptTemplate,
           selectedPromptTemplate,
           syncedPromptTemplates,
@@ -2442,6 +2647,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           setStyleImages,
           setSelectedCharacterIds,
           setSelectedStyleImageId,
+          applyContentTypeSelection,
           setHasSelectedAspectRatio,
           setAspectRatio,
           topic,

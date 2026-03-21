@@ -7,6 +7,7 @@ import SettingsDrawer from '../components/SettingsDrawer';
 import ProviderQuickModal from '../components/ProviderQuickModal';
 import ResultTable from '../components/ResultTable';
 import { LoadingOverlay } from '../components/LoadingOverlay';
+import { OverlayModal } from '../components/inputSection/ui';
 import {
   AspectRatio,
   BackgroundMusicTrack,
@@ -24,7 +25,7 @@ import {
 import { DEFAULT_STORAGE_DIR, createDefaultStudioState, fetchStudioState, saveStudioState, getCachedStudioState } from '../services/localFileApi';
 import { ensureWorkflowDraft } from '../services/workflowDraftService';
 import { getDefaultPreviewMix, createSampleBackgroundTrack } from '../services/musicService';
-import { generateImage, getSelectedImageModel } from '../services/imageService';
+import { generateImage, getSelectedImageModel, isSampleImageModel } from '../services/imageService';
 import { buildThumbnailScene, createSampleThumbnail } from '../services/thumbnailService';
 import { generateTtsAudio } from '../services/ttsService';
 import { generateMotionPrompt, generateScript } from '../services/geminiService';
@@ -101,8 +102,9 @@ const SceneStudioPage: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const basePath = useMemo(() => pathname.replace(/\/(scene-studio|step-6)$/, ''), [pathname]);
+  const basePath = useMemo(() => pathname.replace(/\/(scene-studio|step-6|thumbnail-studio)$/, ''), [pathname]);
   const requestedProjectId = searchParams?.get('projectId') || '';
+  const isThumbnailStudioRoute = useMemo(() => pathname.endsWith('/thumbnail-studio'), [pathname]);
   const [studioState, setStudioState] = useState<StudioState>(() => createBootstrapStudioState(requestedProjectId));
   const [step, setStep] = useState<GenerationStep>(GenerationStep.IDLE);
   const [generatedData, setGeneratedData] = useState<GeneratedAsset[]>([]);
@@ -118,6 +120,7 @@ const SceneStudioPage: React.FC = () => {
   const [activeBackgroundTrackId, setActiveBackgroundTrackId] = useState<string | null>(null);
   const [previewMix, setPreviewMix] = useState<PreviewMixSettings>(getDefaultPreviewMix());
   const [step4Open, setStep4Open] = useState(false);
+  const [summarySection, setSummarySection] = useState<'step1' | 'step2' | 'step3' | 'step4' | 'step5' | 'step6'>('step1');
   const [animatingIndices, setAnimatingIndices] = useState<Set<number>>(new Set());
   const [currentCost, setCurrentCost] = useState<CostBreakdown | null>(null);
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false);
@@ -139,6 +142,7 @@ const SceneStudioPage: React.FC = () => {
   const projectQueryHandledRef = useRef('');
   const currentCostRef = useRef<CostBreakdown>({ images: 0, tts: 0, videos: 0, total: 0, imageCount: 0, ttsCharacters: 0, videoCount: 0 });
   const autosaveSignatureRef = useRef('');
+  const thumbnailToolbarRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,6 +173,16 @@ const SceneStudioPage: React.FC = () => {
     studioStateRef.current = studioState;
   }, [studioState]);
 
+  useEffect(() => {
+    if (!isThumbnailStudioRoute) return;
+    const toolbar = thumbnailToolbarRef.current;
+    if (!toolbar) return;
+    const frame = window.requestAnimationFrame(() => {
+      toolbar.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [isThumbnailStudioRoute, currentProjectId, generatedData.length]);
+
   const draft = useMemo(() => ensureWorkflowDraft(studioState), [studioState]);
   const workflowProgress = useMemo(() => {
     const completed = draft?.completedSteps || { step1: false, step2: false, step3: false, step4: false };
@@ -180,14 +194,39 @@ const SceneStudioPage: React.FC = () => {
   }, [draft]);
 
   const currentProjectSummary = useMemo(() => (studioState?.projects || []).find((item) => item.id === currentProjectId) || null, [studioState?.projects, currentProjectId]);
+  const summaryCharacterIds = useMemo(() => (
+    draft.selectedCharacterIds.length ? draft.selectedCharacterIds : draft.extractedCharacters.map((item) => item.id)
+  ), [draft.extractedCharacters, draft.selectedCharacterIds]);
+  const summaryCharacters = useMemo(() => draft.extractedCharacters.filter((item) => summaryCharacterIds.includes(item.id)), [draft.extractedCharacters, summaryCharacterIds]);
+  const summarySelectedStyle = useMemo(() => draft.styleImages.find((item) => item.id === draft.selectedStyleImageId) || draft.styleImages[0] || null, [draft.selectedStyleImageId, draft.styleImages]);
+  const summarySelectedPromptTemplate = useMemo(() => draft.promptTemplates.find((item) => item.id === draft.selectedPromptTemplateId) || draft.promptTemplates[0] || null, [draft.promptTemplates, draft.selectedPromptTemplateId]);
+  const summarySceneCount = useMemo(() => splitStoryIntoParagraphScenes(draft.script).length, [draft.script]);
+  const summarySections = useMemo(() => ([
+    { id: 'step1' as const, label: '1단계 기본', description: '콘텐츠 유형과 화면 비율 등 시작 설정' },
+    { id: 'step2' as const, label: '2단계 기획', description: '주제와 장르, 분위기, 배경 설정' },
+    { id: 'step3' as const, label: '3단계 대본', description: '선택 프롬프트와 최종 대본, 참조 메모' },
+    { id: 'step4' as const, label: '4단계 캐릭터', description: '선택 출연자와 캐릭터 프롬프트, 대표 이미지 기준' },
+    { id: 'step5' as const, label: '5단계 화풍', description: '최종 영상용 화풍 카드와 프롬프트' },
+    { id: 'step6' as const, label: '6단계 씬 전달', description: '씬 제작 화면으로 넘어온 최종 전달값' },
+  ]), []);
 
   const resolveSceneTtsOptions = useCallback(() => {
-    const provider = (draft.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'elevenLabs' | 'heygen';
+    const preferredProvider = (draft.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'elevenLabs' | 'heygen';
+    const elevenApiKey = studioState?.providers?.elevenLabsApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY) || '';
+    const heygenApiKey = studioState?.providers?.heygenApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.HEYGEN_API_KEY) || '';
+
+    const provider = preferredProvider === 'heygen'
+      ? (heygenApiKey ? 'heygen' : elevenApiKey ? 'elevenLabs' : 'qwen3Tts')
+      : preferredProvider === 'elevenLabs'
+        ? (elevenApiKey ? 'elevenLabs' : heygenApiKey ? 'heygen' : 'qwen3Tts')
+        : 'qwen3Tts';
+
     const apiKey = provider === 'elevenLabs'
-      ? (studioState?.providers?.elevenLabsApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY) || '')
+      ? elevenApiKey
       : provider === 'heygen'
-        ? (studioState?.providers?.heygenApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.HEYGEN_API_KEY) || '')
+        ? heygenApiKey
         : '';
+
     return {
       provider,
       apiKey,
@@ -559,21 +598,21 @@ const SceneStudioPage: React.FC = () => {
         setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 이미지를 준비하는 중...`);
 
         let imageData: string | null = null;
-        let sourceMode: 'ai' | 'sample' = 'sample';
+        const imageModel = getSelectedImageModel();
+        const usesSampleImageFlow = isSampleImageModel(imageModel);
+        let sourceMode: 'ai' | 'sample' = usesSampleImageFlow ? 'sample' : 'ai';
 
         try {
           imageData = await withSoftTimeout(
-            generateImage({ ...assetsRef.current[i], aspectRatio: currentAspectRatio }, referenceImages),
+            generateImage({ ...assetsRef.current[i], aspectRatio: currentAspectRatio }, referenceImages, { qualityMode: 'draft' }),
             12000,
             null
           );
-          if (imageData) {
-            sourceMode = 'ai';
-            const imageModel = getSelectedImageModel();
+          if (imageData && !usesSampleImageFlow) {
             const price = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
             addCost('image', price, 1);
           }
-          setSceneProgress(i, 58, imageData ? 'AI 이미지 완성' : '샘플 이미지 준비');
+          setSceneProgress(i, 58, imageData ? (usesSampleImageFlow ? '샘플 초안 이미지 완성' : 'AI 이미지 완성') : '샘플 이미지 준비');
         } catch {
           imageData = null;
         }
@@ -583,7 +622,7 @@ const SceneStudioPage: React.FC = () => {
         }
 
         const nextImageHistory = imageData
-          ? appendImageHistory(assetsRef.current[i], imageData, sourceMode, sourceMode === 'ai' ? 'AI 생성 이미지' : '샘플 / 대체 이미지')
+          ? appendImageHistory(assetsRef.current[i], imageData, sourceMode, sourceMode === 'ai' ? 'AI 생성 이미지' : '샘플 / 저부하 초안 이미지')
           : assetsRef.current[i].imageHistory || [];
 
         updateAssetAt(i, {
@@ -631,8 +670,8 @@ const SceneStudioPage: React.FC = () => {
       setStep(GenerationStep.COMPLETED);
       setTaskProgressPercent(96);
       setProgressMessage(generateAudio
-        ? '씬 카드(이미지/오디오) 생성이 끝났습니다. 필요하면 씬별로 영상화를 진행해 주세요.'
-        : '씬 이미지 생성이 끝났습니다. 필요하면 씬별 또는 전체 영상 생성을 진행해 주세요.');
+        ? '씬 카드(이미지/오디오) 생성이 끝났습니다. 현재는 저부하 샘플 이미지 중심으로 준비했고, 필요하면 씬별 영상화 또는 최종 출력으로 넘어가 주세요.'
+        : '씬 이미지 생성이 끝났습니다. 현재는 저부하 샘플 이미지 중심으로 준비했고, 필요하면 씬별 또는 전체 영상 생성을 진행해 주세요.');
 
       const saved = await upsertWorkflowProject({
         projectId: currentProjectId,
@@ -871,18 +910,21 @@ const SceneStudioPage: React.FC = () => {
     setSceneProgress(index, 18, '이미지 다시 준비');
     setProgressMessage(`씬 ${index + 1} 이미지를 다시 만드는 중...`);
     try {
-      const imageData = await generateImage(assetsRef.current[index], buildReferenceImages());
+      const imageModel = getSelectedImageModel();
+      const usesSampleImageFlow = isSampleImageModel(imageModel);
+      const imageData = await generateImage(assetsRef.current[index], buildReferenceImages(), { qualityMode: 'draft' });
       if (imageData) {
         updateAssetAt(index, {
           imageData,
-          imageHistory: appendImageHistory(assetsRef.current[index], imageData, 'ai', 'AI 재생성 이미지'),
-          sourceMode: 'ai',
+          imageHistory: appendImageHistory(assetsRef.current[index], imageData, usesSampleImageFlow ? 'sample' : 'ai', usesSampleImageFlow ? '샘플 / 저부하 초안 이미지' : 'AI 재생성 이미지'),
+          sourceMode: usesSampleImageFlow ? 'sample' : 'ai',
           status: 'completed',
         });
-        const imageModel = getSelectedImageModel();
-        const price = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
-        addCost('image', price, 1);
-        setSceneProgress(index, 100, '이미지 다시 생성 완료');
+        if (!usesSampleImageFlow) {
+          const price = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
+          addCost('image', price, 1);
+        }
+        setSceneProgress(index, 100, usesSampleImageFlow ? '샘플 이미지 다시 준비 완료' : '이미지 다시 생성 완료');
         setTaskProgressPercent(100);
         return;
       }
@@ -1086,11 +1128,13 @@ const SceneStudioPage: React.FC = () => {
       let sourceMode: PromptedImageAsset['sourceMode'] = 'sample';
       let sourceLabel = '샘플 썸네일';
       try {
-        const generated = await generateImage(buildThumbnailScene(workingProject, thumbnailVariantSeed), buildReferenceImages());
+        const imageModel = studioState?.routing?.imageModel || getSelectedImageModel();
+        const usesSampleImageFlow = isSampleImageModel(imageModel);
+        const generated = await generateImage(buildThumbnailScene(workingProject, thumbnailVariantSeed), buildReferenceImages(), { qualityMode: 'draft' });
         if (generated) {
           nextThumbnail = generated;
-          sourceMode = 'ai';
-          sourceLabel = 'AI 썸네일';
+          sourceMode = usesSampleImageFlow ? 'sample' : 'ai';
+          sourceLabel = usesSampleImageFlow ? '샘플 썸네일' : 'AI 썸네일';
         }
       } catch {}
 
@@ -1131,6 +1175,120 @@ const SceneStudioPage: React.FC = () => {
     }
   }, [backgroundMusicTracks, buildReferenceImages, currentProjectId, draft, generatedData, isThumbnailGenerating, previewMix, studioState?.routing?.audioModel, studioState?.routing?.imageModel]);
 
+
+  const renderSummarySection = () => {
+    if (summarySection === 'step1') {
+      return (
+        <div className="space-y-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">콘텐츠 유형</div><div className="mt-2 text-sm font-black text-slate-900">{draft.contentType || '미설정'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">화면 비율</div><div className="mt-2 text-sm font-black text-slate-900">{draft.aspectRatio || '16:9'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">프로젝트 번호</div><div className="mt-2 text-sm font-black text-slate-900">{currentProjectSummary?.projectNumber ? `#${currentProjectSummary.projectNumber}` : '미지정'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">완료 단계</div><div className="mt-2 text-sm font-black text-slate-900">{Object.values(draft.completedSteps || {}).filter(Boolean).length} / 5</div></div>
+          </div>
+        </div>
+      );
+    }
+    if (summarySection === 'step2') {
+      return (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">주제</div>
+            <div className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{draft.topic || '미입력'}</div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">장르</div><div className="mt-2 text-sm font-black text-slate-900">{draft.selections?.genre || '미입력'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">분위기</div><div className="mt-2 text-sm font-black text-slate-900">{draft.selections?.mood || '미입력'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">엔딩 톤</div><div className="mt-2 text-sm font-black text-slate-900">{draft.selections?.endingTone || '미입력'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">배경</div><div className="mt-2 text-sm font-black text-slate-900">{draft.selections?.setting || '미입력'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">주인공</div><div className="mt-2 text-sm font-black text-slate-900">{draft.selections?.protagonist || '미입력'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">갈등</div><div className="mt-2 text-sm font-black text-slate-900">{draft.selections?.conflict || '미입력'}</div></div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">예상 분량</div><div className="mt-2 text-sm font-black text-slate-900">{draft.customScriptSettings?.expectedDurationMinutes || 3}분</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">말투</div><div className="mt-2 text-sm font-black text-slate-900">{draft.customScriptSettings?.speechStyle || 'default'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">언어</div><div className="mt-2 text-sm font-black text-slate-900">{draft.customScriptSettings?.language || 'ko'}</div></div>
+          </div>
+        </div>
+      );
+    }
+    if (summarySection === 'step3') {
+      return (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">선택된 프로젝트 프롬프트</div>
+            <div className="mt-2 text-sm font-black text-slate-900">{summarySelectedPromptTemplate?.name || '미선택'}</div>
+            <div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{summarySelectedPromptTemplate?.prompt || '저장된 프롬프트가 없습니다.'}</div>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">스토리 프롬프트 팩</div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{draft.promptPack?.storyPrompt || '없음'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">장면 프롬프트 팩</div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{draft.promptPack?.scenePrompt || '없음'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">캐릭터 프롬프트 팩</div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{draft.promptPack?.characterPrompt || '없음'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">액션 프롬프트 팩</div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{draft.promptPack?.actionPrompt || '없음'}</div></div>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-center justify-between gap-3"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">최종 대본</div><div className="rounded-full bg-white px-2 py-1 text-[10px] font-black text-slate-600">문단 {summarySceneCount}개</div></div>
+            <div className="mt-2 max-h-[320px] overflow-auto whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{draft.script || '저장된 대본이 없습니다.'}</div>
+          </div>
+          {(draft.customScriptSettings?.referenceText || draft.customScriptSettings?.referenceLinks?.length) ? (
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">참조 자료</div>
+              {draft.customScriptSettings?.referenceText ? <div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{draft.customScriptSettings.referenceText}</div> : null}
+              {draft.customScriptSettings?.referenceLinks?.length ? (
+                <div className="mt-3 space-y-2">{draft.customScriptSettings.referenceLinks.map((link) => <div key={link.id} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-6 text-slate-600"><div className="font-black text-slate-800">{link.title || link.url}</div><div className="mt-1 break-all">{link.url}</div><div className="mt-1 whitespace-pre-wrap break-words">{link.summary || link.sourceText || link.status}</div></div>)}</div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+    if (summarySection === 'step4') {
+      return (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">공통 캐릭터 스타일</div>
+            <div className="mt-2 text-sm font-black text-slate-900">{draft.selectedCharacterStyleLabel || '미선택'}</div>
+            <div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{draft.selectedCharacterStylePrompt || '저장된 캐릭터 스타일 프롬프트가 없습니다.'}</div>
+          </div>
+          <div className="space-y-3">
+            {summaryCharacters.length ? summaryCharacters.map((character) => {
+              const selectedImage = (character.generatedImages || []).find((item) => item.id === character.selectedImageId) || character.generatedImages?.[0] || null;
+              return <div key={character.id} className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-sm font-black text-slate-900">{character.name}</div><div className="mt-1 text-xs text-slate-500">{character.roleLabel || character.role || '출연자'} · 후보 {(character.generatedImages || []).length}장</div></div><div className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-600">대표 이미지 {selectedImage ? '선택됨' : '없음'}</div></div><div className="mt-3 grid gap-3 md:grid-cols-2"><div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">캐릭터 프롬프트</div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{character.prompt || character.description || '없음'}</div></div><div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">선택 이미지 프롬프트</div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{selectedImage?.prompt || '선택된 이미지 프롬프트 없음'}</div></div></div></div>;
+            }) : <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">저장된 출연자 정보가 없습니다.</div>}
+          </div>
+        </div>
+      );
+    }
+    if (summarySection === 'step5') {
+      return (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-violet-700">선택된 최종 화풍</div><div className="mt-2 text-sm font-black text-slate-900">{summarySelectedStyle?.groupLabel || summarySelectedStyle?.label || '미선택'}</div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{summarySelectedStyle?.prompt || '저장된 화풍 프롬프트가 없습니다.'}</div></div>
+          <div className="space-y-3">{draft.styleImages.length ? draft.styleImages.map((style) => <div key={style.id} className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="text-sm font-black text-slate-900">{style.groupLabel || style.label}</div><div className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-600">{style.id === draft.selectedStyleImageId ? '현재 선택' : style.sourceMode === 'sample' ? '샘플' : style.sourceMode === 'upload' ? '업로드' : '추천 카드'}</div></div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{style.prompt}</div></div>) : <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">저장된 화풍 카드가 없습니다.</div>}</div>
+        </div>
+      );
+    }
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">씬 수</div><div className="mt-2 text-sm font-black text-slate-900">{summarySceneCount}개</div></div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">출연자 참조 이미지</div><div className="mt-2 text-sm font-black text-slate-900">{summaryCharacters.filter((item) => Boolean(item.imageData)).length}장</div></div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">캐릭터 강도</div><div className="mt-2 text-sm font-black text-slate-900">{draft.referenceImages?.characterStrength || 70}</div></div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">화풍 강도</div><div className="mt-2 text-sm font-black text-slate-900">{draft.referenceImages?.styleStrength || 70}</div></div>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">씬 제작으로 넘기는 핵심 값</div>
+          <div className="mt-3 space-y-3 text-sm leading-6 text-slate-700">
+            <div><span className="font-black text-slate-900">기본:</span> {draft.contentType} · {draft.aspectRatio} · 주제 {draft.topic || '미입력'}</div>
+            <div><span className="font-black text-slate-900">선택 출연자:</span> {summaryCharacters.map((item) => item.name).join(', ') || '없음'}</div>
+            <div><span className="font-black text-slate-900">캐릭터 스타일:</span> {draft.selectedCharacterStyleLabel || '미선택'}</div>
+            <div><span className="font-black text-slate-900">최종 화풍:</span> {summarySelectedStyle?.groupLabel || summarySelectedStyle?.label || '미선택'}</div>
+            <div><span className="font-black text-slate-900">씬 생성 기준 프롬프트:</span> {draft.promptPack?.scenePrompt || '없음'}</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <LoadingOverlay open={Boolean(navigationOverlay)} title={navigationOverlay?.title || '이동 중'} description={navigationOverlay?.description} />
@@ -1159,37 +1317,48 @@ const SceneStudioPage: React.FC = () => {
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
-              <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">씬 제작 화면</div>
+              <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">{isThumbnailStudioRoute ? '썸네일 제작 화면' : '씬 제작 화면'}</div>
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <h1 className="text-3xl font-black text-slate-900">프로젝트 씬 제작</h1>
+                <h1 className="text-3xl font-black text-slate-900">{isThumbnailStudioRoute ? '프로젝트 썸네일 제작' : '프로젝트 씬 제작'}</h1>
                 {currentProjectSummary?.projectNumber && <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">프로젝트 #{currentProjectSummary.projectNumber}</span>}
               </div>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">페이지 자체는 먼저 열고, 필요한 경우에만 짧게 준비 화면을 보여 줍니다. 실제 생성이 시작되면 전체 화면을 막지 않고 제작 중인 씬 카드에만 스켈레톤과 퍼센트를 표시합니다.</p>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{isThumbnailStudioRoute ? '썸네일 생성 버튼과 결과 영역으로 바로 안내하는 전용 페이지입니다. 기존 씬 제작 데이터는 그대로 유지한 채 썸네일 작업만 이어갈 수 있습니다.' : '페이지 자체는 먼저 열고, 필요한 경우에만 짧게 준비 화면을 보여 줍니다. 실제 생성이 시작되면 전체 화면을 막지 않고 제작 중인 씬 카드에만 스켈레톤과 퍼센트를 표시합니다.'}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setStep4Open((prev) => !prev)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">{step4Open ? '입력 요약 접기' : '입력 요약 보기'}</button>
+              <button type="button" onClick={() => setStep4Open(true)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">입력 요약 보기</button>
               <button type="button" onClick={() => void handleGenerate({ preserveExistingCards: true, generateAudio: false })} disabled={isGeneratingScenes} className="rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isGeneratingScenes ? '전체 이미지 생성 중...' : '전체 이미지 생성'}</button>
               <button type="button" onClick={() => void handleGenerate({ preserveExistingCards: true, generateAudio: true })} disabled={isGeneratingScenes} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">이미지 + 오디오 생성</button>
               <button type="button" onClick={() => void handleGenerateAllVideos()} disabled={isGeneratingAllVideos || isGeneratingScenes} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGeneratingAllVideos ? '전체 영상 생성 중...' : '모든 씬 영상 생성'}</button>
             </div>
           </div>
 
-          {step4Open && (
-            <div className="mt-5 grid gap-4 md:grid-cols-3">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-black text-slate-900">3단계에서 고른 캐릭터</div>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{draft.selectedCharacterIds.length || draft.extractedCharacters.length}명 연결됨</p>
+          <OverlayModal
+            open={step4Open}
+            title="입력 요약"
+            description="Step1부터 Step6까지 저장된 값과 실제 전달되는 프롬프트를 구분별 버튼으로 확인합니다."
+            onClose={() => setStep4Open(false)}
+          >
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                {summarySections.map((section) => (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => setSummarySection(section.id)}
+                    className={`rounded-full px-4 py-2 text-xs font-black transition ${summarySection === section.id ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                  >
+                    {section.label}
+                  </button>
+                ))}
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-black text-slate-900">5단계에서 고른 최종 화풍</div>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{(draft.selectedStyleImageId || draft.styleImages[0]?.id) ? '1개 준비됨' : '선택 필요'}</p>
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-600">현재 구분 설명</div>
+                <div className="mt-2 text-sm font-black text-slate-900">{summarySections.find((section) => section.id === summarySection)?.label}</div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{summarySections.find((section) => section.id === summarySection)?.description}</p>
               </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div className="text-sm font-black text-slate-900">예상 씬 수 / 비율</div>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{splitStoryIntoParagraphScenes(draft.script).length}개 · {draft.aspectRatio || '16:9'}</p>
-              </div>
+              <div className="max-h-[62vh] overflow-auto pr-1">{renderSummarySection()}</div>
             </div>
-          )}
+          </OverlayModal>
         </div>
 
         {step !== GenerationStep.IDLE && progressMessage && !generatedData.length && (
@@ -1247,6 +1416,7 @@ const SceneStudioPage: React.FC = () => {
           isGeneratingAllVideos={isGeneratingAllVideos}
           onFooterBack={handleGoBackToWorkflow}
           footerBackLabel="이전으로"
+          thumbnailToolbarRef={thumbnailToolbarRef}
         />
       </main>
     </div>

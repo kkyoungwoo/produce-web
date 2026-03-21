@@ -1,1 +1,11 @@
-{"version":4,"routes":{"/ko":{},"/ko/mp4Creater":{},"/ko/mp4Creater/step-1":{},"/ko/mp4Creater/step-2":{},"/ko/mp4Creater/step-3":{},"/ko/mp4Creater/step-4":{}},"dynamicRoutes":{"/[locale]":{"dataRoute":null,"dataRouteRegex":null,"fallback":null,"fallbackRevalidate":false,"fallbackSourceRoute":"/[locale]","routeRegex":"^\\/([^/]+?)(?:\\/)?$","allowHeader":[]},"/[locale]/mp4Creater":{"dataRoute":null,"dataRouteRegex":null,"fallback":null,"fallbackRevalidate":false,"fallbackSourceRoute":"/[locale]/mp4Creater","routeRegex":"^\\/([^/]+?)\\/mp4Creater(?:\\/)?$","allowHeader":[]},"/[locale]/mp4Creater/step-1":{"dataRoute":null,"dataRouteRegex":null,"fallback":null,"fallbackRevalidate":false,"fallbackSourceRoute":"/[locale]/mp4Creater/step-1","routeRegex":"^\\/([^/]+?)\\/mp4Creater\\/step\\-1(?:\\/)?$","allowHeader":[]},"/[locale]/mp4Creater/step-2":{"dataRoute":null,"dataRouteRegex":null,"fallback":null,"fallbackRevalidate":false,"fallbackSourceRoute":"/[locale]/mp4Creater/step-2","routeRegex":"^\\/([^/]+?)\\/mp4Creater\\/step\\-2(?:\\/)?$","allowHeader":[]},"/[locale]/mp4Creater/step-3":{"dataRoute":null,"dataRouteRegex":null,"fallback":null,"fallbackRevalidate":false,"fallbackSourceRoute":"/[locale]/mp4Creater/step-3","routeRegex":"^\\/([^/]+?)\\/mp4Creater\\/step\\-3(?:\\/)?$","allowHeader":[]},"/[locale]/mp4Creater/step-4":{"dataRoute":null,"dataRouteRegex":null,"fallback":null,"fallbackRevalidate":false,"fallbackSourceRoute":"/[locale]/mp4Creater/step-4","routeRegex":"^\\/([^/]+?)\\/mp4Creater\\/step\\-4(?:\\/)?$","allowHeader":[]}},"notFoundRoutes":[],"preview":{"previewModeId":"33ceba3ba74383a2c4e91a7c9f14417c","previewModeSigningKey":"30a2f037e07bf42e25aa8b984f3e1b15dac7e5fe327c422f34d6a97bf159e793","previewModeEncryptionKey":"97b5246a70b653c07ea6fa51ba9a0be9baec3804ec0b3da5c00263fb15cdcbe5"}}
+{
+  "version": 4,
+  "routes": {},
+  "dynamicRoutes": {},
+  "notFoundRoutes": [],
+  "preview": {
+    "previewModeId": "409b3222fc3c0097fd5f704b16146972",
+    "previewModeSigningKey": "c349ec44e8b6c7b63d0007ea912f7cecc8e68d8daed63ea3b06e8ff848b4b68a",
+    "previewModeEncryptionKey": "d39c69e4a3ab3f42d61af5ec029e6d790737a73c99813b25921d1c5999a24900"
+  }
+}

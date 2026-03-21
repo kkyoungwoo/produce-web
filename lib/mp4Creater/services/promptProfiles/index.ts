@@ -2,6 +2,7 @@ import { ContentType } from '../../types';
 import { buildMusicVideoPrompt } from './musicVideo';
 import { buildStoryPrompt } from './story';
 import { buildNewsPrompt } from './news';
+import { buildInfoDeliveryPrompt } from './infoDelivery';
 
 export function buildScriptPromptByContentType(
   contentType: ContentType,
@@ -10,5 +11,6 @@ export function buildScriptPromptByContentType(
 ): string {
   if (contentType === 'music_video') return buildMusicVideoPrompt(topic, sourceText);
   if (contentType === 'news') return buildNewsPrompt(topic, sourceText);
+  if (contentType === 'info_delivery') return buildInfoDeliveryPrompt(topic, sourceText);
   return buildStoryPrompt(topic, sourceText);
 }

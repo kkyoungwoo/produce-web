@@ -279,11 +279,13 @@ function SettingBlock({
     <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-sm font-black text-slate-900">{label}</div>
-          <p className="mt-1 text-[11px] leading-4 text-slate-500">{helper}</p>
-        </div>
-        <div className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-violet-700 shadow-sm">
+          <div className="text-sm font-black text-slate-900 mb-4">
+        {label}
+        <span className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-violet-700 shadow-sm ml-3">
           {selectedLabel}
+        </span>
+        </div>
+
         </div>
       </div>
       <div className="mt-3">{children}</div>
@@ -323,7 +325,6 @@ export default function Step2Panel({
           <div>
             <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">대본 설정</div>
             <h2 className="mt-1 text-lg font-black text-slate-900">Step3 생성 전에 핵심 설정만 빠르게 정하세요</h2>
-            <p className="mt-1.5 text-xs leading-5 text-slate-600">길이, 대화체, 언어만 먼저 잡아 두면 다음 단계 대본 방향이 더 안정적으로 맞춰집니다.</p>
           </div>
         </div>
 
@@ -333,19 +334,6 @@ export default function Step2Panel({
             helper="카드를 드래그하거나 화살표로 넘기며 길이를 정합니다. 클릭만 하면 바로 선택됩니다."
             selectedLabel={<>{customScriptDurationMinutes}분</>}
           >
-            <HorizontalOptionRail step={200} selectedKey={customScriptDurationMinutes}>
-              {QUICK_DURATION_OPTIONS.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  data-no-drag="true"
-                  onClick={() => onCustomScriptDurationChange(value)}
-                  className={`shrink-0 snap-start rounded-full px-3 py-2 text-xs font-black transition-all duration-200 ${customScriptDurationMinutes === value ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}
-                >
-                  {value}분
-                </button>
-              ))}
-            </HorizontalOptionRail>
             <div className="mt-3 rounded-[18px] border border-violet-100 bg-white px-3 py-3">
               <input
                 type="range"
@@ -364,19 +352,6 @@ export default function Step2Panel({
               </div>
             </div>
             <div className="mt-3">
-              <HorizontalOptionRail step={220} selectedKey={customScriptDurationMinutes}>
-                {DURATION_MARK_OPTIONS.map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    data-no-drag="true"
-                    onClick={() => onCustomScriptDurationChange(value)}
-                    className={`shrink-0 snap-start rounded-full px-3 py-1.5 text-[11px] font-black transition-all duration-200 ${customScriptDurationMinutes === value ? 'bg-violet-100 text-violet-700' : 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-100'}`}
-                  >
-                    {value}분
-                  </button>
-                ))}
-              </HorizontalOptionRail>
             </div>
           </SettingBlock>
 

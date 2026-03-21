@@ -65,27 +65,34 @@ export function applySelectionPromptsToScenes(scenes: ScriptScene[], draft: Work
     `[PROJECT TOPIC] ${draft.topic || 'untitled project'}`,
     `[CONTENT TYPE] ${draft.contentType}`,
     `[ASPECT RATIO] ${draft.aspectRatio || '16:9'}`,
-    `[SELECTIONS] 장르=${draft.selections?.genre || ''}, 분위기=${draft.selections?.mood || ''}, 배경=${draft.selections?.setting || ''}, 주인공=${draft.selections?.protagonist || ''}, 갈등=${draft.selections?.conflict || ''}`,
+    `[OUTPUT MODE] ${draft.outputMode || 'video'}`,
+    `[SELECTIONS] 장르=${draft.selections?.genre || ''}, 분위기=${draft.selections?.mood || ''}, 배경=${draft.selections?.setting || ''}, 주인공=${draft.selections?.protagonist || ''}, 갈등=${draft.selections?.conflict || ''}, 결말톤=${draft.selections?.endingTone || ''}`,
   ].join('\n');
 
-  return scenes.map((scene, index) => ({
-    ...scene,
-    visualPrompt: [
-      scene.visualPrompt,
-      selectionSummary,
-      promptContext.promptTemplateName ? `[SELECTED SCRIPT TEMPLATE] ${promptContext.promptTemplateName}` : '',
-      promptContext.promptTemplatePrompt ? `[SELECTED TEMPLATE PROMPT]\n${promptContext.promptTemplatePrompt}` : '',
-      promptContext.storyPrompt ? `[STORY PROMPT]\n${promptContext.storyPrompt}` : '',
-      promptContext.scenePrompt ? `[SCENE PROMPT]\n${promptContext.scenePrompt}` : '',
-      promptContext.actionPrompt ? `[ACTION PROMPT]\n${promptContext.actionPrompt}` : '',
-      promptContext.characterPromptBlock ? `[SELECTED CHARACTER PROMPTS]\n${promptContext.characterPromptBlock}` : '',
-      promptContext.stylePrompt ? `[SELECTED STYLE PROMPT]\n${promptContext.stylePrompt}` : '',
-      promptContext.styleLabel ? `[STYLE LABEL] ${promptContext.styleLabel}` : '',
-      `[SCENE RULE] Scene ${index + 1} must keep the selected character roles, selected prompt template, and selected style prompt consistently.`,
-    ]
-      .filter(Boolean)
-      .join('\n\n'),
-  }));
+  return scenes.map((scene, index) => {
+    const previousScene = scenes[index - 1];
+    const nextScene = scenes[index + 1];
+    return {
+      ...scene,
+      visualPrompt: [
+        scene.visualPrompt,
+        selectionSummary,
+        promptContext.promptTemplateName ? `[SELECTED SCRIPT TEMPLATE] ${promptContext.promptTemplateName}` : '',
+        promptContext.promptTemplatePrompt ? `[SELECTED TEMPLATE PROMPT]\n${promptContext.promptTemplatePrompt}` : '',
+        promptContext.storyPrompt ? `[STORY PROMPT]\n${promptContext.storyPrompt}` : '',
+        promptContext.scenePrompt ? `[SCENE PROMPT]\n${promptContext.scenePrompt}` : '',
+        promptContext.actionPrompt ? `[ACTION PROMPT]\n${promptContext.actionPrompt}` : '',
+        promptContext.characterPromptBlock ? `[SELECTED CHARACTER PROMPTS]\n${promptContext.characterPromptBlock}` : '',
+        promptContext.stylePrompt ? `[SELECTED STYLE PROMPT]\n${promptContext.stylePrompt}` : '',
+        promptContext.styleLabel ? `[STYLE LABEL] ${promptContext.styleLabel}` : '',
+        previousScene?.narration ? `[PREVIOUS SCENE CONTEXT] ${previousScene.narration}` : '',
+        nextScene?.narration ? `[NEXT SCENE CONTEXT] ${nextScene.narration}` : '',
+        `[SCENE RULE] Scene ${index + 1} must keep the selected character roles, selected prompt template, selected style prompt, and visual continuity with adjacent scenes consistently.`,
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+    };
+  });
 }
 
 export function createInitialSceneAssetsFromDraft(draft: WorkflowDraft): GeneratedAsset[] {

@@ -1,4 +1,4 @@
-﻿# AGENTS.md (produce-web)
+# AGENTS.md (produce-web)
 
 이 문서는 백과사전이 아니라 **작업 목차(Entry Map)** 입니다.  
 큰 문서를 한 번에 읽지 말고, 작업 파일에 맞는 문서만 순서대로 읽습니다.
@@ -13,6 +13,7 @@
 - 불확실하면 범위를 줄여 작은 변경으로 진행하고, 영향 파일을 명시합니다.
 - `mp4Creater`의 사용자 입력은 한국어를 기본으로 유지하되, AI로 보내는 프롬프트는 전송 직전에 영어로 번역합니다.
 - 자막 분리, TTS 본문처럼 원문 보존이 필요한 입력은 번역하지 않습니다.
+- 기능이 바뀌면 관련 MD도 같은 작업에서 함께 갱신하고, 과거 기준 설명은 남겨두지 않습니다.
 
 ## 2) 인코딩 룰 (필수)
 - `.ts`, `.tsx`, `.js`, `.json`, `.css`, `.md`는 UTF-8(권장: BOM 없음)으로 저장합니다.
@@ -47,6 +48,9 @@
 | `components/workbench/product-config.ts` | `content/db-products/ADD_PRODUCT_GUIDE.md`, `docs/agent/task-playbooks.md` |
 | `components/workbench/samples.ts` | `content/db-products/ADD_PRODUCT_GUIDE.md`, `docs/agent/task-playbooks.md` |
 | `components/workbench/constants.ts` | `content/db-products/ADD_PRODUCT_GUIDE.md` |
+| `lib/mp4Creater/components/ProjectGallery.tsx` | `lib/mp4Creater/AGENTS.md`, `lib/mp4Creater/.ai/current-task.md`, `lib/mp4Creater/.ai/context/change-map.md` |
+| `lib/mp4Creater/pages/ThumbnailStudioPage.tsx` | `lib/mp4Creater/AGENTS.md`, `lib/mp4Creater/ARCHITECTURE.md`, `lib/mp4Creater/.ai/rules/testing-rules.md` |
+| `lib/mp4Creater/services/thumbnailService.ts` | `lib/mp4Creater/AGENTS.md`, `lib/mp4Creater/.ai/context/change-map.md`, `lib/mp4Creater/.ai/rules/testing-rules.md` |
 | `lib/mp4Creater/services/videoService.ts` | `lib/mp4Creater/AGENTS.md`, `lib/mp4Creater/ARCHITECTURE.md`, `lib/mp4Creater/.ai/rules/testing-rules.md` |
 | `lib/mp4Creater/services/workflowPromptBuilder.ts` | `lib/mp4Creater/AGENTS.md`, `lib/mp4Creater/.ai/context/change-map.md` |
 | `app/api/local-storage/*` | `lib/mp4Creater/AGENTS.md`, `MP4CREATER_PROJECT_STORAGE_RULES.md` |
@@ -69,5 +73,5 @@
 - 구현 에이전트 기본 운영 문서는 `docs/agent/IMPLEMENTATION_AGENT_RULES.md`를 기준으로 합니다.
 - 기본 동작은 **짧은 계획 + 최소 파일 수정 + hook 결과 기반 수정**입니다.
 - 보안/정형 검사는 대화 체크리스트가 아니라 **bash hook 우선**으로 처리합니다.
-- `mp4Creater` 변경 시 `scene-studio ↔ step-6 ↔ projectId` 흐름을 항상 보존합니다.
+- `mp4Creater` 변경 시 `step-3 ↔ step-4 ↔ step-5 ↔ step-6 ↔ thumbnail-studio ↔ projectId` 흐름을 항상 보존합니다.
 - AI/API 미연결 상태에서도 샘플/폴백 UI로 끝까지 진행 가능해야 합니다.

@@ -5,6 +5,8 @@ import {
   makeScenePlaceholderImage,
   splitStoryIntoParagraphScenes,
 } from '../utils/storyHelpers';
+import { getScriptGenerationPrompt } from './prompts';
+import { runTextAi } from './textAiService';
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -81,6 +83,47 @@ export const findTrendingTopics = async (category: string, usedTopics: string[])
   return base.filter((item) => !usedTopics.includes(item)).slice(0, 3);
 };
 
+function extractJsonObject(text: string): string | null {
+  const trimmed = `${text || ''}`.trim();
+  if (!trimmed) return null;
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) return fenced[1].trim();
+  const start = trimmed.indexOf('{');
+  const end = trimmed.lastIndexOf('}');
+  if (start >= 0 && end > start) return trimmed.slice(start, end + 1);
+  return null;
+}
+
+function normalizeAiScenes(source: string, contentType: ContentType, rawText: string): ScriptScene[] | null {
+  try {
+    const jsonText = extractJsonObject(rawText);
+    if (!jsonText) return null;
+    const parsed = JSON.parse(jsonText);
+    const paragraphs = splitStoryIntoParagraphScenes(source);
+    const rawScenes = Array.isArray(parsed?.scenes) ? parsed.scenes : [];
+    if (!rawScenes.length) return null;
+
+    return paragraphs.map((paragraph, index) => {
+      const scene = rawScenes[index] || {};
+      return {
+        sceneNumber: index + 1,
+        narration: paragraph,
+        visualPrompt: typeof scene?.image_prompt_english === 'string' && scene.image_prompt_english.trim()
+          ? scene.image_prompt_english.trim()
+          : buildLocalVisualPrompt(paragraph, index + 1, contentType, '16:9'),
+        analysis: {
+          composition_type: scene?.analysis?.composition_type || (paragraph.length > 85 ? 'STANDARD' : 'MICRO'),
+          sentiment: scene?.analysis?.sentiment || 'NEUTRAL',
+        },
+        targetDuration: estimateClipDuration(paragraph),
+        aspectRatio: '16:9',
+      } satisfies ScriptScene;
+    });
+  } catch {
+    return null;
+  }
+}
+
 export const generateScript = async (
   topic: string,
   _hasReferenceImage: boolean,
@@ -89,7 +132,26 @@ export const generateScript = async (
 ): Promise<ScriptScene[]> => {
   await wait(120);
   const script = sourceContext?.trim() || getFallbackScript(topic, contentType);
-  return buildScenes(script, contentType);
+  const fallbackScenes = buildScenes(script, contentType);
+
+  const result = await runTextAi({
+    system: 'You convert a script into storyboard scenes. Return JSON only. Keep scene count equal to paragraph count, keep narration unchanged, and make prompts production-ready for short-form video image generation.',
+    user: getScriptGenerationPrompt(topic || 'Auto-generated project', script, contentType),
+    model: 'openrouter/auto',
+    maxTokens: 2200,
+    temperature: 0.45,
+    fallback: JSON.stringify({
+      scenes: fallbackScenes.map((scene) => ({
+        sceneNumber: scene.sceneNumber,
+        narration: scene.narration,
+        visual_keywords: '',
+        analysis: scene.analysis,
+        image_prompt_english: scene.visualPrompt,
+      })),
+    }),
+  });
+
+  return normalizeAiScenes(script, contentType, result.text) || fallbackScenes;
 };
 
 export const generateScriptChunked = async (

@@ -155,6 +155,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../../app/[locale]/mp4Creater/thumbnail-studio/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/[locale]/mp4Creater/thumbnail-studio">> = Specific
+  const handler = {} as typeof import("../../../app/[locale]/mp4Creater/thumbnail-studio/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../../app/[locale]/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/[locale]">> = Specific

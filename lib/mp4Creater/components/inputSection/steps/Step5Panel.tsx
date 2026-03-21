@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { PromptedImageAsset } from '../../../types';
-import { STYLE_SAMPLE_PRESETS } from '../../../samples/presetCatalog';
 
 interface StyleGroup {
   id: string;
@@ -76,16 +75,9 @@ function buildSamplePreview(label: string, subtitle: string) {
 export default function Step5Panel({
   styleGroups,
   selectedStyleImageId,
-  newStyleName,
-  newStylePrompt,
   isExtracting,
   onEnsureStyleRecommendations,
-  onCreateStyle,
-  onCreateVariants,
-  onApplyStyleSample,
   onSelectStyle,
-  onStyleNameChange,
-  onStylePromptChange,
 }: Step5PanelProps) {
   const flattenedCards = useMemo(
     () => styleGroups.map((group) => group.items.find((item) => item.id === selectedStyleImageId) || group.items[0]).filter(Boolean) as PromptedImageAsset[],
@@ -96,11 +88,14 @@ export default function Step5Panel({
   useEffect(() => {
     const selectedGroup = styleGroups.find((group) => group.items.some((item) => item.id === selectedStyleImageId));
     if (selectedGroup?.id) {
-      setExpandedGroupId(selectedGroup.id);
+      if (selectedGroup.id !== expandedGroupId) {
+        setExpandedGroupId(selectedGroup.id);
+      }
       return;
     }
-    if (!styleGroups.some((group) => group.id === expandedGroupId)) {
-      setExpandedGroupId(styleGroups[0]?.id || null);
+    const fallbackGroupId = styleGroups[0]?.id || null;
+    if (!styleGroups.some((group) => group.id === expandedGroupId) && fallbackGroupId !== expandedGroupId) {
+      setExpandedGroupId(fallbackGroupId);
     }
   }, [expandedGroupId, selectedStyleImageId, styleGroups]);
 
@@ -114,19 +109,12 @@ export default function Step5Panel({
           <div>
             <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">최종 영상 화풍</div>
             <h2 className="mt-2 text-xl font-black text-slate-900">배경과 장면 전체 톤을 정하는 Step5 화풍</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              Step4 캐릭터 스타일과 독립적으로 동작합니다. 여기서 고른 화풍은 최종 영상 장면 전체의 비주얼 톤앤매너에만 적용됩니다.
-            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">여기서 고른 화풍은 최종 영상 장면 전체의 비주얼 톤앤매너에만 적용됩니다.</p>
           </div>
           <div className="flex flex-wrap gap-2">
             <button type="button" onClick={onEnsureStyleRecommendations} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500">
               {isExtracting ? '화풍 준비 중...' : '화풍 샘플 더 불러오기'}
             </button>
-            {selectedCard && (
-              <button type="button" onClick={() => onCreateVariants(selectedCard)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                선택 화풍 유사안 추가
-              </button>
-            )}
           </div>
         </div>
 
@@ -145,10 +133,10 @@ export default function Step5Panel({
             <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">한눈에 비교</div>
             <h3 className="mt-2 text-lg font-black text-slate-900">화풍 카드 선택</h3>
           </div>
-          <div className="text-xs text-slate-500">예시 이미지는 모두 샘플 썸네일로 표시됩니다.</div>
+          <div className="text-xs text-slate-500">작게 보고 빠르게 고를 수 있게 카드 높이를 줄였습니다.</div>
         </div>
 
-        <div className="mt-4 grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+        <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
           {flattenedCards.map((card) => {
             const group = styleGroups.find((item) => item.items.some((variant) => variant.id === card.id || variant.groupId === card.groupId));
             const selected = group?.items.some((item) => item.id === selectedStyleImageId) || card.id === selectedStyleImageId;
@@ -161,14 +149,13 @@ export default function Step5Panel({
                   setExpandedGroupId(group?.id || card.groupId || card.id);
                   onSelectStyle(card.id);
                 }}
-                className={`overflow-hidden rounded-[22px] border text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-violet-200'}`}
+                className={`overflow-hidden rounded-[20px] border text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-violet-200'}`}
               >
                 <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
-                  <img src={buildSamplePreview(groupLabel, card.prompt || '최종 영상 전체에 적용될 샘플 미리보기')} alt={`${groupLabel} 샘플`} className="aspect-[4/5] w-full object-cover" />
+                  <img src={buildSamplePreview(groupLabel, '최종 영상 장면용 화풍 카드')} alt={`${groupLabel} 샘플`} className="aspect-[16/9] w-full object-cover" />
                 </div>
                 <div className="p-3">
-                  <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">샘플 카드</div>
-                  <div className="mt-2 flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <div className="truncate text-sm font-black text-slate-900">{groupLabel}</div>
                       <div className="mt-1 text-[11px] text-slate-500">{group?.items.length || 1}개 후보</div>
@@ -186,34 +173,6 @@ export default function Step5Panel({
             아직 준비된 화풍 카드가 없습니다. 화풍 샘플 더 불러오기를 누르면 최종 영상용 화풍 카드가 한 번에 채워집니다.
           </div>
         )}
-      </section>
-
-      <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">직접 추가</div>
-        <div className="mt-4 grid gap-3 rounded-[24px] border border-slate-200 bg-slate-50 p-4 xl:grid-cols-[0.7fr_1.3fr_auto]">
-          <input value={newStyleName} onChange={(e) => onStyleNameChange(e.target.value)} placeholder="새 화풍 이름" className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400" />
-          <textarea value={newStylePrompt} onChange={(e) => onStylePromptChange(e.target.value)} placeholder="최종 영상 전체에 적용할 화풍 프롬프트를 직접 추가할 수 있습니다." className="min-h-[90px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400" />
-          <div className="flex items-center justify-center">
-            <button type="button" onClick={onCreateStyle} className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white hover:bg-slate-800">화풍 생성</button>
-          </div>
-        </div>
-
-        <div className="mt-4">
-          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">빠른 샘플</div>
-          <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            {STYLE_SAMPLE_PRESETS.map((preset) => (
-              <button key={preset.id} type="button" onClick={() => onApplyStyleSample(preset.id)} className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-left text-xs text-slate-700 hover:bg-slate-50">
-                <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
-                  <img src={preset.imageData} alt={preset.label} loading="lazy" className="aspect-square w-full object-cover" />
-                </div>
-                <div className="px-3 py-3">
-                  <div className="font-black text-slate-900">{preset.label}</div>
-                  <div className="mt-1 line-clamp-2 text-[11px] leading-5 text-slate-500">{preset.prompt}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
       </section>
     </div>
   );

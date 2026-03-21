@@ -1,0 +1,240 @@
+{
+  "id": "project_1774100641026_r3o91k",
+  "name": "프로젝트(1)1프로젝트(1)1프로젝트(1)1프로젝트(1",
+  "createdAt": 1774100641026,
+  "topic": "오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조",
+  "projectNumber": 1,
+  "lastSavedAt": 1774102209107,
+  "settings": {
+    "imageModel": "gemini-2.5-flash-image",
+    "outputMode": "video",
+    "elevenLabsModel": "eleven_multilingual_v2"
+  },
+  "assets": [],
+  "thumbnail": "CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjgwIiBoZWlnaHQ9IjcyMCIgdmlld0JveD0iMCAwIDEyODAgNzIwIj4KICAgIDxkZWZzPgogICAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIvPgogICAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2VmZjZmZiIvPgogICAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPC9kZWZzPgogICAgPHJlY3Qgd2lkdGg9IjEyODAiIGhlaWdodD0iNzIwIiBmaWxsPSJ1cmwoI2JnKSIgcng9IjMyIi8+CiAgICA8cmVjdCB4PSI0MyIgeT0iNDMiIHdpZHRoPSIxMTk0IiBoZWlnaHQ9IjYzNCIgcng9IjI4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkYmVhZmUiIHN0cm9rZS13aWR0aD0iMyIvPgogICAgPHRleHQgeD0iMTI4IiB5PSIxNDQiIGZpbGw9IiMyNTYzZWIiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjcwMCI+U0FNUExFIFNDRU5FIDAxIMK3IDE2Ojk8L3RleHQ+CiAgICA8dGV4dCB4PSIxMjgiIHk9IjIzMCIgZmlsbD0iIzBmMTcyYSIgZm9udC1zaXplPSI1NCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIj5BUEkg7YKk6rCAIOyXhuydhCDrlYzrj4Qg7Z2Q66aEIO2ZleyduCDqsIDriqU8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIxMjgiIHk9IjMwMiIgd2lkdGg9IjEwMjQiIGhlaWdodD0iMjMwIj4KICAgICAgPGRpdiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94aHRtbCIgc3R5bGU9ImZvbnQtZmFtaWx5OiBBcmlhbCwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAzNHB4OyBsaW5lLWhlaWdodDogMS41OyBjb2xvcjogIzMzNDE1NTsgd29yZC1icmVhazoga2VlcC1hbGw7Ij7snbQg64yA67O47J2AIOyVvSAyMOu2hCDrtoTrn4nsnYQg66qp7ZGc66GcIO2VqeuLiOuLpC4g7KO87KCc64qUIOyYpOuemOuQnCDslb3sho3qs7wg7IKs7ZqM7J2EIOyLnOyekeygkOycvOuhnCDqtIDqs4TqsIDigKY8L2Rpdj4KICAgIDwvZm9yZWlnbk9iamVjdD4KICAgIDx0ZXh0IHg9IjEyOCIgeT0iNjQ4IiBmaWxsPSIjNjQ3NDhiIiBmb250LXNpemU9IjI2IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPuyEpOygleyXkOyEnCDsnbTrr7jsp4AgQVBJ66W8IOuTseuhne2VmOuptCDsnbQg7Lm47J20IOyLpOygnCDsg53shLEg7J2066+47KeA66GcIOuwlOuAneuLiOuLpC48L3RleHQ+CiAgPC9zdmc+",
+  "thumbnailTitle": "오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조",
+  "thumbnailPrompt": "오래된 약속과 사회을 시작점으로 관계가 … 한국어 썸네일. 배경은 네온 골목, 전경은 무대를 떠난 보컬 클로즈업. 표정과 포즈는 몽환적인. Korean thumbnail title text included. Main hook: 오래된 약속과 사회을 시작점으로 관계가 …. Subtitle text: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가…. Story clue: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천. Character prompt: 무대를 떠난 보컬 / 주인공 / 서사를 이끄는 중심 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몽환적인. Scene context: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이. Style prompt: clean click-worthy thumbnail art direction. Mood: 몽환적인. Thumbnail variation 3. 16:9 thumbnail composition, strong focal contrast, large readable typography, stylish YouTube thumbnail design, no watermark.",
+  "thumbnailHistory": [
+    {
+      "id": "thumbnail_1774100894471_l2x7fn",
+      "label": "오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조",
+      "prompt": "오래된 약속과 사회을 시작점으로 관계가 … 한국어 썸네일. 배경은 도시 야경, 전경은 신인 가수 클로즈업. 표정과 포즈는 몽환적. Korean thumbnail title text included. Main hook: 오래된 약속과 사회을 시작점으로 관계가 …. Subtitle text: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가…. Story clue: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천. Character prompt: 신인 가수 / 주인공 / 서사를 이끄는 중심 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몽환적. Scene context: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이. Style prompt: clean click-worthy thumbnail art direction. Mood: 몽환적. Thumbnail variation 1. 16:9 thumbnail composition, strong focal contrast, large readable typography, stylish YouTube thumbnail design, no watermark.",
+      "imageData": "CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjgwIiBoZWlnaHQ9IjcyMCIgdmlld0JveD0iMCAwIDEyODAgNzIwIj4KICAgIDxkZWZzPgogICAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIvPgogICAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2VmZjZmZiIvPgogICAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPC9kZWZzPgogICAgPHJlY3Qgd2lkdGg9IjEyODAiIGhlaWdodD0iNzIwIiBmaWxsPSJ1cmwoI2JnKSIgcng9IjMyIi8+CiAgICA8cmVjdCB4PSI0MyIgeT0iNDMiIHdpZHRoPSIxMTk0IiBoZWlnaHQ9IjYzNCIgcng9IjI4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkYmVhZmUiIHN0cm9rZS13aWR0aD0iMyIvPgogICAgPHRleHQgeD0iMTI4IiB5PSIxNDQiIGZpbGw9IiMyNTYzZWIiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjcwMCI+U0FNUExFIFNDRU5FIDAxIMK3IDE2Ojk8L3RleHQ+CiAgICA8dGV4dCB4PSIxMjgiIHk9IjIzMCIgZmlsbD0iIzBmMTcyYSIgZm9udC1zaXplPSI1NCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIj5BUEkg7YKk6rCAIOyXhuydhCDrlYzrj4Qg7Z2Q66aEIO2ZleyduCDqsIDriqU8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIxMjgiIHk9IjMwMiIgd2lkdGg9IjEwMjQiIGhlaWdodD0iMjMwIj4KICAgICAgPGRpdiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94aHRtbCIgc3R5bGU9ImZvbnQtZmFtaWx5OiBBcmlhbCwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAzNHB4OyBsaW5lLWhlaWdodDogMS41OyBjb2xvcjogIzMzNDE1NTsgd29yZC1icmVhazoga2VlcC1hbGw7Ij7snbQg64yA67O47J2AIOyVvSAyMOu2hCDrtoTrn4nsnYQg66qp7ZGc66GcIO2VqeuLiOuLpC4g7KO87KCc64qUIOyYpOuemOuQnCDslb3sho3qs7wg7IKs7ZqM7J2EIOyLnOyekeygkOycvOuhnCDqtIDqs4TqsIDigKY8L2Rpdj4KICAgIDwvZm9yZWlnbk9iamVjdD4KICAgIDx0ZXh0IHg9IjEyOCIgeT0iNjQ4IiBmaWxsPSIjNjQ3NDhiIiBmb250LXNpemU9IjI2IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPuyEpOygleyXkOyEnCDsnbTrr7jsp4AgQVBJ66W8IOuTseuhne2VmOuptCDsnbQg7Lm47J20IOyLpOygnCDsg53shLEg7J2066+47KeA66GcIOuwlOuAneuLiOuLpC48L3RleHQ+CiAgPC9zdmc+",
+      "createdAt": 1774100894471,
+      "kind": "thumbnail",
+      "sourceMode": "ai",
+      "selected": true,
+      "note": "보조 문구: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가… · 배경: 도시 야경 · 주인공: 신인 가수 · 새 썸네일 후보",
+      "groupId": "thumbnail-studio-history",
+      "groupLabel": "썸네일 후보"
+    },
+    {
+      "id": "thumbnail_1774100898280_bpp3jx",
+      "label": "오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조",
+      "prompt": "오래된 약속과 사회을 시작점으로 관계가 … 한국어 썸네일. 배경은 도시 야경, 전경은 신인 가수 클로즈업. 표정과 포즈는 몽환적. Korean thumbnail title text included. Main hook: 오래된 약속과 사회을 시작점으로 관계가 …. Subtitle text: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가…. Story clue: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천. Character prompt: 신인 가수 / 주인공 / 서사를 이끄는 중심 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몽환적. Scene context: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이. Style prompt: clean click-worthy thumbnail art direction. Mood: 몽환적. Regenerate with a highly similar feeling to this earlier thumbnail direction: 오래된 약속과 사회을 시작점으로 관계가 … 한국어 썸네일. 배경은 도시 야경, 전경은 신인 가수 클로즈업. 표정과 포즈는 몽환적. Korean thumbnail title text included. Main hook: 오래된 약속과 사회을 시작점으로 관계가 …. Subtitle text: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가…. Story. Thumbnail variation 2. 16:9 thumbnail composition, strong focal contrast, large readable typography, stylish YouTube thumbnail design, no watermark.",
+      "imageData": "CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjgwIiBoZWlnaHQ9IjcyMCIgdmlld0JveD0iMCAwIDEyODAgNzIwIj4KICAgIDxkZWZzPgogICAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIvPgogICAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2VmZjZmZiIvPgogICAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPC9kZWZzPgogICAgPHJlY3Qgd2lkdGg9IjEyODAiIGhlaWdodD0iNzIwIiBmaWxsPSJ1cmwoI2JnKSIgcng9IjMyIi8+CiAgICA8cmVjdCB4PSI0MyIgeT0iNDMiIHdpZHRoPSIxMTk0IiBoZWlnaHQ9IjYzNCIgcng9IjI4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkYmVhZmUiIHN0cm9rZS13aWR0aD0iMyIvPgogICAgPHRleHQgeD0iMTI4IiB5PSIxNDQiIGZpbGw9IiMyNTYzZWIiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjcwMCI+U0FNUExFIFNDRU5FIDAxIMK3IDE2Ojk8L3RleHQ+CiAgICA8dGV4dCB4PSIxMjgiIHk9IjIzMCIgZmlsbD0iIzBmMTcyYSIgZm9udC1zaXplPSI1NCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIj5BUEkg7YKk6rCAIOyXhuydhCDrlYzrj4Qg7Z2Q66aEIO2ZleyduCDqsIDriqU8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIxMjgiIHk9IjMwMiIgd2lkdGg9IjEwMjQiIGhlaWdodD0iMjMwIj4KICAgICAgPGRpdiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94aHRtbCIgc3R5bGU9ImZvbnQtZmFtaWx5OiBBcmlhbCwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAzNHB4OyBsaW5lLWhlaWdodDogMS41OyBjb2xvcjogIzMzNDE1NTsgd29yZC1icmVhazoga2VlcC1hbGw7Ij7snbQg64yA67O47J2AIOyVvSAyMOu2hCDrtoTrn4nsnYQg66qp7ZGc66GcIO2VqeuLiOuLpC4g7KO87KCc64qUIOyYpOuemOuQnCDslb3sho3qs7wg7IKs7ZqM7J2EIOyLnOyekeygkOycvOuhnCDqtIDqs4TqsIDigKY8L2Rpdj4KICAgIDwvZm9yZWlnbk9iamVjdD4KICAgIDx0ZXh0IHg9IjEyOCIgeT0iNjQ4IiBmaWxsPSIjNjQ3NDhiIiBmb250LXNpemU9IjI2IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPuyEpOygleyXkOyEnCDsnbTrr7jsp4AgQVBJ66W8IOuTseuhne2VmOuptCDsnbQg7Lm47J20IOyLpOygnCDsg53shLEg7J2066+47KeA66GcIOuwlOuAneuLiOuLpC48L3RleHQ+CiAgPC9zdmc+",
+      "createdAt": 1774100898280,
+      "kind": "thumbnail",
+      "sourceMode": "ai",
+      "selected": false,
+      "note": "보조 문구: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가… · 배경: 도시 야경 · 주인공: 신인 가수 · 기존 썸네일과 비슷한 느낌으로 재생성",
+      "groupId": "thumbnail-studio-history",
+      "groupLabel": "썸네일 후보"
+    },
+    {
+      "id": "thumbnail_1774102209097_d49g4t",
+      "label": "오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조",
+      "prompt": "오래된 약속과 사회을 시작점으로 관계가 … 한국어 썸네일. 배경은 네온 골목, 전경은 무대를 떠난 보컬 클로즈업. 표정과 포즈는 몽환적인. Korean thumbnail title text included. Main hook: 오래된 약속과 사회을 시작점으로 관계가 …. Subtitle text: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가…. Story clue: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천. Character prompt: 무대를 떠난 보컬 / 주인공 / 서사를 이끄는 중심 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몽환적인. Scene context: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이. Style prompt: clean click-worthy thumbnail art direction. Mood: 몽환적인. Thumbnail variation 3. 16:9 thumbnail composition, strong focal contrast, large readable typography, stylish YouTube thumbnail design, no watermark.",
+      "imageData": "CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjgwIiBoZWlnaHQ9IjcyMCIgdmlld0JveD0iMCAwIDEyODAgNzIwIj4KICAgIDxkZWZzPgogICAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImJnIiB4MT0iMCIgeTE9IjAiIHgyPSIxIiB5Mj0iMSI+CiAgICAgICAgPHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iI2ZmZmZmZiIvPgogICAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2VmZjZmZiIvPgogICAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPC9kZWZzPgogICAgPHJlY3Qgd2lkdGg9IjEyODAiIGhlaWdodD0iNzIwIiBmaWxsPSJ1cmwoI2JnKSIgcng9IjMyIi8+CiAgICA8cmVjdCB4PSI0MyIgeT0iNDMiIHdpZHRoPSIxMTk0IiBoZWlnaHQ9IjYzNCIgcng9IjI4IiBmaWxsPSIjZmZmZmZmIiBzdHJva2U9IiNkYmVhZmUiIHN0cm9rZS13aWR0aD0iMyIvPgogICAgPHRleHQgeD0iMTI4IiB5PSIxNDQiIGZpbGw9IiMyNTYzZWIiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC13ZWlnaHQ9IjcwMCI+U0FNUExFIFNDRU5FIDAxIMK3IDE2Ojk8L3RleHQ+CiAgICA8dGV4dCB4PSIxMjgiIHk9IjIzMCIgZmlsbD0iIzBmMTcyYSIgZm9udC1zaXplPSI1NCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXdlaWdodD0iODAwIj5BUEkg7YKk6rCAIOyXhuydhCDrlYzrj4Qg7Z2Q66aEIO2ZleyduCDqsIDriqU8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIxMjgiIHk9IjMwMiIgd2lkdGg9IjEwMjQiIGhlaWdodD0iMjMwIj4KICAgICAgPGRpdiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94aHRtbCIgc3R5bGU9ImZvbnQtZmFtaWx5OiBBcmlhbCwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAzNHB4OyBsaW5lLWhlaWdodDogMS41OyBjb2xvcjogIzMzNDE1NTsgd29yZC1icmVhazoga2VlcC1hbGw7Ij7snbQg64yA67O47J2AIOyVvSAyMOu2hCDrtoTrn4nsnYQg66qp7ZGc66GcIO2VqeuLiOuLpC4g7KO87KCc64qUIOyYpOuemOuQnCDslb3sho3qs7wg7IKs7ZqM7J2EIOyLnOyekeygkOycvOuhnCDqtIDqs4TqsIDigKY8L2Rpdj4KICAgIDwvZm9yZWlnbk9iamVjdD4KICAgIDx0ZXh0IHg9IjEyOCIgeT0iNjQ4IiBmaWxsPSIjNjQ3NDhiIiBmb250LXNpemU9IjI2IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPuyEpOygleyXkOyEnCDsnbTrr7jsp4AgQVBJ66W8IOuTseuhne2VmOuptCDsnbQg7Lm47J20IOyLpOygnCDsg53shLEg7J2066+47KeA66GcIOuwlOuAneuLiOuLpC48L3RleHQ+CiAgPC9zdmc+",
+      "createdAt": 1774102209097,
+      "kind": "thumbnail",
+      "sourceMode": "ai",
+      "selected": false,
+      "note": "보조 문구: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가… · 배경: 네온 골목 · 주인공: 무대를 떠난 보컬 · 새 썸네일 후보",
+      "groupId": "thumbnail-studio-history",
+      "groupLabel": "썸네일 후보"
+    }
+  ],
+  "selectedThumbnailId": "thumbnail_1774100894471_l2x7fn",
+  "backgroundMusicTracks": [],
+  "previewMix": {
+    "narrationVolume": 1,
+    "backgroundMusicVolume": 0.28
+  },
+  "workflowDraft": {
+    "updatedAt": 1774102199382,
+    "aspectRatio": "1:1",
+    "activeStage": 4,
+    "contentType": "music_video",
+    "outputMode": "video",
+    "completedSteps": {
+      "step1": true,
+      "step2": true,
+      "step3": true,
+      "step4": false,
+      "step5": false
+    },
+    "script": "이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이 번지고\n말하지 못한 멀어진 연인만 박자처럼 남아\n멈춘 줄 알았던 마음이 다시 눈을 뜨고\n같은 거리를 걸어도 오늘은 다르게 울려\n\n[Chorus]\n나는 너를 다시 불러, 후렴처럼 크게 불러\n사라진 줄 알았던 장면을 다시 살려\n끝난 줄 알았던 이 밤도 아직 노래가 돼\n여운 있는 결말 기분까지 안고 끝까지 갈래\n\n[Verse 2]\n젖은 창문 너머로 뒤늦은 진심이 번지고\n숨겨 둔 표정들이 한 줄씩 멜로디가 돼\n돌아설 수 있었던 순간도 천천히 지나가고\n이제는 미뤄 둔 마음까지 전부 따라와\n\n[Outro]\n마지막 불빛 아래서도 나는 멈추지 않아\n남겨 둔 한마디까지 오늘의 노래로 안아\n\n[Outro]\n마지막 불빛 아래서도 나는 멈추지 않아\n남겨 둔 한마디까지 오늘의 노래로 안아\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이 번지고\n말하지 못한 멀어진 연인만 박자처럼 남아\n멈춘 줄 알았던 마음이 다시 눈을 뜨고\n같은 거리를 걸어도 오늘은 다르게 울려\n\n[Chorus]\n나는 너를 다시",
+    "topic": "오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조",
+    "selectedStyleImageId": null,
+    "selectedCharacterIds": [],
+    "promptPack": {
+      "storyPrompt": "",
+      "lyricsPrompt": "",
+      "characterPrompt": "",
+      "scenePrompt": "",
+      "actionPrompt": "",
+      "persuasionStoryPrompt": ""
+    },
+    "promptTemplates": [
+      {
+        "id": "builtin-core-script",
+        "name": "뮤직비디오 기본 프롬프트",
+        "description": "뮤직비디오 콘셉트에 맞는 기본 대본 프롬프트",
+        "prompt": "",
+        "mode": "narration",
+        "engine": "default",
+        "builtIn": true,
+        "isCustomized": false,
+        "updatedAt": 1
+      },
+      {
+        "id": "builtin-dialogue-script",
+        "name": "뮤직비디오 대화형 프롬프트",
+        "description": "대화와 내레이션을 함께 쓰는 변형 프롬프트",
+        "prompt": "",
+        "mode": "dialogue",
+        "engine": "default",
+        "builtIn": true,
+        "isCustomized": false,
+        "updatedAt": 2
+      },
+      {
+        "id": "builtin-scene-heavy",
+        "name": "뮤직비디오 장면 강조 프롬프트",
+        "description": "장면 전환과 시각 요소를 더 강조하는 변형 프롬프트",
+        "prompt": "",
+        "mode": "narration",
+        "engine": "default",
+        "builtIn": true,
+        "isCustomized": false,
+        "updatedAt": 3
+      }
+    ],
+    "selections": {
+      "genre": "감성 드라마",
+      "mood": "몽환적인",
+      "endingTone": "여운 있는 마무리",
+      "setting": "네온 골목",
+      "protagonist": "무대를 떠난 보컬",
+      "conflict": "전하지 못한 마음"
+    },
+    "extractedCharacters": [
+      {
+        "id": "char_1774102199015_v02inq",
+        "name": "무대를 떠난 보컬",
+        "description": "주인공 / 서사를 이끄는 중심 인물",
+        "visualStyle": "몽환적인",
+        "role": "lead",
+        "roleLabel": "주인공 / 서사를 이끄는 중심 인물",
+        "rolePrompt": "주인공 / 서사를 이끄는 중심 인물",
+        "castOrder": 1,
+        "prompt": "무대를 떠난 보컬 / 주인공 / 서사를 이끄는 중심 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몽환적인. Scene context: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이",
+        "imageData": null,
+        "generatedImages": [
+          {
+            "id": "prompted_1774102199015_dwodh7",
+            "label": "무대를 떠난 보컬",
+            "prompt": "무대를 떠난 보컬 / 주인공 / 서사를 이끄는 중심 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몽환적인. Scene context: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이",
+            "imageData": "data:image/svg+xml;base64,CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiB2aWV3Qm94PSIwIDAgOTYwIDU2MCI+CiAgICA8ZGVmcz4KICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiLz4KICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlZmY2ZmYiLz4KICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiByeD0iMzIiIGZpbGw9InVybCgjYmcpIi8+CiAgICA8cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI4OTYiIGhlaWdodD0iNDk2IiByeD0iMjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RiZWFmZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgICA8Y2lyY2xlIGN4PSI3NzAiIGN5PSIxMjIiIHI9Ijg2IiBmaWxsPSIjOGI1Y2Y2IiBvcGFjaXR5PSIwLjE0Ii8+CiAgICA8cmVjdCB4PSI5NiIgeT0iMTI2IiB3aWR0aD0iMjI4IiBoZWlnaHQ9IjI3MCIgcng9IjI0IiBmaWxsPSIjZjhmYWZjIiBzdHJva2U9IiNjYmQ1ZTEiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjE4NiIgcj0iNDgiIGZpbGw9IiNlMmU4ZjAiLz4KICAgIDxwYXRoIGQ9Ik0xNjIgMzAwIEMxODIgMjU2IDIzOCAyNTYgMjU4IDMwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik0yMTAgMjM2IEwyMTAgMzYyIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPHBhdGggZD0iTTE1NCAyODYgTDI2NiAyODYiIHN0cm9rZT0iIzQ3NTU2OSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8cGF0aCBkPSJNMTc2IDQyMCBMMjEwIDM2MiBMMjQ0IDQyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTAyIiBmaWxsPSIjMGYxNzJhIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiPuustOuMgOulvCDrlqDrgpwg67O07LusPC90ZXh0PgogICAgPHRleHQgeD0iMzkwIiB5PSIxNDQiIGZpbGw9IiM0NzU1NjkiIGZvbnQtc2l6ZT0iMjAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+7KO87J246rO1IC8g7ISc7IKs66W8IOydtOuBhOuKlCDspJHsi6wg7J2466y8PC90ZXh0PgogICAgPGZvcmVpZ25PYmplY3QgeD0iMzkwIiB5PSIxODgiIHdpZHRoPSI0NzAiIGhlaWdodD0iMjMwIj4KICAgICAgPGRpdiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94aHRtbCIgc3R5bGU9ImZvbnQtZmFtaWx5OiBBcmlhbCwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAyNHB4OyBsaW5lLWhlaWdodDogMS41OyBjb2xvcjogIzMzNDE1NTsgd29yZC1icmVhazoga2VlcC1hbGw7Ij7rrLTrjIDrpbwg65ag64KcIOuztOy7rCAvIOyjvOyduOqztSAvIOyEnOyCrOulvCDsnbTrgYTripQg7KSR7IusIOyduOusvApTdHlsaXplZCAyRCBhbmltZSBjaGFyYWN0ZXIgaW5zcGlyZWQgYnkgZWFybHkgMjAwMHMgYW5pbWF0aW9uIGFlc3RoZXRpY3MgYW5kIG5vc3RhbGdpYyBjaXR5IHBvcCBhdG1vc3BoZXJlLiBCYWxhbmNlZCwgaHVtYW4tbGlrZSBmYWNpYWwgcHJvcG9ydGlvbnMgPC9kaXY+CiAgICA8L2ZvcmVpZ25PYmplY3Q+CiAgICA8dGV4dCB4PSIzOTAiIHk9IjQ3MCIgZmlsbD0iIzY0NzQ4YiIgZm9udC1zaXplPSIxOCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIj7tlITroaztlITtirgg6riw67CYIOyEoO2DnSDsubTrk5w8L3RleHQ+CiAgPC9zdmc+",
+            "createdAt": 1774102199015,
+            "kind": "character",
+            "sourceMode": "sample",
+            "groupId": "prompted_1774102199015_dwodh7",
+            "groupLabel": "무대를 떠난 보컬"
+          }
+        ],
+        "selectedImageId": null,
+        "createdAt": 1774102199015
+      },
+      {
+        "id": "char_1774102199015_czounc",
+        "name": "연인",
+        "description": "조연 / 주인공의 흐름을 받쳐 주는 인물",
+        "visualStyle": "몽환적인",
+        "role": "support",
+        "roleLabel": "조연 / 주인공의 흐름을 받쳐 주는 인물",
+        "rolePrompt": "조연 / 주인공의 흐름을 받쳐 주는 인물",
+        "castOrder": 2,
+        "prompt": "연인 / 조연 / 주인공의 흐름을 받쳐 주는 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몽환적인. Scene context: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이",
+        "imageData": null,
+        "generatedImages": [
+          {
+            "id": "prompted_1774102199015_5sd9af",
+            "label": "연인",
+            "prompt": "연인 / 조연 / 주인공의 흐름을 받쳐 주는 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몽환적인. Scene context: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이",
+            "imageData": "data:image/svg+xml;base64,CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiB2aWV3Qm94PSIwIDAgOTYwIDU2MCI+CiAgICA8ZGVmcz4KICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiLz4KICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlZmY2ZmYiLz4KICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiByeD0iMzIiIGZpbGw9InVybCgjYmcpIi8+CiAgICA8cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI4OTYiIGhlaWdodD0iNDk2IiByeD0iMjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RiZWFmZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgICA8Y2lyY2xlIGN4PSI3NzAiIGN5PSIxMjIiIHI9Ijg2IiBmaWxsPSIjMjU2M2ViIiBvcGFjaXR5PSIwLjE0Ii8+CiAgICA8cmVjdCB4PSI5NiIgeT0iMTI2IiB3aWR0aD0iMjI4IiBoZWlnaHQ9IjI3MCIgcng9IjI0IiBmaWxsPSIjZjhmYWZjIiBzdHJva2U9IiNjYmQ1ZTEiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjE4NiIgcj0iNDgiIGZpbGw9IiNlMmU4ZjAiLz4KICAgIDxwYXRoIGQ9Ik0xNjIgMzAwIEMxODIgMjU2IDIzOCAyNTYgMjU4IDMwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik0yMTAgMjM2IEwyMTAgMzYyIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPHBhdGggZD0iTTE1NCAyODYgTDI2NiAyODYiIHN0cm9rZT0iIzQ3NTU2OSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8cGF0aCBkPSJNMTc2IDQyMCBMMjEwIDM2MiBMMjQ0IDQyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTAyIiBmaWxsPSIjMGYxNzJhIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiPuyXsOyduDwvdGV4dD4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTQ0IiBmaWxsPSIjNDc1NTY5IiBmb250LXNpemU9IjIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPuyhsOyXsCAvIOyjvOyduOqzteydmCDtnZDrpoTsnYQg67Cb7LOQIOyjvOuKlCDsnbjrrLw8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIzOTAiIHk9IjE4OCIgd2lkdGg9IjQ3MCIgaGVpZ2h0PSIyMzAiPgogICAgICA8ZGl2IHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hodG1sIiBzdHlsZT0iZm9udC1mYW1pbHk6IEFyaWFsLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDI0cHg7IGxpbmUtaGVpZ2h0OiAxLjU7IGNvbG9yOiAjMzM0MTU1OyB3b3JkLWJyZWFrOiBrZWVwLWFsbDsiPuyXsOyduCAvIOyhsOyXsCAvIOyjvOyduOqzteydmCDtnZDrpoTsnYQg67Cb7LOQIOyjvOuKlCDsnbjrrLwKU3R5bGl6ZWQgMkQgYW5pbWUgY2hhcmFjdGVyIGluc3BpcmVkIGJ5IGVhcmx5IDIwMDBzIGFuaW1hdGlvbiBhZXN0aGV0aWNzIGFuZCBub3N0YWxnaWMgY2l0eSBwb3AgYXRtb3NwaGVyZS4gQmFsYW5jZWQsIGh1bWFuLWxpa2UgZmFjaWFsIHByb3BvcnRpb25zIHdpdGg8L2Rpdj4KICAgIDwvZm9yZWlnbk9iamVjdD4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iNDcwIiBmaWxsPSIjNjQ3NDhiIiBmb250LXNpemU9IjE4IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPu2UhOuhrO2UhO2KuCDquLDrsJgg7ISg7YOdIOy5tOuTnDwvdGV4dD4KICA8L3N2Zz4=",
+            "createdAt": 1774102199015,
+            "kind": "character",
+            "sourceMode": "sample",
+            "groupId": "prompted_1774102199015_5sd9af",
+            "groupLabel": "연인"
+          }
+        ],
+        "selectedImageId": null,
+        "createdAt": 1774102199015
+      }
+    ],
+    "styleImages": [],
+    "characterImages": [
+      {
+        "id": "prompted_1774102199015_dwodh7",
+        "label": "무대를 떠난 보컬",
+        "prompt": "무대를 떠난 보컬 / 주인공 / 서사를 이끄는 중심 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몽환적인. Scene context: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이",
+        "imageData": "data:image/svg+xml;base64,CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiB2aWV3Qm94PSIwIDAgOTYwIDU2MCI+CiAgICA8ZGVmcz4KICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiLz4KICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlZmY2ZmYiLz4KICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiByeD0iMzIiIGZpbGw9InVybCgjYmcpIi8+CiAgICA8cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI4OTYiIGhlaWdodD0iNDk2IiByeD0iMjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RiZWFmZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgICA8Y2lyY2xlIGN4PSI3NzAiIGN5PSIxMjIiIHI9Ijg2IiBmaWxsPSIjOGI1Y2Y2IiBvcGFjaXR5PSIwLjE0Ii8+CiAgICA8cmVjdCB4PSI5NiIgeT0iMTI2IiB3aWR0aD0iMjI4IiBoZWlnaHQ9IjI3MCIgcng9IjI0IiBmaWxsPSIjZjhmYWZjIiBzdHJva2U9IiNjYmQ1ZTEiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjE4NiIgcj0iNDgiIGZpbGw9IiNlMmU4ZjAiLz4KICAgIDxwYXRoIGQ9Ik0xNjIgMzAwIEMxODIgMjU2IDIzOCAyNTYgMjU4IDMwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik0yMTAgMjM2IEwyMTAgMzYyIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPHBhdGggZD0iTTE1NCAyODYgTDI2NiAyODYiIHN0cm9rZT0iIzQ3NTU2OSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8cGF0aCBkPSJNMTc2IDQyMCBMMjEwIDM2MiBMMjQ0IDQyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTAyIiBmaWxsPSIjMGYxNzJhIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiPuustOuMgOulvCDrlqDrgpwg67O07LusPC90ZXh0PgogICAgPHRleHQgeD0iMzkwIiB5PSIxNDQiIGZpbGw9IiM0NzU1NjkiIGZvbnQtc2l6ZT0iMjAiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+7KO87J246rO1IC8g7ISc7IKs66W8IOydtOuBhOuKlCDspJHsi6wg7J2466y8PC90ZXh0PgogICAgPGZvcmVpZ25PYmplY3QgeD0iMzkwIiB5PSIxODgiIHdpZHRoPSI0NzAiIGhlaWdodD0iMjMwIj4KICAgICAgPGRpdiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94aHRtbCIgc3R5bGU9ImZvbnQtZmFtaWx5OiBBcmlhbCwgc2Fucy1zZXJpZjsgZm9udC1zaXplOiAyNHB4OyBsaW5lLWhlaWdodDogMS41OyBjb2xvcjogIzMzNDE1NTsgd29yZC1icmVhazoga2VlcC1hbGw7Ij7rrLTrjIDrpbwg65ag64KcIOuztOy7rCAvIOyjvOyduOqztSAvIOyEnOyCrOulvCDsnbTrgYTripQg7KSR7IusIOyduOusvApTdHlsaXplZCAyRCBhbmltZSBjaGFyYWN0ZXIgaW5zcGlyZWQgYnkgZWFybHkgMjAwMHMgYW5pbWF0aW9uIGFlc3RoZXRpY3MgYW5kIG5vc3RhbGdpYyBjaXR5IHBvcCBhdG1vc3BoZXJlLiBCYWxhbmNlZCwgaHVtYW4tbGlrZSBmYWNpYWwgcHJvcG9ydGlvbnMgPC9kaXY+CiAgICA8L2ZvcmVpZ25PYmplY3Q+CiAgICA8dGV4dCB4PSIzOTAiIHk9IjQ3MCIgZmlsbD0iIzY0NzQ4YiIgZm9udC1zaXplPSIxOCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIj7tlITroaztlITtirgg6riw67CYIOyEoO2DnSDsubTrk5w8L3RleHQ+CiAgPC9zdmc+",
+        "createdAt": 1774102199015,
+        "kind": "character",
+        "sourceMode": "sample",
+        "groupId": "prompted_1774102199015_dwodh7",
+        "groupLabel": "무대를 떠난 보컬"
+      },
+      {
+        "id": "prompted_1774102199015_5sd9af",
+        "label": "연인",
+        "prompt": "연인 / 조연 / 주인공의 흐름을 받쳐 주는 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몽환적인. Scene context: 이 대본은 약 20분 분량을 목표로 합니다. 주제는 오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조이고 분위기는 몽환적, 배경은 도시 야경입니다.\n\n말투는 요체를 유지합니다.\n\n[Intro]\n도시 야경 위로 젖은 불빛이 내려와\n오래된 약속과 사회을 시작점으로 관계가 천천히 뒤집히는 감성 구조의 첫 문장이 입술 끝에 맴돌아\n\n[Verse 1]\n신인 가수의 걸음마다 몽환적 밤이",
+        "imageData": "data:image/svg+xml;base64,CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiB2aWV3Qm94PSIwIDAgOTYwIDU2MCI+CiAgICA8ZGVmcz4KICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiLz4KICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlZmY2ZmYiLz4KICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiByeD0iMzIiIGZpbGw9InVybCgjYmcpIi8+CiAgICA8cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI4OTYiIGhlaWdodD0iNDk2IiByeD0iMjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RiZWFmZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgICA8Y2lyY2xlIGN4PSI3NzAiIGN5PSIxMjIiIHI9Ijg2IiBmaWxsPSIjMjU2M2ViIiBvcGFjaXR5PSIwLjE0Ii8+CiAgICA8cmVjdCB4PSI5NiIgeT0iMTI2IiB3aWR0aD0iMjI4IiBoZWlnaHQ9IjI3MCIgcng9IjI0IiBmaWxsPSIjZjhmYWZjIiBzdHJva2U9IiNjYmQ1ZTEiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjE4NiIgcj0iNDgiIGZpbGw9IiNlMmU4ZjAiLz4KICAgIDxwYXRoIGQ9Ik0xNjIgMzAwIEMxODIgMjU2IDIzOCAyNTYgMjU4IDMwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik0yMTAgMjM2IEwyMTAgMzYyIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPHBhdGggZD0iTTE1NCAyODYgTDI2NiAyODYiIHN0cm9rZT0iIzQ3NTU2OSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8cGF0aCBkPSJNMTc2IDQyMCBMMjEwIDM2MiBMMjQ0IDQyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTAyIiBmaWxsPSIjMGYxNzJhIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiPuyXsOyduDwvdGV4dD4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTQ0IiBmaWxsPSIjNDc1NTY5IiBmb250LXNpemU9IjIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPuyhsOyXsCAvIOyjvOyduOqzteydmCDtnZDrpoTsnYQg67Cb7LOQIOyjvOuKlCDsnbjrrLw8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIzOTAiIHk9IjE4OCIgd2lkdGg9IjQ3MCIgaGVpZ2h0PSIyMzAiPgogICAgICA8ZGl2IHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hodG1sIiBzdHlsZT0iZm9udC1mYW1pbHk6IEFyaWFsLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDI0cHg7IGxpbmUtaGVpZ2h0OiAxLjU7IGNvbG9yOiAjMzM0MTU1OyB3b3JkLWJyZWFrOiBrZWVwLWFsbDsiPuyXsOyduCAvIOyhsOyXsCAvIOyjvOyduOqzteydmCDtnZDrpoTsnYQg67Cb7LOQIOyjvOuKlCDsnbjrrLwKU3R5bGl6ZWQgMkQgYW5pbWUgY2hhcmFjdGVyIGluc3BpcmVkIGJ5IGVhcmx5IDIwMDBzIGFuaW1hdGlvbiBhZXN0aGV0aWNzIGFuZCBub3N0YWxnaWMgY2l0eSBwb3AgYXRtb3NwaGVyZS4gQmFsYW5jZWQsIGh1bWFuLWxpa2UgZmFjaWFsIHByb3BvcnRpb25zIHdpdGg8L2Rpdj4KICAgIDwvZm9yZWlnbk9iamVjdD4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iNDcwIiBmaWxsPSIjNjQ3NDhiIiBmb250LXNpemU9IjE4IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPu2UhOuhrO2UhO2KuCDquLDrsJgg7ISg7YOdIOy5tOuTnDwvdGV4dD4KICA8L3N2Zz4=",
+        "createdAt": 1774102199015,
+        "kind": "character",
+        "sourceMode": "sample",
+        "groupId": "prompted_1774102199015_5sd9af",
+        "groupLabel": "연인"
+      }
+    ],
+    "selectedCharacterStyleId": null,
+    "selectedCharacterStyleLabel": "",
+    "selectedCharacterStylePrompt": "",
+    "referenceImages": {
+      "character": [],
+      "style": [],
+      "characterStrength": 70,
+      "styleStrength": 70
+    },
+    "selectedPromptTemplateId": "builtin-core-script",
+    "customScriptSettings": {
+      "expectedDurationMinutes": 3,
+      "speechStyle": "default",
+      "language": "ko",
+      "referenceText": "",
+      "referenceLinks": [],
+      "scriptModel": "openrouter/auto"
+    },
+    "constitutionAnalysis": null
+  },
+  "voicePreviewAsset": null,
+  "scriptPreviewAsset": null,
+  "finalVoiceAsset": null,
+  "backgroundMusicPreview": null,
+  "finalBackgroundMusic": null,
+  "musicVideoPreview": null,
+  "finalMusicVideo": null
+}

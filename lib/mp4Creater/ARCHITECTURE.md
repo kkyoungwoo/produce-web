@@ -1,126 +1,101 @@
 # MP4Creater Architecture
 
-## 1. 화면 축
-
+## 화면 축
 1. 워크플로우 허브
    - 파일: `lib/mp4Creater/App.tsx`, `lib/mp4Creater/components/InputSection.tsx`
-   - 역할: Step 1~5 진행, draft autosave, 프로젝트 진입/복원
-
+   - 역할: Step 1~5 진행, draft autosave, 프로젝트 진입/복원, gallery 진입/복귀
 2. Scene Studio
-   - 파일: `lib/mp4Creater/pages/SceneStudioPage.tsx`
-   - 역할: 씬 카드 렌더, 이미지/오디오/영상 생성, 썸네일 생성/이력 관리, 결과 export
+   - 파일: `lib/mp4Creater/pages/SceneStudioPage.tsx`, `lib/mp4Creater/components/ResultTable.tsx`
+   - 역할: 문단 단위 씬 카드 렌더, 이미지/오디오/영상 생성, 품질 선택 기반 최종 출력, CapCut 작업 패키지 export
+3. Thumbnail Studio
+   - 파일: `lib/mp4Creater/pages/ThumbnailStudioPage.tsx`, `lib/mp4Creater/services/thumbnailService.ts`
+   - 역할: 프로젝트의 대본/선택 캐릭터/화풍/장르/갈등/결말 톤을 바탕으로 대표 썸네일 후보를 여러 개 만들고 선택
+4. Project Gallery
+   - 파일: `lib/mp4Creater/components/ProjectGallery.tsx`
+   - 역할: 프로젝트 목록, 이름 hover rename affordance, 프로젝트 상세 진입, 썸네일 제작 진입
 
-## 2. 라우팅 구조
+## Step 흐름
+1. Step 1: 콘셉트 선택
+   - 내부 타입은 `music_video`, `story`, `news`, `info_delivery`를 사용하고 UI에서는 `뮤직비디오`, `이야기`, `영화`, `정보 전달`로 보입니다.
+   - 콘셉트 변경 시 주제/대본/출연자/스타일과 함께 프로젝트 프롬프트도 해당 콘셉트 기본값으로 재초기화합니다.
+2. Step 2: 주제 입력과 생성 옵션 설정
+3. Step 3: 프로젝트 프롬프트 확인 → 최종 대본 생성/수정 → 출연자 선택
+   - 대본이 있는데 출연자를 고르지 않은 상태로 다음을 누르면, 출연자 선택 영역으로 스크롤하며 다음 작업을 안내합니다.
+4. Step 4: 캐릭터 느낌 선택 → 선택 출연자별 대표 이미지 확정
+   - 느낌 선택 시 화면 최상단으로 스크롤합니다.
+   - 이미 느낌이 저장된 프로젝트는 Step 3 다음 클릭 시 바로 출연자별 캐릭터 제작 구간으로 이어집니다.
+   - 캐릭터 후보는 `+` 생성 카드가 첫 칸, 생성 결과는 오른쪽 누적, 좌우 화살표로 탐색하는 UI를 기준으로 합니다.
+5. Step 5: 최종 영상 화풍 선택
+   - 스타일 선택 상태 동기화는 불필요한 재렌더/새로고침 루프가 없도록 안정적으로 유지합니다.
+6. 완료 즉시 `step-6` 자동 진입
+7. 부가 흐름: `thumbnail-studio`
+   - 갤러리의 `썸네일 제작` 버튼에서 진입합니다.
+   - 대본, 선택된 캐릭터 대표 이미지, 화풍, 배경, 주인공, 썸네일 문구, 장르/갈등/결말 톤을 조합해 썸네일 프롬프트를 구성합니다.
+   - 최종 선택한 썸네일은 프로젝트 저장소 썸네일로 저장합니다.
 
-- `app/[locale]/mp4Creater/step-1/page.tsx`
-- `app/[locale]/mp4Creater/step-2/page.tsx`
-- `app/[locale]/mp4Creater/step-3/page.tsx`
-- `app/[locale]/mp4Creater/step-4/page.tsx`
-- `app/[locale]/mp4Creater/step-5/page.tsx`
-- `app/[locale]/mp4Creater/step-6/page.tsx`
-- `app/[locale]/mp4Creater/scene-studio/page.tsx` (legacy redirect)
+## 프롬프트 연결 원칙
+- Step 1~5에서 정한 값은 최종 씬의 `visualPrompt`와 썸네일 프롬프트까지 이어져야 합니다.
+- 씬 프롬프트는 최소한 다음 값을 직접 반영합니다.
+  - `topic`
+  - `contentType`
+  - `aspectRatio`
+  - `genre`
+  - `mood`
+  - `setting`
+  - `protagonist`
+  - `conflict`
+  - `endingTone`
+  - `storyPrompt`
+  - `scenePrompt`
+  - `actionPrompt`
+  - 선택 캐릭터/스타일 프롬프트
+- 문단별 씬은 이전/다음 문단 문맥을 함께 받아, 인접 장면이 비슷한 인물/배경/무드 결을 유지하도록 조립합니다.
+- `info_delivery`는 이야기형과 분리된 전용 프롬프트 프로필을 사용합니다.
 
-Step 5 완료 후에는 별도 중간 단계 없이 `step-6`으로 즉시 이동합니다.
-`?view=main` 진입은 더 이상 직접 사용하지 않고 gallery로 리다이렉트합니다.
+## 생성 파이프라인 원칙
+- 기본 제작 흐름은 문단 단위(scene-by-scene)입니다.
+- 이미지 생성은 초안 단계에서 토큰 소모를 줄이기 위해 샘플/저부하 흐름을 우선 사용할 수 있습니다.
+- 실제 AI 결과와 샘플 결과는 `sourceMode`를 구분해 저장해야 하며, 샘플 이미지를 AI 생성처럼 기록하지 않습니다.
+- 대본 장면 계획은 텍스트 API가 준비되어 있으면 실제 JSON 씬 프롬프트를 우선 사용하고, 없으면 로컬 폴백으로 내려갑니다.
+- 영상 생성이 없어도 이미지 + 오디오 + 자막만으로 후반 편집을 이어갈 수 있어야 합니다.
 
-## 3. Step 흐름 (최신 기준)
+## 결과물/내보내기 축
+- 최종 출력은 `preview` / `final` 품질 모드를 지원합니다.
+  - `preview`: 저화질/저비용 우선
+  - `final`: 고화질 우선
+- Scene Studio 결과 영역에서는 다음 내보내기 흐름을 유지합니다.
+  - 문단별 자산 다운로드
+  - 전체 SRT 다운로드
+  - 이미지/영상 ZIP export
+  - CapCut 작업 패키지 export
+- CapCut 패키지는 브라우저에서 데스크톱 앱 자동 임포트까지는 보장하지 않고, 대신 초보자도 바로 가져다 쓸 수 있는 타임라인용 구조를 제공합니다.
 
-1. Step 1: 초기 설정(콘텐츠 유형/비율)
-2. Step 2: 콘텐츠 주제 입력 + 추천문장 클릭 즉시 반영
-3. Step 3: 프롬프트 선택 → 추천 문구 추가(`promptAdditions`) → 최종 대본 생성
-   - `프롬프트 보기` 모달은 기본 프롬프트를 프로젝트 전용 복사본으로 분기한 뒤 수정 저장합니다.
-   - 기본 프롬프트 원본은 고정이며, 수정은 프로젝트 복사본에만 반영됩니다.
-4. Step 4: 최종 대본 완료 후 캐릭터 카드 제작(주인공/조연/나레이터)
-5. Step 5: 화풍 선택
-6. 완료 즉시 `step-6`(Scene Studio) 자동 진입
+## CapCut 패키지 구조
+- `timeline_ready/`
+  - 문단별로 바로 타임라인에 올리기 쉬운 클립
+- `scenes/scene_001/ ...`
+  - 문단별 원본 이미지/영상/오디오/자막 텍스트
+- `subtitles/project_subtitles.srt`
+  - 전체 자막 파일
+- `audio/`, `background_music/`
+  - 추가 작업용 오디오 자산
+- `timeline_import_guide.csv`, `manifest.json`, `README.txt`, `capcut_links.txt`
+  - 초보자용 가져오기 순서, 자산 인덱스, 다운로드/설치 안내
 
-## 4. 상태/저장 구조
+## 현재 중요 연결
+- `workflowPromptBuilder.ts`: 콘셉트별 기본 프롬프트와 프롬프트 템플릿 구성
+- `workflowDraftService.ts`: 프로젝트 복원 시 기본 프롬프트 선택값 보정
+- `InputSection.tsx`: 콘셉트 변경 초기화, Step 완료 판정, 출연자 선택 보존, Step 3 안내 스크롤
+- `thumbnailService.ts`: 썸네일용 프롬프트 구성과 샘플/폴백 결과 생성
+- `geminiService.ts`: 문단 단위 씬 계획 생성, JSON 폴백 정규화
+- `sceneAssemblyService.ts`: Step 값과 문단 연속성을 묶어 최종 씬 프롬프트 조립
+- `imageService.ts`: 샘플 이미지 모델 판정과 저부하 기본 이미지 흐름
+- `falService.ts`: image-to-video, data URL 업로드 fallback, 품질 모드 반영
+- `ResultTable.tsx`: 품질 선택, 결과 다운로드, CapCut으로 보내기 버튼
+- `exportService.ts`: ZIP export, CapCut 패키지 생성, CapCut 링크/가이드 포함
+- `projectService.ts`, `localFileApi.ts`: `thumbnail`, `thumbnailTitle`, `thumbnailPrompt`, `thumbnailHistory`, `selectedThumbnailId` 계열 저장 경로
 
-핵심 타입
-- `lib/mp4Creater/types.ts`
-  - `WorkflowDraft`
-  - `SavedProject`
-  - `PromptedImageAsset`
-  - `GeneratedAsset`
-
-저장 서비스
-- `lib/mp4Creater/services/workflowDraftService.ts`
-  - draft 기본값/복원 보정
-- `lib/mp4Creater/services/projectService.ts`
-  - IndexedDB + 프로젝트 인덱스 JSON + 프로젝트 상세 JSON 동기화
-  - 프로젝트 patch 반영 및 autosave 대상 통합
-- `app/api/local-storage/_shared.ts`
-  - 전역 인덱스(`studio-state.json`) read/write
-  - 프로젝트 상세 JSON(`projects/<projectId>.json`) read/write
-  - project number 정규화
-  - client summary 직렬화
-
-저장 원칙
-- 프로젝트별 물리 폴더는 만들지 않습니다.
-- 전역 설정/목록은 `studio-state.json` 하나로 관리합니다.
-- 각 프로젝트의 프롬프트/씬/썸네일/에셋 상세는 `projects/<projectId>.json` 개별 파일로 분리합니다.
-- 갤러리 목록은 인덱스 JSON만 읽고, 프로젝트 본문은 열 때만 개별 JSON을 읽습니다.
-- 생성/복사/삭제/가져오기는 인덱스와 프로젝트 상세 JSON을 분리 갱신합니다.
-
-autosave 범위(워크플로우 + 씬 연결 데이터)
-- 콘텐츠 주제
-- 프롬프트 선택값
-- 추천 문구 추가값(`promptAdditions`)
-- 최종 대본
-- 캐릭터 카드(주인공/조연/나레이터) 및 선택 상태
-- 화풍 선택값
-- 썸네일 관련 데이터(`thumbnail`, `thumbnailHistory`, `selectedThumbnailId`, `thumbnailPrompt`)
-- 씬 생성 연결 데이터(`assets`, `backgroundMusicTracks`, `previewMix`, `cost`)
-
-## 5. 갤러리 UX
-
-- `ProjectGallery.tsx`에서 프로젝트 카드를 렌더링합니다.
-- 카드 좌측 상단에는 개별 선택 체크박스를 둡니다.
-- 상단 헤더에는 전체 선택, 가져오기, 선택 내보내기, 선택 삭제 액션을 둡니다.
-- 카드 내부 개별 삭제 버튼은 사용하지 않습니다.
-- 개별 복사는 카드 우측 상단에서 수행합니다.
-
-## 6. 썸네일 규칙
-
-프로젝트 카드 표시 우선순위
-1. 마지막에 생성된 썸네일(`thumbnailHistory` 최신 항목)
-2. 첫 번째 씬 이미지
-3. fallback 이미지
-
-Scene Studio에서 썸네일은 다회 생성이 가능하며, 생성 이력에서 현재 대표 썸네일을 선택할 수 있습니다.
-
-## 7. Scene Studio 로딩/성능
-
-- `step-6` 진입 시 전체 자동 생성을 시작하지 않습니다.
-- 프로젝트 진입 시 텍스트/메타 UI를 먼저 렌더링하고, 씬 카드는 빈 썸네일 상태로 먼저 표시합니다.
-- 이미지 생성은 씬 카드의 `이미지 생성` 버튼 또는 `전체 이미지 생성` 버튼을 눌렀을 때만 시작합니다.
-- 영상 생성은 해당 씬의 `이미지 + 비주얼 프롬프트`를 기준으로 씬별/일괄 처리합니다.
-- 진행률은 퍼센트로 노출하고, 씬 단위 로딩 상태를 분리합니다.
-- 미리보기는 요청 시 씬들을 합친 합본 영상(프리뷰 렌더)으로 표시합니다.
-- 이미지/영상 생성 이력은 카드 단위로 관리해 필요한 범위만 확인합니다.
-
-## 8. 주요 연계 파일
-
-- `lib/mp4Creater/components/ProjectGallery.tsx` (프로젝트 목록/썸네일 표시)
-- `lib/mp4Creater/services/thumbnailService.ts` (썸네일 프롬프트/샘플 생성)
-- `lib/mp4Creater/services/sceneAssemblyService.ts` (draft 기반 씬 프롬프트 조립)
-- `lib/mp4Creater/services/scriptComposerService.ts` (Step 3 최종 대본 생성)
-- `lib/mp4Creater/services/projectNavigationCache.ts` (step/scene 이동 시 프로젝트 문맥 캐시)
-
-## 2026-03 provider/fallback update
-- OpenRouter handles text generation, recommendations, and prompt translation.
-- ElevenLabs handles premium voice flows.
-- qwen3-tts is exposed as the default free TTS choice and falls back to browser/sample audio internally.
-- Scene Studio keeps working without API keys by using sample image/audio/video paths.
-- Prompt files are split into `musicVideoPrompts.ts`, `storyPrompts.ts`, and `newsPrompts.ts`.
-
-## 2026-03-21 storage/performance update
-- 프로젝트 저장 구조를 프로젝트별 폴더 방식에서 단일 JSON 저장소 방식으로 단순화했습니다.
-- 생성/복사/삭제 후 강한 force sync 의존을 줄여 갤러리 반응 속도를 높였습니다.
-- 선택 내보내기 / 가져오기 / 선택 삭제 UX를 갤러리 헤더 액션으로 통합했습니다.
-
-## 2026-03-21 index-detail split update
-- `studio-state.json`은 전역 설정 + `projectIndex`만 보관합니다.
-- 프로젝트 본문은 `local-data/tubegen-studio/projects/<projectId>.json`으로 분리했습니다.
-- 갤러리는 요약본만 사용하고, 제작하기/복사/내보내기는 필요 시 상세 JSON을 로드합니다.
-- 자동 저장은 전체 목록 재기록 대신 현재 프로젝트 상세 JSON 한 개만 갱신합니다.
+## 라우팅 원칙
+- `step-1` ~ `step-6`, `thumbnail-studio` 이동 시 `projectId` 쿼리를 유지합니다.
+- 내부 버튼은 브라우저 뒤로가기와 충돌하지 않도록 `push` 기반 이동을 우선 사용하고, 보정성 redirect만 `replace`를 사용합니다.
+- `scene-studio`는 레거시 경로여도 완전히 끊지 말고, 정식 흐름인 `step-6`과 호환되게 유지합니다.

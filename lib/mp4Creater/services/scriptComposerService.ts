@@ -22,6 +22,8 @@ interface ScriptComposerOptions {
   model?: string;
   conversationMode?: boolean;
   customSettings?: CustomScriptSettings;
+  generationIntent?: 'draft' | 'expand';
+  expandByChars?: number;
 }
 
 export interface ScriptComposerResult {
@@ -152,6 +154,101 @@ function formatDuration(minutes: number) {
   return `${safeMinutes} minute${safeMinutes > 1 ? 's' : ''}`;
 }
 
+
+function resolveExpandByChars(options: ScriptComposerOptions) {
+  return Math.max(300, Math.min(4000, Math.round(options.expandByChars || 800)));
+}
+
+function buildGenerationIntentGuide(options: ScriptComposerOptions) {
+  if (options.generationIntent === 'expand') {
+    const target = resolveExpandByChars(options);
+    return options.contentType === 'music_video'
+      ? `현재 대본을 지우지 말고 그대로 유지한 채 뒤에 약 ${target}자 분량을 이어서 확장한다. 새로 시작하지 말고, 같은 노래의 다음 가사 블록을 자연스럽게 추가한다.`
+      : `현재 대본을 지우지 말고 그대로 유지한 채 뒤에 약 ${target}자 분량을 이어서 확장한다. 새로 다시 쓰지 말고 현재 결말 다음으로 자연스럽게 문단을 추가한다.`;
+  }
+
+  return options.contentType === 'music_video'
+    ? '선택된 프롬프트와 예시를 따라 실제로 부를 수 있는 가사형 최종 대본을 새로 작성한다.'
+    : '선택된 프롬프트와 예시를 따라 최종 영상용 대본을 새로 작성한다.';
+}
+
+function buildOutputFormatReminder(options: ScriptComposerOptions) {
+  if (options.contentType === 'music_video') {
+    return [
+      '출력 형식: [Intro], [Verse 1], [Chorus], [Verse 2], [Bridge], [Outro] 중 필요한 블록을 사용한다.',
+      '각 블록 안에는 실제 가사 줄을 2~4줄 배치한다.',
+      '설명문이나 해설문 대신 가사만 쓴다.',
+    ].join(' ');
+  }
+
+  if (options.contentType === 'info_delivery') {
+    return '출력 형식: 문단형 정보 전달 대본으로 쓰고 첫 문단은 핵심 질문, 중간은 설명 블록, 마지막은 요약과 다음 행동으로 끝낸다.';
+  }
+
+  if (options.contentType === 'news') {
+    return '출력 형식: 장면이 보이는 영화형 문단 대본으로 쓰고 각 문단이 하나의 시네마틱 장면처럼 읽히게 한다.';
+  }
+
+  return '출력 형식: 감정과 사건이 이어지는 이야기형 문단 대본으로 쓴다.';
+}
+
+function createMusicVideoExpansionFallback(options: ScriptComposerOptions) {
+  const topic = options.topic || '이 노래';
+  const lead = options.selections.protagonist || '화자';
+  const conflict = options.selections.conflict || '남겨 둔 마음';
+  const mood = options.selections.mood || '짙은';
+  const endingTone = options.selections.endingTone || '여운 있는 마감';
+  const target = resolveExpandByChars(options);
+  const extraBlocks = [
+    `[Bridge]
+${lead}의 숨 위로 ${mood} 불빛이 더 크게 번져
+끝내 숨겨 둔 ${conflict}마저 멜로디로 흘러와
+돌아갈 수 없는 마음도 오늘은 후렴이 되고
+멈춘 장면 같던 밤이 다시 앞으로 걸어가`,
+    `[Chorus]
+나는 너를 더 크게 불러, 이번엔 나를 먼저 불러
+사라진 줄 알았던 떨림을 끝까지 살려
+대답 없는 새벽이어도 이 노래는 계속돼
+${topic}의 마지막 줄까지 전부 안고 갈게`,
+    `[Outro]
+${endingTone} 공기 속에서도 나는 천천히 웃어
+남겨 둔 한마디까지 오늘의 노래로 남겨`,
+  ];
+  const blockCount = target >= 1800 ? 3 : target >= 900 ? 2 : 1;
+  return normalizeStoryText([options.currentScript?.trim() || '', ...extraBlocks.slice(0, blockCount)].filter(Boolean).join('\n\n'));
+}
+
+function createNarrativeExpansionFallback(options: ScriptComposerOptions) {
+  const topic = options.topic || '이번 이야기';
+  const lead = options.selections.protagonist || '주인공';
+  const setting = options.selections.setting || '익숙한 공간';
+  const conflict = options.selections.conflict || '남겨 둔 문제';
+  const mood = options.selections.mood || '긴장감 있는';
+  const endingTone = options.selections.endingTone || '여운 있는 마감';
+  const target = resolveExpandByChars(options);
+  const extras = options.contentType === 'info_delivery'
+    ? [
+        `${topic}를 더 쉽게 이해하려면 실제 장면 하나를 붙여 보는 편이 좋다. ${setting} 기준 사례를 넣으면 시청자는 설명이 아니라 체감으로 내용을 받아들이게 된다. 여기서 ${conflict}이 왜 중요한지도 자연스럽게 정리된다.`,
+        `이어서 비교 지점을 짚어 주면 정보 전달력이 더 좋아진다. 이전 방식과 지금 방식을 나란히 보여 주고, 숫자나 짧은 예시를 더해 차이가 어디서 발생하는지 설명한다. ${mood} 톤을 유지하되 문장은 어렵지 않게 정리한다.`,
+        `마지막에는 핵심을 다시 한 번 묶어 준다. 지금 당장 기억해야 할 포인트와 다음에 확인할 행동을 한 줄씩 남기면 ${endingTone} 흐름으로 마무리할 수 있다.`,
+      ]
+    : [
+        `${setting}의 공기는 조금씩 달라지고, ${lead}은 방금 지나간 장면이 끝이 아니라는 사실을 뒤늦게 알아챈다. ${conflict}은 아직 해결되지 않았고, 오히려 더 또렷한 표정으로 눈앞에 돌아온다.`,
+        `${lead}은 이번에는 도망치지 않기로 한다. 사소해 보였던 말과 움직임이 하나씩 이어지면서 ${topic}의 진짜 무게가 드러나고, ${mood} 결의가 다음 선택을 밀어 올린다.`,
+        `결국 마지막 장면은 이전보다 한 걸음 더 나아간 자리에서 멈춘다. 모든 것이 끝난 것은 아니지만, ${lead}은 ${endingTone} 공기 속에서 분명히 다른 얼굴로 다음 장면을 맞는다.`,
+      ];
+  const paragraphCount = target >= 1800 ? 3 : target >= 900 ? 2 : 1;
+  return normalizeStoryText([options.currentScript?.trim() || '', ...extras.slice(0, paragraphCount)].filter(Boolean).join('\n\n'));
+}
+
+function createExpansionFallback(options: ScriptComposerOptions) {
+  const current = normalizeStoryText(options.currentScript || '');
+  if (!current) return createFallback({ ...options, generationIntent: 'draft' });
+  return options.contentType === 'music_video'
+    ? createMusicVideoExpansionFallback(options)
+    : createNarrativeExpansionFallback(options);
+}
+
 function buildLocalizedGuide(options: ScriptComposerOptions) {
   const settings = options.customSettings;
   if (!settings) return [] as string[];
@@ -235,6 +332,10 @@ function applyCustomFallback(baseText: string, options: ScriptComposerOptions) {
 }
 
 function createFallback(options: ScriptComposerOptions) {
+  if (options.generationIntent === 'expand') {
+    return createExpansionFallback(options);
+  }
+
   const speechStyle = options.customSettings?.speechStyle || 'yo';
   const isSilentMode = options.customSettings?.language === 'mute';
   const baseText = isSilentMode
@@ -505,6 +606,8 @@ function buildConstitutionUserPayload(options: ScriptComposerOptions) {
     `예상 길이: ${Math.max(1, Math.min(30, options.customSettings?.expectedDurationMinutes || 3))}분`,
     `대본 언어: ${formatScriptLanguageLabel(options.customSettings?.language)}`,
     `선호 말투: ${formatSpeechStyleLabel(options.customSettings?.speechStyle)}`,
+    `생성 작업: ${buildGenerationIntentGuide(options)}`,
+    `출력 형식: ${buildOutputFormatReminder(options)}`,
     `현재 초안: ${options.currentScript?.trim() || '없음'}`,
     `참고 텍스트: ${options.customSettings?.referenceText?.trim() || '없음'}`,
     additionBlock.length ? `[추가 가이드]\n${additionBlock.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
@@ -559,6 +662,8 @@ Ending tone: ${options.selections.endingTone}
 
 Prompt template: ${options.template.name}
 Prompt description: ${options.template.description}
+Generation task: ${buildGenerationIntentGuide(options)}
+Output format reminder: ${buildOutputFormatReminder(options)}
 Expected duration: ${options.customSettings?.expectedDurationMinutes || 3} minutes
 Preferred speech style: ${formatSpeechStyleEnglish(options.customSettings?.speechStyle)}
 Script language: ${formatScriptLanguageEnglish(options.customSettings?.language)}
@@ -585,7 +690,7 @@ ${additionBlock.map((item, index) => `${index + 1}. ${item}`).join('\n')}`
     : requestPayload;
 
   const result = await runTextAi({
-    system: bundle.system,
+    system: `${bundle.system} 선택된 프롬프트의 출력 형식과 예시를 우선 규칙으로 따르고, 현재 초안이 있으면 지우지 말고 이어서 확장한다.`,
     user: mergedPayload,
     model: options.model || options.customSettings?.scriptModel || 'openrouter/auto',
     temperature: options.conversationMode || options.template.mode === 'dialogue' ? 0.9 : 0.76,
