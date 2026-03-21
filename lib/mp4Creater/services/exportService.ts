@@ -1,9 +1,9 @@
 /**
- * 스토리보드 / 작업 패키지 내보내기 서비스
+ * 스토리보드 / CapCut 패키지 내보내기 서비스
  * 외부 ZIP 의존성 없이 브라우저에서 바로 저장 가능한 패키지를 만듭니다.
  */
 
-import { BackgroundMusicTrack, GeneratedAsset, SavedProject } from '../types';
+import { BackgroundMusicTrack, GeneratedAsset, PreviewMixSettings, SavedProject } from '../types';
 import { generateSrtContent } from './srtService';
 import { generateVideo } from './videoService';
 import { blobFromDataValue, extensionFromMime, sanitizeDownloadName, triggerBlobDownload } from '../utils/downloadHelpers';
@@ -80,17 +80,10 @@ type ZipEntry = {
   modifiedAt?: number;
 };
 
-type CapCutRegistrationRow = {
-  order: string;
-  kind: 'timeline_clip' | 'subtitle' | 'image' | 'tts' | 'source_video' | 'bgm';
-  path: string;
-  note: string;
-};
-
 type SceneClipBuildResult = {
   blob: Blob;
   extension: string;
-  mode: 'existing-video' | 'rendered-image-audio' | 'rendered-image-only';
+  mode: 'rendered-scene' | 'existing-video';
 };
 
 function createZipBlob(entries: ZipEntry[]): Blob {
@@ -226,56 +219,26 @@ function buildProjectCsv(assets: GeneratedAsset[]): string {
   return ['\uFEFF' + header.join(','), ...rows].join('\n');
 }
 
-function buildSceneSubtitleText(asset: GeneratedAsset): string {
-  if (!asset.subtitleData?.words?.length) return '';
-  if (asset.subtitleData.fullText?.trim()) return asset.subtitleData.fullText.trim();
-  return asset.subtitleData.words.map((item) => item.word).join(' ').trim();
-}
+async function fetchBlobFromValue(value: string | null | undefined, fallbackMime: string): Promise<Blob | null> {
+  if (!value) return null;
 
-function buildCapCutRegistrationCsv(rows: CapCutRegistrationRow[]): string {
-  const header = ['order', 'kind', 'relative_path', 'note'];
-  return ['\uFEFF' + header.join(','), ...rows.map((row) => [
-    escapeCsvCell(row.order),
-    escapeCsvCell(row.kind),
-    escapeCsvCell(row.path),
-    escapeCsvCell(row.note),
-  ].join(','))].join('\n');
-}
+  const direct = blobFromDataValue(value, fallbackMime);
+  if (direct && direct.size > 0) return direct;
 
-function buildTimelineOrderText(rows: CapCutRegistrationRow[]): string {
-  return rows
-    .filter((row) => row.kind === 'timeline_clip')
-    .map((row) => `${row.order}. ${row.path}`)
-    .join('\n');
-}
-
-async function buildSceneClip(asset: GeneratedAsset, qualityMode: 'preview' | 'final'): Promise<SceneClipBuildResult | null> {
-  const localVideoBlob = blobFromDataValue(asset.videoData, 'video/mp4');
-  if (localVideoBlob && localVideoBlob.size > 0) {
-    return {
-      blob: localVideoBlob,
-      extension: extensionFromMime(localVideoBlob.type || 'video/mp4', 'mp4'),
-      mode: 'existing-video',
-    };
+  if (typeof fetch !== 'function') return null;
+  const trimmed = value.trim();
+  if (!(trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('blob:') || trimmed.startsWith('/'))) {
+    return null;
   }
 
-  if (!asset.imageData) return null;
-
   try {
-    const result = await generateVideo([asset], () => {}, undefined, {
-      enableSubtitles: false,
-      qualityMode,
-      aspectRatio: asset.aspectRatio || '16:9',
-      useSceneVideos: false,
-    });
-    if (!result?.videoBlob) return null;
-    return {
-      blob: result.videoBlob,
-      extension: extensionFromMime(result.videoBlob.type || 'video/mp4', 'mp4'),
-      mode: asset.audioData ? 'rendered-image-audio' : 'rendered-image-only',
-    };
+    const response = await fetch(trimmed);
+    if (!response.ok) return null;
+    const fetched = await response.blob();
+    if (!fetched.size) return null;
+    return fetched;
   } catch (error) {
-    console.warn('[CapCut Export] scene clip render failed:', asset.sceneNumber, error);
+    console.warn('[CapCut Export] fetch blob failed:', error);
     return null;
   }
 }
@@ -285,19 +248,70 @@ async function pushBlobEntry(path: string, blob: Blob, pushEntry: (path: string,
   pushEntry(path, new Uint8Array(buffer));
 }
 
+async function buildSceneClip(options: {
+  asset: GeneratedAsset;
+  qualityMode: 'preview' | 'final';
+  backgroundTrack?: BackgroundMusicTrack | null;
+  previewMix?: PreviewMixSettings | null;
+}): Promise<SceneClipBuildResult | null> {
+  const { asset, qualityMode, backgroundTrack, previewMix } = options;
+
+  if (asset.imageData) {
+    try {
+      const result = await generateVideo([asset], () => {}, undefined, {
+        enableSubtitles: true,
+        qualityMode,
+        aspectRatio: asset.aspectRatio || '16:9',
+        useSceneVideos: true,
+        backgroundTracks: backgroundTrack?.audioData ? [backgroundTrack] : [],
+        previewMix: {
+          narrationVolume: previewMix?.narrationVolume ?? 1,
+          backgroundMusicVolume: previewMix?.backgroundMusicVolume ?? backgroundTrack?.volume ?? 0.28,
+        },
+      });
+
+      if (result?.videoBlob) {
+        return {
+          blob: result.videoBlob,
+          extension: extensionFromMime(result.videoBlob.type || 'video/mp4', 'mp4'),
+          mode: 'rendered-scene',
+        };
+      }
+    } catch (error) {
+      console.warn('[CapCut Export] scene render failed:', asset.sceneNumber, error);
+    }
+  }
+
+  const originalVideoBlob = await fetchBlobFromValue(asset.videoData, 'video/mp4');
+  if (originalVideoBlob && originalVideoBlob.size > 0) {
+    return {
+      blob: originalVideoBlob,
+      extension: extensionFromMime(originalVideoBlob.type || 'video/mp4', 'mp4'),
+      mode: 'existing-video',
+    };
+  }
+
+  return null;
+}
+
 export async function exportCapCutPackage(options: {
   assets: GeneratedAsset[];
   projectName: string;
   backgroundMusicTracks?: BackgroundMusicTrack[];
   activeBackgroundTrackId?: string | null;
+  previewMix?: PreviewMixSettings | null;
   topic?: string;
   qualityMode?: 'preview' | 'final';
 }): Promise<void> {
   const safeName = sanitizeDownloadName(options.projectName || options.topic || 'mp4Creater_project', 'mp4Creater_project');
-  const root = `${safeName}_capcut_package`;
+  const root = `${safeName}_capcut_drag_package`;
   const entries: ZipEntry[] = [];
   const addedPaths = new Set<string>();
   const qualityMode = options.qualityMode || 'preview';
+  const selectedBackgroundTrack = options.backgroundMusicTracks?.find((track) => track.id === options.activeBackgroundTrackId)
+    || options.backgroundMusicTracks?.[0]
+    || null;
+
   const pushEntry = (path: string, bytes: Uint8Array) => {
     const normalized = `${root}/${path.replace(/^\/+/, '')}`;
     if (addedPaths.has(normalized)) return;
@@ -305,171 +319,89 @@ export async function exportCapCutPackage(options: {
     entries.push({ path: normalized, bytes, modifiedAt: Date.now() });
   };
 
-  const mainBgm = options.backgroundMusicTracks?.find((track) => track.id === options.activeBackgroundTrackId)
-    || options.backgroundMusicTracks?.[0]
-    || null;
+  const videoIndexRows: string[] = ['order,file,mode,note'];
   const srtContent = await generateSrtContent(options.assets).catch(() => '');
-  const registrationRows: CapCutRegistrationRow[] = [];
-  const sceneSummaries: Array<Record<string, unknown>> = [];
-  let generatedClipCount = 0;
 
   pushEntry('README.txt', textToBytes([
-    'CapCut 파일등록용 작업 패키지입니다.',
+    'CapCut 드래그용 3폴더 패키지입니다.',
     '',
-    '추천 순서',
-    '1) 압축을 풀고 timeline_ready 폴더의 문단별 clip 파일을 CapCut에 한 번에 Import 합니다.',
-    '2) clip 파일을 scene_001 -> scene_002 -> scene_003 순서로 타임라인에 배치합니다.',
-    '3) 자막은 CapCut 상단 Captions > Add Captions 또는 Import file에서 subtitles/project_subtitles.srt 를 불러옵니다.',
-    '4) 씬별 세부 수정이 필요하면 scenes/scene_001 폴더의 이미지, TTS, 자막 파일을 사용해 교체 편집합니다.',
-    '5) 배경음은 audio 폴더 파일을 추가로 올려 길이에 맞게 깔아 주세요.',
+    '구성',
+    '- 01_videos : 문단별 클립. 기본으로 자막/나레이션/선택 배경음까지 합쳐서 저장합니다.',
+    '- 02_music : 원본 배경음 파일. CapCut 안에서 따로 볼륨 조절하거나 교체할 때 사용합니다.',
+    '- 03_subtitles : 전체 편집용 SRT. CapCut에서 텍스트 자막을 다시 수정하고 싶을 때만 가져옵니다.',
     '',
-    `현재 패키지 품질: ${qualityMode === 'final' ? '고화질' : '저화질 빠른 편집용'}`,
-    'scene clip 은 가능한 경우 기존 영상 파일을 사용하고, 없으면 현재 이미지 + TTS로 로컬 MP4/WebM 클립을 만들어 넣습니다.',
-    '브라우저/코덱 환경에 따라 일부 clip 이 WebM으로 저장될 수 있습니다. 그런 경우 scenes 폴더의 이미지 + TTS를 직접 넣어도 됩니다.',
-  ].join('\n')));
-
-  pushEntry('capcut_download.txt', textToBytes([
-    'CapCut Desktop 다운로드',
-    'https://www.capcut.com/tools/desktop-video-editor',
+    '추천 사용 순서',
+    '1) 압축을 푼 뒤 01_videos 폴더의 파일을 모두 CapCut에 드래그합니다.',
+    '2) 필요하면 02_music 폴더의 배경음을 추가합니다.',
+    '3) 텍스트 자막을 수정하고 싶을 때만 03_subtitles/project_subtitles.srt 를 CapCut 자막 가져오기로 불러옵니다.',
     '',
-    '자막 가져오기 도움말',
-    'https://www.capcut.com/help/how-to-import-subtitles',
-    '',
-    'MP4/JPG 가져오기 문제 도움말',
-    'https://www.capcut.com/help/can-not-import-mp4-and-jpg-files',
+    `현재 내보내기 품질: ${qualityMode === 'final' ? '고화질' : '저화질 빠른 편집용'}`,
+    '클립은 가능한 한 현재 씬 영상 + 자막 + 나레이션 + 선택 배경음을 함께 굽습니다.',
+    '브라우저/코덱 환경에 따라 확장자가 mp4 대신 webm으로 저장될 수 있습니다.',
   ].join('\n')));
 
   pushEntry('project_script.csv', textToBytes(buildProjectCsv(options.assets)));
 
   if (srtContent.trim()) {
-    pushEntry('subtitles/project_subtitles.srt', textToBytes(srtContent));
-    registrationRows.push({
-      order: 'project',
-      kind: 'subtitle',
-      path: 'subtitles/project_subtitles.srt',
-      note: 'CapCut에서 전체 자막 파일로 가져오기',
-    });
+    pushEntry('03_subtitles/001_project_subtitles.srt', textToBytes(srtContent));
+  } else {
+    pushEntry('03_subtitles/000_no_subtitles.txt', textToBytes('현재 프로젝트에는 가져올 SRT 자막 데이터가 없습니다.'));
   }
 
+  let clipCount = 0;
   for (let index = 0; index < options.assets.length; index += 1) {
     const asset = options.assets[index];
     const sceneNo = `${asset.sceneNumber || index + 1}`.padStart(3, '0');
-    const sceneFolder = `scenes/scene_${sceneNo}`;
-    const subtitleText = buildSceneSubtitleText(asset);
-    const sceneSrt = await generateSrtContent([asset]).catch(() => '');
-
-    pushEntry(`${sceneFolder}/scene_${sceneNo}_narration.txt`, textToBytes(asset.narration || ''));
-    pushEntry(`${sceneFolder}/scene_${sceneNo}_prompt.txt`, textToBytes(asset.visualPrompt || ''));
-
-    if (subtitleText) {
-      pushEntry(`${sceneFolder}/scene_${sceneNo}_subtitle.txt`, textToBytes(subtitleText));
-    }
-
-    if (sceneSrt.trim()) {
-      pushEntry(`${sceneFolder}/scene_${sceneNo}_subtitle.srt`, textToBytes(sceneSrt));
-    }
-
-    const imageBlob = blobFromDataValue(asset.imageData, 'image/png');
-    if (imageBlob) {
-      const imageExt = extensionFromMime(imageBlob.type || 'image/png', 'png');
-      await pushBlobEntry(`${sceneFolder}/scene_${sceneNo}_image.${imageExt}`, imageBlob, pushEntry);
-      registrationRows.push({
-        order: sceneNo,
-        kind: 'image',
-        path: `${sceneFolder}/scene_${sceneNo}_image.${imageExt}`,
-        note: 'clip 교체가 필요할 때 씬 원본 이미지로 사용',
-      });
-    }
-
-    const audioBlob = blobFromDataValue(asset.audioData, 'audio/mpeg');
-    if (audioBlob) {
-      const audioExt = extensionFromMime(audioBlob.type || 'audio/mpeg', 'mp3');
-      await pushBlobEntry(`${sceneFolder}/scene_${sceneNo}_tts.${audioExt}`, audioBlob, pushEntry);
-      registrationRows.push({
-        order: sceneNo,
-        kind: 'tts',
-        path: `${sceneFolder}/scene_${sceneNo}_tts.${audioExt}`,
-        note: 'CapCut에서 음성만 따로 교체하거나 볼륨 조절할 때 사용',
-      });
-    }
-
-    const originalVideoBlob = blobFromDataValue(asset.videoData, 'video/mp4');
-    if (originalVideoBlob) {
-      const originalVideoExt = extensionFromMime(originalVideoBlob.type || 'video/mp4', 'mp4');
-      await pushBlobEntry(`${sceneFolder}/scene_${sceneNo}_source_video.${originalVideoExt}`, originalVideoBlob, pushEntry);
-      registrationRows.push({
-        order: sceneNo,
-        kind: 'source_video',
-        path: `${sceneFolder}/scene_${sceneNo}_source_video.${originalVideoExt}`,
-        note: '원본 씬 영상 보관본',
-      });
-    }
-
-    const clipResult = await buildSceneClip(asset, qualityMode);
-    if (clipResult) {
-      const clipPath = `timeline_ready/scene_${sceneNo}_clip.${clipResult.extension}`;
-      await pushBlobEntry(clipPath, clipResult.blob, pushEntry);
-      registrationRows.push({
-        order: sceneNo,
-        kind: 'timeline_clip',
-        path: clipPath,
-        note: clipResult.mode === 'existing-video'
-          ? '이 파일을 CapCut에 먼저 Import 해서 타임라인에 배치'
-          : clipResult.mode === 'rendered-image-audio'
-            ? '현재 이미지 + TTS로 만든 문단 클립'
-            : '현재 이미지로 만든 정적 문단 클립',
-      });
-      generatedClipCount += 1;
-    }
-
-    sceneSummaries.push({
-      sceneNumber: asset.sceneNumber || index + 1,
-      narration: asset.narration,
-      targetDuration: asset.targetDuration,
-      hasImage: Boolean(asset.imageData),
-      hasAudio: Boolean(asset.audioData),
-      hasVideo: Boolean(asset.videoData),
-      hasSubtitle: Boolean(asset.subtitleData?.words?.length || asset.subtitleData?.fullText),
-      exportedTimelineClip: Boolean(clipResult),
+    const clipResult = await buildSceneClip({
+      asset,
       qualityMode,
+      backgroundTrack: selectedBackgroundTrack,
+      previewMix: options.previewMix,
     });
+
+    if (!clipResult) continue;
+
+    const clipFilename = `01_videos/${sceneNo}_scene_${sceneNo}_clip.${clipResult.extension}`;
+    await pushBlobEntry(clipFilename, clipResult.blob, pushEntry);
+    videoIndexRows.push([
+      sceneNo,
+      clipFilename,
+      clipResult.mode,
+      escapeCsvCell(clipResult.mode === 'rendered-scene' ? '자막/나레이션/선택 배경음이 합쳐진 클립' : '기존 영상 원본 클립'),
+    ].join(','));
+    clipCount += 1;
   }
 
-  const bgmTasks = (options.backgroundMusicTracks || []).flatMap((track, index) => {
-    const blob = blobFromDataValue(track.audioData, 'audio/mpeg');
-    if (!blob) return [] as Array<Promise<void>>;
-    const extension = extensionFromMime(blob.type || 'audio/mpeg', 'mp3');
-    const suffix = `${index + 1}`.padStart(2, '0');
-    const fileName = `audio/background_${suffix}_${sanitizeFilename(track.title || 'bgm')}.${extension}`;
-    registrationRows.push({
-      order: suffix,
-      kind: 'bgm',
-      path: fileName,
-      note: track.id === mainBgm?.id ? '현재 선택된 메인 배경음' : '추가 배경음 후보',
-    });
-    return [blob.arrayBuffer().then((buffer) => {
-      pushEntry(fileName, new Uint8Array(buffer));
-    })];
-  });
-  await Promise.all(bgmTasks);
+  pushEntry('01_videos/000_import_order.csv', textToBytes('\uFEFF' + videoIndexRows.join('\n')));
 
-  pushEntry('capcut_file_registration.csv', textToBytes(buildCapCutRegistrationCsv(registrationRows)));
-  pushEntry('timeline_ready/timeline_import_order.txt', textToBytes(buildTimelineOrderText(registrationRows)));
+  if (selectedBackgroundTrack?.audioData) {
+    const bgmBlob = await fetchBlobFromValue(selectedBackgroundTrack.audioData, 'audio/mpeg');
+    if (bgmBlob && bgmBlob.size > 0) {
+      const bgmExtension = extensionFromMime(bgmBlob.type || 'audio/mpeg', 'mp3');
+      await pushBlobEntry(
+        `02_music/001_selected_background_${sanitizeFilename(selectedBackgroundTrack.title || 'bgm')}.${bgmExtension}`,
+        bgmBlob,
+        pushEntry,
+      );
+    }
+  }
+
+  if (!(selectedBackgroundTrack?.audioData)) {
+    pushEntry('02_music/000_no_background_music.txt', textToBytes('현재 선택된 배경음이 없습니다.'));
+  }
 
   pushEntry('manifest.json', textToBytes(JSON.stringify({
     projectName: options.projectName,
     topic: options.topic || options.projectName,
     exportedAt: new Date().toISOString(),
+    clipCount,
     sceneCount: options.assets.length,
-    generatedClipCount,
-    hasOverallSrt: Boolean(srtContent.trim()),
     qualityMode,
-    backgroundMusic: mainBgm ? { id: mainBgm.id, title: mainBgm.title } : null,
-    scenes: sceneSummaries,
+    selectedBackgroundTrack: selectedBackgroundTrack ? { id: selectedBackgroundTrack.id, title: selectedBackgroundTrack.title } : null,
   }, null, 2)));
 
   const zipBlob = createZipBlob(entries);
-  triggerBlobDownload(zipBlob, `${safeName}_capcut_package.zip`);
+  triggerBlobDownload(zipBlob, `${safeName}_capcut_drag_package.zip`);
 }
 
 export async function exportProjectToZip(project: SavedProject): Promise<void> {

@@ -355,7 +355,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
           <div className="text-4xl">🎬</div>
           <h3 className="mt-4 text-xl font-black text-slate-900">씬 생성 전입니다</h3>
           <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            캐릭터와 화풍을 정리한 뒤 씬이 생성되면 여기서는 편집과 재생성, 그리고 바로 내보내기까지 이어서 진행할 수 있습니다.
+            캐릭터와 화풍을 정리한 뒤 씬이 생성되면 여기서는 편집과 재생성만 다루고, 실제 결과 확인은 미리보기 팝업에서 먼저 볼 수 있습니다.
           </p>
         </div>
       </div>
@@ -369,7 +369,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
           <div>
             <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">씬 작업 도구</div>
             <h2 className="mt-2 text-2xl font-black text-slate-900">{currentTopic || '프로젝트'} 씬 카드</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">페이지에서는 장면 편집과 재생성, 그리고 바로 파일 내보내기에 집중하도록 정리했습니다.</p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">페이지에서는 장면 편집과 재생성에 집중하고, 최종 확인은 결과 미리보기 팝업에서 먼저 검토하도록 정리했습니다.</p>
           </div>
           <div className="flex flex-wrap gap-2 text-xs text-slate-500">
             <span className="rounded-full bg-slate-100 px-3 py-2">씬 {data.length}개</span>
@@ -397,16 +397,25 @@ const ResultTable: React.FC<ResultTableProps> = ({
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
               <div>
                 <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">다운로드 품질</div>
-                <p className="mt-1 text-xs leading-5 text-slate-500">토큰과 렌더 부담을 줄이기 위해 평소에는 저화질로 저장하고, 마지막 출력만 고화질로 선택할 수 있습니다.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">작업 확인은 가볍게 보고, 최종 저장은 고화질로 선택할 수 있습니다.</p>
               </div>
               <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1">
-                <button type="button" onClick={() => setDownloadQuality('preview')} className={`rounded-2xl px-3 py-2 text-sm font-black ${downloadQuality === 'preview' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'}`}>저화질</button>
-                <button type="button" onClick={() => setDownloadQuality('final')} className={`rounded-2xl px-3 py-2 text-sm font-black ${downloadQuality === 'final' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-white'}`}>고화질</button>
+                <button type="button" onClick={() => setDownloadQuality('preview')} className={`rounded-2xl px-3 py-2 text-sm font-black ${downloadQuality === 'preview' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'}`}>미리보기</button>
+                <button type="button" onClick={() => setDownloadQuality('final')} className={`rounded-2xl px-3 py-2 text-sm font-black ${downloadQuality === 'final' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-white'}`}>최종 고화질</button>
               </div>
             </div>
           )}
 
           <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              onClick={() => {
+                setFinalOutputMode('video');
+                setPreviewOpen(true);
+              }}
+              className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white hover:bg-slate-800"
+            >
+              전체 미리보기
+            </button>
             {onGenerateAllImages && (
               <button onClick={() => void onGenerateAllImages?.()} disabled={isGenerating} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">
                 {isGenerating ? '이미지 생성 중...' : '전체 이미지 생성'}
@@ -428,25 +437,18 @@ const ResultTable: React.FC<ResultTableProps> = ({
             </button>
             <button
               type="button"
-              onClick={() => {
-                window.open('https://www.capcut.com/tools/desktop-video-editor', '_blank', 'noopener,noreferrer');
-              }}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-            >
-              CapCut 다운로드
-            </button>
-            <button
               onClick={() => void exportCapCutPackage({
                 assets: data,
                 projectName: currentTopic || 'mp4Creater_project',
                 backgroundMusicTracks,
                 activeBackgroundTrackId,
+                previewMix,
                 topic: currentTopic,
                 qualityMode: downloadQuality,
               })}
               className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
             >
-              CapCut 파일등록 ZIP
+              CapCut 3폴더 ZIP
             </button>
             {finalOutputMode === 'image' && (
               <button onClick={() => exportAssetsToZip(data, 'mp4Creater_image_storyboard')} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-500">
@@ -464,7 +466,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
               </>
             )}
           </div>
-          <p className="mt-3 text-xs leading-5 text-slate-500">CapCut 패키지는 문단별 clip 파일을 함께 만들어 넣습니다. 영상이 없어도 현재 이미지와 TTS 기준으로 문단 MP4를 만들어 가져오기 쉽게 정리합니다.</p>
+          <p className="mt-3 text-xs leading-5 text-slate-500">CapCut ZIP은 01_videos, 02_music, 03_subtitles 세 폴더만 담습니다. 01_videos 클립에는 가능한 경우 문단 영상, 나레이션, 선택 배경음, 자막까지 함께 굽습니다.</p>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
@@ -971,6 +973,19 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <button type="button" onClick={() => exportAssetsToZip(data, 'mp4Creater_image_storyboard')} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-500">이미지 패키지 ZIP</button>
               )}
               <button type="button" onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">SRT 저장</button>
+              <button
+                type="button"
+                onClick={() => void exportCapCutPackage({
+                  assets: data,
+                  projectName: currentTopic || 'mp4Creater_project',
+                  backgroundMusicTracks,
+                  activeBackgroundTrackId,
+                  previewMix,
+                  topic: currentTopic,
+                  qualityMode: downloadQuality,
+                })}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              >CapCut 3폴더 ZIP</button>
               {onExportVideo && finalOutputMode === 'video' && (
                 <>
                   <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: true, qualityMode: downloadQuality })} disabled={isExporting} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isExporting ? '렌더링 중...' : '최종 출력 (자막 O)'}</button>
@@ -1027,15 +1042,27 @@ const ResultTable: React.FC<ResultTableProps> = ({
         </div>
       )}
 
-      {shouldShowFooter && onFooterBack && (
+      {shouldShowFooter && (
         <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">
           <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-3 py-3 shadow-xl shadow-slate-200/70 backdrop-blur-md">
+            {onFooterBack && (
+              <button
+                type="button"
+                onClick={onFooterBack}
+                className="min-w-[120px] rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              >
+                {footerBackLabel || '이전으로'}
+              </button>
+            )}
             <button
               type="button"
-              onClick={onFooterBack}
-              className="min-w-[120px] rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50"
+              onClick={() => {
+                setFinalOutputMode('video');
+                setPreviewOpen(true);
+              }}
+              className="min-w-[140px] rounded-full bg-slate-900 px-6 py-3 text-sm font-black text-white transition hover:bg-slate-800"
             >
-              {footerBackLabel || '이전으로'}
+              결과 미리보기
             </button>
           </div>
         </div>
