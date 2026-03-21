@@ -2152,6 +2152,41 @@ const InputSection: React.FC<InputSectionProps> = ({
     );
   };
 
+  const handleCharacterVoiceDirectInputChange = (characterId: string, provider: 'elevenLabs' | 'heygen', value: string) => {
+    const directId = value.trim();
+    setExtractedCharacters((prev) =>
+      prev.map((item) => {
+        if (item.id !== characterId) return item;
+        if (!directId) return { ...item, ...buildCharacterVoicePatch(provider, '') };
+        const catalogVoice = provider === 'elevenLabs'
+          ? (elevenLabsVoices.find((voice) => voice.voice_id === directId) || null)
+          : (heygenVoices.find((voice) => voice.voice_id === directId) || null);
+
+        if (provider === 'elevenLabs') {
+          return {
+            ...item,
+            voiceProvider: 'elevenLabs' as const,
+            voiceHint: directId,
+            voiceId: directId,
+            voiceName: catalogVoice?.name || `ElevenLabs 직접 입력 (${directId})`,
+            voicePreviewUrl: catalogVoice?.preview_url || null,
+            voiceLocale: item.voiceLocale || null,
+          };
+        }
+
+        return {
+          ...item,
+          voiceProvider: 'heygen' as const,
+          voiceHint: directId,
+          voiceId: directId,
+          voiceName: catalogVoice?.name || `HeyGen 직접 입력 (${directId})`,
+          voicePreviewUrl: catalogVoice?.preview_audio_url || catalogVoice?.preview_audio || null,
+          voiceLocale: catalogVoice?.language || item.voiceLocale || null,
+        };
+      })
+    );
+  };
+
   const handlePreviewCharacterVoice = async (characterId: string) => {
     const character = extractedCharacters.find((item) => item.id === characterId);
     if (!character) return;
@@ -2588,6 +2623,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           voicePreviewMessage,
           handleCharacterVoiceProviderChange,
           handleCharacterVoiceChoiceChange,
+          handleCharacterVoiceDirectInputChange,
           handlePreviewCharacterVoice,
           getCharacterVoiceSummary,
           newCharacterName,

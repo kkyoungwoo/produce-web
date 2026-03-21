@@ -12,9 +12,6 @@ import { blobFromDataValue, extensionFromMime, triggerSequentialDownloads } from
 
 type PreviewVideoStatus = 'idle' | 'loading' | 'ready' | 'fallback' | 'error';
 
-const CAPCUT_DESKTOP_DOWNLOAD_URL = 'https://www.capcut.com/tools/desktop-video-editor';
-const CAPCUT_INSTALL_GUIDE_URL = 'https://www.capcut.com/help/download-and-install';
-
 interface ResultTableProps {
   data: GeneratedAsset[];
   onRegenerateImage?: (index: number) => void;
@@ -430,34 +427,27 @@ const ResultTable: React.FC<ResultTableProps> = ({
               SRT 저장
             </button>
             <button
+              type="button"
+              onClick={() => {
+                window.open('https://www.capcut.com/tools/desktop-video-editor', '_blank', 'noopener,noreferrer');
+              }}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              CapCut 다운로드
+            </button>
+            <button
               onClick={() => void exportCapCutPackage({
                 assets: data,
                 projectName: currentTopic || 'mp4Creater_project',
                 backgroundMusicTracks,
                 activeBackgroundTrackId,
                 topic: currentTopic,
-                autoOpenCapCut: true,
+                qualityMode: downloadQuality,
               })}
               className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
             >
-              CapCut으로 보내기
+              CapCut 파일등록 ZIP
             </button>
-            <a
-              href={CAPCUT_DESKTOP_DOWNLOAD_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-            >
-              CapCut 다운로드
-            </a>
-            <a
-              href={CAPCUT_INSTALL_GUIDE_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-            >
-              설치 가이드
-            </a>
             {finalOutputMode === 'image' && (
               <button onClick={() => exportAssetsToZip(data, 'mp4Creater_image_storyboard')} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-500">
                 이미지 묶음 ZIP
@@ -474,11 +464,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
               </>
             )}
           </div>
-          <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-xs leading-5 text-slate-500">
-            <div className="font-black text-slate-700">CapCut 초보자 안내</div>
-            <p className="mt-1">1) <span className="font-semibold text-slate-700">CapCut으로 보내기</span>를 누르면 타임라인 ZIP이 저장되고 CapCut 편집기가 새 탭에서 함께 열립니다. 2) ZIP을 풀면 <span className="font-semibold text-slate-700">timeline_ready</span> 폴더에 문단별 클립이 번호순으로 정리되어 있으니 CapCut에서 한 번에 가져와 타임라인에 올리면 됩니다. 3) 자막은 <span className="font-semibold text-slate-700">subtitles/project_subtitles.srt</span>, 배경음은 <span className="font-semibold text-slate-700">audio</span> 폴더 파일을 추가하면 됩니다.</p>
-            <p className="mt-1">CapCut 공식 기준으로 데스크톱 앱 자동 실행과 외부 프로젝트 자동 임포트는 지원되지 않아서, 현재 버튼은 <span className="font-semibold text-slate-700">타임라인 ZIP 다운로드 + CapCut 편집기 자동 열기</span>까지를 한 번에 처리합니다.</p>
-          </div>
+          <p className="mt-3 text-xs leading-5 text-slate-500">CapCut 패키지는 문단별 clip 파일을 함께 만들어 넣습니다. 영상이 없어도 현재 이미지와 TTS 기준으로 문단 MP4를 만들어 가져오기 쉽게 정리합니다.</p>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
@@ -985,16 +971,6 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <button type="button" onClick={() => exportAssetsToZip(data, 'mp4Creater_image_storyboard')} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-500">이미지 패키지 ZIP</button>
               )}
               <button type="button" onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">SRT 저장</button>
-              <button type="button" onClick={() => void exportCapCutPackage({
-                assets: data,
-                projectName: currentTopic || 'mp4Creater_project',
-                backgroundMusicTracks,
-                activeBackgroundTrackId,
-                topic: currentTopic,
-                autoOpenCapCut: true,
-              })} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">CapCut으로 보내기</button>
-              <a href={CAPCUT_DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-bold text-slate-700 hover:bg-slate-50">CapCut 다운로드</a>
-              <a href={CAPCUT_INSTALL_GUIDE_URL} target="_blank" rel="noreferrer" className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-center text-sm font-bold text-slate-700 hover:bg-slate-50">설치 가이드</a>
               {onExportVideo && finalOutputMode === 'video' && (
                 <>
                   <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: true, qualityMode: downloadQuality })} disabled={isExporting} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isExporting ? '렌더링 중...' : '최종 출력 (자막 O)'}</button>

@@ -117,6 +117,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
     voicePreviewMessage,
     handleCharacterVoiceProviderChange,
     handleCharacterVoiceChoiceChange,
+    handleCharacterVoiceDirectInputChange,
     handlePreviewCharacterVoice,
     getCharacterVoiceSummary,
     newCharacterName,
@@ -235,6 +236,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
           onCharacterRemove={(characterId) => removeCharacter(characterId)}
           onCharacterVoiceProviderChange={handleCharacterVoiceProviderChange}
           onCharacterVoiceChoiceChange={handleCharacterVoiceChoiceChange}
+          onCharacterVoiceDirectInputChange={handleCharacterVoiceDirectInputChange}
           onPreviewCharacterVoice={handlePreviewCharacterVoice}
           onNewCharacterNameChange={(value) => setNewCharacterName(value)}
           onNewCharacterPromptChange={(value) => setNewCharacterPrompt(value)}

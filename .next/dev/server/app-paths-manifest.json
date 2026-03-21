@@ -1,1 +1,7 @@
-{}
+{
+  "/[locale]/mp4Creater/step-2/page": "app/[locale]/mp4Creater/step-2/page.js",
+  "/[locale]/mp4Creater/step-3/page": "app/[locale]/mp4Creater/step-3/page.js",
+  "/[locale]/mp4Creater/step-4/page": "app/[locale]/mp4Creater/step-4/page.js",
+  "/[locale]/mp4Creater/step-5/page": "app/[locale]/mp4Creater/step-5/page.js",
+  "/[locale]/mp4Creater/step-6/page": "app/[locale]/mp4Creater/step-6/page.js"
+}

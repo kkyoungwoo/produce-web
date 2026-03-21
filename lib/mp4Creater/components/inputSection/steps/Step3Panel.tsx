@@ -53,6 +53,7 @@ interface Step3PanelProps {
   onCharacterRemove: (characterId: string) => void;
   onCharacterVoiceProviderChange: (characterId: string, provider: 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen') => void;
   onCharacterVoiceChoiceChange: (characterId: string, provider: 'qwen3Tts' | 'elevenLabs' | 'heygen', value: string) => void;
+  onCharacterVoiceDirectInputChange: (characterId: string, provider: 'elevenLabs' | 'heygen', value: string) => void;
   onPreviewCharacterVoice: (characterId: string) => void;
   onNewCharacterNameChange: (value: string) => void;
   onNewCharacterPromptChange: (value: string) => void;
@@ -95,6 +96,7 @@ export default function Step3Panel({
   onCharacterRemove,
   onCharacterVoiceProviderChange,
   onCharacterVoiceChoiceChange,
+  onCharacterVoiceDirectInputChange,
   onPreviewCharacterVoice,
   onCreateCharacterFromForm,
   getCharacterVoiceSummary,
@@ -256,9 +258,10 @@ export default function Step3Panel({
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {extractedCharacters.map((character) => {
                 const voiceProvider = character.voiceProvider || 'project-default';
-                const qwenVoiceId = character.voiceProvider === 'qwen3Tts' ? (character.voiceId || character.voiceHint || 'qwen-default') : 'qwen-default';
-                const elevenVoiceId = character.voiceProvider === 'elevenLabs' ? (character.voiceId || character.voiceHint || elevenLabsVoices[0]?.voice_id || '') : (elevenLabsVoices[0]?.voice_id || '');
-                const heygenVoiceId = character.voiceProvider === 'heygen' ? (character.voiceId || character.voiceHint || heygenVoices[0]?.voice_id || '') : (heygenVoices[0]?.voice_id || '');
+                const currentVoiceId = character.voiceId || character.voiceHint || '';
+                const qwenVoiceId = character.voiceProvider === 'qwen3Tts' ? (currentVoiceId || 'qwen-default') : 'qwen-default';
+                const elevenVoiceId = character.voiceProvider === 'elevenLabs' ? (currentVoiceId || elevenLabsVoices[0]?.voice_id || '') : (elevenLabsVoices[0]?.voice_id || '');
+                const heygenVoiceId = character.voiceProvider === 'heygen' ? (currentVoiceId || heygenVoices[0]?.voice_id || '') : (heygenVoices[0]?.voice_id || '');
                 const isPreviewing = activeVoicePreviewCharacterId === character.id;
                 const selected = selectedCharacterIds.includes(character.id);
 
@@ -338,23 +341,41 @@ export default function Step3Panel({
                                 {QWEN_VOICE_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                               </select>
                             ) : voiceProvider === 'elevenLabs' ? (
-                              <select
-                                value={elevenVoiceId}
-                                onClick={(event) => event.stopPropagation()}
-                                onChange={(e) => onCharacterVoiceChoiceChange(character.id, 'elevenLabs', e.target.value)}
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
-                              >
-                                {elevenLabsVoices.length ? elevenLabsVoices.map((item) => <option key={item.voice_id} value={item.voice_id}>{item.name}</option>) : <option value="">연결된 보이스 없음</option>}
-                              </select>
+                              <div className="grid gap-2">
+                                <select
+                                  value={elevenVoiceId}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={(e) => onCharacterVoiceChoiceChange(character.id, 'elevenLabs', e.target.value)}
+                                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
+                                >
+                                  {elevenLabsVoices.length ? elevenLabsVoices.map((item) => <option key={item.voice_id} value={item.voice_id}>{item.name}</option>) : <option value="">연결된 보이스 없음</option>}
+                                </select>
+                                <input
+                                  value={currentVoiceId}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={(e) => onCharacterVoiceDirectInputChange(character.id, 'elevenLabs', e.target.value)}
+                                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-violet-400"
+                                  placeholder="또는 ElevenLabs voice_id 직접 입력"
+                                />
+                              </div>
                             ) : (
-                              <select
-                                value={heygenVoiceId}
-                                onClick={(event) => event.stopPropagation()}
-                                onChange={(e) => onCharacterVoiceChoiceChange(character.id, 'heygen', e.target.value)}
-                                className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
-                              >
-                                {heygenVoices.length ? heygenVoices.map((item) => <option key={item.voice_id} value={item.voice_id}>{item.name}{item.language ? ` · ${item.language}` : ''}</option>) : <option value="">연결된 보이스 없음</option>}
-                              </select>
+                              <div className="grid gap-2">
+                                <select
+                                  value={heygenVoiceId}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={(e) => onCharacterVoiceChoiceChange(character.id, 'heygen', e.target.value)}
+                                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
+                                >
+                                  {heygenVoices.length ? heygenVoices.map((item) => <option key={item.voice_id} value={item.voice_id}>{item.name}{item.language ? ` · ${item.language}` : ''}</option>) : <option value="">연결된 보이스 없음</option>}
+                                </select>
+                                <input
+                                  value={currentVoiceId}
+                                  onClick={(event) => event.stopPropagation()}
+                                  onChange={(e) => onCharacterVoiceDirectInputChange(character.id, 'heygen', e.target.value)}
+                                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-violet-400"
+                                  placeholder="또는 HeyGen voice_id 직접 입력"
+                                />
+                              </div>
                             )}
                           </label>
                         </div>
