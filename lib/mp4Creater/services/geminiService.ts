@@ -16,7 +16,14 @@ function getFallbackScript(topic: string, contentType: ContentType): string {
 
 마지막 장면에서 그는 멀어지던 관계 대신 앞으로 걸어갈 이유를 발견한다.`;
   }
-  if (contentType === 'news' || contentType === 'info_delivery') {
+  if (contentType === 'news') {
+    return `비에 젖은 도시의 밤, 주인공은 오래 숨겨 둔 단서가 다시 움직이기 시작했다는 사실을 알아차린다.
+
+사라진 약속과 남겨진 흔적이 같은 장소로 모이면서, 관계와 목적이 뒤엉킨 긴장이 점점 선명해진다.
+
+마지막 장면에서 그는 되돌릴 수 없는 선택 앞에 서고, 그 밤의 여운이 다음 장면을 예고한다.`;
+  }
+  if (contentType === 'info_delivery') {
     return `오늘 핵심 이슈는 빠르게 변하는 현장 상황과 이에 대한 다양한 해석이다.
 
 자료와 현장 반응을 함께 보면, 숫자만으로 설명되지 않는 체감 변화가 분명히 드러난다.

@@ -23,13 +23,13 @@ const BANKS: Record<ContentType, SelectionBank> = {
     conflict: ['끝내 미루던 선택', '속이고 있던 진실', '잊고 있던 약속', '돌아갈 수 없는 실수'],
   },
   news: {
-    topic: ['신규 정책 전달 정리', 'AI 서비스 변화 브리핑', '시장 변화 핵심 정리', '지역 이슈 사례 요약'],
-    genre: ['뉴스 브리핑', '해설 리포트', '이슈 요약', '현장 리포트'],
-    mood: ['정돈된', '속도감 있는', '차분한', '명확한'],
-    endingTone: ['핵심 요약으로 마무리', '다음 이슈를 예고하는 엔딩', '중립적인 정리', '시청자 행동을 유도하는 마감'],
-    setting: ['뉴스룸 스튜디오', '전달 배경', '현장 브리핑 장소', '데이터 스크린'],
-    protagonist: ['앵커', '현장 기자', '전문 해설자', '차분한 진행자'],
-    conflict: ['엇갈리는 해석', '데이터 체감의 차이', '빠르게 바뀌는 상황', '확인되지 않은 소문'],
+    topic: ['비 오는 도시에서 다시 마주친 약속', '사라진 편지를 따라가는 밤의 추적', '막차 직전 서로를 붙잡는 선택', '폐극장에서 시작되는 마지막 리허설'],
+    genre: ['시네마틱 드라마', '느와르 로맨스', '서스펜스', '감성 미스터리'],
+    mood: ['몰입감 있는', '서늘한', '감성적인', '긴장감 있는'],
+    endingTone: ['긴 여운으로 마무리', '서정적인 결말', '열린 결말', '반전이 남는 엔딩'],
+    setting: ['비 내리는 도시 골목', '새벽 지하철역', '낡은 극장 무대', '네온 불빛의 옥상'],
+    protagonist: ['과거를 숨긴 주인공', '무대를 떠난 배우', '마지막 기회를 잡으려는 연인', '진실을 쫓는 관찰자'],
+    conflict: ['되돌릴 수 없는 선택의 대가', '끝내 전하지 못한 진심', '사라진 단서를 둘러싼 오해', '같은 밤 서로 다른 목적'],
   },
   info_delivery: {
     topic: ['초보자를 위한 핵심 개념 정리', '업무 프로세스 빠른 이해 가이드', '실수 줄이는 체크리스트 안내', '도구 사용법 단계별 설명'],
@@ -83,12 +83,12 @@ const TOPIC_SENTENCE_PATTERNS: Record<ContentType, string[]> = {
     '{topic}의 감정 차이를 살린 서사 흐름',
   ],
   news: [
-    '{topic} 핵심만 빠르게 이해하는 브리핑 구성',
-    '{topic}의 변화와 영향만 먼저 보여주기',
-    '{topic} 관련 수치와 체감 차이를 함께 정리하기',
-    '{topic}의 찬반 포인트를 균형 있게 요약하기',
-    '{topic} 이후 체크할 지점까지 연결하기',
-    '{topic}을 3문단 요약으로 시작하기',
+    '{topic}을 첫 장면부터 영화처럼 밀어붙이는 구성',
+    '{topic} 속 감정선과 비밀을 교차시키는 전개',
+    '{topic}이 관계를 바꾸는 결정적 밤으로 설계하기',
+    '{topic}을 따라 추적과 회상이 엇갈리는 흐름 만들기',
+    '{topic}의 긴장과 침묵을 장면 전환으로 살리기',
+    '{topic}을 엔딩의 여운까지 이어지는 영화 톤으로 묶기',
   ],
   info_delivery: [
     '{topic}을 처음 보는 사람도 이해하는 단계별 설명',
@@ -109,7 +109,7 @@ function normalizeTopicSeed(value: string): string {
 
 function getContentLabel(contentType: ContentType) {
   if (contentType === 'music_video') return '뮤직비디오';
-  if (contentType === 'news') return '뉴스';
+  if (contentType === 'news') return '영화';
   if (contentType === 'info_delivery') return '정보 전달';
   return '이야기';
 }

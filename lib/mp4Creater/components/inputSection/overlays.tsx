@@ -68,7 +68,7 @@ export function RouteStepFooter({
 interface SampleGuideModalProps {
   open: boolean;
   onClose: () => void;
-  onOpenApiModal?: (options?: { title?: string; description?: string; focusField?: 'openRouter' | 'elevenLabs' | null }) => void | Promise<void>;
+  onOpenApiModal?: (options?: { title?: string; description?: string; focusField?: 'openRouter' | 'elevenLabs' | 'heygen' | 'fal' | null }) => void | Promise<void>;
   onContinueWithSample: () => void;
 }
 

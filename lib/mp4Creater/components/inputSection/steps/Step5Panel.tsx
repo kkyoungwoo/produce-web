@@ -23,6 +23,56 @@ interface Step5PanelProps {
   onStylePromptChange: (value: string) => void;
 }
 
+function inferCategory(label: string) {
+  if (/광고|브랜드|뷰티|패션|비즈니스|테크/i.test(label)) return '광고·브랜드';
+  if (/애니|3d|픽사|디즈니|지브리|아케인|스파이더버스/i.test(label)) return '애니메이션';
+  if (/웹툰|코믹|로판|만화|치비/i.test(label)) return '웹툰·코믹';
+  if (/스케치|펜슬|잉크|콘티|블루프린트/i.test(label)) return '스케치·기획';
+  if (/유화|수채화|필름|스냅|드론|아트|포스터/i.test(label)) return '아트·사진';
+  return '영화·드라마';
+}
+
+function resolvePalette(label: string) {
+  if (/느와르|범죄|호러|공포/i.test(label)) return { from: '#111827', to: '#1d4ed8' };
+  if (/sf|퓨처|스파이|테크|사이버/i.test(label)) return { from: '#0f172a', to: '#0891b2' };
+  if (/광고|뷰티|패션|럭셔리/i.test(label)) return { from: '#7c3aed', to: '#ec4899' };
+  if (/애니|3d|픽사|디즈니|지브리/i.test(label)) return { from: '#059669', to: '#38bdf8' };
+  if (/웹툰|코믹|만화|로판/i.test(label)) return { from: '#2563eb', to: '#8b5cf6' };
+  if (/스케치|펜슬|잉크|콘티/i.test(label)) return { from: '#334155', to: '#94a3b8' };
+  if (/유화|수채화|필름|아트|포스터/i.test(label)) return { from: '#b45309', to: '#f97316' };
+  return { from: '#0f172a', to: '#475569' };
+}
+
+function buildSamplePreview(label: string, subtitle: string) {
+  const category = inferCategory(label);
+  const palette = resolvePalette(label);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="${palette.from}"/>
+        <stop offset="100%" stop-color="${palette.to}"/>
+      </linearGradient>
+    </defs>
+    <rect width="1200" height="720" rx="36" fill="url(#bg)"/>
+    <rect x="46" y="46" width="1108" height="628" rx="30" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.24)"/>
+    <rect x="84" y="84" width="232" height="52" rx="26" fill="rgba(255,255,255,0.16)"/>
+    <text x="112" y="118" fill="#ffffff" font-size="24" font-family="Arial, sans-serif" font-weight="700">${category} · 샘플</text>
+    <rect x="86" y="188" width="330" height="378" rx="28" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.22)"/>
+    <circle cx="252" cy="286" r="76" fill="rgba(255,255,255,0.78)"/>
+    <path d="M168 432c24-78 144-78 168 0" fill="none" stroke="rgba(255,255,255,0.9)" stroke-width="18" stroke-linecap="round"/>
+    <path d="M252 364v126" stroke="rgba(255,255,255,0.9)" stroke-width="18" stroke-linecap="round"/>
+    <path d="M180 416h144" stroke="rgba(255,255,255,0.9)" stroke-width="18" stroke-linecap="round"/>
+    <circle cx="920" cy="242" r="114" fill="rgba(255,255,255,0.12)"/>
+    <circle cx="1012" cy="358" r="52" fill="rgba(255,255,255,0.08)"/>
+    <text x="470" y="278" fill="#ffffff" font-size="66" font-family="Arial, sans-serif" font-weight="700">${label}</text>
+    <foreignObject x="470" y="326" width="540" height="186">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; font-size: 28px; line-height: 1.55; color: rgba(255,255,255,0.92);">${subtitle}</div>
+    </foreignObject>
+    <text x="470" y="586" fill="rgba(255,255,255,0.82)" font-size="26" font-family="Arial, sans-serif">예시 이미지는 모두 샘플 썸네일입니다.</text>
+  </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
 export default function Step5Panel({
   styleGroups,
   selectedStyleImageId,
@@ -95,13 +145,14 @@ export default function Step5Panel({
             <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">한눈에 비교</div>
             <h3 className="mt-2 text-lg font-black text-slate-900">화풍 카드 선택</h3>
           </div>
-          <div className="text-xs text-slate-500">최소 10개 내외 카드를 작게 배치해 비교가 쉽도록 구성했습니다.</div>
+          <div className="text-xs text-slate-500">예시 이미지는 모두 샘플 썸네일로 표시됩니다.</div>
         </div>
 
         <div className="mt-4 grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
           {flattenedCards.map((card) => {
             const group = styleGroups.find((item) => item.items.some((variant) => variant.id === card.id || variant.groupId === card.groupId));
             const selected = group?.items.some((item) => item.id === selectedStyleImageId) || card.id === selectedStyleImageId;
+            const groupLabel = group?.label || card.groupLabel || card.label;
             return (
               <button
                 key={group?.id || card.id}
@@ -113,12 +164,13 @@ export default function Step5Panel({
                 className={`overflow-hidden rounded-[22px] border text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-violet-200'}`}
               >
                 <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
-                  <img src={card.imageData} alt={card.label} className="aspect-square w-full object-cover" />
+                  <img src={buildSamplePreview(groupLabel, card.prompt || '최종 영상 전체에 적용될 샘플 미리보기')} alt={`${groupLabel} 샘플`} className="aspect-[4/5] w-full object-cover" />
                 </div>
                 <div className="p-3">
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">샘플 카드</div>
+                  <div className="mt-2 flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-black text-slate-900">{group?.label || card.groupLabel || card.label}</div>
+                      <div className="truncate text-sm font-black text-slate-900">{groupLabel}</div>
                       <div className="mt-1 text-[11px] text-slate-500">{group?.items.length || 1}개 후보</div>
                     </div>
                     <span className={`rounded-full px-2 py-1 text-[10px] font-black ${selected ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{selected ? '선택' : '비교'}</span>
@@ -135,56 +187,6 @@ export default function Step5Panel({
           </div>
         )}
       </section>
-
-      {selectedGroup && (
-        <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">선택 화풍 상세 비교</div>
-              <h3 className="mt-2 text-lg font-black text-slate-900">{selectedGroup.label}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-600">같은 화풍 안에서 누적된 후보를 비교하고, 원하는 1개를 최종 선택하세요.</p>
-            </div>
-            <button type="button" onClick={() => selectedCard && onCreateVariants(selectedCard)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-              이 화풍 유사안 더 만들기
-            </button>
-          </div>
-
-          <div className="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-            <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-slate-100">
-              <img src={selectedCard?.imageData || '/mp4Creater/flow-render.svg'} alt={selectedCard?.label || selectedGroup.label} className="aspect-square w-full object-cover" />
-            </div>
-            <div className="space-y-4">
-              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">선택 프롬프트</div>
-                <p className="mt-2 text-sm leading-6 text-slate-700">{selectedCard?.prompt || '프롬프트가 없습니다.'}</p>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {selectedGroup.items.map((item) => {
-                  const picked = item.id === selectedStyleImageId;
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => onSelectStyle(item.id)}
-                      className={`overflow-hidden rounded-[22px] border bg-white text-left ${picked ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:border-slate-300'}`}
-                    >
-                      <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
-                        <img src={item.imageData} alt={item.label} className="aspect-square w-full object-cover" />
-                      </div>
-                      <div className="p-3">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-xs font-black text-slate-900">후보</div>
-                          {picked && <span className="rounded-full bg-violet-600 px-2 py-1 text-[10px] font-black text-white">선택됨</span>}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
 
       <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">직접 추가</div>

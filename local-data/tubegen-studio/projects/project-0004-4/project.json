@@ -1,0 +1,318 @@
+{
+  "id": "project_1774060521971_oualrd",
+  "name": "프로젝트(4)",
+  "createdAt": 1774060521971,
+  "topic": "프로젝트(4)",
+  "projectNumber": 4,
+  "folderName": "project-0004-4",
+  "folderPath": "local-data/tubegen-studio/projects/project-0004-4",
+  "lastSavedAt": 1774060798949,
+  "settings": {
+    "imageModel": "gemini-2.5-flash-image",
+    "outputMode": "video",
+    "elevenLabsModel": "eleven_multilingual_v2"
+  },
+  "assets": [],
+  "thumbnail": null,
+  "thumbnailTitle": null,
+  "thumbnailPrompt": null,
+  "thumbnailHistory": [],
+  "selectedThumbnailId": null,
+  "backgroundMusicTracks": [],
+  "previewMix": {
+    "narrationVolume": 1,
+    "backgroundMusicVolume": 0.28
+  },
+  "workflowDraft": {
+    "id": "workflow_1774060521971",
+    "contentType": "story",
+    "aspectRatio": "16:9",
+    "topic": "프로젝트(4)",
+    "outputMode": "video",
+    "selections": {
+      "genre": "드라마",
+      "mood": "몰입감 있는",
+      "endingTone": "희망적인 결말",
+      "setting": "새벽의 편의점",
+      "protagonist": "초보 창작자",
+      "conflict": "잊고 있던 약속"
+    },
+    "script": "이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.",
+    "activeStage": 1,
+    "extractedCharacters": [
+      {
+        "id": "char_1774060688209_swb51o",
+        "name": "초보 창작자",
+        "description": "주인공 / 서사를 이끄는 중심 인물",
+        "visualStyle": "몰입감 있는",
+        "role": "lead",
+        "roleLabel": "주인공 / 서사를 이끄는 중심 인물",
+        "rolePrompt": "주인공 / 서사를 이끄는 중심 인물",
+        "castOrder": 1,
+        "prompt": "초보 창작자 / 주인공 / 서사를 이끄는 중심 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몰입감 있는. Scene context: 이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한",
+        "imageData": "data:image/svg+xml;base64,CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiB2aWV3Qm94PSIwIDAgOTYwIDU2MCI+CiAgICA8ZGVmcz4KICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiLz4KICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlZmY2ZmYiLz4KICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiByeD0iMzIiIGZpbGw9InVybCgjYmcpIi8+CiAgICA8cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI4OTYiIGhlaWdodD0iNDk2IiByeD0iMjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RiZWFmZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgICA8Y2lyY2xlIGN4PSI3NzAiIGN5PSIxMjIiIHI9Ijg2IiBmaWxsPSIjOGI1Y2Y2IiBvcGFjaXR5PSIwLjE0Ii8+CiAgICA8cmVjdCB4PSI5NiIgeT0iMTI2IiB3aWR0aD0iMjI4IiBoZWlnaHQ9IjI3MCIgcng9IjI0IiBmaWxsPSIjZjhmYWZjIiBzdHJva2U9IiNjYmQ1ZTEiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjE4NiIgcj0iNDgiIGZpbGw9IiNlMmU4ZjAiLz4KICAgIDxwYXRoIGQ9Ik0xNjIgMzAwIEMxODIgMjU2IDIzOCAyNTYgMjU4IDMwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik0yMTAgMjM2IEwyMTAgMzYyIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPHBhdGggZD0iTTE1NCAyODYgTDI2NiAyODYiIHN0cm9rZT0iIzQ3NTU2OSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8cGF0aCBkPSJNMTc2IDQyMCBMMjEwIDM2MiBMMjQ0IDQyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTAyIiBmaWxsPSIjMGYxNzJhIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiPuy0iOuztCDssL3snpHsnpA8L3RleHQ+CiAgICA8dGV4dCB4PSIzOTAiIHk9IjE0NCIgZmlsbD0iIzQ3NTU2OSIgZm9udC1zaXplPSIyMCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIj7so7zsnbjqs7UgLyDshJzsgqzrpbwg7J2064GE64qUIOykkeyLrCDsnbjrrLw8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIzOTAiIHk9IjE4OCIgd2lkdGg9IjQ3MCIgaGVpZ2h0PSIyMzAiPgogICAgICA8ZGl2IHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hodG1sIiBzdHlsZT0iZm9udC1mYW1pbHk6IEFyaWFsLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDI0cHg7IGxpbmUtaGVpZ2h0OiAxLjU7IGNvbG9yOiAjMzM0MTU1OyB3b3JkLWJyZWFrOiBrZWVwLWFsbDsiPuy0iOuztCDssL3snpHsnpAgLyDso7zsnbjqs7UgLyDshJzsgqzrpbwg7J2064GE64qUIOykkeyLrCDsnbjrrLwKU3R5bGl6ZWQgMkQgYW5pbWUgY2hhcmFjdGVyIGluc3BpcmVkIGJ5IGVhcmx5IDIwMDBzIGFuaW1hdGlvbiBhZXN0aGV0aWNzIGFuZCBub3N0YWxnaWMgY2l0eSBwb3AgYXRtb3NwaGVyZS4gQmFsYW5jZWQsIGh1bWFuLWxpa2UgZmFjaWFsIHByb3BvcnRpb25zIHdpdDwvZGl2PgogICAgPC9mb3JlaWduT2JqZWN0PgogICAgPHRleHQgeD0iMzkwIiB5PSI0NzAiIGZpbGw9IiM2NDc0OGIiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+7ZSE66Gs7ZSE7Yq4IOq4sOuwmCDshKDtg50g7Lm065OcPC90ZXh0PgogIDwvc3ZnPg==",
+        "generatedImages": [
+          {
+            "id": "prompted_1774060688209_2bn63g",
+            "label": "초보 창작자",
+            "prompt": "초보 창작자 / 주인공 / 서사를 이끄는 중심 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몰입감 있는. Scene context: 이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한",
+            "imageData": "data:image/svg+xml;base64,CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiB2aWV3Qm94PSIwIDAgOTYwIDU2MCI+CiAgICA8ZGVmcz4KICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiLz4KICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlZmY2ZmYiLz4KICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiByeD0iMzIiIGZpbGw9InVybCgjYmcpIi8+CiAgICA8cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI4OTYiIGhlaWdodD0iNDk2IiByeD0iMjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RiZWFmZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgICA8Y2lyY2xlIGN4PSI3NzAiIGN5PSIxMjIiIHI9Ijg2IiBmaWxsPSIjOGI1Y2Y2IiBvcGFjaXR5PSIwLjE0Ii8+CiAgICA8cmVjdCB4PSI5NiIgeT0iMTI2IiB3aWR0aD0iMjI4IiBoZWlnaHQ9IjI3MCIgcng9IjI0IiBmaWxsPSIjZjhmYWZjIiBzdHJva2U9IiNjYmQ1ZTEiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjE4NiIgcj0iNDgiIGZpbGw9IiNlMmU4ZjAiLz4KICAgIDxwYXRoIGQ9Ik0xNjIgMzAwIEMxODIgMjU2IDIzOCAyNTYgMjU4IDMwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik0yMTAgMjM2IEwyMTAgMzYyIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPHBhdGggZD0iTTE1NCAyODYgTDI2NiAyODYiIHN0cm9rZT0iIzQ3NTU2OSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8cGF0aCBkPSJNMTc2IDQyMCBMMjEwIDM2MiBMMjQ0IDQyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTAyIiBmaWxsPSIjMGYxNzJhIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiPuy0iOuztCDssL3snpHsnpA8L3RleHQ+CiAgICA8dGV4dCB4PSIzOTAiIHk9IjE0NCIgZmlsbD0iIzQ3NTU2OSIgZm9udC1zaXplPSIyMCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIj7so7zsnbjqs7UgLyDshJzsgqzrpbwg7J2064GE64qUIOykkeyLrCDsnbjrrLw8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIzOTAiIHk9IjE4OCIgd2lkdGg9IjQ3MCIgaGVpZ2h0PSIyMzAiPgogICAgICA8ZGl2IHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hodG1sIiBzdHlsZT0iZm9udC1mYW1pbHk6IEFyaWFsLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDI0cHg7IGxpbmUtaGVpZ2h0OiAxLjU7IGNvbG9yOiAjMzM0MTU1OyB3b3JkLWJyZWFrOiBrZWVwLWFsbDsiPuy0iOuztCDssL3snpHsnpAgLyDso7zsnbjqs7UgLyDshJzsgqzrpbwg7J2064GE64qUIOykkeyLrCDsnbjrrLwKU3R5bGl6ZWQgMkQgYW5pbWUgY2hhcmFjdGVyIGluc3BpcmVkIGJ5IGVhcmx5IDIwMDBzIGFuaW1hdGlvbiBhZXN0aGV0aWNzIGFuZCBub3N0YWxnaWMgY2l0eSBwb3AgYXRtb3NwaGVyZS4gQmFsYW5jZWQsIGh1bWFuLWxpa2UgZmFjaWFsIHByb3BvcnRpb25zIHdpdDwvZGl2PgogICAgPC9mb3JlaWduT2JqZWN0PgogICAgPHRleHQgeD0iMzkwIiB5PSI0NzAiIGZpbGw9IiM2NDc0OGIiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+7ZSE66Gs7ZSE7Yq4IOq4sOuwmCDshKDtg50g7Lm065OcPC90ZXh0PgogIDwvc3ZnPg==",
+            "createdAt": 1774060688209,
+            "kind": "character",
+            "sourceMode": "sample",
+            "groupId": "prompted_1774060688209_2bn63g",
+            "groupLabel": "초보 창작자"
+          }
+        ],
+        "selectedImageId": "prompted_1774060688209_2bn63g",
+        "createdAt": 1774060688209,
+        "voiceProvider": "qwen3Tts",
+        "voiceHint": "qwen-default",
+        "voiceId": "qwen-default",
+        "voiceName": "qwen3-tts 기본 보이스",
+        "voicePreviewUrl": null,
+        "voiceLocale": "ko-KR"
+      },
+      {
+        "id": "char_1774060688209_mwlfwu",
+        "name": "조연",
+        "description": "조연 / 주인공의 흐름을 받쳐 주는 인물",
+        "visualStyle": "몰입감 있는",
+        "role": "support",
+        "roleLabel": "조연 / 주인공의 흐름을 받쳐 주는 인물",
+        "rolePrompt": "조연 / 주인공의 흐름을 받쳐 주는 인물",
+        "castOrder": 2,
+        "prompt": "조연 / 조연 / 주인공의 흐름을 받쳐 주는 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몰입감 있는. Scene context: 이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한",
+        "imageData": "data:image/svg+xml;base64,CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiB2aWV3Qm94PSIwIDAgOTYwIDU2MCI+CiAgICA8ZGVmcz4KICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiLz4KICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlZmY2ZmYiLz4KICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiByeD0iMzIiIGZpbGw9InVybCgjYmcpIi8+CiAgICA8cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI4OTYiIGhlaWdodD0iNDk2IiByeD0iMjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RiZWFmZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgICA8Y2lyY2xlIGN4PSI3NzAiIGN5PSIxMjIiIHI9Ijg2IiBmaWxsPSIjMjU2M2ViIiBvcGFjaXR5PSIwLjE0Ii8+CiAgICA8cmVjdCB4PSI5NiIgeT0iMTI2IiB3aWR0aD0iMjI4IiBoZWlnaHQ9IjI3MCIgcng9IjI0IiBmaWxsPSIjZjhmYWZjIiBzdHJva2U9IiNjYmQ1ZTEiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjE4NiIgcj0iNDgiIGZpbGw9IiNlMmU4ZjAiLz4KICAgIDxwYXRoIGQ9Ik0xNjIgMzAwIEMxODIgMjU2IDIzOCAyNTYgMjU4IDMwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik0yMTAgMjM2IEwyMTAgMzYyIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPHBhdGggZD0iTTE1NCAyODYgTDI2NiAyODYiIHN0cm9rZT0iIzQ3NTU2OSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8cGF0aCBkPSJNMTc2IDQyMCBMMjEwIDM2MiBMMjQ0IDQyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTAyIiBmaWxsPSIjMGYxNzJhIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiPuyhsOyXsDwvdGV4dD4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTQ0IiBmaWxsPSIjNDc1NTY5IiBmb250LXNpemU9IjIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPuyhsOyXsCAvIOyjvOyduOqzteydmCDtnZDrpoTsnYQg67Cb7LOQIOyjvOuKlCDsnbjrrLw8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIzOTAiIHk9IjE4OCIgd2lkdGg9IjQ3MCIgaGVpZ2h0PSIyMzAiPgogICAgICA8ZGl2IHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hodG1sIiBzdHlsZT0iZm9udC1mYW1pbHk6IEFyaWFsLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDI0cHg7IGxpbmUtaGVpZ2h0OiAxLjU7IGNvbG9yOiAjMzM0MTU1OyB3b3JkLWJyZWFrOiBrZWVwLWFsbDsiPuyhsOyXsCAvIOyhsOyXsCAvIOyjvOyduOqzteydmCDtnZDrpoTsnYQg67Cb7LOQIOyjvOuKlCDsnbjrrLwKU3R5bGl6ZWQgMkQgYW5pbWUgY2hhcmFjdGVyIGluc3BpcmVkIGJ5IGVhcmx5IDIwMDBzIGFuaW1hdGlvbiBhZXN0aGV0aWNzIGFuZCBub3N0YWxnaWMgY2l0eSBwb3AgYXRtb3NwaGVyZS4gQmFsYW5jZWQsIGh1bWFuLWxpa2UgZmFjaWFsIHByb3BvcnRpb25zIHdpdGg8L2Rpdj4KICAgIDwvZm9yZWlnbk9iamVjdD4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iNDcwIiBmaWxsPSIjNjQ3NDhiIiBmb250LXNpemU9IjE4IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPu2UhOuhrO2UhO2KuCDquLDrsJgg7ISg7YOdIOy5tOuTnDwvdGV4dD4KICA8L3N2Zz4=",
+        "generatedImages": [
+          {
+            "id": "prompted_1774060688209_m0v8a4",
+            "label": "조연",
+            "prompt": "조연 / 조연 / 주인공의 흐름을 받쳐 주는 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몰입감 있는. Scene context: 이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한",
+            "imageData": "data:image/svg+xml;base64,CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiB2aWV3Qm94PSIwIDAgOTYwIDU2MCI+CiAgICA8ZGVmcz4KICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiLz4KICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlZmY2ZmYiLz4KICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiByeD0iMzIiIGZpbGw9InVybCgjYmcpIi8+CiAgICA8cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI4OTYiIGhlaWdodD0iNDk2IiByeD0iMjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RiZWFmZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgICA8Y2lyY2xlIGN4PSI3NzAiIGN5PSIxMjIiIHI9Ijg2IiBmaWxsPSIjMjU2M2ViIiBvcGFjaXR5PSIwLjE0Ii8+CiAgICA8cmVjdCB4PSI5NiIgeT0iMTI2IiB3aWR0aD0iMjI4IiBoZWlnaHQ9IjI3MCIgcng9IjI0IiBmaWxsPSIjZjhmYWZjIiBzdHJva2U9IiNjYmQ1ZTEiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjE4NiIgcj0iNDgiIGZpbGw9IiNlMmU4ZjAiLz4KICAgIDxwYXRoIGQ9Ik0xNjIgMzAwIEMxODIgMjU2IDIzOCAyNTYgMjU4IDMwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik0yMTAgMjM2IEwyMTAgMzYyIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPHBhdGggZD0iTTE1NCAyODYgTDI2NiAyODYiIHN0cm9rZT0iIzQ3NTU2OSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8cGF0aCBkPSJNMTc2IDQyMCBMMjEwIDM2MiBMMjQ0IDQyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTAyIiBmaWxsPSIjMGYxNzJhIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiPuyhsOyXsDwvdGV4dD4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTQ0IiBmaWxsPSIjNDc1NTY5IiBmb250LXNpemU9IjIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPuyhsOyXsCAvIOyjvOyduOqzteydmCDtnZDrpoTsnYQg67Cb7LOQIOyjvOuKlCDsnbjrrLw8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIzOTAiIHk9IjE4OCIgd2lkdGg9IjQ3MCIgaGVpZ2h0PSIyMzAiPgogICAgICA8ZGl2IHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hodG1sIiBzdHlsZT0iZm9udC1mYW1pbHk6IEFyaWFsLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDI0cHg7IGxpbmUtaGVpZ2h0OiAxLjU7IGNvbG9yOiAjMzM0MTU1OyB3b3JkLWJyZWFrOiBrZWVwLWFsbDsiPuyhsOyXsCAvIOyhsOyXsCAvIOyjvOyduOqzteydmCDtnZDrpoTsnYQg67Cb7LOQIOyjvOuKlCDsnbjrrLwKU3R5bGl6ZWQgMkQgYW5pbWUgY2hhcmFjdGVyIGluc3BpcmVkIGJ5IGVhcmx5IDIwMDBzIGFuaW1hdGlvbiBhZXN0aGV0aWNzIGFuZCBub3N0YWxnaWMgY2l0eSBwb3AgYXRtb3NwaGVyZS4gQmFsYW5jZWQsIGh1bWFuLWxpa2UgZmFjaWFsIHByb3BvcnRpb25zIHdpdGg8L2Rpdj4KICAgIDwvZm9yZWlnbk9iamVjdD4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iNDcwIiBmaWxsPSIjNjQ3NDhiIiBmb250LXNpemU9IjE4IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPu2UhOuhrO2UhO2KuCDquLDrsJgg7ISg7YOdIOy5tOuTnDwvdGV4dD4KICA8L3N2Zz4=",
+            "createdAt": 1774060688209,
+            "kind": "character",
+            "sourceMode": "sample",
+            "groupId": "prompted_1774060688209_m0v8a4",
+            "groupLabel": "조연"
+          }
+        ],
+        "selectedImageId": "prompted_1774060688209_m0v8a4",
+        "createdAt": 1774060688209
+      }
+    ],
+    "styleImages": [],
+    "characterImages": [
+      {
+        "id": "prompted_1774060688209_2bn63g",
+        "label": "초보 창작자",
+        "prompt": "초보 창작자 / 주인공 / 서사를 이끄는 중심 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몰입감 있는. Scene context: 이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한",
+        "imageData": "data:image/svg+xml;base64,CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiB2aWV3Qm94PSIwIDAgOTYwIDU2MCI+CiAgICA8ZGVmcz4KICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiLz4KICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlZmY2ZmYiLz4KICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiByeD0iMzIiIGZpbGw9InVybCgjYmcpIi8+CiAgICA8cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI4OTYiIGhlaWdodD0iNDk2IiByeD0iMjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RiZWFmZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgICA8Y2lyY2xlIGN4PSI3NzAiIGN5PSIxMjIiIHI9Ijg2IiBmaWxsPSIjOGI1Y2Y2IiBvcGFjaXR5PSIwLjE0Ii8+CiAgICA8cmVjdCB4PSI5NiIgeT0iMTI2IiB3aWR0aD0iMjI4IiBoZWlnaHQ9IjI3MCIgcng9IjI0IiBmaWxsPSIjZjhmYWZjIiBzdHJva2U9IiNjYmQ1ZTEiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjE4NiIgcj0iNDgiIGZpbGw9IiNlMmU4ZjAiLz4KICAgIDxwYXRoIGQ9Ik0xNjIgMzAwIEMxODIgMjU2IDIzOCAyNTYgMjU4IDMwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik0yMTAgMjM2IEwyMTAgMzYyIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPHBhdGggZD0iTTE1NCAyODYgTDI2NiAyODYiIHN0cm9rZT0iIzQ3NTU2OSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8cGF0aCBkPSJNMTc2IDQyMCBMMjEwIDM2MiBMMjQ0IDQyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTAyIiBmaWxsPSIjMGYxNzJhIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiPuy0iOuztCDssL3snpHsnpA8L3RleHQ+CiAgICA8dGV4dCB4PSIzOTAiIHk9IjE0NCIgZmlsbD0iIzQ3NTU2OSIgZm9udC1zaXplPSIyMCIgZm9udC1mYW1pbHk9IkFyaWFsLCBzYW5zLXNlcmlmIj7so7zsnbjqs7UgLyDshJzsgqzrpbwg7J2064GE64qUIOykkeyLrCDsnbjrrLw8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIzOTAiIHk9IjE4OCIgd2lkdGg9IjQ3MCIgaGVpZ2h0PSIyMzAiPgogICAgICA8ZGl2IHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hodG1sIiBzdHlsZT0iZm9udC1mYW1pbHk6IEFyaWFsLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDI0cHg7IGxpbmUtaGVpZ2h0OiAxLjU7IGNvbG9yOiAjMzM0MTU1OyB3b3JkLWJyZWFrOiBrZWVwLWFsbDsiPuy0iOuztCDssL3snpHsnpAgLyDso7zsnbjqs7UgLyDshJzsgqzrpbwg7J2064GE64qUIOykkeyLrCDsnbjrrLwKU3R5bGl6ZWQgMkQgYW5pbWUgY2hhcmFjdGVyIGluc3BpcmVkIGJ5IGVhcmx5IDIwMDBzIGFuaW1hdGlvbiBhZXN0aGV0aWNzIGFuZCBub3N0YWxnaWMgY2l0eSBwb3AgYXRtb3NwaGVyZS4gQmFsYW5jZWQsIGh1bWFuLWxpa2UgZmFjaWFsIHByb3BvcnRpb25zIHdpdDwvZGl2PgogICAgPC9mb3JlaWduT2JqZWN0PgogICAgPHRleHQgeD0iMzkwIiB5PSI0NzAiIGZpbGw9IiM2NDc0OGIiIGZvbnQtc2l6ZT0iMTgiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiI+7ZSE66Gs7ZSE7Yq4IOq4sOuwmCDshKDtg50g7Lm065OcPC90ZXh0PgogIDwvc3ZnPg==",
+        "createdAt": 1774060688209,
+        "kind": "character",
+        "sourceMode": "sample",
+        "groupId": "prompted_1774060688209_2bn63g",
+        "groupLabel": "초보 창작자"
+      },
+      {
+        "id": "prompted_1774060688209_m0v8a4",
+        "label": "조연",
+        "prompt": "조연 / 조연 / 주인공의 흐름을 받쳐 주는 인물\nStylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.\nunique character design, varied outfit style, clean silhouette, based on the story mood: 몰입감 있는. Scene context: 이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한",
+        "imageData": "data:image/svg+xml;base64,CiAgPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiB2aWV3Qm94PSIwIDAgOTYwIDU2MCI+CiAgICA8ZGVmcz4KICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJiZyIgeDE9IjAiIHkxPSIwIiB4Mj0iMSIgeTI9IjEiPgogICAgICAgIDxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNmZmZmZmYiLz4KICAgICAgICA8c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNlZmY2ZmYiLz4KICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNTYwIiByeD0iMzIiIGZpbGw9InVybCgjYmcpIi8+CiAgICA8cmVjdCB4PSIzMiIgeT0iMzIiIHdpZHRoPSI4OTYiIGhlaWdodD0iNDk2IiByeD0iMjgiIGZpbGw9IiNmZmZmZmYiIHN0cm9rZT0iI2RiZWFmZSIgc3Ryb2tlLXdpZHRoPSIzIi8+CiAgICA8Y2lyY2xlIGN4PSI3NzAiIGN5PSIxMjIiIHI9Ijg2IiBmaWxsPSIjMjU2M2ViIiBvcGFjaXR5PSIwLjE0Ii8+CiAgICA8cmVjdCB4PSI5NiIgeT0iMTI2IiB3aWR0aD0iMjI4IiBoZWlnaHQ9IjI3MCIgcng9IjI0IiBmaWxsPSIjZjhmYWZjIiBzdHJva2U9IiNjYmQ1ZTEiLz4KICAgIDxjaXJjbGUgY3g9IjIxMCIgY3k9IjE4NiIgcj0iNDgiIGZpbGw9IiNlMmU4ZjAiLz4KICAgIDxwYXRoIGQ9Ik0xNjIgMzAwIEMxODIgMjU2IDIzOCAyNTYgMjU4IDMwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICAgIDxwYXRoIGQ9Ik0yMTAgMjM2IEwyMTAgMzYyIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMTAiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIvPgogICAgPHBhdGggZD0iTTE1NCAyODYgTDI2NiAyODYiIHN0cm9rZT0iIzQ3NTU2OSIgc3Ryb2tlLXdpZHRoPSIxMCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgICA8cGF0aCBkPSJNMTc2IDQyMCBMMjEwIDM2MiBMMjQ0IDQyMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDc1NTY5IiBzdHJva2Utd2lkdGg9IjEwIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTAyIiBmaWxsPSIjMGYxNzJhIiBmb250LXNpemU9IjM0IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiIGZvbnQtd2VpZ2h0PSI3MDAiPuyhsOyXsDwvdGV4dD4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iMTQ0IiBmaWxsPSIjNDc1NTY5IiBmb250LXNpemU9IjIwIiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPuyhsOyXsCAvIOyjvOyduOqzteydmCDtnZDrpoTsnYQg67Cb7LOQIOyjvOuKlCDsnbjrrLw8L3RleHQ+CiAgICA8Zm9yZWlnbk9iamVjdCB4PSIzOTAiIHk9IjE4OCIgd2lkdGg9IjQ3MCIgaGVpZ2h0PSIyMzAiPgogICAgICA8ZGl2IHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hodG1sIiBzdHlsZT0iZm9udC1mYW1pbHk6IEFyaWFsLCBzYW5zLXNlcmlmOyBmb250LXNpemU6IDI0cHg7IGxpbmUtaGVpZ2h0OiAxLjU7IGNvbG9yOiAjMzM0MTU1OyB3b3JkLWJyZWFrOiBrZWVwLWFsbDsiPuyhsOyXsCAvIOyhsOyXsCAvIOyjvOyduOqzteydmCDtnZDrpoTsnYQg67Cb7LOQIOyjvOuKlCDsnbjrrLwKU3R5bGl6ZWQgMkQgYW5pbWUgY2hhcmFjdGVyIGluc3BpcmVkIGJ5IGVhcmx5IDIwMDBzIGFuaW1hdGlvbiBhZXN0aGV0aWNzIGFuZCBub3N0YWxnaWMgY2l0eSBwb3AgYXRtb3NwaGVyZS4gQmFsYW5jZWQsIGh1bWFuLWxpa2UgZmFjaWFsIHByb3BvcnRpb25zIHdpdGg8L2Rpdj4KICAgIDwvZm9yZWlnbk9iamVjdD4KICAgIDx0ZXh0IHg9IjM5MCIgeT0iNDcwIiBmaWxsPSIjNjQ3NDhiIiBmb250LXNpemU9IjE4IiBmb250LWZhbWlseT0iQXJpYWwsIHNhbnMtc2VyaWYiPu2UhOuhrO2UhO2KuCDquLDrsJgg7ISg7YOdIOy5tOuTnDwvdGV4dD4KICA8L3N2Zz4=",
+        "createdAt": 1774060688209,
+        "kind": "character",
+        "sourceMode": "sample",
+        "groupId": "prompted_1774060688209_m0v8a4",
+        "groupLabel": "조연"
+      }
+    ],
+    "selectedCharacterIds": [
+      "char_1774060688209_swb51o",
+      "char_1774060688209_mwlfwu"
+    ],
+    "selectedCharacterStyleId": null,
+    "selectedCharacterStyleLabel": "",
+    "selectedCharacterStylePrompt": "",
+    "selectedStyleImageId": null,
+    "referenceImages": {
+      "character": [],
+      "style": [],
+      "characterStrength": 70,
+      "styleStrength": 70
+    },
+    "promptPack": {
+      "storyPrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.",
+      "lyricsPrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[MUSIC VIDEO FLOW]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.",
+      "characterPrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[CHARACTERS]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[SCRIPT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.",
+      "scenePrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[SCENE PROMPTS]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[SCRIPT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.",
+      "actionPrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[SCENE ACTIONS]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말",
+      "persuasionStoryPrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[RECOMMENDED PHRASES]\n첫 장면부터 감정이 바로 느껴지게 써줘.\n장면이 머릿속에 그려지도록 구체적으로 써줘.\n한 문단이 끝날 때 다음 장면이 궁금하게 이어줘."
+    },
+    "promptTemplates": [
+      {
+        "id": "builtin-channel-constitution-v32",
+        "name": "채널 헌법 v32 분석형",
+        "description": "타겟팅, 안전성, 제목 설계까지 함께 정리하는 유튜브 분석형 대본 템플릿",
+        "prompt": "[채널 헌법 v32 압축 적용판]\n1. 절대 사실성. 입력 소스, 링크 분석 결과, 현재 초안에 없는 내용은 추정하지 않는다.\n2. 관찰과 해석 분리. 먼저 확인 가능한 사실을 정리하고, 그 사실에 근거한 해석만 허용한다.\n3. 불확실성 명시. 확인되지 않는 정보는 단정하지 말고 한계를 밝힌다.\n4. 동적 타겟팅. 주제, 링크, 톤을 보고 최적 타겟 페르소나를 정의한다.\n5. 안전/수익화 게이트키핑. 위험 요소와 광고 제한 가능성을 간단히 점검한다.\n6. 제목 생성 규칙. 설명형 제목보다 현상 제시형 제목을 우선한다.\n7. 60초 구조 선택. 핵심 메시지에 맞는 기승전결 모델 1개를 골라 대본 리듬을 설계한다.\n8. 현재 프로젝트에서는 주제, 참고 텍스트, 링크 분석 결과, 현재 초안을 유일한 소스로 취급한다.\n\n[기본 제작 방향]\n감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.\n\n[반드시 지킬 출력 계약]\n오직 JSON 객체 하나만 반환한다. 마크다운 설명과 코드펜스는 금지한다.\nJSON 스키마:\n{\n  \"targetProfile\": {\n    \"name\": \"타겟 명칭\",\n    \"identity\": \"핵심 정체성\",\n    \"interests\": [\"관심사1\", \"관심사2\"],\n    \"tone\": \"선호 톤앤매너\"\n  },\n  \"safetyReview\": {\n    \"grade\": \"safe 또는 danger\",\n    \"details\": \"커뮤니티 가이드 관점 요약\",\n    \"decision\": \"계속 진행 또는 중단 판단\"\n  },\n  \"monetizationReview\": {\n    \"grade\": \"green 또는 yellow 또는 red\",\n    \"details\": \"광고 친화도 요약\",\n    \"solution\": \"리스크를 낮추는 표현 가이드\"\n  },\n  \"selectedStructure\": {\n    \"id\": \"001~010\",\n    \"reason\": \"선정 이유\"\n  },\n  \"titles\": [\"제목1\", \"제목2\", \"제목3\"],\n  \"keywords\": [{\"ko\": \"한국어 키워드\", \"en\": \"English keyword\"}],\n  \"script\": \"문단 사이를 빈 줄로 구분한 최종 내레이션 대본\"\n}\n\n[script 필드 규칙]\n- 순수 내레이션 문단만 작성한다.\n- 문단 수는 대체로 4~10문단 안에서 주제와 예상 길이에 맞춘다.\n- 입력 소스에서 확인 가능한 사실만 사용한다.\n- 지나친 비유, 호들갑, 선정적 표현, 근거 없는 단정은 금지한다.",
+        "mode": "narration",
+        "engine": "channel_constitution_v32",
+        "builtIn": true,
+        "basePrompt": "[채널 헌법 v32 압축 적용판]\n1. 절대 사실성. 입력 소스, 링크 분석 결과, 현재 초안에 없는 내용은 추정하지 않는다.\n2. 관찰과 해석 분리. 먼저 확인 가능한 사실을 정리하고, 그 사실에 근거한 해석만 허용한다.\n3. 불확실성 명시. 확인되지 않는 정보는 단정하지 말고 한계를 밝힌다.\n4. 동적 타겟팅. 주제, 링크, 톤을 보고 최적 타겟 페르소나를 정의한다.\n5. 안전/수익화 게이트키핑. 위험 요소와 광고 제한 가능성을 간단히 점검한다.\n6. 제목 생성 규칙. 설명형 제목보다 현상 제시형 제목을 우선한다.\n7. 60초 구조 선택. 핵심 메시지에 맞는 기승전결 모델 1개를 골라 대본 리듬을 설계한다.\n8. 현재 프로젝트에서는 주제, 참고 텍스트, 링크 분석 결과, 현재 초안을 유일한 소스로 취급한다.\n\n[기본 제작 방향]\n감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.\n\n[반드시 지킬 출력 계약]\n오직 JSON 객체 하나만 반환한다. 마크다운 설명과 코드펜스는 금지한다.\nJSON 스키마:\n{\n  \"targetProfile\": {\n    \"name\": \"타겟 명칭\",\n    \"identity\": \"핵심 정체성\",\n    \"interests\": [\"관심사1\", \"관심사2\"],\n    \"tone\": \"선호 톤앤매너\"\n  },\n  \"safetyReview\": {\n    \"grade\": \"safe 또는 danger\",\n    \"details\": \"커뮤니티 가이드 관점 요약\",\n    \"decision\": \"계속 진행 또는 중단 판단\"\n  },\n  \"monetizationReview\": {\n    \"grade\": \"green 또는 yellow 또는 red\",\n    \"details\": \"광고 친화도 요약\",\n    \"solution\": \"리스크를 낮추는 표현 가이드\"\n  },\n  \"selectedStructure\": {\n    \"id\": \"001~010\",\n    \"reason\": \"선정 이유\"\n  },\n  \"titles\": [\"제목1\", \"제목2\", \"제목3\"],\n  \"keywords\": [{\"ko\": \"한국어 키워드\", \"en\": \"English keyword\"}],\n  \"script\": \"문단 사이를 빈 줄로 구분한 최종 내레이션 대본\"\n}\n\n[script 필드 규칙]\n- 순수 내레이션 문단만 작성한다.\n- 문단 수는 대체로 4~10문단 안에서 주제와 예상 길이에 맞춘다.\n- 입력 소스에서 확인 가능한 사실만 사용한다.\n- 지나친 비유, 호들갑, 선정적 표현, 근거 없는 단정은 금지한다.",
+        "isCustomized": false,
+        "updatedAt": 1
+      },
+      {
+        "id": "builtin-core-script",
+        "name": "Core script draft",
+        "description": "Default structure for story/news flow",
+        "prompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.",
+        "mode": "narration",
+        "engine": "default",
+        "builtIn": true,
+        "basePrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.",
+        "isCustomized": false,
+        "updatedAt": 2
+      },
+      {
+        "id": "builtin-dialogue-script",
+        "name": "Dialogue draft",
+        "description": "A more conversational variation",
+        "prompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.\n\nExtra rules:\n- Blend dialogue and narration naturally.\n- Prefer visual and concrete sentences.",
+        "mode": "dialogue",
+        "engine": "default",
+        "builtIn": true,
+        "basePrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[INPUT]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[CURRENT DRAFT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.\n\nExtra rules:\n- Blend dialogue and narration naturally.\n- Prefer visual and concrete sentences.",
+        "isCustomized": false,
+        "updatedAt": 3
+      },
+      {
+        "id": "builtin-scene-heavy",
+        "name": "Scene-heavy draft",
+        "description": "Stronger scene transitions and visual detail",
+        "prompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[SCENE PROMPTS]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[SCRIPT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.\n\nExtra rules:\n- Start each paragraph with a visible scene shift.\n- Add concrete visual anchors.",
+        "mode": "narration",
+        "engine": "default",
+        "builtIn": true,
+        "basePrompt": "감정 흐름과 장면 전환이 자연스럽게 이어지는 이야기형 대본을 만든다. 도입은 강하게 시작하고, 끝은 다음 장면이 떠오르게 마무리한다.\n\n[SCENE PROMPTS]\nTopic: 프로젝트(4)\nGenre: 드라마\nMood: 몰입감 있는\nSetting: 새벽의 편의점\nLead: 초보 창작자\nConflict: 잊고 있던 약속\nEnding tone: 희망적인 결말\n\n[SCRIPT]\n이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(4)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.\n\n말투는 기본체를 유지합니다.\n\n참고 내용은 잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.를 반영해 주세요.\n\n새벽의 편의점에서 초보 창작자은 프로젝트(4)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 초보 창작자은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 잊고 있던 약속가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 희망적인 결말 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 초보 창작자은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n중간 전환은 사례 중심으로 정리한다.\n\nExtra rules:\n- Start each paragraph with a visible scene shift.\n- Add concrete visual anchors.",
+        "isCustomized": false,
+        "updatedAt": 4
+      }
+    ],
+    "selectedPromptTemplateId": "builtin-channel-constitution-v32",
+    "promptAdditions": [],
+    "customScriptSettings": {
+      "expectedDurationMinutes": 3,
+      "speechStyle": "default",
+      "language": "ko",
+      "referenceText": "잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n새벽의 편의점 배경과 몰입감 있는 분위기를 자연스럽게 반영해 주세요.\n잊고 있던 약속를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.\n초보 창작자 관점에서 시작하고 희망적인 결말으로 마무리해 주세요.",
+      "referenceLinks": [],
+      "scriptModel": "openrouter/auto"
+    },
+    "constitutionAnalysis": {
+      "targetProfile": {
+        "name": "2030 호기심 몰입형",
+        "identity": "몰입감 있는 톤에서 핵심만 빠르게 건지는 시청자",
+        "interests": [
+          "드라마",
+          "새벽의 편의점",
+          "잊고 있던 약속"
+        ],
+        "tone": "몰입감 있는 톤의 짧고 선명한 설명"
+      },
+      "safetyReview": {
+        "grade": "safe",
+        "details": "현재 입력 기준으로 즉시 중단해야 할 위험 신호는 크지 않습니다.",
+        "decision": "대본 생성을 계속 진행해도 됩니다."
+      },
+      "monetizationReview": {
+        "grade": "green",
+        "details": "선정성이나 노골적인 위험 조장 없이 정보/스토리 중심으로 정리된 초안입니다.",
+        "solution": "자극적인 단어를 과하게 늘리지 않고 사실 중심 표현을 유지합니다."
+      },
+      "selectedStructure": {
+        "id": "005",
+        "reason": "현재 주제와 톤에 맞춰 짧은 쇼츠에서 이해와 몰입을 동시에 잡기 쉬운 구조를 선택했습니다."
+      },
+      "titles": [
+        "프로젝트(4)에서 가장 먼저 보이는 장면",
+        "프로젝트(4)가 빠르게 먹히는 포인트",
+        "프로젝트(4)를 끝까지 보게 되는 흐름",
+        "프로젝트(4)를 설명보다 현상으로 푸는 방식",
+        "프로젝트(4)를 짧게 정리하는 구성"
+      ],
+      "keywords": [
+        {
+          "ko": "프로젝트(4)",
+          "en": "프로젝트(4)"
+        },
+        {
+          "ko": "드라마",
+          "en": "드라마"
+        },
+        {
+          "ko": "새벽의 편의점",
+          "en": "새벽의 편의점"
+        },
+        {
+          "ko": "잊고 있던 약속",
+          "en": "잊고 있던 약속"
+        },
+        {
+          "ko": "몰입감 있는",
+          "en": "몰입감 있는"
+        }
+      ],
+      "source": "sample",
+      "updatedAt": 1774060688209
+    },
+    "openRouterModel": "openrouter/auto",
+    "ttsProvider": "qwen3Tts",
+    "elevenLabsVoiceId": null,
+    "elevenLabsModelId": null,
+    "heygenVoiceId": null,
+    "qwenVoicePreset": "qwen-default",
+    "qwenStylePreset": "balanced",
+    "voicePreviewAsset": null,
+    "scriptPreviewAsset": null,
+    "finalVoiceAsset": null,
+    "backgroundMusicPreview": null,
+    "finalBackgroundMusic": null,
+    "musicVideoPreview": null,
+    "finalMusicVideo": null,
+    "sampleMode": {
+      "text": true,
+      "tts": true,
+      "backgroundMusic": true,
+      "musicVideo": true
+    },
+    "completedSteps": {
+      "step1": false,
+      "step2": false,
+      "step3": false,
+      "step4": false,
+      "step5": false
+    },
+    "updatedAt": 1774060798406
+  },
+  "voicePreviewAsset": null,
+  "scriptPreviewAsset": null,
+  "finalVoiceAsset": null,
+  "backgroundMusicPreview": null,
+  "finalBackgroundMusic": null,
+  "musicVideoPreview": null,
+  "finalMusicVideo": null,
+  "summary": {
+    "id": "project_1774060521971_oualrd",
+    "name": "프로젝트(4)",
+    "topic": "프로젝트(4)",
+    "projectNumber": 4,
+    "folderName": "project-0004-4",
+    "createdAt": 1774060521971,
+    "lastSavedAt": 1774060798949,
+    "assetCount": 0,
+    "imageCount": 0,
+    "videoCount": 0,
+    "audioCount": 0,
+    "thumbnailPath": null
+  }
+}

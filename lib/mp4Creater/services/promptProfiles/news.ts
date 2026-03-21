@@ -1,19 +1,19 @@
 export function buildNewsPrompt(topic: string, sourceText: string) {
   return `
-# Task: Generate a news-style storyboard for "${topic}"
+# Task: Generate a cinematic movie-style storyboard for "${topic}"
 
 ## Core direction
-- Use clean, trustworthy, explanatory visuals.
-- Think in anchor shot, evidence shot, chart or data shot, context shot, closing shot.
+- Use immersive, emotional, movie-like visuals.
+- Think in opening shot, tension shot, reveal shot, confrontation shot, ending shot.
 - One paragraph becomes one scene.
-- Keep tone clear, structured, and easy to understand.
-- Prefer neutral framing, graphic overlays, screens, newsroom, urban b-roll, documents, or charts when relevant.
+- Keep the flow visual, dramatic, and coherent.
+- Prefer character-driven framing, dramatic lighting, meaningful props, and environmental storytelling.
 
 ## Scene rules
 - Input paragraph count = output scene count
 - narration must copy each original paragraph exactly
-- if the paragraph mentions numbers, systems, or institutions, visualise them clearly
-- avoid over-dramatizing unless the paragraph itself is dramatic
+- preserve emotional escalation across scenes
+- avoid flat explainer visuals unless the paragraph itself explicitly requires them
 
 ## Output JSON
 {

@@ -26,7 +26,7 @@ import { ensureWorkflowDraft } from '../services/workflowDraftService';
 import { getDefaultPreviewMix, createSampleBackgroundTrack } from '../services/musicService';
 import { generateImage, getSelectedImageModel } from '../services/imageService';
 import { buildThumbnailScene, createSampleThumbnail } from '../services/thumbnailService';
-import { generateAudioWithElevenLabs } from '../services/elevenLabsService';
+import { generateTtsAudio } from '../services/ttsService';
 import { generateMotionPrompt, generateScript } from '../services/geminiService';
 import { generateVideo } from '../services/videoService';
 import { generateVideoFromImage, getFalApiKey } from '../services/falService';
@@ -111,7 +111,7 @@ const SceneStudioPage: React.FC = () => {
   const [showApiModal, setShowApiModal] = useState(false);
   const [apiModalTitle, setApiModalTitle] = useState('API 키 등록');
   const [apiModalDescription, setApiModalDescription] = useState('필요한 키를 등록하면 실제 생성 품질이 올라갑니다.');
-  const [apiModalFocusField, setApiModalFocusField] = useState<'openRouter' | 'elevenLabs' | 'fal' | null>(null);
+  const [apiModalFocusField, setApiModalFocusField] = useState<'openRouter' | 'elevenLabs' | 'heygen' | 'fal' | null>(null);
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [backgroundMusicTracks, setBackgroundMusicTracks] = useState<BackgroundMusicTrack[]>([]);
@@ -169,6 +169,38 @@ const SceneStudioPage: React.FC = () => {
 
   const currentProjectSummary = useMemo(() => (studioState?.projects || []).find((item) => item.id === currentProjectId) || null, [studioState?.projects, currentProjectId]);
 
+  const resolveSceneTtsOptions = useCallback(() => {
+    const provider = (draft.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'elevenLabs' | 'heygen';
+    const apiKey = provider === 'elevenLabs'
+      ? (studioState?.providers?.elevenLabsApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY) || '')
+      : provider === 'heygen'
+        ? (studioState?.providers?.heygenApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.HEYGEN_API_KEY) || '')
+        : '';
+    return {
+      provider,
+      apiKey,
+      voiceId: provider === 'elevenLabs'
+        ? (draft.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID)
+        : provider === 'heygen'
+          ? (draft.heygenVoiceId || studioState?.routing?.heygenVoiceId || null)
+          : (draft.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default'),
+      modelId: draft.elevenLabsModelId || studioState?.routing?.elevenLabsModelId || studioState?.routing?.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+      qwenPreset: draft.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default',
+    };
+  }, [draft.elevenLabsModelId, draft.elevenLabsVoiceId, draft.heygenVoiceId, draft.qwenVoicePreset, draft.ttsProvider, studioState?.providers?.elevenLabsApiKey, studioState?.providers?.heygenApiKey, studioState?.routing?.audioModel, studioState?.routing?.elevenLabsModelId, studioState?.routing?.elevenLabsVoiceId, studioState?.routing?.heygenVoiceId, studioState?.routing?.qwenVoicePreset, studioState?.routing?.ttsProvider]);
+
+  const generateSceneAudioAsset = useCallback(async (text: string) => {
+    const tts = resolveSceneTtsOptions();
+    return await generateTtsAudio({
+      provider: tts.provider,
+      text,
+      apiKey: tts.apiKey || undefined,
+      voiceId: tts.voiceId || undefined,
+      modelId: tts.modelId || undefined,
+      qwenPreset: tts.qwenPreset || undefined,
+    });
+  }, [resolveSceneTtsOptions]);
+
   useEffect(() => {
     if (generatedData.length) return;
     if (!draft.script?.trim()) return;
@@ -186,7 +218,7 @@ const SceneStudioPage: React.FC = () => {
     const scriptReady = Boolean(draft.script?.trim());
     const charactersReady = Boolean(draft.selectedCharacterIds.length || draft.extractedCharacters.length);
     const styleReady = Boolean(draft.selectedStyleImageId || draft.styleImages[0]?.id);
-    const aiAudioReady = Boolean(studioState?.providers?.elevenLabsApiKey);
+    const aiAudioReady = Boolean(studioState?.providers?.elevenLabsApiKey || studioState?.providers?.heygenApiKey || draft.ttsProvider === 'qwen3Tts');
     const aiVideoReady = Boolean(studioState?.providers?.falApiKey);
 
     return [
@@ -354,7 +386,7 @@ const SceneStudioPage: React.FC = () => {
     }
   }, [draft, buildReferenceImages]);
 
-  const openApiModal = (options: { title?: string; description?: string; focusField?: 'openRouter' | 'elevenLabs' | 'fal' | null }) => {
+  const openApiModal = (options: { title?: string; description?: string; focusField?: 'openRouter' | 'elevenLabs' | 'heygen' | 'fal' | null }) => {
     setApiModalTitle(options.title || 'API 키 등록');
     setApiModalDescription(options.description || '필요한 키를 등록하면 실제 생성 품질이 올라갑니다.');
     setApiModalFocusField(options.focusField || null);
@@ -528,9 +560,8 @@ const SceneStudioPage: React.FC = () => {
       setStep(GenerationStep.ASSETS);
       initialAssets.forEach((_, index) => setSceneProgress(index, 8, '생성 대기 중'));
 
-      const elevenKey = generateAudio
-        ? (studioState?.providers?.elevenLabsApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY) || '')
-        : '';
+      const initialTtsOptions = generateAudio ? resolveSceneTtsOptions() : null;
+      const isTtsAvailable = Boolean(initialTtsOptions && (initialTtsOptions.provider === 'qwen3Tts' || initialTtsOptions.apiKey));
 
       for (let i = 0; i < initialAssets.length; i++) {
         const currentAspectRatio = assetsRef.current[i].aspectRatio || draft.aspectRatio || '16:9';
@@ -575,13 +606,14 @@ const SceneStudioPage: React.FC = () => {
           status: 'completed',
           aspectRatio: currentAspectRatio,
         });
-        setSceneProgress(i, elevenKey ? 72 : 100, elevenKey ? '오디오 대기 중' : '이미지 준비 완료');
+        setSceneProgress(i, isTtsAvailable ? 72 : 100, isTtsAvailable ? '오디오 대기 중' : '이미지 준비 완료');
 
-        if (elevenKey) {
+        const sceneTts = resolveSceneTtsOptions();
+        if (generateAudio && (sceneTts.provider === 'qwen3Tts' || sceneTts.apiKey)) {
           setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 오디오와 자막을 준비하는 중...`);
           try {
             const audio = await withSoftTimeout(
-              generateAudioWithElevenLabs(assetsRef.current[i].narration, elevenKey),
+              generateSceneAudioAsset(assetsRef.current[i].narration),
               15000,
               { audioData: null, subtitleData: null, estimatedDuration: null, sourceMode: 'sample' as const }
             );
@@ -885,15 +917,19 @@ const SceneStudioPage: React.FC = () => {
   const handleRegenerateAudio = async (index: number) => {
     setTaskProgressPercent(12);
     setSceneProgress(index, 24, '오디오 다시 생성');
-    const apiKey = studioState?.providers?.elevenLabsApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY) || '';
-    if (!apiKey) {
+    const tts = resolveSceneTtsOptions();
+    if (tts.provider !== 'qwen3Tts' && !tts.apiKey) {
       setTaskProgressPercent(null);
-      openApiModal({ title: '오디오 생성에는 ElevenLabs API 키가 필요합니다', description: '키를 넣고 저장하면 현재 씬의 오디오만 바로 다시 만들 수 있습니다.', focusField: 'elevenLabs' });
+      openApiModal({
+        title: tts.provider === 'heygen' ? '오디오 생성에는 HeyGen API 키가 필요합니다' : '오디오 생성에는 ElevenLabs API 키가 필요합니다',
+        description: '키를 넣고 저장하면 현재 씬의 오디오만 바로 다시 만들 수 있습니다.',
+        focusField: tts.provider === 'heygen' ? 'heygen' : 'elevenLabs',
+      });
       return;
     }
 
     try {
-      const audio = await generateAudioWithElevenLabs(assetsRef.current[index].narration, apiKey);
+      const audio = await generateSceneAudioAsset(assetsRef.current[index].narration);
       if (audio.audioData) {
         updateAssetAt(index, {
           audioData: audio.audioData,

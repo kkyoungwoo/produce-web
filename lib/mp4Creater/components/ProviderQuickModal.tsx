@@ -9,15 +9,15 @@ interface ProviderQuickModalProps {
   studioState: StudioState | null;
   title?: string;
   description?: string;
-  focusField?: 'openRouter' | 'elevenLabs' | 'fal' | null;
+  focusField?: 'openRouter' | 'elevenLabs' | 'heygen' | 'fal' | null;
   onClose: () => void;
   onSave: (partial: Partial<StudioState>) => void | Promise<void>;
   onOpenFullSettings?: () => void;
 }
 
-type ProviderField = 'openRouter' | 'elevenLabs';
+type ProviderField = 'openRouter' | 'elevenLabs' | 'heygen';
 
-const fieldOrder: ProviderField[] = ['openRouter', 'elevenLabs'];
+const fieldOrder: ProviderField[] = ['openRouter', 'elevenLabs', 'heygen'];
 
 const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
   open,
@@ -31,16 +31,19 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
 }) => {
   const [openRouterApiKey, setOpenRouterApiKey] = useState('');
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
+  const [heygenApiKey, setHeygenApiKey] = useState('');
   const [feedback, setFeedback] = useState<Record<string, { tone: 'success' | 'error' | 'info'; message: string } | null>>({});
   const [checking, setChecking] = useState<Record<string, boolean>>({});
   const panelRef = useRef<HTMLDivElement>(null);
   const openRouterInputRef = useRef<HTMLInputElement>(null);
   const elevenLabsInputRef = useRef<HTMLInputElement>(null);
+  const heygenInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
     setOpenRouterApiKey(studioState?.providers?.openRouterApiKey || '');
     setElevenLabsApiKey(studioState?.providers?.elevenLabsApiKey || '');
+    setHeygenApiKey(studioState?.providers?.heygenApiKey || '');
     setFeedback({});
     setChecking({});
   }, [open, studioState]);
@@ -50,14 +53,21 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
     const timer = window.setTimeout(() => {
       if (focusField === 'openRouter') openRouterInputRef.current?.focus();
       if (focusField === 'elevenLabs') elevenLabsInputRef.current?.focus();
+      if (focusField === 'heygen') heygenInputRef.current?.focus();
     }, 60);
     return () => window.clearTimeout(timer);
   }, [open, focusField]);
 
   if (!open || !studioState) return null;
 
+  const getValue = (field: ProviderField) => {
+    if (field === 'openRouter') return openRouterApiKey;
+    if (field === 'elevenLabs') return elevenLabsApiKey;
+    return heygenApiKey;
+  };
+
   const runCheck = async (field: ProviderField) => {
-    const value = field === 'openRouter' ? openRouterApiKey : elevenLabsApiKey;
+    const value = getValue(field);
     setChecking((prev) => ({ ...prev, [field]: true }));
     try {
       const result = await validateProviderConnection(field, value);
@@ -70,7 +80,7 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
 
   const handleSave = async () => {
     for (const field of fieldOrder) {
-      const value = field === 'openRouter' ? openRouterApiKey : elevenLabsApiKey;
+      const value = getValue(field);
       if (!value.trim()) continue;
       const result = await runCheck(field);
       if (!result.ok) return;
@@ -81,6 +91,7 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
         ...studioState.providers,
         openRouterApiKey: openRouterApiKey.trim(),
         elevenLabsApiKey: elevenLabsApiKey.trim(),
+        heygenApiKey: heygenApiKey.trim(),
       },
     });
     onClose();
@@ -102,7 +113,7 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
     >
       <div
         ref={panelRef}
-        className="w-full max-w-2xl rounded-[28px] border border-slate-200 bg-white shadow-2xl"
+        className="w-full max-w-3xl rounded-[28px] border border-slate-200 bg-white shadow-2xl"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="border-b border-slate-200 px-6 py-5">
@@ -118,7 +129,7 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
           </div>
         </div>
 
-        <div className="grid gap-4 p-6 md:grid-cols-2">
+        <div className="grid gap-4 p-6 md:grid-cols-3">
           <label className={`rounded-2xl border p-4 ${focusField === 'openRouter' ? 'border-blue-300 bg-blue-50/70' : 'border-slate-200 bg-slate-50'}`}>
             <div className="text-sm font-black text-slate-900">OpenRouter</div>
             <div className="mt-1 text-xs leading-5 text-slate-500">대본 생성, 추천 문장, 프롬프트 보강에 사용합니다.</div>
@@ -167,6 +178,31 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
               {checking.elevenLabs ? '확인 중...' : '연결 확인'}
             </button>
             {renderFeedback('elevenLabs')}
+          </label>
+
+          <label className={`rounded-2xl border p-4 ${focusField === 'heygen' ? 'border-blue-300 bg-blue-50/70' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="text-sm font-black text-slate-900">HeyGen</div>
+            <div className="mt-1 text-xs leading-5 text-slate-500">Starfish TTS, 보이스 캐스팅, 미리 듣기에 사용합니다.</div>
+            <input
+              ref={heygenInputRef}
+              type="password"
+              value={heygenApiKey}
+              onChange={(e) => {
+                setHeygenApiKey(e.target.value);
+                setFeedback((prev) => ({ ...prev, heygen: null }));
+              }}
+              className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-400"
+              placeholder="X-Api-Key ..."
+            />
+            <button
+              type="button"
+              onClick={() => void runCheck('heygen')}
+              disabled={!heygenApiKey.trim() || checking.heygen}
+              className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              {checking.heygen ? '확인 중...' : '연결 확인'}
+            </button>
+            {renderFeedback('heygen')}
           </label>
         </div>
 

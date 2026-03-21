@@ -181,7 +181,7 @@ export interface BackgroundMusicTrack {
   volume: number;
   sourceMode: 'ai' | 'sample';
   createdAt: number;
-  provider?: 'elevenLabs' | 'qwen3Tts' | 'sample';
+  provider?: 'elevenLabs' | 'qwen3Tts' | 'heygen' | 'sample';
   mode?: 'preview' | 'final';
   stylePreset?: string;
 }
@@ -192,7 +192,7 @@ export interface AudioPreviewAsset {
   text: string;
   audioData: string | null;
   duration?: number | null;
-  provider: 'elevenLabs' | 'qwen3Tts' | 'sample';
+  provider: 'elevenLabs' | 'qwen3Tts' | 'heygen' | 'sample';
   mode: 'voice-preview' | 'script-preview' | 'final-output';
   sourceMode: 'ai' | 'sample';
   voiceId?: string | null;
@@ -217,6 +217,11 @@ export interface CharacterProfile {
   description: string;
   visualStyle: string;
   voiceHint?: string;
+  voiceProvider?: 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen';
+  voiceId?: string;
+  voiceName?: string;
+  voicePreviewUrl?: string | null;
+  voiceLocale?: string | null;
   createdAt: number;
   role?: 'lead' | 'support' | 'narrator';
   roleLabel?: string;
@@ -280,7 +285,7 @@ export interface ConstitutionAnalysisSummary {
   updatedAt: number;
 }
 
-export type ScriptSpeechStyle = 'yo' | 'da' | 'random';
+export type ScriptSpeechStyle = 'default' | 'yo' | 'da' | 'eum';
 export type ScriptLanguageOption = 'ko' | 'en' | 'ja' | 'zh' | 'vi' | 'mn' | 'th' | 'uz';
 export type ReferenceLinkKind = 'youtube' | 'web';
 
@@ -344,9 +349,10 @@ export interface WorkflowDraft {
   customScriptSettings?: CustomScriptSettings;
   constitutionAnalysis?: ConstitutionAnalysisSummary | null;
   openRouterModel?: string;
-  ttsProvider?: 'qwen3Tts' | 'elevenLabs';
+  ttsProvider?: 'qwen3Tts' | 'elevenLabs' | 'heygen';
   elevenLabsVoiceId?: string | null;
   elevenLabsModelId?: string | null;
+  heygenVoiceId?: string | null;
   qwenVoicePreset?: string | null;
   qwenStylePreset?: string | null;
   voicePreviewAsset?: AudioPreviewAsset | null;
@@ -440,16 +446,17 @@ export interface AiRoutingSettings {
   openRouterInputMaxChars?: number;
   imageProvider: 'sample' | 'openrouter' | 'custom';
   imageModel: string;
-  audioProvider: 'elevenLabs' | 'qwen3Tts' | 'sample';
+  audioProvider: 'elevenLabs' | 'qwen3Tts' | 'heygen' | 'sample';
   audioModel: string;
   ttsNarratorId: string;
   backgroundMusicModel: string;
   videoProvider: 'elevenLabs' | 'sample';
   videoModel: string;
   textModel?: string;
-  ttsProvider?: 'qwen3Tts' | 'elevenLabs';
+  ttsProvider?: 'qwen3Tts' | 'elevenLabs' | 'heygen';
   elevenLabsVoiceId?: string | null;
   elevenLabsModelId?: string | null;
+  heygenVoiceId?: string | null;
   qwenVoicePreset?: string | null;
   qwenStylePreset?: string | null;
   backgroundMusicProvider?: 'elevenLabs' | 'sample';
@@ -475,6 +482,7 @@ export interface ProviderRegistryItem {
 export interface StudioProviderSecrets {
   openRouterApiKey?: string;
   elevenLabsApiKey?: string;
+  heygenApiKey?: string;
   falApiKey?: string;
 }
 

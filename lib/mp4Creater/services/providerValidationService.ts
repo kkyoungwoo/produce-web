@@ -1,4 +1,4 @@
-export type ProviderValidationKind = 'openRouter' | 'elevenLabs' | 'fal';
+export type ProviderValidationKind = 'openRouter' | 'elevenLabs' | 'heygen' | 'fal';
 
 export interface ProviderValidationResult {
   ok: boolean;
@@ -60,6 +60,34 @@ async function validateElevenLabs(apiKey: string): Promise<ProviderValidationRes
     ok: true,
     tone: 'success',
     message: 'ElevenLabs API 연결이 확인되었습니다.',
+  };
+}
+
+
+async function validateHeyGen(apiKey: string): Promise<ProviderValidationResult> {
+  const response = await fetch('/api/mp4Creater/heygen/voices', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      apiKey,
+      limit: 5,
+    }),
+  });
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      tone: 'error',
+      message: buildFailureMessage(response.status, 'HeyGen'),
+    };
+  }
+
+  return {
+    ok: true,
+    tone: 'success',
+    message: 'HeyGen API 연결이 확인되었습니다.',
   };
 }
 
@@ -126,6 +154,7 @@ export async function validateProviderConnection(
   try {
     if (kind === 'openRouter') return await validateOpenRouter(trimmed);
     if (kind === 'elevenLabs') return await validateElevenLabs(trimmed);
+    if (kind === 'heygen') return await validateHeyGen(trimmed);
     return await validateFal(trimmed);
   } catch {
     return {

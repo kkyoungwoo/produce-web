@@ -73,7 +73,7 @@ export function buildBackgroundMusicPrompt(draft: WorkflowDraft, modelId = 'samp
     draft.contentType === 'music_video'
       ? '뮤직비디오'
       : draft.contentType === 'news'
-        ? '뉴스'
+        ? '영화'
         : draft.contentType === 'info_delivery'
           ? '정보 전달'
           : '스토리';

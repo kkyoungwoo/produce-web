@@ -84,9 +84,11 @@ export function buildLocalVisualPrompt(narration: string, sceneNumber: number, c
   const modeLine =
     contentType === 'music_video'
       ? 'Music video storyboard illustration, lyrical, symbolic, cinematic rhythm.'
-      : contentType === 'news' || contentType === 'info_delivery'
-        ? 'News explainer storyboard illustration, clean visual hierarchy, credible composition.'
-        : 'Narrative storyboard illustration, cinematic emotion and clear visual storytelling.';
+      : contentType === 'news'
+        ? 'Cinematic movie storyboard illustration, dramatic lighting, emotional tension, immersive composition.'
+        : contentType === 'info_delivery'
+          ? 'Information explainer storyboard illustration, clean visual hierarchy, credible composition.'
+          : 'Narrative storyboard illustration, cinematic emotion and clear visual storytelling.';
 
   return [
     `${modeLine} Scene ${sceneNumber}.`,

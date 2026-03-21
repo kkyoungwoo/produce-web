@@ -30,10 +30,10 @@ export interface ScriptComposerResult {
 }
 
 function resolveSpeechStyle(style: ScriptSpeechStyle | undefined) {
-  if (style === 'random') {
-    return Math.random() > 0.5 ? 'yo' : 'da';
-  }
-  return style === 'da' ? 'da' : 'yo';
+  if (style === 'eum') return 'eum';
+  if (style === 'da') return 'da';
+  if (style === 'yo') return 'yo';
+  return 'default';
 }
 
 function createDialogueFallback(topic: string, selections: StorySelectionState, style: ScriptSpeechStyle) {
@@ -51,7 +51,21 @@ ${selections.protagonist}: ${selections.mood} 분위기다. 배경은 ${selectio
 ${selections.protagonist}: ${selections.endingTone}으로 간다.`);
   }
 
-  return normalizeStoryText(`Scene 1
+  if (speechStyle === 'eum') {
+    return normalizeStoryText(`Scene 1
+${selections.protagonist}: ${topic || '이 이야기'} 오늘 밤 시작함.
+상대: 왜 지금임?
+${selections.protagonist}: ${selections.conflict} 더는 못 미룸.
+
+Scene 2
+상대: 분위기 어떰?
+${selections.protagonist}: ${selections.mood} 분위기감. 배경 ${selections.setting}.
+상대: 결말은?
+${selections.protagonist}: ${selections.endingTone}으로 끝냄.`);
+  }
+
+  if (speechStyle === 'yo') {
+    return normalizeStoryText(`Scene 1
 ${selections.protagonist}: ${topic || '이 이야기'}는 오늘 밤 시작돼요.
 상대: 왜 지금이어야 하죠?
 ${selections.protagonist}: ${selections.conflict}는 더는 미룰 수 없으니까요.
@@ -61,10 +75,22 @@ Scene 2
 ${selections.protagonist}: ${selections.mood} 분위기로 가요. 배경은 ${selections.setting}이에요.
 상대: 결말은요?
 ${selections.protagonist}: ${selections.endingTone}으로 마무리해요.`);
+  }
+
+  return normalizeStoryText(`Scene 1
+${selections.protagonist}: ${topic || '이 이야기'}는 오늘 밤 시작된다.
+상대: 왜 지금이어야 해?
+${selections.protagonist}: ${selections.conflict}는 더는 미룰 수 없어.
+
+Scene 2
+상대: 그럼 어떤 분위기로 가는 거야?
+${selections.protagonist}: ${selections.mood} 분위기로 간다. 배경은 ${selections.setting}이야.
+상대: 결말은?
+${selections.protagonist}: ${selections.endingTone}으로 마무리한다.`);
 }
 
 function formatDuration(minutes: number) {
-  const safeMinutes = Math.max(1, Math.min(16, Math.round(minutes || 1)));
+  const safeMinutes = Math.max(1, Math.min(30, Math.round(minutes || 1)));
   return `${safeMinutes} minute${safeMinutes > 1 ? 's' : ''}`;
 }
 
@@ -72,19 +98,19 @@ function buildLocalizedGuide(options: ScriptComposerOptions) {
   const settings = options.customSettings;
   if (!settings) return [] as string[];
 
-  const duration = Math.max(1, Math.min(16, Math.round(settings.expectedDurationMinutes || 1)));
+  const duration = Math.max(1, Math.min(30, Math.round(settings.expectedDurationMinutes || 1)));
   const topic = options.topic || 'Auto-generated topic';
   const reference = settings.referenceText?.trim();
   const speechStyle = resolveSpeechStyle(settings.speechStyle);
   const languageGuides: Record<CustomScriptSettings['language'], string[]> = {
     ko: [
       `이 대본은 약 ${duration}분 분량을 목표로 합니다. 주제는 ${topic}이고 분위기는 ${options.selections.mood}, 배경은 ${options.selections.setting}입니다.`,
-      `말투는 ${speechStyle === 'da' ? '다체' : '요체'}를 유지합니다.`,
-      reference ? `참고 내용은 ${reference}${speechStyle === 'da' ? '를 반영한다.' : '를 반영해 주세요.'}` : '',
+      `말투는 ${speechStyle === 'default' ? '기본체' : speechStyle === 'da' ? '다체' : speechStyle === 'eum' ? '음슴체' : '요체'}를 유지합니다.`,
+      reference ? `참고 내용은 ${reference}${speechStyle === 'da' ? '를 반영한다.' : speechStyle === 'eum' ? ' 반영 바람.' : '를 반영해 주세요.'}` : '',
     ],
     en: [
       `This script targets about ${formatDuration(duration)}. The topic is ${topic}, with a ${options.selections.mood} mood in ${options.selections.setting}.`,
-      `Keep the speech style ${speechStyle === 'da' ? 'declarative' : 'polite conversational'}.`,
+      `Keep the speech style ${speechStyle === 'default' ? 'natural screenplay dialogue' : speechStyle === 'da' ? 'declarative' : speechStyle === 'eum' ? 'terse informal fragment style' : 'polite conversational'}.`,
       reference ? `Reference notes: ${reference}` : '',
     ],
     ja: [
@@ -124,7 +150,7 @@ function applyCustomFallback(baseText: string, options: ScriptComposerOptions) {
     .split(/\n{2,}/)
     .map((item) => item.trim())
     .filter(Boolean);
-  const targetParagraphCount = Math.max(3, Math.min(12, Math.round((settings.expectedDurationMinutes || 1) * 1.2)));
+  const targetParagraphCount = Math.max(3, Math.min(36, Math.round((settings.expectedDurationMinutes || 1) * 1.2)));
   const cloned = [...paragraphs];
   const variationSuffixes = [
     '도입은 조금 더 빠르게 전개한다.',
@@ -161,11 +187,11 @@ function buildConstitutionFallbackAnalysis(options: ScriptComposerOptions, sourc
   const mood = options.selections.mood || '몰입형';
   const topic = options.topic || '이번 프로젝트';
   const targetName = options.contentType === 'news'
-    ? '2030 브리핑 실속형'
+    ? '2030 시네마 몰입형'
     : options.contentType === 'info_delivery'
       ? '2030 실전 학습형'
       : '2030 호기심 몰입형';
-  const structureId = options.contentType === 'news' ? '002' : options.contentType === 'info_delivery' ? '010' : '005';
+  const structureId = options.contentType === 'news' ? '005' : options.contentType === 'info_delivery' ? '010' : '005';
   const titles = [
     `${topic}에서 가장 먼저 보이는 장면`,
     `${topic}가 빠르게 먹히는 포인트`,
@@ -338,9 +364,9 @@ function buildConstitutionUserPayload(options: ScriptComposerOptions) {
     `주인공/화자: ${options.selections.protagonist}`,
     `핵심 갈등: ${options.selections.conflict}`,
     `결말 톤: ${options.selections.endingTone}`,
-    `예상 길이: ${options.customSettings?.expectedDurationMinutes || 3}분`,
+    `예상 길이: ${Math.max(1, Math.min(30, options.customSettings?.expectedDurationMinutes || 3))}분`,
     `대본 언어: ${options.customSettings?.language || 'ko'}`,
-    `선호 말투: ${resolveSpeechStyle(options.customSettings?.speechStyle) === 'da' ? '다체' : '요체'}`,
+    `선호 말투: ${resolveSpeechStyle(options.customSettings?.speechStyle) === 'da' ? '다체' : resolveSpeechStyle(options.customSettings?.speechStyle) === 'eum' ? '음슴체' : '요체'}`,
     `현재 초안: ${options.currentScript?.trim() || '없음'}`,
     `참고 텍스트: ${options.customSettings?.referenceText?.trim() || '없음'}`,
     additionBlock.length ? `[추가 가이드]\n${additionBlock.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
@@ -397,7 +423,7 @@ Ending tone: ${options.selections.endingTone}
 Prompt template: ${options.template.name}
 Prompt description: ${options.template.description}
 Expected duration: ${options.customSettings?.expectedDurationMinutes || 3} minutes
-Preferred speech style: ${resolvedSpeechStyle === 'da' ? 'Declarative Korean ending (다체)' : 'Polite Korean ending (요체)'}
+Preferred speech style: ${resolvedSpeechStyle === 'da' ? 'Declarative Korean ending (다체)' : resolvedSpeechStyle === 'eum' ? 'Terse informal Korean fragment style (음슴체)' : 'Polite Korean ending (요체)'}
 Script language: ${options.customSettings?.language || 'ko'}
 Reference notes: ${options.customSettings?.referenceText?.trim() || 'None'}
 

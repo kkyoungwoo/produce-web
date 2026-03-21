@@ -15,11 +15,11 @@
     <path d="M210 236 L210 362" stroke="#475569" stroke-width="10" stroke-linecap="round"/>
     <path d="M154 286 L266 286" stroke="#475569" stroke-width="10" stroke-linecap="round"/>
     <path d="M176 420 L210 362 L244 420" fill="none" stroke="#475569" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
-    <text x="390" y="102" fill="#0f172a" font-size="34" font-family="Arial, sans-serif" font-weight="700">설명자</text>
+    <text x="390" y="102" fill="#0f172a" font-size="34" font-family="Arial, sans-serif" font-weight="700">초보 창작자</text>
     <text x="390" y="144" fill="#475569" font-size="20" font-family="Arial, sans-serif">주인공 / 서사를 이끄는 중심 인물</text>
     <foreignObject x="390" y="188" width="470" height="230">
-      <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; font-size: 24px; line-height: 1.5; color: #334155; word-break: keep-all;">설명자 / 주인공 / 서사를 이끄는 중심 인물
-Stylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with c</div>
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; font-size: 24px; line-height: 1.5; color: #334155; word-break: keep-all;">초보 창작자 / 주인공 / 서사를 이끄는 중심 인물
+Stylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions wit</div>
     </foreignObject>
     <text x="390" y="470" fill="#64748b" font-size="18" font-family="Arial, sans-serif">프롬프트 기반 선택 카드</text>
   </svg>

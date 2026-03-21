@@ -54,12 +54,10 @@ export default function RouteStepView({ vm }: { vm: any }) {
     isExtracting,
     hydrateCharactersForScript,
     handleCharacterUploadForId,
-    applyCharacterSampleToCharacter,
-    toggleCharacterSelection,
     selectCharacterImageById,
-    handleCharacterVoiceChange,
     updateCharacterPrompt,
     createCharacterVariants,
+    characterLoadingProgress,
     characterUploadInputRef,
     handleUpload,
     styleGroups,
@@ -108,6 +106,24 @@ export default function RouteStepView({ vm }: { vm: any }) {
     addReferenceLink,
     removeReferenceLink,
     setSelectedScriptGenerationModel,
+    elevenLabsVoices,
+    heygenVoices,
+    isLoadingVoiceCatalogs,
+    projectVoiceProvider,
+    projectVoiceSummary,
+    voicePreviewCharacterId,
+    voicePreviewMessage,
+    handleCharacterVoiceProviderChange,
+    handleCharacterVoiceChoiceChange,
+    handlePreviewCharacterVoice,
+    getCharacterVoiceSummary,
+    newCharacterName,
+    newCharacterPrompt,
+    setNewCharacterName,
+    setNewCharacterPrompt,
+    createNewCharacterByPrompt,
+    removeCharacter,
+    toggleCharacterSelection,
   } = vm;
 
   if (!routeStep) return null;
@@ -163,9 +179,15 @@ export default function RouteStepView({ vm }: { vm: any }) {
           isRefreshingTopic={isRefreshingTopic}
           isInitialLoadingRecommendations={isRefreshingTopic && topicRecommendations.length === 0}
           topicRecommendations={topicRecommendations}
+          customScriptDurationMinutes={customScriptDurationMinutes}
+          customScriptSpeechStyle={customScriptSpeechStyle}
+          customScriptLanguage={customScriptLanguage}
           onTopicChange={setTopic}
           onRefreshTopic={() => { void refreshTopicRecommendation(); }}
           onSelectTopicRecommendation={(value) => setTopic(value)}
+          onCustomScriptDurationChange={setCustomScriptDurationMinutes}
+          onCustomScriptSpeechStyleChange={setCustomScriptSpeechStyle}
+          onCustomScriptLanguageChange={setCustomScriptLanguage}
         />
       );
     }
@@ -176,9 +198,6 @@ export default function RouteStepView({ vm }: { vm: any }) {
           isGeneratingScript={isGeneratingScript}
           sceneCount={sceneCount}
           storyScript={storyScript}
-          customScriptDurationMinutes={customScriptDurationMinutes}
-          customScriptSpeechStyle={customScriptSpeechStyle}
-          customScriptLanguage={customScriptLanguage}
           customScriptReferenceText={customScriptReferenceText}
           scriptReferenceSuggestions={scriptReferenceSuggestions}
           referenceLinks={referenceLinks}
@@ -192,8 +211,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
           selectedPromptTemplateEngine={selectedPromptTemplateEngine}
           onGenerateScript={handleGenerateScriptClick}
           onViewPrompt={() => {
-            const projectTemplate = ensureProjectPromptTemplate();
-            const targetTemplate = projectTemplate || selectedPromptTemplate || syncedPromptTemplates[0] || null;
+            const targetTemplate = selectedPromptTemplate || syncedPromptTemplates[0] || null;
             if (!targetTemplate) {
               setNotice('표시할 프롬프트가 아직 준비되지 않았습니다. 잠시 후 다시 시도해 주세요.');
               return;
@@ -202,9 +220,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
             setPromptPreviewId(targetTemplate.id);
           }}
           onStoryScriptChange={setStoryScript}
-          onCustomScriptDurationChange={setCustomScriptDurationMinutes}
-          onCustomScriptSpeechStyleChange={setCustomScriptSpeechStyle}
-          onCustomScriptLanguageChange={setCustomScriptLanguage}
+          onSaveStoryScript={() => { void hydrateCharactersForScript({ preserveSelection: true }); }}
           onCustomScriptReferenceTextChange={setCustomScriptReferenceText}
           onApplyScriptReferenceSuggestion={applyScriptReferenceSuggestion}
           onRefreshScriptReferenceSuggestions={refreshScriptReferenceSuggestions}
@@ -213,6 +229,27 @@ export default function RouteStepView({ vm }: { vm: any }) {
           onAddReferenceLink={addReferenceLink}
           onRemoveReferenceLink={removeReferenceLink}
           onScriptModelChange={setSelectedScriptGenerationModel}
+          extractedCharacters={extractedCharacters}
+          selectedCharacterIds={selectedCharacterIds || []}
+          isHydratingCharacters={isExtracting}
+          isLoadingVoiceCatalogs={isLoadingVoiceCatalogs}
+          projectVoiceProvider={projectVoiceProvider}
+          projectVoiceSummary={projectVoiceSummary}
+          elevenLabsVoices={elevenLabsVoices}
+          heygenVoices={heygenVoices}
+          activeVoicePreviewCharacterId={voicePreviewCharacterId}
+          voicePreviewMessage={voicePreviewMessage}
+          newCharacterName={newCharacterName}
+          newCharacterPrompt={newCharacterPrompt}
+          onCharacterToggle={(characterId) => toggleCharacterSelection(characterId)}
+          onCharacterRemove={(characterId) => removeCharacter(characterId)}
+          onCharacterVoiceProviderChange={handleCharacterVoiceProviderChange}
+          onCharacterVoiceChoiceChange={handleCharacterVoiceChoiceChange}
+          onPreviewCharacterVoice={handlePreviewCharacterVoice}
+          onNewCharacterNameChange={(value) => setNewCharacterName(value)}
+          onNewCharacterPromptChange={(value) => setNewCharacterPrompt(value)}
+          onCreateNewCharacter={createNewCharacterByPrompt}
+          getCharacterVoiceSummary={getCharacterVoiceSummary}
         />
       );
     }
@@ -221,19 +258,14 @@ export default function RouteStepView({ vm }: { vm: any }) {
       return (
         <Step4Panel
           extractedCharacters={extractedCharacters}
-          selectedCharacterIds={selectedCharacterIds}
+          selectedCharacterIds={selectedCharacterIds || []}
           selectedCharacterStyleId={selectedCharacterStyleId}
           characterStyleOptions={characterStyleOptions}
           isExtracting={isExtracting}
-          onHydrateCharacters={(forceSample) => {
-            void hydrateCharactersForScript(forceSample ? { forceSample: true } : { preserveSelection: true });
-          }}
           onSelectCharacterStyle={vm.setSelectedCharacterStyleId}
+          characterLoadingProgress={characterLoadingProgress}
           onUploadCharacterImage={handleCharacterUploadForId}
-          onApplyCharacterSampleToCharacter={applyCharacterSampleToCharacter}
-          onToggleCharacter={toggleCharacterSelection}
           onSelectCharacterImage={selectCharacterImageById}
-          onCharacterVoiceChange={handleCharacterVoiceChange}
           onCharacterPromptChange={updateCharacterPrompt}
           onCreateVariants={(character) => { void createCharacterVariants(character); }}
           uploadInput={<input ref={characterUploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void handleUpload(e, 'character')} />}

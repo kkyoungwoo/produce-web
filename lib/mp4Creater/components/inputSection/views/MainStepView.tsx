@@ -79,6 +79,9 @@ export default function MainStepView({ vm }: { vm: any }) {
     setCustomScriptReferenceText,
     applyScriptReferenceSuggestion,
     refreshScriptReferenceSuggestions,
+    selectedScriptGenerationModel,
+    customScriptModelOptions,
+    setSelectedScriptGenerationModel,
     ensureProjectPromptTemplate,
     setPromptPreviewDraft,
     setPromptPreviewId,
@@ -260,7 +263,7 @@ export default function MainStepView({ vm }: { vm: any }) {
           open={openStage === 1}
           completed={stageStatus[1]}
           onToggle={() => toggleStage(1)}
-          actions={<HelpTip title="첫 단계가 흐름을 바꿉니다">뮤직비디오는 가사 블록 중심, 스토리는 서사 문단 중심, 뉴스는 브리핑 문단 중심으로 다음 단계가 자동 조정됩니다.</HelpTip>}
+          actions={<HelpTip title="첫 단계가 흐름을 바꿉니다">뮤직비디오는 가사 블록 중심, 스토리는 서사 문단 중심, 영화는 장면과 감정선 중심으로 다음 단계가 자동 조정됩니다.</HelpTip>}
         >
           <div className="grid gap-4 lg:grid-cols-3">
             {CONTENT_TYPE_CARDS.map((card) => {
@@ -642,15 +645,25 @@ export default function MainStepView({ vm }: { vm: any }) {
                                 <div className="text-sm font-black text-slate-900">영상 예상 길이</div>
                                 <div className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700">{customScriptDurationMinutes}분</div>
                               </div>
-                              <input type="range" min={1} max={16} step={1} value={customScriptDurationMinutes} onChange={(e) => setCustomScriptDurationMinutes(Number(e.target.value))} className="mt-4 h-2 w-full cursor-pointer accent-violet-600" />
-                              <div className="mt-2 flex justify-between text-[11px] font-bold text-slate-400"><span>1분</span><span>8분</span><span>16분</span></div>
+                              <div className="mt-4 flex flex-wrap gap-2">
+                                {[1, 3, 5, 8, 11, 15].map((value) => (
+                                  <button
+                                    key={value}
+                                    type="button"
+                                    onClick={() => setCustomScriptDurationMinutes(value)}
+                                    className={`rounded-2xl px-3 py-2 text-sm font-black transition ${customScriptDurationMinutes === value ? 'bg-violet-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}
+                                  >
+                                    {value}분
+                                  </button>
+                                ))}
+                              </div>
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
                               <div className="rounded-[20px] border border-white/70 bg-white p-4">
                                 <div className="text-sm font-black text-slate-900">대화체</div>
-                                <div className="mt-3 grid grid-cols-2 gap-2">
-                                  {([['yo', '요체'], ['da', '다체']] as const).map(([value, label]) => (
+                                <div className="mt-3 grid grid-cols-3 gap-2">
+                                  {([['default', '기본'], ['yo', '요체'], ['da', '다체'], ['eum', '음슴체']] as const).map(([value, label]) => (
                                     <button key={value} type="button" onClick={() => setCustomScriptSpeechStyle(value)} className={`rounded-2xl px-4 py-3 text-sm font-black transition ${customScriptSpeechStyle === value ? 'bg-violet-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}>
                                       {label}
                                     </button>
@@ -660,16 +673,18 @@ export default function MainStepView({ vm }: { vm: any }) {
 
                               <div className="rounded-[20px] border border-white/70 bg-white p-4">
                                 <div className="text-sm font-black text-slate-900">대본 언어</div>
-                                <select value={customScriptLanguage} onChange={(e) => setCustomScriptLanguage(e.target.value)} className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400">
-                                  <option value="ko">한국어</option>
-                                  <option value="en">영어</option>
-                                  <option value="ja">일본어</option>
-                                  <option value="zh">중국어</option>
-                                  <option value="vi">베트남어</option>
-                                  <option value="mn">몽골어</option>
-                                  <option value="th">태국어</option>
-                                  <option value="uz">우즈베크어</option>
-                                </select>
+                                <div className="mt-3 grid grid-cols-2 gap-2">
+                                  {[['ko', '🇰🇷 한국어'], ['en', '🇺🇸 영어'], ['ja', '🇯🇵 일본어'], ['zh', '🇨🇳 중국어'], ['vi', '🇻🇳 베트남어'], ['mn', '🇲🇳 몽골어'], ['th', '🇹🇭 태국어'], ['uz', '🇺🇿 우즈베크어']].map(([value, label]) => (
+                                    <button
+                                      key={value}
+                                      type="button"
+                                      onClick={() => setCustomScriptLanguage(value)}
+                                      className={`rounded-2xl border px-3 py-3 text-left text-sm font-black transition ${customScriptLanguage === value ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200 text-slate-900' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                                    >
+                                      {label}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           </div>
@@ -689,6 +704,17 @@ export default function MainStepView({ vm }: { vm: any }) {
                                   <div className="mt-3 line-clamp-4">{suggestion}</div>
                                 </button>
                               ))}
+                            </div>
+                            <div className="mt-4 rounded-[20px] border border-violet-100 bg-white p-4">
+                              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-violet-700">AI 설정 및 생성</div>
+                              <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <select value={selectedScriptGenerationModel} onChange={(e) => setSelectedScriptGenerationModel(e.target.value)} className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400 md:max-w-[420px]">
+                                  {customScriptModelOptions.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                                </select>
+                                <button type="button" onClick={handleGenerateScriptClick} disabled={isGeneratingScript} className="rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500">
+                                  {isGeneratingScript ? '대본 생성 중...' : '대본 생성'}
+                                </button>
+                              </div>
                             </div>
                             <textarea value={customScriptReferenceText} onChange={(e) => setCustomScriptReferenceText(e.target.value)} placeholder="예: 시작 10초 안에 문제를 선명하게 보여주고, 중간에는 구체 사례를 1개 넣고, 마지막은 한 줄 행동 제안으로 끝내 주세요." className="mt-4 min-h-[150px] w-full rounded-3xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-900 outline-none transition focus:border-violet-400" />
                           </div>

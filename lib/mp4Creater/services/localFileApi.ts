@@ -29,6 +29,7 @@ export const DEFAULT_ROUTING: AiRoutingSettings = {
   ttsProvider: 'qwen3Tts',
   elevenLabsVoiceId: CONFIG.DEFAULT_VOICE_ID,
   elevenLabsModelId: CONFIG.DEFAULT_ELEVENLABS_MODEL,
+  heygenVoiceId: null,
   qwenVoicePreset: 'qwen-default',
   qwenStylePreset: 'balanced',
   backgroundMusicProvider: 'sample',
@@ -249,6 +250,12 @@ function syncStudioStateToLocalCache(state: StudioState) {
     localStorage.removeItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY);
   }
 
+  if (state.providers?.heygenApiKey) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.HEYGEN_API_KEY, state.providers.heygenApiKey);
+  } else {
+    localStorage.removeItem(CONFIG.STORAGE_KEYS.HEYGEN_API_KEY);
+  }
+
   if (state.routing?.imageModel) {
     localStorage.setItem(CONFIG.STORAGE_KEYS.IMAGE_MODEL, state.routing.imageModel);
   }
@@ -262,6 +269,11 @@ function syncStudioStateToLocalCache(state: StudioState) {
   }
   if (state.routing?.qwenVoicePreset) {
     localStorage.setItem(CONFIG.STORAGE_KEYS.QWEN_VOICE_PRESET, state.routing.qwenVoicePreset);
+  }
+  if (state.routing?.heygenVoiceId) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.HEYGEN_VOICE_ID, state.routing.heygenVoiceId);
+  } else {
+    localStorage.removeItem(CONFIG.STORAGE_KEYS.HEYGEN_VOICE_ID);
   }
   if (state.routing?.qwenStylePreset) {
     localStorage.setItem(CONFIG.STORAGE_KEYS.QWEN_STYLE_PRESET, state.routing.qwenStylePreset);

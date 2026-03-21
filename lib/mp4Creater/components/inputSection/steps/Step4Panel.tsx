@@ -1,7 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { CharacterProfile } from '../../../types';
-import { TTS_NARRATOR_OPTIONS } from '../../../config';
-import { CHARACTER_SAMPLE_PRESETS } from '../../../samples/presetCatalog';
 
 interface CharacterStyleOption {
   id: string;
@@ -12,16 +10,62 @@ interface CharacterStyleOption {
   accentTo: string;
 }
 
+
+
+const SAMPLE_STYLE_PALETTE: Record<string, { from: string; to: string; badge: string }> = {
+  realistic: { from: '#0f172a', to: '#475569', badge: '영화·드라마' },
+  anime: { from: '#c026d3', to: '#7c3aed', badge: '애니메이션' },
+  webtoon: { from: '#2563eb', to: '#06b6d4', badge: '웹툰·코믹' },
+  threeD: { from: '#059669', to: '#14b8a6', badge: '3D 스타일' },
+  illustration: { from: '#f59e0b', to: '#f97316', badge: '아트·포스터' },
+};
+
+function getStylePalette(id: string, label: string) {
+  if (id.includes('real') || label.includes('실사')) return SAMPLE_STYLE_PALETTE.realistic;
+  if (id.includes('anime') || label.includes('애니')) return SAMPLE_STYLE_PALETTE.anime;
+  if (id.includes('webtoon') || label.includes('웹툰')) return SAMPLE_STYLE_PALETTE.webtoon;
+  if (id.includes('3d') || label.includes('3D')) return SAMPLE_STYLE_PALETTE.threeD;
+  return SAMPLE_STYLE_PALETTE.illustration;
+}
+
+function buildSampleStylePreview(id: string, label: string, description: string) {
+  const palette = getStylePalette(id, label);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+    <defs>
+      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="${palette.from}"/>
+        <stop offset="100%" stop-color="${palette.to}"/>
+      </linearGradient>
+    </defs>
+    <rect width="1200" height="720" rx="38" fill="url(#bg)"/>
+    <rect x="48" y="48" width="1104" height="624" rx="32" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.28)"/>
+    <rect x="92" y="92" width="226" height="54" rx="27" fill="rgba(255,255,255,0.18)"/>
+    <text x="120" y="126" fill="#ffffff" font-size="24" font-family="Arial, sans-serif" font-weight="700">${palette.badge} · 샘플</text>
+    <circle cx="872" cy="298" r="148" fill="rgba(255,255,255,0.13)"/>
+    <rect x="130" y="186" width="290" height="366" rx="28" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.25)"/>
+    <circle cx="276" cy="292" r="70" fill="rgba(255,255,255,0.78)"/>
+    <path d="M194 430c24-68 138-68 162 0" fill="none" stroke="rgba(255,255,255,0.92)" stroke-width="18" stroke-linecap="round"/>
+    <path d="M276 362v126" stroke="rgba(255,255,255,0.92)" stroke-width="18" stroke-linecap="round"/>
+    <path d="M204 414h144" stroke="rgba(255,255,255,0.92)" stroke-width="18" stroke-linecap="round"/>
+    <text x="490" y="270" fill="#ffffff" font-size="64" font-family="Arial, sans-serif" font-weight="700">${label}</text>
+    <foreignObject x="490" y="318" width="560" height="192">
+      <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; font-size: 30px; line-height: 1.5; color: rgba(255,255,255,0.94);">${description}</div>
+    </foreignObject>
+    <text x="490" y="580" fill="rgba(255,255,255,0.82)" font-size="26" font-family="Arial, sans-serif">예시 이미지는 모두 샘플 썸네일입니다.</text>
+  </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
 interface Step4PanelProps {
   extractedCharacters: CharacterProfile[];
   selectedCharacterIds: string[];
   selectedCharacterStyleId: string | null;
   characterStyleOptions: CharacterStyleOption[];
   isExtracting: boolean;
+  characterLoadingProgress: Record<string, number>;
   onHydrateCharacters: (forceSample?: boolean) => void;
   onSelectCharacterStyle: (styleId: string) => void;
   onUploadCharacterImage: (characterId: string) => void;
-  onApplyCharacterSampleToCharacter: (characterId: string, sampleId: string) => void;
   onToggleCharacter: (id: string) => void;
   onSelectCharacterImage: (characterId: string, imageId: string) => void;
   onCharacterVoiceChange: (characterId: string, voiceHint: string | null) => void;
@@ -36,10 +80,10 @@ export default function Step4Panel({
   selectedCharacterStyleId,
   characterStyleOptions,
   isExtracting,
+  characterLoadingProgress,
   onHydrateCharacters,
   onSelectCharacterStyle,
   onUploadCharacterImage,
-  onApplyCharacterSampleToCharacter,
   onToggleCharacter,
   onSelectCharacterImage,
   onCharacterVoiceChange,
@@ -47,9 +91,11 @@ export default function Step4Panel({
   onCreateVariants,
   uploadInput,
 }: Step4PanelProps) {
-  const resolvedSelectedIds = selectedCharacterIds.length ? selectedCharacterIds : extractedCharacters.map((item) => item.id);
+  const resolvedSelectedIds = selectedCharacterIds;
   const [localStage, setLocalStage] = useState<'style' | 'cast' | 'character'>(selectedCharacterStyleId ? 'cast' : 'style');
-  const [activeCharacterId, setActiveCharacterId] = useState<string | null>(resolvedSelectedIds[0] || extractedCharacters[0]?.id || null);
+  const [activeCharacterId, setActiveCharacterId] = useState<string | null>(resolvedSelectedIds[0] || null);
+  const stripRef = useRef<HTMLDivElement | null>(null);
+  const dragStateRef = useRef<{ startX: number; startScrollLeft: number; active: boolean }>({ startX: 0, startScrollLeft: 0, active: false });
 
   const selectedStyle = useMemo(
     () => characterStyleOptions.find((item) => item.id === selectedCharacterStyleId) || null,
@@ -95,6 +141,34 @@ export default function Step4Panel({
     setLocalStage('character');
   };
 
+  const scrollStripBy = (direction: 'left' | 'right') => {
+    const container = stripRef.current;
+    if (!container) return;
+    const amount = Math.max(240, Math.floor(container.clientWidth * 0.72));
+    container.scrollBy({ left: direction === 'right' ? amount : -amount, behavior: 'smooth' });
+  };
+
+  const startDrag = (clientX: number) => {
+    const container = stripRef.current;
+    if (!container) return;
+    dragStateRef.current = {
+      startX: clientX,
+      startScrollLeft: container.scrollLeft,
+      active: true,
+    };
+  };
+
+  const moveDrag = (clientX: number) => {
+    const container = stripRef.current;
+    if (!container || !dragStateRef.current.active) return;
+    const delta = clientX - dragStateRef.current.startX;
+    container.scrollLeft = dragStateRef.current.startScrollLeft - delta;
+  };
+
+  const endDrag = () => {
+    dragStateRef.current.active = false;
+  };
+
   return (
     <div className="space-y-6">
       {localStage === 'style' && (
@@ -120,12 +194,13 @@ export default function Step4Panel({
                   }}
                   className={`overflow-hidden rounded-[24px] border text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'}`}
                 >
-                  <div className={`h-28 bg-gradient-to-br ${style.accentFrom} ${style.accentTo} p-4 text-white`}>
-                    <div className="inline-flex rounded-full bg-white/20 px-2 py-1 text-[10px] font-black uppercase tracking-[0.18em]">공통 캐릭터</div>
-                    <div className="mt-4 text-base font-black">{style.label}</div>
+                  <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
+                    <img src={buildSampleStylePreview(style.id, style.label, style.description)} alt={`${style.label} 샘플`} className="aspect-[16/10] w-full object-cover" />
                   </div>
                   <div className="p-4">
-                    <p className="line-clamp-3 text-xs leading-5 text-slate-600">{style.description}</p>
+                    <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">샘플 미리보기</div>
+                    <div className="mt-2 text-base font-black text-slate-900">{style.label}</div>
+                    <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">{style.description}</p>
                     <div className="mt-3 flex items-center justify-between">
                       <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">전체 적용</span>
                       <span className={`rounded-full px-2 py-1 text-[10px] font-black ${selected ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'}`}>
@@ -154,9 +229,6 @@ export default function Step4Panel({
               </button>
               <button type="button" onClick={() => onHydrateCharacters(false)} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500">
                 {isExtracting ? '불러오는 중...' : '출연자 다시 불러오기'}
-              </button>
-              <button type="button" onClick={() => onHydrateCharacters(true)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                샘플 출연자 불러오기
               </button>
             </div>
           </div>
@@ -191,7 +263,7 @@ export default function Step4Panel({
 
           {!extractedCharacters.length && (
             <div className="mt-4 rounded-[24px] border border-dashed border-slate-300 bg-white p-8 text-center text-sm leading-6 text-slate-500">
-              3단계 대본 기준 출연자를 먼저 불러와 주세요. AI 연결이 없어도 샘플 2명으로 바로 진행할 수 있습니다.
+              3단계 대본 기준 출연자를 먼저 불러와 주세요.
             </div>
           )}
 
@@ -248,56 +320,27 @@ export default function Step4Panel({
               <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <label className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{activeCharacter.name} 프롬프트</label>
-                  <button type="button" onClick={() => onCreateVariants(activeCharacter)} className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white hover:bg-violet-500">
-                    이미지 다시 만들기
-                  </button>
                 </div>
                 <textarea
                   value={activeCharacter.prompt || ''}
                   onChange={(event) => onCharacterPromptChange(activeCharacter.id, event.target.value)}
-                  placeholder="이 출연자 이미지를 어떤 느낌으로 만들지 직접 수정하세요. 수정 후 이미지 다시 만들기를 누르면 비슷한 방향으로 새 후보를 더 만듭니다."
+                  placeholder="이 출연자 이미지를 어떤 느낌으로 만들지 직접 수정하세요. 수정 후 이미지 생성을 누르면 비슷한 방향으로 새 후보를 더 만듭니다."
                   className="mt-2 min-h-[170px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400"
                 />
               </div>
 
               <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <label className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">이미지 수정 및 보이스</label>
-                  <div className="flex flex-wrap gap-2">
-                    <button type="button" onClick={() => onUploadCharacterImage(activeCharacter.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">
-                      이미지 업로드
-                    </button>
-                  </div>
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">보이스 안내</div>
+                <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-4 text-sm leading-6 text-slate-600">
+                  보이스 API와 목소리 선택은 Step3에서 완료합니다.
+                  <div className="mt-2 text-xs font-black text-slate-700">현재 저장값 · {activeCharacter.voiceName || activeCharacter.voiceHint || '프로젝트 기본 보이스'}</div>
                 </div>
-                <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                  {CHARACTER_SAMPLE_PRESETS.map((preset) => (
-                    <button
-                      key={`${activeCharacter.id}_${preset.id}`}
-                      type="button"
-                      onClick={() => onApplyCharacterSampleToCharacter(activeCharacter.id, preset.id)}
-                      className="rounded-2xl border border-slate-200 bg-white p-3 text-left text-xs text-slate-700 hover:bg-slate-50"
-                    >
-                      <div className="font-black text-slate-900">{preset.name}</div>
-                      <div className="mt-1 line-clamp-2 text-[11px] leading-5 text-slate-500">{preset.roleLabel}</div>
-                    </button>
-                  ))}
-                </div>
-                <select
-                  value={activeCharacter.voiceHint || ''}
-                  onChange={(event) => onCharacterVoiceChange(activeCharacter.id, event.target.value || null)}
-                  className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none focus:border-violet-400"
-                >
-                  <option value="">프로젝트 기본 보이스</option>
-                  {TTS_NARRATOR_OPTIONS.map((voice) => (
-                    <option key={voice.id} value={voice.id}>{voice.name}</option>
-                  ))}
-                </select>
               </div>
             </div>
 
             <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
               <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{activeCharacter.name} 이미지 후보</div>
-              <div className="mt-1 text-sm font-black text-slate-900">출연자별 이미지 스타일 선택</div>
+              <div className="mt-1 text-sm font-black text-slate-900">카드뉴스처럼 넘겨 보며 대표 이미지를 선택합니다</div>
               <div className="mt-4 overflow-hidden rounded-[24px] border border-slate-200 bg-white">
                 <img
                   src={(activeCharacter.generatedImages || []).find((item) => item.id === activeCharacter.selectedImageId)?.imageData || activeCharacter.generatedImages?.[0]?.imageData || '/mp4Creater/flow-character.svg'}
@@ -305,7 +348,38 @@ export default function Step4Panel({
                   className="aspect-square w-full object-cover"
                 />
               </div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => onCreateVariants(activeCharacter)}
+                    disabled={characterLoadingProgress[activeCharacter.id] !== undefined}
+                    className="rounded-xl bg-violet-600 px-3 py-2 text-xs font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500"
+                  >
+                    {characterLoadingProgress[activeCharacter.id] !== undefined ? '이미지 생성 중...' : '이미지 생성'}
+                  </button>
+                  <button type="button" onClick={() => onUploadCharacterImage(activeCharacter.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">
+                    이미지 등록
+                  </button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => scrollStripBy('left')} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">←</button>
+                  <button type="button" onClick={() => scrollStripBy('right')} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">→</button>
+                </div>
+              </div>
+
+              <div
+                ref={stripRef}
+                className="mt-4 flex gap-3 overflow-x-auto scroll-smooth pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                onMouseDown={(event) => startDrag(event.clientX)}
+                onMouseMove={(event) => moveDrag(event.clientX)}
+                onMouseUp={endDrag}
+                onMouseLeave={endDrag}
+                onTouchStart={(event) => startDrag(event.touches[0]?.clientX || 0)}
+                onTouchMove={(event) => moveDrag(event.touches[0]?.clientX || 0)}
+                onTouchEnd={endDrag}
+              >
                 {(activeCharacter.generatedImages || []).map((image, index) => {
                   const selected = image.id === activeCharacter.selectedImageId;
                   return (
@@ -313,10 +387,10 @@ export default function Step4Panel({
                       key={image.id}
                       type="button"
                       onClick={() => onSelectCharacterImage(activeCharacter.id, image.id)}
-                      className={`rounded-2xl border bg-white p-2 text-left ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:border-slate-300'}`}
+                      className={`min-w-[180px] max-w-[180px] shrink-0 rounded-2xl border bg-white p-2 text-left ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:border-slate-300'}`}
                     >
                       <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
-                        <img src={image.imageData} alt={image.label} className="aspect-square w-full object-cover" />
+                        <img src={image.imageData} alt={image.label} className="aspect-square w-full object-cover" draggable={false} />
                       </div>
                       <div className="mt-2 flex items-center justify-between gap-2">
                         <div className="truncate text-[11px] font-black text-slate-800">후보 {index + 1}</div>

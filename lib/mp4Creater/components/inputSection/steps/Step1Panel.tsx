@@ -14,7 +14,7 @@ interface Step1PanelProps {
 const QUICK_CONCEPT_CARDS: Array<{ key: string; title: string; desc: string; value: ContentType }> = [
   { key: 'music_video', title: '뮤직비디오', desc: '음악 중심 영상 제작', value: 'music_video' },
   { key: 'story', title: '이야기', desc: '스토리텔링 중심 구성', value: 'story' },
-  { key: 'news', title: '뉴스', desc: '브리핑/리포트형 구성', value: 'news' },
+  { key: 'news', title: '영화', desc: '영화 같은 장면과 감정선 중심 구성', value: 'news' },
   { key: 'info_delivery', title: '정보 전달', desc: '설명형 전달 콘텐츠', value: 'info_delivery' },
 ];
 

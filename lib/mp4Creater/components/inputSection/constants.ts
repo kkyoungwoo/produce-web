@@ -4,7 +4,7 @@ import { StepId } from './types';
 export const CONTENT_TYPE_CARDS: Array<{ id: ContentType; title: string; desc: string; badge: string }> = [
   { id: 'music_video', title: '뮤직비디오', desc: '음악 중심 장면 구성', badge: 'MV' },
   { id: 'story', title: '이야기', desc: '서사 중심 스토리 구성', badge: 'STORY' },
-  { id: 'news', title: '뉴스', desc: '브리핑 중심 정보 전달', badge: 'NEWS' },
+  { id: 'news', title: '영화', desc: '영화 같은 장면 연출과 감정선 구성', badge: 'FILM' },
   { id: 'info_delivery', title: '정보 전달', desc: '설명형 콘텐츠 전달', badge: 'INFO' },
 ];
 
@@ -26,12 +26,12 @@ export const FIELD_OPTIONS_BY_TYPE: Record<ContentType, Record<keyof StorySelect
     conflict: ['선택의 딜레마', '세대 갈등', '시간 부족', '비밀 노출'],
   },
   news: {
-    genre: ['뉴스 브리핑', '해설 리포트', '요약 전달', '현장 리포트'],
-    mood: ['정확함', '차분함', '명확함', '신속함'],
-    endingTone: ['핵심 요약', '다음 이슈 안내', '중립적 마무리'],
-    setting: ['스튜디오', '현장 배경', '데이터 보드', '회의실'],
-    protagonist: ['앵커', '기자', '해설자', '진행자'],
-    conflict: ['상반된 해석', '정보 경쟁', '검증 이슈', '정책결정 지연'],
+    genre: ['시네마틱 드라마', '감정선 중심 영화', '느와르 무드', '서사형 영화'],
+    mood: ['묵직한', '몰입감 있는', '감성적인', '긴장감 있는'],
+    endingTone: ['여운 있는 결말', '강한 반전', '열린 결말', '먹먹한 마무리'],
+    setting: ['비 오는 골목', '야간 도시', '낡은 아파트 복도', '기차역 플랫폼'],
+    protagonist: ['혼자 버티는 주인공', '비밀을 안고 사는 인물', '돌아온 연인', '끝까지 포기하지 않는 인물'],
+    conflict: ['숨겨 온 진실', '끝내 미루던 선택', '돌이킬 수 없는 오해', '다시 마주친 과거'],
   },
   info_delivery: {
     genre: ['정보 전달', '가이드 설명', '핵심 요약', '스텝별 설명'],
@@ -45,9 +45,9 @@ export const FIELD_OPTIONS_BY_TYPE: Record<ContentType, Record<keyof StorySelect
 
 export const STEP_META: Array<{ id: StepId; title: string; subtitle: string }> = [
   { id: 1, title: '콘셉트 선택', subtitle: '유형과 화면비율 선택' },
-  { id: 2, title: '스토리 입력', subtitle: '주제와 방향 정리' },
-  { id: 3, title: '대본 구성', subtitle: '프롬프트와 대본 확정' },
-  { id: 4, title: '캐릭터 연출', subtitle: '출연과 장면 구성' },
+  { id: 2, title: '스토리 입력', subtitle: '주제와 대본 설정 정리' },
+  { id: 3, title: '대본 구성', subtitle: '최종 대본과 출연자 확정' },
+  { id: 4, title: '캐릭터 연출', subtitle: '선택 출연자 이미지 정리' },
   { id: 5, title: '화풍 선택', subtitle: '스타일 확정 후 이동' },
 ];
 

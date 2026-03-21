@@ -1,9 +1,9 @@
-설명자 / 주인공 / 서사를 이끄는 중심 인물
+초보 창작자 / 주인공 / 서사를 이끄는 중심 인물
 Stylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.
-unique character design, varied outfit style, clean silhouette, based on the story mood: 정돈된. Scene context: 이 대본은 약 16분 분량을 목표로 합니다. 주제는 실수 줄이는 체크리스트 안내이고 분위기는 정돈된, 배경은 설명형 보드입니다.
+unique character design, varied outfit style, clean silhouette, based on the story mood: 몰입감 있는. Scene context: 이 대본은 약 3분 분량을 목표로 합니다. 주제는 프로젝트(2)이고 분위기는 몰입감 있는, 배경은 새벽의 편의점입니다.
 
-참고 내용은 [직접 입력 참고]
-마지막 문단은 요약 정리 느낌으로 정리하고 바로 행
-- 실수 줄이는 체크리스트 안내의 문제를 시작 5초 안에 보이도록 도입을 강하게 잡아 주세요.
-- 중간에는 설명자가 복잡도 축약을 체감하는 실제 상황을 1개 넣어 주세요.
-- 마지
+말투는 기본체를 유지합니다.
+
+새벽의 편의점에서 초보 창작자은 프로젝트(2)의 조짐을 처음 마주한다. 몰입감 있는 톤으로 시작하지만, 화면 어딘가에는 이미 잊고 있던 약속의 그림자가 놓여 있다.
+
+처음엔 사소해 보였던 단서가 점점 커지면서 초보 창작자의 일상은 흔들리기 시

@@ -258,18 +258,24 @@ export function buildStyleRecommendations(
 ): PromptedImageAsset[] {
   const seed = hashCode(script || contentType);
   const palettes = [
-    ['감성 일러스트풍', '#8b5cf6'],
-    ['시네마틱풍', '#0f172a'],
-    ['수채화풍', '#06b6d4'],
-    ['웹툰풍', '#2563eb'],
-    ['애니메이션풍', '#ec4899'],
-    ['동화풍', '#16a34a'],
-    ['미니멀 아트풍', '#f59e0b'],
-    ['네온 시티팝풍', '#7c3aed'],
-    ['빈티지 포스터풍', '#b45309'],
-    ['클린 뉴스 그래픽풍', '#0f766e'],
-    ['몽환 판타지풍', '#9333ea'],
-    ['하이패션 에디토리얼풍', '#be185d'],
+    ['시네마틱', '#0f172a'],
+    ['느와르 / 범죄 스릴러', '#1e293b'],
+    ['K-드라마', '#fb7185'],
+    ['SF 퓨처리스틱', '#06b6d4'],
+    ['호러 / 공포', '#334155'],
+    ['뷰티 / 코스메틱', '#f472b6'],
+    ['라이프스타일', '#16a34a'],
+    ['디즈니 / 픽사 3D', '#f59e0b'],
+    ['지브리', '#22c55e'],
+    ['스파이더버스', '#7c3aed'],
+    ['K-웹툰', '#2563eb'],
+    ['로판', '#ec4899'],
+    ['치비 / SD', '#f97316'],
+    ['러프 펜슬 스케치', '#64748b'],
+    ['수채화', '#38bdf8'],
+    ['빈티지 필름', '#a16207'],
+    ['감성 일러스트', '#8b5cf6'],
+    ['하이패션 에디토리얼', '#be185d'],
   ] as const;
 
   const filtered = palettes.filter(([label]) => !excludeLabels.includes(label));
@@ -280,7 +286,7 @@ export function buildStyleRecommendations(
     const prompt = `${label}. Create a cohesive full-scene visual style for the final video. Keep background direction, composition rhythm, lighting logic, color palette, texture density, and rendering finish consistent across scenes. ${getAspectRatioPrompt(aspectRatio)}. Variation seed ${seed + index + excludeLabels.length}. Story context: ${(script || contentType).slice(0, 220)}.`;
     return buildPromptPreviewCard({
       label,
-      subtitle: contentType === 'news' || contentType === 'info_delivery' ? '최종 영상용 정보형 화풍' : '최종 영상용 비주얼 화풍',
+      subtitle: contentType === 'info_delivery' ? '최종 영상용 정보형 화풍' : '최종 영상용 비주얼 화풍',
       prompt,
       accent,
       kind: 'style',

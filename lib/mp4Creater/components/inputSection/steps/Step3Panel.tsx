@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  CharacterProfile,
   ConstitutionAnalysisSummary,
   ReferenceLinkDraft,
-  ScriptLanguageOption,
-  ScriptSpeechStyle,
   WorkflowPromptTemplateEngine,
 } from '../../../types';
 
@@ -11,9 +10,6 @@ interface Step3PanelProps {
   isGeneratingScript: boolean;
   sceneCount: number;
   storyScript: string;
-  customScriptDurationMinutes: number;
-  customScriptSpeechStyle: ScriptSpeechStyle;
-  customScriptLanguage: ScriptLanguageOption;
   customScriptReferenceText: string;
   scriptReferenceSuggestions: string[];
   referenceLinks: ReferenceLinkDraft[];
@@ -25,12 +21,22 @@ interface Step3PanelProps {
   constitutionAnalysis: ConstitutionAnalysisSummary | null;
   selectedPromptTemplateName: string;
   selectedPromptTemplateEngine: WorkflowPromptTemplateEngine;
+  extractedCharacters: CharacterProfile[];
+  selectedCharacterIds: string[];
+  isHydratingCharacters: boolean;
+  isLoadingVoiceCatalogs: boolean;
+  projectVoiceProvider: 'qwen3Tts' | 'elevenLabs' | 'heygen';
+  projectVoiceSummary: string;
+  elevenLabsVoices: Array<{ voice_id: string; name: string; preview_url?: string; labels?: { accent?: string; gender?: string; description?: string } }>;
+  heygenVoices: Array<{ voice_id: string; name: string; language?: string; gender?: string; preview_audio_url?: string; preview_audio?: string }>;
+  activeVoicePreviewCharacterId: string | null;
+  voicePreviewMessage: string;
+  newCharacterName: string;
+  newCharacterPrompt: string;
   onGenerateScript: () => void;
   onViewPrompt: () => void;
   onStoryScriptChange: (value: string) => void;
-  onCustomScriptDurationChange: (value: number) => void;
-  onCustomScriptSpeechStyleChange: (value: ScriptSpeechStyle) => void;
-  onCustomScriptLanguageChange: (value: ScriptLanguageOption) => void;
+  onSaveStoryScript: () => void;
   onCustomScriptReferenceTextChange: (value: string) => void;
   onApplyScriptReferenceSuggestion: (value: string) => void;
   onRefreshScriptReferenceSuggestions: () => void;
@@ -39,65 +45,71 @@ interface Step3PanelProps {
   onAddReferenceLink: () => void;
   onRemoveReferenceLink: (id: string) => void;
   onScriptModelChange: (value: string) => void;
+  onCharacterToggle: (characterId: string) => void;
+  onCharacterRemove: (characterId: string) => void;
+  onCharacterVoiceProviderChange: (characterId: string, provider: 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen') => void;
+  onCharacterVoiceChoiceChange: (characterId: string, provider: 'qwen3Tts' | 'elevenLabs' | 'heygen', value: string) => void;
+  onPreviewCharacterVoice: (characterId: string) => void;
+  onNewCharacterNameChange: (value: string) => void;
+  onNewCharacterPromptChange: (value: string) => void;
+  onCreateNewCharacter: () => void;
+  getCharacterVoiceSummary: (character: CharacterProfile) => string;
 }
 
-const SCRIPT_LANGUAGE_OPTIONS: Array<{ value: ScriptLanguageOption; label: string }> = [
-  { value: 'ko', label: '한국어' },
-  { value: 'en', label: '영어' },
-  { value: 'ja', label: '일본어' },
-  { value: 'zh', label: '중국어' },
-  { value: 'vi', label: '베트남어' },
-  { value: 'mn', label: '몽골어' },
-  { value: 'th', label: '태국어' },
-  { value: 'uz', label: '우즈베크어' },
+const QWEN_VOICE_OPTIONS = [
+  { id: 'qwen-default', name: 'qwen3-tts 기본 보이스' },
+  { id: 'qwen-soft', name: 'qwen3-tts 부드러운 보이스' },
 ];
-
-const DURATION_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16];
 
 export default function Step3Panel({
   isGeneratingScript,
   sceneCount,
   storyScript,
-  customScriptDurationMinutes,
-  customScriptSpeechStyle,
-  customScriptLanguage,
-  customScriptReferenceText,
-  scriptReferenceSuggestions,
-  referenceLinks,
-  pendingLinkUrl,
-  showReferenceLinkInput,
-  isAddingReferenceLink,
   selectedScriptModel,
   scriptModelOptions,
   constitutionAnalysis,
   selectedPromptTemplateName,
   selectedPromptTemplateEngine,
+  extractedCharacters,
+  selectedCharacterIds,
+  isHydratingCharacters,
+  isLoadingVoiceCatalogs,
+  projectVoiceProvider,
+  projectVoiceSummary,
+  elevenLabsVoices,
+  heygenVoices,
+  activeVoicePreviewCharacterId,
+  voicePreviewMessage,
   onGenerateScript,
   onViewPrompt,
   onStoryScriptChange,
-  onCustomScriptDurationChange,
-  onCustomScriptSpeechStyleChange,
-  onCustomScriptLanguageChange,
-  onCustomScriptReferenceTextChange,
-  onApplyScriptReferenceSuggestion,
-  onRefreshScriptReferenceSuggestions,
-  onPendingLinkUrlChange,
-  onToggleReferenceLinkInput,
-  onAddReferenceLink,
-  onRemoveReferenceLink,
+  onSaveStoryScript,
   onScriptModelChange,
+  onCharacterToggle,
+  onCharacterRemove,
+  onCharacterVoiceProviderChange,
+  onCharacterVoiceChoiceChange,
+  onPreviewCharacterVoice,
+  getCharacterVoiceSummary,
 }: Step3PanelProps) {
-  const hasPendingLinkInput = pendingLinkUrl.trim().length > 0;
+  const [isEditingScript, setIsEditingScript] = useState(false);
   const isConstitutionMode = selectedPromptTemplateEngine === 'channel_constitution_v32';
   const visibleTitles = (constitutionAnalysis?.titles || []).slice(0, 6);
+  const selectedCount = selectedCharacterIds.length;
+
+  useEffect(() => {
+    if (isGeneratingScript) {
+      setIsEditingScript(false);
+    }
+  }, [isGeneratingScript]);
 
   return (
     <div className="space-y-6">
       <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">고객 커스텀 대본생성</div>
-            <div className="mt-2 text-sm text-slate-600">길이, 말투, 언어, 참고 링크를 먼저 정하면 대본 생성 버튼을 눌렀을 때 결과가 더 또렷해집니다.</div>
+            <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">AI 대본 생성</div>
+            <div className="mt-2 text-sm text-slate-600">프롬프트를 확인한 뒤 모델을 선택하고 바로 대본을 생성할 수 있습니다.</div>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px] font-black">
               <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">현재 프롬프트 · {selectedPromptTemplateName || '미선택'}</span>
               {isConstitutionMode && <span className="rounded-full bg-violet-100 px-3 py-1 text-violet-700">채널 헌법 v32 분석형</span>}
@@ -176,194 +188,204 @@ export default function Step3Panel({
           </div>
         )}
 
-        <div className="mt-5 grid gap-4 xl:grid-cols-3">
-          <div className="rounded-[24px] border border-violet-100 bg-violet-50/60 p-4">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-black text-slate-900">영상 예상 길이</div>
-                <p className="mt-1 text-xs leading-5 text-slate-500">드래그 없이 바로 눌러 선택합니다.</p>
-              </div>
-              <span className="rounded-full bg-white px-3 py-1 text-xs font-black text-violet-700">{customScriptDurationMinutes}분</span>
+        <div className="mt-5 rounded-[24px] border border-violet-100 bg-white p-4">
+          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-violet-700">AI 설정 및 생성</div>
+          <div className="mt-3 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="min-w-0 flex-1">
+              <div className="text-sm font-black text-slate-900">대본 생성 모델</div>
+              <select
+                value={selectedScriptModel}
+                onChange={(e) => onScriptModelChange(e.target.value)}
+                className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400"
+              >
+                {scriptModelOptions.map((item) => (
+                  <option key={item.id} value={item.id}>{item.name}</option>
+                ))}
+              </select>
             </div>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {DURATION_OPTIONS.map((value) => {
-                const selected = customScriptDurationMinutes === value;
-                return (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => onCustomScriptDurationChange(value)}
-                    className={`rounded-2xl px-3 py-2 text-sm font-black transition ${selected ? 'bg-violet-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}
-                  >
-                    {value}분
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-black text-slate-900">대화체</div>
-            <div className="mt-3 grid grid-cols-3 gap-2">
-              {([
-                ['yo', '요체'],
-                ['da', '다체'],
-                ['random', '랜덤'],
-              ] as const).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => onCustomScriptSpeechStyleChange(value)}
-                  className={`rounded-2xl px-3 py-3 text-sm font-black transition ${customScriptSpeechStyle === value ? 'bg-violet-600 text-white shadow-sm' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-black text-slate-900">대본 언어</div>
-            <select
-              value={customScriptLanguage}
-              onChange={(e) => onCustomScriptLanguageChange(e.target.value as ScriptLanguageOption)}
-              className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400"
+            <button
+              type="button"
+              onClick={onGenerateScript}
+              disabled={isGeneratingScript}
+              className="rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500"
             >
-              {SCRIPT_LANGUAGE_OPTIONS.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
+              {isGeneratingScript ? '대본 생성 중...' : '대본 생성'}
+            </button>
           </div>
-        </div>
-
-        <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-sm font-black text-slate-900">대본 참고 내용</div>
-              <p className="mt-1 text-xs leading-5 text-slate-500">텍스트와 링크를 섞어서 넣으면 유튜브는 영상 메타를, 일반 링크는 웹페이지 본문을 읽어 함께 반영합니다.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={onToggleReferenceLinkInput}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-100"
-              >
-                링크 넣기
-              </button>
-              <button
-                type="button"
-                onClick={onRefreshScriptReferenceSuggestions}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 hover:bg-slate-100"
-              >
-                추천 새로고침
-              </button>
-            </div>
-          </div>
-
-          {(showReferenceLinkInput || hasPendingLinkInput || referenceLinks.some((item) => item.status === 'loading')) && (
-            <div className="mt-4 flex flex-col gap-3 rounded-[20px] border border-slate-200 bg-white p-4 md:flex-row">
-              <input
-                value={pendingLinkUrl}
-                onChange={(e) => onPendingLinkUrlChange(e.target.value)}
-                placeholder="유튜브 또는 웹사이트 링크를 붙여 넣으세요"
-                className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400"
-              />
-              <button
-                type="button"
-                onClick={onAddReferenceLink}
-                disabled={isAddingReferenceLink || !pendingLinkUrl.trim()}
-                className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500"
-              >
-                {isAddingReferenceLink ? '분석 중...' : '링크 분석 추가'}
-              </button>
-            </div>
-          )}
-
-          {referenceLinks.length > 0 && (
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {referenceLinks.map((link) => (
-                <div key={link.id} className="rounded-[20px] border border-slate-200 bg-white p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${link.kind === 'youtube' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
-                          {link.kind === 'youtube' ? '유튜브 분석' : '웹사이트 글 분석'}
-                        </span>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${link.status === 'ready' ? 'bg-emerald-100 text-emerald-700' : link.status === 'error' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
-                          {link.status === 'ready' ? '반영 준비 완료' : link.status === 'error' ? '분석 실패' : '분석 중'}
-                        </span>
-                      </div>
-                      <div className="mt-3 truncate text-sm font-black text-slate-900">{link.title || link.url}</div>
-                      <div className="mt-1 truncate text-xs text-slate-500">{link.url}</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => onRemoveReferenceLink(link.id)}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-600 hover:bg-slate-50"
-                    >
-                      삭제
-                    </button>
-                  </div>
-                  {link.summary && <p className="mt-3 line-clamp-4 text-xs leading-6 text-slate-600">{link.summary}</p>}
-                  {link.error && <p className="mt-3 text-xs leading-5 text-rose-600">{link.error}</p>}
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
-            {scriptReferenceSuggestions.map((suggestion, index) => (
-              <button
-                key={`script-reference-${index}`}
-                type="button"
-                onClick={() => onApplyScriptReferenceSuggestion(suggestion)}
-                className="rounded-[20px] border border-slate-200 bg-white px-4 py-4 text-left text-sm leading-6 text-slate-700 transition hover:-translate-y-0.5 hover:border-violet-200 hover:bg-violet-50"
-              >
-                <span className="inline-flex rounded-full bg-violet-100 px-2.5 py-1 text-[11px] font-black text-violet-700">추천 {index + 1}</span>
-                <div className="mt-3 line-clamp-4">{suggestion}</div>
-              </button>
-            ))}
-          </div>
-
-          <textarea
-            value={customScriptReferenceText}
-            onChange={(e) => onCustomScriptReferenceTextChange(e.target.value)}
-            className="mt-4 min-h-[150px] w-full rounded-3xl border border-slate-200 bg-white px-5 py-4 text-sm leading-7 text-slate-900 outline-none transition focus:border-violet-400"
-            placeholder="예: 초반 5초는 문제 상황을 강하게 보여주고, 중간에는 실제 사례를 넣고, 마지막엔 바로 행동할 수 있는 한 줄로 마무리해 주세요. 링크 분석 내용과 함께 섞여 최종 대본에 반영됩니다."
-          />
         </div>
       </section>
 
       <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-xl font-black text-slate-900">최종 대본</h2>
+          <div>
+            <h2 className="text-xl font-black text-slate-900">최종 대본</h2>
+            <p className="mt-1 text-sm leading-6 text-slate-500">대본 생성 후 자동으로 출연자를 다시 정리합니다. 직접 수정할 때는 저장하기를 눌러 다시 반영하세요.</p>
+          </div>
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">{sceneCount}문단</span>
-            <select
-              value={selectedScriptModel}
-              onChange={(e) => onScriptModelChange(e.target.value)}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400"
-            >
-              {scriptModelOptions.map((item) => (
-                <option key={item.id} value={item.id}>{item.name}</option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={onGenerateScript}
-              disabled={isGeneratingScript}
-              className="rounded-2xl bg-violet-600 px-4 py-2.5 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500"
-            >
-              {isGeneratingScript ? '대본 생성 중...' : '대본생성'}
-            </button>
+            {storyScript.trim() ? (
+              <button
+                type="button"
+                onClick={() => {
+                  if (isEditingScript) {
+                    onSaveStoryScript();
+                    setIsEditingScript(false);
+                    return;
+                  }
+                  setIsEditingScript(true);
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              >
+                {isEditingScript ? (isHydratingCharacters ? '저장 중...' : '저장하기') : '수정하기'}
+              </button>
+            ) : null}
           </div>
         </div>
         <textarea
           value={storyScript}
           onChange={(e) => onStoryScriptChange(e.target.value)}
-          className="min-h-[420px] w-full rounded-3xl border border-slate-200 bg-slate-50 px-5 py-5 text-sm leading-7 text-slate-900 outline-none transition focus:border-blue-400"
+          readOnly={!isEditingScript}
+          className={`min-h-[420px] w-full rounded-3xl border px-5 py-5 text-sm leading-7 text-slate-900 outline-none transition ${isEditingScript ? 'border-blue-300 bg-white focus:border-blue-400' : 'border-slate-200 bg-slate-50'}`}
           placeholder="여기에 최종 대본을 입력하거나 생성해 주세요."
         />
+      </section>
+
+      <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">출연자 관리 및 보이스</div>
+            <h2 className="mt-2 text-xl font-black text-slate-900">최종 대본 아래에서 출연자와 보이스를 같이 정리합니다</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">선택된 출연자만 Step4에서 이미지 후보를 고르게 됩니다. 필요하면 제외만 해 주세요.</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 text-[11px] font-black">
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">영상에 사용할 출연자 {selectedCount}명</span>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">현재 프로젝트 기본 · {projectVoiceSummary}</span>
+          </div>
+        </div>
+
+        {extractedCharacters.length > 0 && !selectedCount ? (
+          <div className="mt-4 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-800">
+            출연자를 1명 이상 선택해야 다음 단계로 넘어갈 수 있습니다. 자동 생성된 출연자는 기본 선택 상태가 되도록 보정했습니다.
+          </div>
+        ) : null}
+
+        {!extractedCharacters.length ? (
+          <div className="mt-4 rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm leading-6 text-slate-500">
+            대본이 준비되면 출연자를 자동으로 불러옵니다.
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-4 xl:grid-cols-2">
+            {extractedCharacters.map((character) => {
+              const voiceProvider = character.voiceProvider || 'project-default';
+              const qwenVoiceId = character.voiceProvider === 'qwen3Tts' ? (character.voiceId || character.voiceHint || 'qwen-default') : 'qwen-default';
+              const elevenVoiceId = character.voiceProvider === 'elevenLabs' ? (character.voiceId || character.voiceHint || elevenLabsVoices[0]?.voice_id || '') : (elevenLabsVoices[0]?.voice_id || '');
+              const heygenVoiceId = character.voiceProvider === 'heygen' ? (character.voiceId || character.voiceHint || heygenVoices[0]?.voice_id || '') : (heygenVoices[0]?.voice_id || '');
+              const isPreviewing = activeVoicePreviewCharacterId === character.id;
+              const selected = selectedCharacterIds.includes(character.id);
+              const preview = (character.generatedImages || []).find((item) => item.id === character.selectedImageId) || character.generatedImages?.[0] || null;
+
+              return (
+                <div key={character.id} className={`rounded-[24px] border p-4 ${selected ? 'border-violet-300 bg-violet-50/60 ring-2 ring-violet-100' : 'border-slate-200 bg-slate-50'}`}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 gap-3">
+                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                        <img src={preview?.imageData || '/mp4Creater/flow-character.svg'} alt={character.name} className="h-full w-full object-cover" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-base font-black text-slate-900">{character.name}</div>
+                        <div className="mt-1 text-xs text-slate-500">{character.roleLabel || (character.role === 'lead' ? '주인공' : character.role === 'support' ? '조연' : '내레이터')}</div>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onCharacterToggle(character.id)}
+                        className={`rounded-full px-3 py-1.5 text-[11px] font-black ${selected ? 'bg-violet-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                      >
+                        {selected ? '영상 사용 중' : '영상에 포함'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onCharacterRemove(character.id)}
+                        className="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-[11px] font-black text-rose-600 hover:bg-rose-50"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 md:grid-cols-[0.95fr_1.05fr]">
+                    <label className="block">
+                      <div className="mb-1 text-xs font-black text-slate-700">API 선택</div>
+                      <select
+                        value={voiceProvider}
+                        onChange={(e) => onCharacterVoiceProviderChange(character.id, e.target.value as 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen')}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
+                      >
+                        <option value="project-default">프로젝트 기본값 사용</option>
+                        <option value="qwen3Tts">qwen3-tts</option>
+                        <option value="elevenLabs">ElevenLabs</option>
+                        <option value="heygen">HeyGen</option>
+                      </select>
+                    </label>
+
+                    <label className="block">
+                      <div className="mb-1 text-xs font-black text-slate-700">보이스 선택</div>
+                      {voiceProvider === 'project-default' ? (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">{projectVoiceSummary}</div>
+                      ) : voiceProvider === 'qwen3Tts' ? (
+                        <select
+                          value={qwenVoiceId}
+                          onChange={(e) => onCharacterVoiceChoiceChange(character.id, 'qwen3Tts', e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
+                        >
+                          {QWEN_VOICE_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                        </select>
+                      ) : voiceProvider === 'elevenLabs' ? (
+                        <select
+                          value={elevenVoiceId}
+                          onChange={(e) => onCharacterVoiceChoiceChange(character.id, 'elevenLabs', e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
+                        >
+                          {elevenLabsVoices.length ? elevenLabsVoices.map((item) => <option key={item.voice_id} value={item.voice_id}>{item.name}</option>) : <option value="">연결된 보이스 없음</option>}
+                        </select>
+                      ) : (
+                        <select
+                          value={heygenVoiceId}
+                          onChange={(e) => onCharacterVoiceChoiceChange(character.id, 'heygen', e.target.value)}
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
+                        >
+                          {heygenVoices.length ? heygenVoices.map((item) => <option key={item.voice_id} value={item.voice_id}>{item.name}{item.language ? ` · ${item.language}` : ''}</option>) : <option value="">연결된 보이스 없음</option>}
+                        </select>
+                      )}
+                    </label>
+                  </div>
+
+                  <div className="mt-3 rounded-[20px] border border-white bg-white px-4 py-3 text-xs leading-6 text-slate-600">
+                    {getCharacterVoiceSummary(character)}
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex flex-wrap gap-2 text-[11px] font-black">
+                      <span className={`rounded-full px-2.5 py-1 ${projectVoiceProvider === 'qwen3Tts' ? 'bg-violet-100 text-violet-700' : projectVoiceProvider === 'elevenLabs' ? 'bg-emerald-100 text-emerald-700' : 'bg-sky-100 text-sky-700'}`}>프로젝트 기본 API · {projectVoiceProvider}</span>
+                      {isLoadingVoiceCatalogs ? <span className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-500">보이스 목록 동기화 중</span> : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onPreviewCharacterVoice(character.id)}
+                      className="rounded-2xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white hover:bg-slate-800"
+                    >
+                      {isPreviewing ? '미리듣기 정지' : '미리듣기'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {isHydratingCharacters ? <p className="mt-4 text-xs leading-6 text-violet-600">대본 변경을 기준으로 출연자를 다시 정리하고 있습니다.</p> : null}
+        {voicePreviewMessage ? <p className="mt-2 text-xs leading-6 text-slate-500">{voicePreviewMessage}</p> : null}
       </section>
     </div>
   );

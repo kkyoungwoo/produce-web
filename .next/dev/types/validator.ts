@@ -218,6 +218,24 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../../app/api/mp4Creater/heygen/tts/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/heygen/tts">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/heygen/tts/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/mp4Creater/heygen/voices/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/heygen/voices">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/heygen/voices/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../../app/api/mp4Creater/reference-extract/route.ts
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/reference-extract">> = Specific

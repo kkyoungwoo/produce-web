@@ -80,9 +80,13 @@ export const ELEVENLABS_MODELS = [
 
 export type ElevenLabsModelId = typeof ELEVENLABS_MODELS[number]['id'];
 
-export const TTS_NARRATOR_OPTIONS = [
+export const QWEN_TTS_PRESET_OPTIONS = [
   { id: 'qwen-default', name: 'qwen3-tts 기본 보이스' },
   { id: 'qwen-soft', name: 'qwen3-tts 부드러운 보이스' },
+] as const;
+
+export const TTS_NARRATOR_OPTIONS = [
+  ...QWEN_TTS_PRESET_OPTIONS,
   { id: 'rachel', name: 'Rachel 보이스 (ElevenLabs)' },
   { id: 'adam', name: 'Adam 보이스 (ElevenLabs)' },
 ] as const;
@@ -131,6 +135,8 @@ export const CONFIG = {
     OPENROUTER_MAX_TOKENS: 'mp4creater_openrouter_max_tokens',
     OPENROUTER_INPUT_MAX_CHARS: 'mp4creater_openrouter_input_max_chars',
     TTS_PROVIDER: 'mp4creater_tts_provider',
+    HEYGEN_API_KEY: 'mp4creater_heygen_api_key',
+    HEYGEN_VOICE_ID: 'mp4creater_heygen_voice_id',
     QWEN_VOICE_PRESET: 'mp4creater_qwen_voice_preset',
     QWEN_STYLE_PRESET: 'mp4creater_qwen_style_preset',
     BGM_PROVIDER: 'mp4creater_bgm_provider',

@@ -136,6 +136,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   const [duplicatingProjectId, setDuplicatingProjectId] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [showDuplicateInProgressModal, setShowDuplicateInProgressModal] = useState(false);
+  const [showRefreshHint, setShowRefreshHint] = useState(false);
   const CARD_HEIGHT = 'h-[230px]';
   const CARD_WIDTH = 'w-[212px]';
   const SKELETON_COUNT = 3;
@@ -163,6 +164,16 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
     const frame = window.requestAnimationFrame(() => setIsGalleryIntroVisible(true));
     return () => window.cancelAnimationFrame(frame);
   }, []);
+
+  useEffect(() => {
+    if (!isCreatingProject) {
+      setShowRefreshHint(false);
+      return;
+    }
+
+    const timer = window.setTimeout(() => setShowRefreshHint(true), 3000);
+    return () => window.clearTimeout(timer);
+  }, [isCreatingProject]);
 
   useEffect(() => {
     const currentIds = sortedProjects.map((project) => project.id);
@@ -459,19 +470,6 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           </div>
         </button>
 
-        {isLoading && Array.from({ length: Math.max(1, SKELETON_COUNT - visibleProjects.length) }).map((_, index) => (
-          <div key={`skeleton-${index}`} className={`${CARD_HEIGHT} ${CARD_WIDTH} overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm`}>
-            <div className="h-[118px] animate-pulse bg-slate-200" />
-            <div className="space-y-2.5 p-3">
-              <div className="h-4 w-2/3 animate-pulse rounded bg-slate-200" />
-              <div className="h-3 w-1/2 animate-pulse rounded bg-slate-200" />
-              <div className="mt-4 grid grid-cols-3 gap-1.5">
-                <div className="col-span-2 h-7 animate-pulse rounded-xl bg-slate-200" />
-                <div className="col-span-1 h-7 animate-pulse rounded-xl bg-slate-200" />
-              </div>
-            </div>
-          </div>
-        ))}
         {duplicatingProjectId && (
           <div key="skeleton-copying" className={`${CARD_HEIGHT} ${CARD_WIDTH} overflow-hidden rounded-[24px] border border-blue-200 bg-white shadow-sm`}>
             <div className="relative h-[118px] overflow-hidden border-b border-slate-200" style={{ background: duplicatingProject ? resolveThumbnailBackground(duplicatingProject) : 'linear-gradient(135deg, #dbeafe, #bfdbfe)' }}>
@@ -631,7 +629,21 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
         })}
         {isInteractionLocked ? (
           <div className="pointer-events-auto absolute inset-0 z-30 flex items-center justify-center rounded-2xl bg-slate-200/55 backdrop-blur-[1px]">
-            <div className="rounded-xl bg-slate-700/90 px-3 py-2 text-xs font-black text-white">새 프로젝트 생성 중...</div>
+            <div className="w-[min(92vw,360px)] rounded-2xl bg-slate-800/92 p-4 text-white shadow-xl">
+              <div className="text-sm font-black">새 프로젝트 생성 중...</div>
+              <p className="mt-2 text-xs leading-5 text-slate-200">프로젝트 생성은 계속 진행됩니다. 잠깐 지연되면 이 페이지를 빠르게 다시 열 수 있도록 새로고침 버튼을 함께 보여드립니다.</p>
+              {showRefreshHint && (
+                <div className="mt-3 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => window.location.reload()}
+                    className="rounded-xl bg-white px-3 py-2 text-xs font-black text-slate-800 hover:bg-slate-100"
+                  >
+                    새로고침
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         ) : null}
         {!isLoading && hasMoreProjects ? <div ref={loadMoreTriggerRef} className="h-2 w-full" aria-hidden="true" /> : null}

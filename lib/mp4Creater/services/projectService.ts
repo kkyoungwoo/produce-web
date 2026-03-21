@@ -117,7 +117,7 @@ function normalizeAudioPreview(item: any): AudioPreviewAsset | null {
     text: typeof item.text === 'string' ? item.text : '',
     audioData: typeof item.audioData === 'string' ? item.audioData : null,
     duration: typeof item.duration === 'number' ? item.duration : null,
-    provider: item.provider === 'elevenLabs' ? 'elevenLabs' : item.provider === 'qwen3Tts' ? 'qwen3Tts' : 'sample',
+    provider: item.provider === 'elevenLabs' ? 'elevenLabs' : item.provider === 'qwen3Tts' ? 'qwen3Tts' : item.provider === 'heygen' ? 'heygen' : 'sample',
     mode: item.mode === 'script-preview' || item.mode === 'final-output' ? item.mode : 'voice-preview',
     sourceMode: item.sourceMode === 'ai' ? 'ai' : 'sample',
     voiceId: typeof item.voiceId === 'string' ? item.voiceId : null,
@@ -431,9 +431,9 @@ export async function saveProject(
   };
 
   const next = [project, ...current].sort((a, b) => b.createdAt - a.createdAt);
-  await syncProjectsAcrossStorage(next);
+  await syncProjectsAcrossStorage(next, { immediateStudioSync: true });
 
-  return project;
+  return (await readIndexedProjectById(project.id)) || project;
 }
 
 
@@ -472,7 +472,9 @@ export async function upsertWorkflowProject(options: {
 
   if (options.projectId) {
     const updated = await updateProject(options.projectId, patch);
-    if (updated) return updated;
+    if (updated) {
+      return (await readIndexedProjectById(updated.id)) || updated;
+    }
   }
 
   return saveProject(
@@ -588,10 +590,8 @@ export async function getProjectById(id: string, options?: { forceSync?: boolean
 
 
 export async function deleteProject(id: string): Promise<boolean> {
-  const current = await getSavedProjects();
-  const next = current.filter((project) => project.id !== id);
-  await syncProjectsAcrossStorage(next, { immediateStudioSync: true });
-  return true;
+  const deletedCount = await deleteProjects([id]);
+  return deletedCount > 0;
 }
 
 export async function renameProject(id: string, newName: string): Promise<boolean> {
@@ -648,6 +648,82 @@ export async function duplicateProject(id: string): Promise<SavedProject | null>
   const next = [copied, ...current].sort((a, b) => b.createdAt - a.createdAt);
   await syncProjectsAcrossStorage(next, { immediateStudioSync: true });
   return copied;
+}
+
+
+export function buildProjectsExportPayload(projects: SavedProject[]) {
+  const normalizedProjects = Array.isArray(projects)
+    ? projects.map((project) => cloneValue(normalizeProject(project)))
+    : [];
+
+  return {
+    format: 'mp4creater-project-export',
+    version: 1,
+    exportedAt: Date.now(),
+    projectCount: normalizedProjects.length,
+    projects: normalizedProjects,
+  };
+}
+
+function extractImportedProjects(payload: any): any[] {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.projects)) return payload.projects;
+  if (payload && typeof payload === 'object' && payload.id && payload.name) return [payload];
+  return [];
+}
+
+function createImportedProjectId() {
+  return `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+export async function importProjectsFromFile(file: File): Promise<SavedProject[]> {
+  const text = await file.text();
+  let parsed: any;
+
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error('JSON 파일 형식이 올바르지 않습니다.');
+  }
+
+  const importedProjects = extractImportedProjects(parsed);
+  if (!importedProjects.length) {
+    throw new Error('불러올 프로젝트 데이터가 없습니다.');
+  }
+
+  const current = await getSavedProjects();
+  let nextProjectNumber = current.reduce((max, project) => (
+    typeof project.projectNumber === 'number' && project.projectNumber > max ? project.projectNumber : max
+  ), 0) + 1;
+  let timestampCursor = Date.now();
+
+  const prepared = importedProjects.map((project) => {
+    const normalized = normalizeProject({
+      ...cloneValue(project),
+      id: createImportedProjectId(),
+      createdAt: timestampCursor,
+      projectNumber: nextProjectNumber,
+      folderName: undefined,
+      folderPath: undefined,
+      lastSavedAt: timestampCursor,
+    });
+    nextProjectNumber += 1;
+    timestampCursor += 1;
+    return normalized;
+  });
+
+  const next = [...prepared, ...current].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  await syncProjectsAcrossStorage(next, { immediateStudioSync: true });
+  return prepared;
+}
+
+export async function deleteProjects(ids: string[]): Promise<number> {
+  const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)));
+  if (!uniqueIds.length) return 0;
+  const current = await getSavedProjects();
+  const next = current.filter((project) => !uniqueIds.includes(project.id));
+  await syncProjectsAcrossStorage(next, { immediateStudioSync: true });
+  return current.length - next.length;
 }
 
 export async function migrateFromLocalStorage(): Promise<void> {

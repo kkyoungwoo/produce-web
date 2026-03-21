@@ -1,0 +1,41 @@
+{
+  "id": "project_1774060517651_dqkb8c",
+  "name": "프로젝트(3)",
+  "topic": "프로젝트(3)",
+  "createdAt": 1774060517651,
+  "lastSavedAt": 1774060798949,
+  "projectNumber": 3,
+  "folderName": "project-0003-3",
+  "folderPath": "local-data/tubegen-studio/projects/project-0003-3",
+  "thumbnail": null,
+  "thumbnailTitle": null,
+  "selectedThumbnailId": null,
+  "assetCount": 0,
+  "imageCount": 0,
+  "videoCount": 0,
+  "audioCount": 0,
+  "workflowDraft": {
+    "updatedAt": 1774060517650,
+    "aspectRatio": "16:9",
+    "script": "",
+    "selectedStyleImageId": null,
+    "selectedCharacterIds": []
+  },
+  "assets": [],
+  "backgroundMusicTracks": [],
+  "thumbnailHistory": [],
+  "summary": {
+    "id": "project_1774060517651_dqkb8c",
+    "name": "프로젝트(3)",
+    "topic": "프로젝트(3)",
+    "projectNumber": 3,
+    "folderName": "project-0003-3",
+    "createdAt": 1774060517651,
+    "lastSavedAt": 1774060798949,
+    "assetCount": 0,
+    "imageCount": 0,
+    "videoCount": 0,
+    "audioCount": 0,
+    "thumbnailPath": null
+  }
+}

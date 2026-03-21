@@ -30,8 +30,9 @@ import {
 import {
   getProjectById,
   getSavedProjects,
-  deleteProject,
+  deleteProjects,
   duplicateProject,
+  importProjectsFromFile,
   migrateFromLocalStorage,
   renameProject,
   updateProject,
@@ -131,7 +132,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   const [showApiModal, setShowApiModal] = useState(false);
   const [apiModalTitle, setApiModalTitle] = useState('API 키 등록');
   const [apiModalDescription, setApiModalDescription] = useState('필요한 키를 등록하면 실제 생성 품질이 올라갑니다.');
-  const [apiModalFocusField, setApiModalFocusField] = useState<'openRouter' | 'elevenLabs' | 'fal' | null>(null);
+  const [apiModalFocusField, setApiModalFocusField] = useState<'openRouter' | 'elevenLabs' | 'heygen' | 'fal' | null>(null);
   const [viewMode, setViewMode] = useState<'main' | 'gallery'>(routeStep ? 'main' : resolveAppViewMode(searchParams));
   const [currentTopic, setCurrentTopic] = useState<string>('');
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
@@ -195,7 +196,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   const openApiModal = useCallback((options?: {
     title?: string;
     description?: string;
-    focusField?: 'openRouter' | 'elevenLabs' | 'fal' | null;
+    focusField?: 'openRouter' | 'elevenLabs' | 'heygen' | 'fal' | null;
   }) => {
     setApiModalTitle(options?.title || 'API 키 등록');
     setApiModalDescription(options?.description || '필요한 키를 등록하면 실제 생성 품질이 올라갑니다.');
@@ -256,101 +257,92 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   ) => {
     if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
     pendingWorkflowDraftRef.current = null;
+
+    const shouldUseOverlay = Boolean(navigateToStep1 && viewMode !== 'gallery');
     try {
-    if (navigateToStep1) {
-      setNavigationOverlay({
-        title: '프로젝트 생성 중',
-        description: '새 프로젝트를 만들고 있습니다.',
-        mode: 'gray',
-      });
-      try {
-        router.prefetch(`${basePath}/step-1`);
-      } catch {}
-    }
+      if (shouldUseOverlay) {
+        setNavigationOverlay({
+          title: '프로젝트 생성 중',
+          description: '새 프로젝트를 만들고 있습니다.',
+          mode: 'gray',
+        });
+      }
+      if (navigateToStep1) {
+        try {
+          router.prefetch(`${basePath}/step-1`);
+        } catch {}
+      }
 
-    const currentState = studioStateRef.current || studioState || createDefaultStudioState();
-    const nextDraft = createDefaultWorkflowDraft(forceType || 'story');
-    const safeProjectName = projectName?.trim() || '';
-    if (safeProjectName) nextDraft.topic = safeProjectName;
-    const topic = safeProjectName || nextDraft.topic || '새 프로젝트';
-    const nextPreviewMix = getDefaultPreviewMix();
-    const pendingStateForSave: StudioState = {
-      ...currentState,
-      workflowDraft: nextDraft,
-      selectedCharacterId: null,
-      updatedAt: Date.now(),
-      lastContentType: nextDraft.contentType,
-    };
-    const optimisticProjectId = `project_pending_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const optimisticProject: SavedProject = {
-      id: optimisticProjectId,
-      name: topic,
-      createdAt: Date.now(),
-      topic,
-      settings: {
-        imageModel: currentState.routing?.imageModel || CONFIG.DEFAULT_IMAGE_MODEL,
-        outputMode: nextDraft.outputMode || 'video',
-        elevenLabsModel: currentState.routing?.elevenLabsModelId || currentState.routing?.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
-      },
-      assets: [],
-      thumbnail: null,
-      thumbnailTitle: null,
-      thumbnailPrompt: null,
-      thumbnailHistory: [],
-      selectedThumbnailId: null,
-      backgroundMusicTracks: [],
-      previewMix: nextPreviewMix,
-      workflowDraft: nextDraft,
-      lastSavedAt: Date.now(),
-    };
-    setSavedProjects((prev) => [optimisticProject, ...prev.filter((item) => item.id !== optimisticProjectId)]);
-    setStudioState(pendingStateForSave);
-    setGeneratedData([]);
-    setCurrentTopic('');
-    setCurrentProjectId(optimisticProjectId);
-    setBackgroundMusicTracks([]);
-    setPreviewMix(nextPreviewMix);
-    setCurrentCost(null);
-    setStep(GenerationStep.IDLE);
-    if (navigateToStep1) {
-      router.replace(`${basePath}/step-1?projectId=${encodeURIComponent(optimisticProjectId)}`, { scroll: false });
-    } else {
-      setViewMode('main');
-    }
+      const currentState = studioStateRef.current || studioState || createDefaultStudioState();
+      const nextDraft = createDefaultWorkflowDraft(forceType || 'story');
+      const safeProjectName = projectName?.trim() || '';
+      if (safeProjectName) nextDraft.topic = safeProjectName;
+      const topic = safeProjectName || nextDraft.topic || '새 프로젝트';
+      const nextPreviewMix = getDefaultPreviewMix();
+      const pendingStateForSave: StudioState = {
+        ...currentState,
+        workflowDraft: nextDraft,
+        selectedCharacterId: null,
+        updatedAt: Date.now(),
+        lastContentType: nextDraft.contentType,
+      };
 
-    const saveStatePromise = saveStudioState(pendingStateForSave)
-      .then((nextState) => {
-        setStudioState(nextState);
-      })
-      .catch((error) => {
-        console.warn('[mp4Creater] initial studio state save failed', error);
-      });
+      setStudioState(pendingStateForSave);
+      setGeneratedData([]);
+      setCurrentTopic('');
+      setCurrentProjectId(null);
+      setBackgroundMusicTracks([]);
+      setPreviewMix(nextPreviewMix);
+      setCurrentCost(null);
+      setStep(GenerationStep.IDLE);
+      if (!navigateToStep1) {
+        setViewMode('main');
+      }
 
-    const project = await upsertWorkflowProject({
-      projectId: null,
-      topic,
-      workflowDraft: nextDraft,
-      assets: [],
-      backgroundMusicTracks: [],
-      previewMix: nextPreviewMix,
-    });
-    void saveStatePromise;
-    setCurrentProjectId(project.id);
-    setProgressMessage('새 프로젝트를 생성했고 프로젝트 보관함에도 바로 저장했습니다.');
-    rememberProjectNavigationProject(project);
-    setSavedProjects((prev) => [project, ...prev.filter((item) => item.id !== project.id && item.id !== optimisticProjectId)]);
-    if (navigateToStep1) {
-      if (project.id !== optimisticProjectId) {
+      const saveStatePromise = saveStudioState(pendingStateForSave)
+        .then((nextState) => {
+          setStudioState(nextState);
+        })
+        .catch((error) => {
+          console.warn('[mp4Creater] initial studio state save failed', error);
+        });
+
+      let project: SavedProject | null = null;
+      let lastError: unknown = null;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          const created = await upsertWorkflowProject({
+            projectId: null,
+            topic,
+            workflowDraft: nextDraft,
+            assets: [],
+            backgroundMusicTracks: [],
+            previewMix: nextPreviewMix,
+          });
+          const verified = await getProjectById(created.id, { localOnly: true });
+          project = verified || created;
+          break;
+        } catch (error) {
+          lastError = error;
+        }
+      }
+      if (!project) throw lastError || new Error('project_create_failed');
+
+      void saveStatePromise;
+      setCurrentProjectId(project.id);
+      setProgressMessage('새 프로젝트를 생성했고 프로젝트 보관함에도 바로 저장했습니다.');
+      rememberProjectNavigationProject(project);
+      setSavedProjects((prev) => [project!, ...prev.filter((item) => item.id !== project!.id)]);
+      await refreshProjects({ forceSync: true, silent: true });
+
+      if (navigateToStep1) {
         router.replace(`${basePath}/step-1?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
       }
-    }
-    void refreshProjects({ forceSync: false, silent: true });
     } catch (error) {
-      setSavedProjects((prev) => prev.filter((item) => !item.id.startsWith('project_pending_')));
       setNavigationOverlay(null);
       throw error;
     }
-  }, [basePath, refreshProjects, router, studioState]);
+  }, [basePath, refreshProjects, router, studioState, viewMode]);
 
   useEffect(() => {
     setViewMode(routeStep ? 'main' : resolveAppViewMode(searchParams));
@@ -454,16 +446,25 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     };
   }, [currentProjectId, generatedData, backgroundMusicTracks, previewMix, studioState?.workflowDraft, refreshProjects, storageReady]);
 
-  const handleDeleteProject = async (id: string) => {
+  const handleDeleteProjects = async (ids: string[]) => {
+    const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)));
+    if (!uniqueIds.length) return;
     const previousProjects = savedProjects;
-    setSavedProjects((prev) => prev.filter((project) => project.id !== id));
+    setSavedProjects((prev) => prev.filter((project) => !uniqueIds.includes(project.id)));
     try {
-      await deleteProject(id);
-      void refreshProjects({ silent: true });
+      await deleteProjects(uniqueIds);
+      await refreshProjects({ forceSync: true, silent: true });
     } catch (error) {
       setSavedProjects(previousProjects);
       throw error;
     }
+  };
+
+  const handleImportProjects = async (file: File) => {
+    const imported = await importProjectsFromFile(file);
+    if (!imported.length) return;
+    setSavedProjects((prev) => mergeProjectLists(imported, prev));
+    await refreshProjects({ forceSync: true, silent: true });
   };
 
   const handleRenameProject = async (id: string, name: string) => {
@@ -494,7 +495,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     setPreviewMix(project.previewMix || getDefaultPreviewMix());
     setCurrentCost(project.cost || null);
     setStep(GenerationStep.COMPLETED);
-    setProgressMessage(`"${project.name}" 프로젝트를 불러왔습니다.`);
+
     setViewMode('main');
 
     if (project.workflowDraft) {
@@ -771,7 +772,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         <ProjectGallery
           projects={savedProjects}
           isLoading={isProjectsLoading}
-          onDelete={handleDeleteProject}
+          onDeleteProjects={handleDeleteProjects}
+          onImportProjects={handleImportProjects}
           onDuplicateProject={handleDuplicateProject}
           onRenameProject={handleRenameProject}
           onLoad={handleLoadProject}
