@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AssetHistoryItem, BackgroundMusicTrack, CostBreakdown, GeneratedAsset, PreviewMixSettings } from '../types';
 import { getAspectRatioClass } from '../utils/aspectRatio';
 import { handleHorizontalWheel, scrollContainerBy, scrollElementIntoView } from '../utils/horizontalScroll';
-import { exportAssetsToZip, exportCapCutPackage } from '../services/exportService';
+import { exportAssetsToZip, exportCapCutDragBundle } from '../services/exportService';
 import { downloadProjectZip } from '../utils/csvHelper';
 import { downloadSrt } from '../services/srtService';
 import HelpTip from './HelpTip';
@@ -435,21 +435,18 @@ const ResultTable: React.FC<ResultTableProps> = ({
             <button onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
               SRT 저장
             </button>
-            <button
-              type="button"
-              onClick={() => void exportCapCutPackage({
-                assets: data,
-                projectName: currentTopic || 'mp4Creater_project',
-                backgroundMusicTracks,
-                activeBackgroundTrackId,
-                previewMix,
-                topic: currentTopic,
-                qualityMode: downloadQuality,
-              })}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-            >
-              CapCut 3폴더 ZIP
-            </button>
+            {finalOutputMode === 'video' && (
+              <button
+                onClick={() => void exportCapCutDragBundle(data, currentTopic || 'mp4Creater', {
+                  qualityMode: downloadQuality,
+                  backgroundTracks: mainBgm ? [mainBgm] : [],
+                  previewMix,
+                })}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+              >
+                CapCut 드래그 ZIP
+              </button>
+            )}
             {finalOutputMode === 'image' && (
               <button onClick={() => exportAssetsToZip(data, 'mp4Creater_image_storyboard')} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-500">
                 이미지 묶음 ZIP
@@ -466,7 +463,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
               </>
             )}
           </div>
-          <p className="mt-3 text-xs leading-5 text-slate-500">CapCut ZIP은 01_videos, 02_music, 03_subtitles 세 폴더만 담습니다. 01_videos 클립에는 가능한 경우 문단 영상, 나레이션, 선택 배경음, 자막까지 함께 굽습니다.</p>
+          <p className="mt-3 text-xs leading-5 text-slate-500">작업 화면에서는 가벼운 미리보기로 확인하고, 저장할 때는 선택한 품질로 최종 파일을 만들 수 있습니다. CapCut 드래그 ZIP은 01_videos 안에 자막, 나레이션, 배경음까지 최대한 합친 문단별 클립을 담습니다.</p>
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
@@ -973,19 +970,19 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <button type="button" onClick={() => exportAssetsToZip(data, 'mp4Creater_image_storyboard')} className="rounded-2xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-500">이미지 패키지 ZIP</button>
               )}
               <button type="button" onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">SRT 저장</button>
-              <button
-                type="button"
-                onClick={() => void exportCapCutPackage({
-                  assets: data,
-                  projectName: currentTopic || 'mp4Creater_project',
-                  backgroundMusicTracks,
-                  activeBackgroundTrackId,
-                  previewMix,
-                  topic: currentTopic,
-                  qualityMode: downloadQuality,
-                })}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-              >CapCut 3폴더 ZIP</button>
+              {finalOutputMode === 'video' && (
+                <button
+                  type="button"
+                  onClick={() => void exportCapCutDragBundle(data, currentTopic || 'mp4Creater', {
+                    qualityMode: downloadQuality,
+                    backgroundTracks: mainBgm ? [mainBgm] : [],
+                    previewMix,
+                  })}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  CapCut 드래그 ZIP
+                </button>
+              )}
               {onExportVideo && finalOutputMode === 'video' && (
                 <>
                   <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: true, qualityMode: downloadQuality })} disabled={isExporting} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isExporting ? '렌더링 중...' : '최종 출력 (자막 O)'}</button>
