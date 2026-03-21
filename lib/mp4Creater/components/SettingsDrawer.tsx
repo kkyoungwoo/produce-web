@@ -535,20 +535,20 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
           <section className={cardClass}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-black text-slate-900">저장 폴더</h3>
-                <p className="mt-1 text-xs text-slate-600">프로젝트 파일과 생성 결과를 저장할 기본 폴더입니다.</p>
+                <h3 className="text-base font-black text-slate-900">저장 위치</h3>
+                <p className="mt-1 text-xs text-slate-600">프로젝트 JSON 저장소와 생성 결과 메타데이터를 저장할 기본 위치입니다.</p>
               </div>
               <button type="button" onClick={handleFolderPick} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-500">폴더 선택</button>
             </div>
             <input value={storageDir} onChange={(e) => setStorageDir(e.target.value)} className={`${inputClass} mt-3`} placeholder="./local-data/tubegen-studio" />
-            {pickedFolderLabel ? <p className="mt-2 text-xs text-slate-500">선택됨: {pickedFolderLabel}</p> : null}
+            {pickedFolderLabel ? <p className="mt-2 text-xs text-slate-500">선택한 위치: {pickedFolderLabel}</p> : null}
           </section>
 
           <section className={cardClass}>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">API 연결</h3>
-                <p className="mt-1 text-xs text-slate-600">텍스트(OpenRouter), 음성(ElevenLabs/HeyGen), 영상(FAL.AI) 키를 연결합니다.</p>
+                <p className="mt-1 text-xs text-slate-600">텍스트(OpenRouter), 음성(ElevenLabs/HeyGen), 영상(FAL.AI/HeyGen) 연동 키를 연결합니다.</p>
               </div>
             </div>
             <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -608,7 +608,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-black text-slate-900">HeyGen API 키</div>
-                <div className="mt-1 text-[11px] text-slate-500">Starfish TTS, 보이스 목록, 미리 듣기에 사용합니다.</div>
+                <div className="mt-1 text-[11px] text-slate-500">Starfish TTS, 보이스 목록, 미리 듣기와 HeyGen 기반 영상 제작 연동에 사용합니다.</div>
                 <div className="mt-3 flex items-center gap-2">
                   <input
                     type={showSecrets.heygenApiKey ? 'text' : 'password'}
@@ -633,7 +633,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 </div>
                 <button type="button" onClick={() => void runProviderCheck('heygenApiKey')} disabled={!providerValues.heygenApiKey.trim() || isCheckingProviders.heygenApiKey} className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400">{isCheckingProviders.heygenApiKey ? '확인 중...' : '연결 확인'}</button>
                 {providerFeedback.heygenApiKey?.message ? <p className="mt-2 text-xs text-slate-500">{providerFeedback.heygenApiKey.message}</p> : null}
-                <p className="mt-2 text-xs text-slate-500">등록 후 설정 기본 음성과 Step3 출연자별 보이스 선택에 바로 반영됩니다.</p>
+                <p className="mt-2 text-xs text-slate-500">등록 후 설정 기본 음성과 Step3 출연자별 보이스 선택, HeyGen 연동 영상 제작 설정에 함께 사용됩니다.</p>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-black text-slate-900">FAL.AI API 키</div>

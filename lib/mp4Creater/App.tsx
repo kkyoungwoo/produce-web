@@ -26,6 +26,8 @@ import {
   saveStudioState,
   createDefaultStudioState,
   getCachedStudioState,
+  DEFAULT_STORAGE_DIR,
+  summarizeProjectForIndex,
 } from './services/localFileApi';
 import {
   getProjectById,
@@ -96,6 +98,17 @@ const resolveBasePath = (pathname?: string | null) => {
 
 let hasBootstrappedSession = false;
 
+const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
+
+const isLocalMp4CreaterRuntime = () => (
+  typeof window !== 'undefined' && LOCAL_HOSTNAMES.has(window.location.hostname)
+);
+
+const shouldAutoConfigureLocalStorage = (state?: Pick<StudioState, 'isStorageConfigured' | 'storageDir'> | null) => (
+  isLocalMp4CreaterRuntime()
+  && (!state?.isStorageConfigured || !state?.storageDir?.trim())
+);
+
 const mergeProjectLists = (primary: SavedProject[] = [], fallback: SavedProject[] = []) => {
   const byId = new Map<string, SavedProject>();
   [...primary, ...fallback].forEach((project) => {
@@ -149,11 +162,35 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
   const storageReady = Boolean(studioState?.isStorageConfigured && studioState?.storageDir?.trim());
 
+  const applyProjectListSnapshot = useCallback((projects: SavedProject[] = []) => {
+    const nextProjects = [...projects]
+      .map((project) => summarizeProjectForIndex(project))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    setSavedProjects(nextProjects);
+    setStudioState((prev) => (prev ? { ...prev, projects: nextProjects, projectIndex: nextProjects as any } : prev));
+    return nextProjects;
+  }, []);
+
   const promptStorageSelection = useCallback((message?: string) => {
     setShowStartupWizard(true);
     setNavigationOverlay(null);
-    setProgressMessage(message || '프로젝트 폴더를 먼저 정해야 저장 파일과 프로젝트 폴더가 생성됩니다. 저장 폴더를 선택해 주세요.');
+    setProgressMessage(message || 'JSON 저장 위치를 먼저 정해야 프로젝트와 워크플로우를 안정적으로 저장할 수 있습니다. 저장 위치를 선택해 주세요.');
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch {}
+  }, []);
+
+  const ensureRuntimeStorageReady = useCallback(async (state?: StudioState | null) => {
+    const currentState = state || studioStateRef.current || createDefaultStudioState();
+    if (!shouldAutoConfigureLocalStorage(currentState)) return currentState;
+
+    try {
+      const configured = await configureStorage(DEFAULT_STORAGE_DIR);
+      setStudioState(configured);
+      setShowStartupWizard(false);
+      return configured;
+    } catch (error) {
+      console.warn('[mp4Creater] local default storage auto-config failed', error);
+      return currentState;
+    }
   }, []);
 
   useEffect(() => {
@@ -211,24 +248,27 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     if (cachedState) {
       setStudioState(cachedState);
       if (cachedProjects.length) {
-        setSavedProjects((prev) => mergeProjectLists(prev, cachedProjects));
+        applyProjectListSnapshot(cachedProjects);
       }
     }
 
     try {
       const projects = await getSavedProjects({ forceSync: Boolean(options?.forceSync) });
-      setSavedProjects(mergeProjectLists(projects, cachedProjects));
+      const nextProjects = applyProjectListSnapshot(projects);
 
       if (!cachedState || options?.forceSync) {
         const state = await fetchStudioState({ force: Boolean(options?.forceSync) });
-        setStudioState(state);
+        setStudioState({
+          ...state,
+          projects: nextProjects,
+        });
       }
     } catch {
       // local cache fallback handled in service
     } finally {
       if (!options?.silent) setIsProjectsLoading(false);
     }
-  }, []);
+  }, [applyProjectListSnapshot]);
 
   const commitPendingWorkflowDraft = useCallback(async () => {
     const currentState = studioStateRef.current;
@@ -273,7 +313,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         } catch {}
       }
 
-      const currentState = studioStateRef.current || studioState || createDefaultStudioState();
+      const currentState = await ensureRuntimeStorageReady(studioStateRef.current || studioState || createDefaultStudioState());
       const nextDraft = createDefaultWorkflowDraft(forceType || 'story');
       const safeProjectName = projectName?.trim() || '';
       if (safeProjectName) nextDraft.topic = safeProjectName;
@@ -319,8 +359,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
             backgroundMusicTracks: [],
             previewMix: nextPreviewMix,
           });
-          const verified = await getProjectById(created.id, { localOnly: true });
-          project = verified || created;
+          project = created;
           break;
         } catch (error) {
           lastError = error;
@@ -330,23 +369,31 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
       void saveStatePromise;
       setCurrentProjectId(project.id);
-      setProgressMessage('새 프로젝트를 생성했고 프로젝트 보관함에도 바로 저장했습니다.');
       rememberProjectNavigationProject(project);
-      setSavedProjects((prev) => [project!, ...prev.filter((item) => item.id !== project!.id)]);
-      await refreshProjects({ forceSync: true, silent: true });
+      applyProjectListSnapshot([project!, ...savedProjects.filter((item) => item.id !== project!.id)]);
 
       if (navigateToStep1) {
+        setViewMode('main');
         router.replace(`${basePath}/step-1?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+      } else {
+        void refreshProjects({ silent: true });
       }
     } catch (error) {
       setNavigationOverlay(null);
       throw error;
     }
-  }, [basePath, refreshProjects, router, studioState, viewMode]);
+  }, [basePath, ensureRuntimeStorageReady, refreshProjects, router, studioState, viewMode]);
 
   useEffect(() => {
     setViewMode(routeStep ? 'main' : resolveAppViewMode(searchParams));
   }, [searchParams, routeStep]);
+
+  useEffect(() => {
+    if (!routeStep) return;
+    try {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    } catch {}
+  }, [routeStep, pathname]);
 
   useEffect(() => {
     if (routeStep) return;
@@ -366,52 +413,64 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
 
   useEffect(() => {
-    (async () => {
+    let cancelled = false;
+
+    void (async () => {
       const bootstrapCachedState = getCachedStudioState();
       const cachedProjects = Array.isArray(bootstrapCachedState?.projects) ? bootstrapCachedState.projects : [];
       if (bootstrapCachedState) {
-        setStudioState(bootstrapCachedState);
+        const cachedState = await ensureRuntimeStorageReady(bootstrapCachedState);
+        if (cancelled) return;
+        setStudioState(cachedState);
         if (cachedProjects.length) {
-          setSavedProjects((prev) => mergeProjectLists(prev, cachedProjects));
+          applyProjectListSnapshot(cachedProjects);
         }
-        const shouldShowWizardFromCache = !bootstrapCachedState.isStorageConfigured || !bootstrapCachedState.storageDir?.trim();
+        const shouldShowWizardFromCache = !cachedState.isStorageConfigured || !cachedState.storageDir?.trim();
         setShowStartupWizard(shouldShowWizardFromCache);
       }
 
       if (hasBootstrappedSession && bootstrapCachedState) {
-        setIsProjectsLoading(false);
+        if (!cancelled) setIsProjectsLoading(false);
         void refreshProjects({ silent: true });
         return;
       }
 
       hasBootstrappedSession = true;
-      setIsProjectsLoading(true);
+      if (!cancelled) setIsProjectsLoading(true);
       try {
         try {
-          const state = await fetchStudioState({ force: true });
+          const fetchedState = await fetchStudioState({ force: true });
+          const state = await ensureRuntimeStorageReady(fetchedState);
+          if (cancelled) return;
           setStudioState(state);
           if (Array.isArray(state.projects) && state.projects.length) {
-            setSavedProjects((prev) => mergeProjectLists(prev, state.projects));
+            applyProjectListSnapshot(state.projects);
           }
           const shouldShowWizard = !state.isStorageConfigured || !state.storageDir?.trim();
           setShowStartupWizard(shouldShowWizard);
         } catch {
-          const fallback = createDefaultStudioState();
+          const fallback = await ensureRuntimeStorageReady(createDefaultStudioState());
+          if (cancelled) return;
           setStudioState(fallback);
-          setShowStartupWizard(true);
+          setShowStartupWizard(!fallback.isStorageConfigured || !fallback.storageDir?.trim());
         }
 
         await migrateFromLocalStorage();
         const projects = await getSavedProjects();
+        if (cancelled) return;
         const latestCachedProjects = getCachedStudioState()?.projects || [];
-        setSavedProjects(mergeProjectLists(projects, latestCachedProjects));
+        applyProjectListSnapshot(projects.length ? projects : latestCachedProjects);
         const latestCachedState = getCachedStudioState();
         if (latestCachedState) setStudioState(latestCachedState);
       } finally {
-        setIsProjectsLoading(false);
+        if (!cancelled) setIsProjectsLoading(false);
       }
     })();
-  }, [refreshProjects]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ensureRuntimeStorageReady, refreshProjects]);
 
   useEffect(() => {
     const newFlag = searchParams?.get('new') || '';
@@ -431,31 +490,66 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     if (!storageReady) return;
     if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     autosaveTimerRef.current = window.setTimeout(async () => {
-      await updateProject(currentProjectId, {
+      const updated = await updateProject(currentProjectId, {
         assets: generatedData,
         backgroundMusicTracks,
         previewMix,
         workflowDraft: studioState?.workflowDraft || null,
       });
-      await refreshProjects();
-      setProgressMessage('현재 프로젝트 변경사항을 자동 저장했습니다.');
+      if (updated) {
+        applyProjectListSnapshot([updated, ...savedProjects.filter((item) => item.id !== updated.id)]);
+      }
     }, 500);
 
     return () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
-  }, [currentProjectId, generatedData, backgroundMusicTracks, previewMix, studioState?.workflowDraft, refreshProjects, storageReady]);
+  }, [currentProjectId, generatedData, backgroundMusicTracks, previewMix, studioState?.workflowDraft, savedProjects, storageReady]);
 
   const handleDeleteProjects = async (ids: string[]) => {
     const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)));
     if (!uniqueIds.length) return;
+
+    const deletingCurrentProject = Boolean(currentProjectId && uniqueIds.includes(currentProjectId));
+    if (autosaveTimerRef.current) {
+      window.clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    if (projectDraftSyncTimerRef.current) {
+      window.clearTimeout(projectDraftSyncTimerRef.current);
+      projectDraftSyncTimerRef.current = null;
+    }
+    if (deletingCurrentProject && workflowDraftSaveTimerRef.current) {
+      window.clearTimeout(workflowDraftSaveTimerRef.current);
+      workflowDraftSaveTimerRef.current = null;
+      pendingWorkflowDraftRef.current = null;
+    }
+
     const previousProjects = savedProjects;
-    setSavedProjects((prev) => prev.filter((project) => !uniqueIds.includes(project.id)));
+    const nextProjects = previousProjects.filter((project) => !uniqueIds.includes(project.id));
+    applyProjectListSnapshot(nextProjects);
+
+    if (deletingCurrentProject) {
+      setCurrentProjectId(null);
+      setCurrentTopic('');
+      setGeneratedData([]);
+      setBackgroundMusicTracks([]);
+      setPreviewMix(getDefaultPreviewMix());
+      setCurrentCost(null);
+      setStep(GenerationStep.IDLE);
+      setNavigationOverlay(null);
+      setProgressMessage('');
+      setViewMode('gallery');
+      try {
+        router.replace(`${basePath}?view=gallery`, { scroll: false });
+      } catch {}
+    }
+
     try {
       await deleteProjects(uniqueIds);
-      await refreshProjects({ forceSync: true, silent: true });
+      void refreshProjects({ silent: true });
     } catch (error) {
-      setSavedProjects(previousProjects);
+      applyProjectListSnapshot(previousProjects);
       throw error;
     }
   };
@@ -463,8 +557,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   const handleImportProjects = async (file: File) => {
     const imported = await importProjectsFromFile(file);
     if (!imported.length) return;
-    setSavedProjects((prev) => mergeProjectLists(imported, prev));
-    await refreshProjects({ forceSync: true, silent: true });
+    applyProjectListSnapshot([...imported, ...savedProjects.filter((existing) => !imported.some((item) => item.id === existing.id))]);
+    void refreshProjects({ silent: true });
   };
 
   const handleRenameProject = async (id: string, name: string) => {
@@ -472,15 +566,13 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     if (!trimmed) return;
     const ok = await renameProject(id, trimmed);
     if (!ok) return;
-    setSavedProjects((prev) => prev.map((item) => item.id === id ? { ...item, name: trimmed } : item));
-    await refreshProjects({ forceSync: true });
+    applyProjectListSnapshot(savedProjects.map((item) => item.id === id ? { ...item, name: trimmed } : item));
   };
 
   const handleDuplicateProject = async (id: string) => {
     const copied = await duplicateProject(id);
     if (!copied) return;
-    setSavedProjects((prev) => [copied, ...prev.filter((item) => item.id !== copied.id)].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
-    void refreshProjects({ silent: true });
+    applyProjectListSnapshot([copied, ...savedProjects.filter((item) => item.id !== copied.id)]);
   };
 
   const handleLoadProject = useCallback((project: SavedProject) => {
@@ -528,7 +620,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       if (!project) return;
       handleLoadProject(project);
       if (returnTo === 'workflow') {
-        setProgressMessage('씬 제작 화면에서 돌아온 프로젝트를 다시 불러왔습니다. 프롬프트와 화풍을 수정한 뒤 Step 4에서 다시 씬 제작으로 이동할 수 있습니다.');
+        setProgressMessage('');
       }
       const nextStep = resolveDraftStep(project.workflowDraft || null, project.assets || []);
       const clearRouteStep = routeStep || nextStep;
@@ -634,9 +726,9 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   };
 
   const handleOpenSceneStudio = useCallback(async (draftPatch: Partial<WorkflowDraft>) => {
-    const currentState = studioStateRef.current || createDefaultStudioState();
+    const currentState = await ensureRuntimeStorageReady(studioStateRef.current || createDefaultStudioState());
     if (!currentState.isStorageConfigured || !currentState.storageDir?.trim()) {
-      promptStorageSelection('저장 폴더가 정해져야 프로젝트 번호 폴더와 씬 파일을 만들 수 있습니다. 먼저 저장 폴더를 선택해 주세요.');
+      promptStorageSelection('JSON 저장 위치가 정해져야 프로젝트와 씬 데이터를 빠르게 저장할 수 있습니다. 먼저 저장 위치를 선택해 주세요.');
       return;
     }
     const baseDraft = currentState.workflowDraft || createDefaultWorkflowDraft(currentState.lastContentType || 'story');
@@ -692,7 +784,6 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       setGeneratedData(normalizeLoadedAssets(initialSceneAssets));
       setBackgroundMusicTracks(nextBackgroundTracks);
       setPreviewMix(nextPreviewMix);
-      setProgressMessage('문단별 씬 카드와 신규 배경음을 먼저 준비했습니다. 씬 제작 화면에서는 생성 버튼을 누를 때만 실제 AI 작업이 시작됩니다.');
 
       setCurrentProjectId(project.id);
       rememberProjectNavigationProject(project);
@@ -708,7 +799,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       setNavigationOverlay(null);
       setProgressMessage('씬 제작 페이지를 여는 중 문제가 생겼습니다. 입력값을 다시 확인해 주세요.');
     }
-  }, [backgroundMusicTracks, basePath, currentCost, currentProjectId, generatedData, previewMix, promptStorageSelection, refreshProjects, router]);
+  }, [backgroundMusicTracks, basePath, currentCost, currentProjectId, ensureRuntimeStorageReady, generatedData, previewMix, promptStorageSelection, refreshProjects, router]);
 
   const handleNarrationChange = (index: number, narration: string) => {
     setGeneratedData((prev) => prev.map((item, itemIndex) => itemIndex === index ? {
@@ -784,15 +875,15 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
       {viewMode === 'main' && (
         <main className="py-8">
-          {!storageReady && (
+          {!storageReady && !shouldAutoConfigureLocalStorage(studioState) && (
             <div className="mx-auto mb-6 max-w-6xl px-4">
               <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <div className="text-xs font-black uppercase tracking-[0.2em] text-amber-700">저장 폴더 필요</div>
-                    <p className="mt-1 text-sm font-semibold text-amber-900">프로젝트 폴더를 정해야 번호별 프로젝트 폴더와 이미지·영상·프롬프트 파일이 함께 저장됩니다.</p>
+                    <div className="text-xs font-black uppercase tracking-[0.2em] text-amber-700">저장 위치 필요</div>
+                    <p className="mt-1 text-sm font-semibold text-amber-900">JSON 저장 위치를 정해야 프로젝트와 프롬프트, 미디어 메타데이터가 한 번에 안정적으로 저장됩니다.</p>
                   </div>
-                  <button type="button" onClick={() => setShowStartupWizard(true)} className="rounded-2xl bg-amber-600 px-4 py-3 text-sm font-black text-white hover:bg-amber-500">폴더 선택하기</button>
+                  <button type="button" onClick={() => setShowStartupWizard(true)} className="rounded-2xl bg-amber-600 px-4 py-3 text-sm font-black text-white hover:bg-amber-500">저장 위치 정하기</button>
                 </div>
               </div>
             </div>
@@ -815,9 +906,11 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
                 });
               }
               const projectQuery = currentProjectId ? `?projectId=${encodeURIComponent(currentProjectId)}` : '';
+              try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
               router.replace(`${basePath}/step-${nextStep}${projectQuery}`, { scroll: false });
             }}
             onGoBackFromStep1={() => {
+              try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
               router.replace(`${basePath}?view=gallery`, { scroll: false });
             }}
             onOpenSettings={() => setShowSettings(true)}
@@ -826,15 +919,6 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
             onSaveWorkflowDraft={handleSaveWorkflowDraft}
             onOpenSceneStudio={handleOpenSceneStudio}
           />
-
-          {progressMessage && (
-            <div className="mx-auto mb-6 max-w-6xl px-4 text-center">
-              <div className="inline-flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
-                <div className={`h-2.5 w-2.5 rounded-full ${step === GenerationStep.ERROR ? 'bg-red-500' : 'bg-emerald-500'}`} />
-                <span className="text-sm font-bold text-slate-700">{progressMessage}</span>
-              </div>
-            </div>
-          )}
 
           {!routeStep && generatedData.length > 0 && (
             <ResultTable

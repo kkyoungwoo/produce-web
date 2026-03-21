@@ -71,7 +71,7 @@ const Header: React.FC<HeaderProps> = ({
               </div>
               <div className="mt-1 truncate text-xs text-slate-500">
                 {selectedCharacterName ? `캐릭터: ${selectedCharacterName}` : '캐릭터 미선택'}
-                {storageDir ? ` · 저장 폴더: ${storageDir}` : ' · 저장 폴더 미설정'}
+                {storageDir ? ` · 저장 위치: ${storageDir}` : ' · 저장 위치 미설정'}
               </div>
             </div>
           </div>

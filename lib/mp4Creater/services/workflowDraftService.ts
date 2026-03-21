@@ -6,6 +6,7 @@ import {
   StorySelectionState,
   StudioState,
   WorkflowDraft,
+  WorkflowPromptTemplate,
 } from '../types';
 import {
   buildWorkflowPromptPack,
@@ -116,6 +117,38 @@ export function createDefaultWorkflowDraft(contentType: ContentType = 'story', o
       step5: false,
     },
     updatedAt: Date.now(),
+  };
+}
+
+
+function compactPromptTemplatesForStorage(templates?: WorkflowPromptTemplate[]): WorkflowPromptTemplate[] {
+  if (!Array.isArray(templates)) return [];
+  return templates
+    .filter((template): template is WorkflowPromptTemplate => Boolean(template?.id))
+    .map((template) => {
+      const shouldKeepPromptBody = !template.builtIn || Boolean(template.isCustomized);
+      if (shouldKeepPromptBody) return { ...template };
+      return {
+        ...template,
+        prompt: '',
+        basePrompt: undefined,
+      };
+    });
+}
+
+export function compactWorkflowDraftForStorage(draft?: WorkflowDraft | null): WorkflowDraft | null {
+  if (!draft) return null;
+  return {
+    ...draft,
+    promptPack: {
+      storyPrompt: '',
+      lyricsPrompt: '',
+      characterPrompt: '',
+      scenePrompt: '',
+      actionPrompt: '',
+      persuasionStoryPrompt: '',
+    },
+    promptTemplates: compactPromptTemplatesForStorage(draft.promptTemplates),
   };
 }
 

@@ -286,7 +286,7 @@ export interface ConstitutionAnalysisSummary {
 }
 
 export type ScriptSpeechStyle = 'default' | 'yo' | 'da' | 'eum';
-export type ScriptLanguageOption = 'ko' | 'en' | 'ja' | 'zh' | 'vi' | 'mn' | 'th' | 'uz';
+export type ScriptLanguageOption = 'mute' | 'ko' | 'en' | 'ja' | 'zh' | 'vi' | 'mn' | 'th' | 'uz';
 export type ReferenceLinkKind = 'youtube' | 'web';
 
 export interface ReferenceLinkDraft {
@@ -506,6 +506,7 @@ export interface StudioState {
   routing: AiRoutingSettings;
   providers: StudioProviderSecrets;
   projects: SavedProject[];
+  projectIndex?: SavedProject[];
   workflowDraft?: WorkflowDraft | null;
   agentProfile?: StudioAgentProfile;
   preferredPromptProfile?: PromptProfileId;

@@ -73,6 +73,8 @@ const TOPIC_SENTENCE_PATTERNS: Record<ContentType, string[]> = {
     '{topic} 분위기를 따라가는 몽환적 흐름',
     '{topic}에서 추억과 현재가 겹치게 만들기',
     '{topic}을 짧고 강한 장면으로 압축하기',
+    '{topic}을 한밤중 재회와 감정 폭발로 이어지는 흐름으로 설계하기',
+    '{topic}을 후렴처럼 반복되는 상징 장면으로 묶어 전개하기',
   ],
   story: [
     '{topic} 문제로 주인공의 선택이 흔들리는 이야기',
@@ -81,6 +83,8 @@ const TOPIC_SENTENCE_PATTERNS: Record<ContentType, string[]> = {
     '{topic}으로 관계가 달라지는 인물 중심 구성',
     '{topic} 기반으로 한 직관적 반전 구조',
     '{topic}의 감정 차이를 살린 서사 흐름',
+    '{topic} 때문에 숨겨 둔 과거가 드러나는 한밤의 전개',
+    '{topic}을 시작점으로 관계가 천천히 뒤집히는 감성 구조',
   ],
   news: [
     '{topic}을 첫 장면부터 영화처럼 밀어붙이는 구성',
@@ -89,6 +93,8 @@ const TOPIC_SENTENCE_PATTERNS: Record<ContentType, string[]> = {
     '{topic}을 따라 추적과 회상이 엇갈리는 흐름 만들기',
     '{topic}의 긴장과 침묵을 장면 전환으로 살리기',
     '{topic}을 엔딩의 여운까지 이어지는 영화 톤으로 묶기',
+    '{topic}을 결정적 단서와 감정 충돌이 함께 움직이는 장면으로 설계하기',
+    '{topic}을 같은 공간의 다른 기억이 부딪히는 영화형 흐름으로 전개하기',
   ],
   info_delivery: [
     '{topic}을 처음 보는 사람도 이해하는 단계별 설명',
@@ -97,6 +103,8 @@ const TOPIC_SENTENCE_PATTERNS: Record<ContentType, string[]> = {
     '{topic}에서 자주 헷갈리는 포인트를 먼저 안내하기',
     '{topic} 체크리스트를 바로 실행 가능하게 만들기',
     '{topic} 핵심 요약과 다음 액션까지 한 번에 제시하기',
+    '{topic}을 실무자가 바로 적용할 수 있는 짧은 사례 중심으로 설명하기',
+    '{topic}을 처음 듣는 사람도 한 번에 이해하는 순서로 차근차근 안내하기',
   ],
 };
 
@@ -114,7 +122,7 @@ function getContentLabel(contentType: ContentType) {
   return '이야기';
 }
 
-export function buildTopicSentenceRecommendations(contentType: ContentType, topic: string, count = 4): string[] {
+export function buildTopicSentenceRecommendations(contentType: ContentType, topic: string, count = 8): string[] {
   const baseTopic = normalizeTopicSeed(topic) || getTopicSuggestion(contentType, '');
   const pool = TOPIC_SENTENCE_PATTERNS[contentType]
     .map((pattern) => pattern.replaceAll('{topic}', baseTopic))

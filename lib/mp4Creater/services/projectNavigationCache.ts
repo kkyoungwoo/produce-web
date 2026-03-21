@@ -1,4 +1,5 @@
 import { SavedProject } from '../types';
+import { compactWorkflowDraftForStorage } from './workflowDraftService';
 
 const PROJECT_NAVIGATION_CACHE_KEY = 'mp4creater_scene_project_cache';
 
@@ -51,7 +52,7 @@ function stripProjectBinary(project: SavedProject): SavedProject {
           audioData: null,
         }))
       : [],
-    workflowDraft: stripWorkflowDraftBinary(project.workflowDraft),
+    workflowDraft: compactWorkflowDraftForStorage(stripWorkflowDraftBinary(project.workflowDraft) as any) as any,
   };
 }
 

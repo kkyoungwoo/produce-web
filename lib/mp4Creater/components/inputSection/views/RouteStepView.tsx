@@ -54,6 +54,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
     isExtracting,
     hydrateCharactersForScript,
     handleCharacterUploadForId,
+    openCharacterUploadPicker,
     selectCharacterImageById,
     updateCharacterPrompt,
     createCharacterVariants,
@@ -122,6 +123,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
     setNewCharacterName,
     setNewCharacterPrompt,
     createNewCharacterByPrompt,
+    createNewCharacterFromForm,
     removeCharacter,
     toggleCharacterSelection,
   } = vm;
@@ -249,6 +251,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
           onNewCharacterNameChange={(value) => setNewCharacterName(value)}
           onNewCharacterPromptChange={(value) => setNewCharacterPrompt(value)}
           onCreateNewCharacter={createNewCharacterByPrompt}
+          onCreateCharacterFromForm={createNewCharacterFromForm}
           getCharacterVoiceSummary={getCharacterVoiceSummary}
         />
       );
@@ -262,9 +265,12 @@ export default function RouteStepView({ vm }: { vm: any }) {
           selectedCharacterStyleId={selectedCharacterStyleId}
           characterStyleOptions={characterStyleOptions}
           isExtracting={isExtracting}
-          onSelectCharacterStyle={vm.setSelectedCharacterStyleId}
           characterLoadingProgress={characterLoadingProgress}
+          onHydrateCharacters={() => { void hydrateCharactersForScript({ preserveSelection: true }); }}
+          onSelectCharacterStyle={vm.setSelectedCharacterStyleId}
           onUploadCharacterImage={handleCharacterUploadForId}
+          onUploadNewCharacterImage={openCharacterUploadPicker}
+          onToggleCharacter={toggleCharacterSelection}
           onSelectCharacterImage={selectCharacterImageById}
           onCharacterPromptChange={updateCharacterPrompt}
           onCreateVariants={(character) => { void createCharacterVariants(character); }}
@@ -355,21 +361,18 @@ export default function RouteStepView({ vm }: { vm: any }) {
                   setNotice('프롬프트 수정이 저장되었습니다. 대본생성 시 바로 반영됩니다.');
                   setPromptPreviewId(null);
                 }}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500"
               >
                 이 프롬프트 수정
               </button>
             )}
-            <button type="button" onClick={() => setPromptPreviewId(null)} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500">
-              닫기
-            </button>
           </>
         )}
       >
         <textarea
           value={promptPreviewDraft || syncedPromptTemplates.find((item: any) => item.id === promptPreviewId)?.prompt || selectedPromptTemplate?.prompt || ''}
           onChange={(event) => setPromptPreviewDraft(event.target.value)}
-          className="min-h-[420px] w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-700 outline-none"
+          className="min-h-[420px] w-full rounded-2xl border border-blue-400 bg-blue-600 px-4 py-4 text-sm leading-7 text-white outline-none placeholder:text-blue-100"
           placeholder="프롬프트를 불러오는 중입니다."
         />
       </OverlayModal>

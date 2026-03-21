@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -21,7 +21,7 @@ import {
   SavedProject,
   WorkflowDraft,
 } from '../types';
-import { createDefaultStudioState, fetchStudioState, saveStudioState, getCachedStudioState } from '../services/localFileApi';
+import { DEFAULT_STORAGE_DIR, createDefaultStudioState, fetchStudioState, saveStudioState, getCachedStudioState } from '../services/localFileApi';
 import { ensureWorkflowDraft } from '../services/workflowDraftService';
 import { getDefaultPreviewMix, createSampleBackgroundTrack } from '../services/musicService';
 import { generateImage, getSelectedImageModel } from '../services/imageService';
@@ -88,8 +88,8 @@ function createBootstrapStudioState(projectId: string): StudioState {
       workflowDraft: cachedProject.workflowDraft,
       projects: [cachedProject],
       lastContentType: cachedProject.workflowDraft?.contentType || 'story',
-      storageDir: cachedProject.folderPath || '',
-      isStorageConfigured: Boolean(cachedProject.folderPath),
+      storageDir: cachedState?.storageDir || DEFAULT_STORAGE_DIR,
+      isStorageConfigured: Boolean((cachedState?.storageDir || DEFAULT_STORAGE_DIR).trim()),
       updatedAt: Date.now(),
     };
   }
@@ -132,6 +132,7 @@ const SceneStudioPage: React.FC = () => {
   const [taskProgressPercent, setTaskProgressPercent] = useState<number | null>(null);
   const [sceneProgressMap, setSceneProgressMap] = useState<Record<number, { percent: number; label: string }>>({});
   const assetsRef = useRef<GeneratedAsset[]>([]);
+  const studioStateRef = useRef<StudioState | null>(null);
   const isAbortedRef = useRef(false);
   const isProcessingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
@@ -140,6 +141,8 @@ const SceneStudioPage: React.FC = () => {
   const autosaveSignatureRef = useRef('');
 
   useEffect(() => {
+    let cancelled = false;
+
     try {
       window.scrollTo({ top: 0, behavior: 'auto' });
     } catch {}
@@ -150,12 +153,21 @@ const SceneStudioPage: React.FC = () => {
       if (cachedState.workflowDraft) setBackgroundMusicTracks([]);
     }
 
-    (async () => {
+    void (async () => {
       const state = await fetchStudioState({ force: true });
+      if (cancelled) return;
       setStudioState(state);
       if (state.workflowDraft) setBackgroundMusicTracks([]);
     })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [requestedProjectId]);
+
+  useEffect(() => {
+    studioStateRef.current = studioState;
+  }, [studioState]);
 
   const draft = useMemo(() => ensureWorkflowDraft(studioState), [studioState]);
   const workflowProgress = useMemo(() => {
@@ -213,32 +225,6 @@ const SceneStudioPage: React.FC = () => {
     setStep(GenerationStep.COMPLETED);
     setProgressMessage((prev) => prev || '전달된 데이터로 씬 카드를 먼저 표시했습니다. 필요한 씬만 개별 생성하면 됩니다.');
   }, [draft, generatedData.length]);
-
-  const beginnerGuideItems = useMemo(() => {
-    const scriptReady = Boolean(draft.script?.trim());
-    const charactersReady = Boolean(draft.selectedCharacterIds.length || draft.extractedCharacters.length);
-    const styleReady = Boolean(draft.selectedStyleImageId || draft.styleImages[0]?.id);
-    const aiAudioReady = Boolean(studioState?.providers?.elevenLabsApiKey || studioState?.providers?.heygenApiKey || draft.ttsProvider === 'qwen3Tts');
-    const aiVideoReady = Boolean(studioState?.providers?.falApiKey);
-
-    return [
-      scriptReady
-        ? `대본 준비 완료: ${splitStoryIntoParagraphScenes(draft.script).length}개 씬으로 나눌 수 있습니다.`
-        : '대본이 아직 없습니다. 1단계부터 3단계까지 프롬프트 또는 직접 입력으로 원고를 먼저 준비해 주세요.',
-      charactersReady
-        ? `출연자 준비 완료: ${(draft.selectedCharacterIds.length || draft.extractedCharacters.length)}명이 씬 참조 이미지로 연결됩니다.`
-        : '출연자가 없어도 장면 생성은 가능하지만, 4단계에서 캐릭터 예시를 채우면 일관성이 더 좋아집니다.',
-      styleReady
-        ? '최종 화풍 선택 완료: 지금 고른 화풍이 모든 씬 이미지 스타일 기준이 됩니다. Step4 캐릭터 스타일과는 별도로 적용됩니다.'
-        : '최종 영상 화풍이 아직 없습니다. 5단계에서 화풍 1개를 선택해야 프로젝트 씬 생성이 안정적으로 진행됩니다.',
-      aiAudioReady
-        ? '오디오 / 자막은 실제 AI로 생성됩니다.'
-        : 'ElevenLabs 키가 없으면 오디오는 건너뛰고 이미지 중심 샘플 흐름으로 빠르게 확인합니다.',
-      aiVideoReady
-        ? '씬 영상화는 실제 AI로 이어집니다.'
-        : 'FAL 키가 없으면 씬 카드는 정상 생성되고, 영상화 버튼만 연결 전 상태로 남습니다.',
-    ];
-  }, [draft, studioState?.providers?.elevenLabsApiKey, studioState?.providers?.falApiKey]);
 
   const selectedCharacterName = useMemo(
     () => studioState?.characters?.find((item) => item.id === studioState.selectedCharacterId)?.name || '',
@@ -445,7 +431,7 @@ const SceneStudioPage: React.FC = () => {
     void (async () => {
       setProgressMessage('프로젝트 요약과 씬 카드를 먼저 붙이는 중...');
 
-      const cachedProject = readProjectNavigationProject(projectId) || await getProjectById(projectId);
+      const cachedProject = readProjectNavigationProject(projectId) || await getProjectById(projectId, { localOnly: true });
       if (cancelled) return;
 
       if (cachedProject) {
@@ -465,7 +451,7 @@ const SceneStudioPage: React.FC = () => {
 
       const projectDraft = project.workflowDraft;
       if (projectDraft) {
-        const existingDraft = studioState.workflowDraft;
+        const existingDraft = studioStateRef.current?.workflowDraft;
         const sameDraft = Boolean(existingDraft
           && existingDraft.updatedAt === projectDraft.updatedAt
           && existingDraft.selectedStyleImageId === projectDraft.selectedStyleImageId
@@ -480,10 +466,11 @@ const SceneStudioPage: React.FC = () => {
             lastContentType: projectDraft.contentType || prev.lastContentType || 'story',
           } : prev);
         } else {
+          const baseStudioState = studioStateRef.current || createDefaultStudioState();
           const syncedState = await saveStudioState({
-            ...studioState,
+            ...baseStudioState,
             workflowDraft: projectDraft,
-            lastContentType: projectDraft.contentType || studioState.lastContentType || 'story',
+            lastContentType: projectDraft.contentType || baseStudioState.lastContentType || 'story',
             updatedAt: Date.now(),
           });
           if (!cancelled) setStudioState(syncedState);
@@ -500,7 +487,7 @@ const SceneStudioPage: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [applyProjectToScreen, searchParams, studioState]);
+  }, [applyProjectToScreen, searchParams]);
 
 
   const handleGenerate = useCallback(async (options?: { preserveExistingCards?: boolean; generateAudio?: boolean }) => {
@@ -1176,7 +1163,6 @@ const SceneStudioPage: React.FC = () => {
               <div className="mt-2 flex flex-wrap items-center gap-2">
                 <h1 className="text-3xl font-black text-slate-900">프로젝트 씬 제작</h1>
                 {currentProjectSummary?.projectNumber && <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">프로젝트 #{currentProjectSummary.projectNumber}</span>}
-                {currentProjectSummary?.folderName && <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">{currentProjectSummary.folderName}</span>}
               </div>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">페이지 자체는 먼저 열고, 필요한 경우에만 짧게 준비 화면을 보여 줍니다. 실제 생성이 시작되면 전체 화면을 막지 않고 제작 중인 씬 카드에만 스켈레톤과 퍼센트를 표시합니다.</p>
             </div>
@@ -1204,31 +1190,6 @@ const SceneStudioPage: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
-
-        <div className="mt-6 grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">처음 이용하는 분을 위한 순서</div>
-            <h2 className="mt-2 text-2xl font-black text-slate-900">지금 화면에서 이렇게 진행하면 됩니다</h2>
-            <div className="mt-4 grid gap-3 lg:grid-cols-2">
-              {beginnerGuideItems.map((item, index) => (
-                <div key={`scene-guide-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
-                  <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-blue-600 text-xs font-black text-white">{index + 1}</span>
-                  {item}
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="text-xs font-black uppercase tracking-[0.24em] text-violet-600">현재 상태</div>
-            <h2 className="mt-2 text-2xl font-black text-slate-900">프로젝트 준비 현황</h2>
-            <div className="mt-4 space-y-3 text-sm">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700">대본 {draft.script?.trim() ? '준비됨' : '필요'}</div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700">출연자 {draft.selectedCharacterIds.length || draft.extractedCharacters.length}명 연결</div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700">화풍 {(draft.selectedStyleImageId || draft.styleImages[0]?.id) ? '선택 완료' : '선택 필요'}</div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-700">예상 씬 {splitStoryIntoParagraphScenes(draft.script).length}개</div>
-            </div>
-          </div>
         </div>
 
         {step !== GenerationStep.IDLE && progressMessage && !generatedData.length && (

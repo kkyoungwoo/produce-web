@@ -1,59 +1,26 @@
 {
-  "version": 6,
-  "storageDir": "./local-data/tubegen-studio",
-  "isStorageConfigured": true,
-  "configuredAt": 1774074272910,
-  "updatedAt": 1774078835572,
-  "selectedCharacterId": null,
-  "characters": [],
-  "routing": {
-    "scriptModel": "openrouter/auto",
-    "sceneModel": "openrouter/auto",
-    "imagePromptModel": "openrouter/auto",
-    "motionPromptModel": "openrouter/auto",
-    "openRouterMaxTokens": 800,
-    "openRouterInputMaxChars": 7000,
-    "imageProvider": "gemini",
+  "id": "project_1774078798884_k1if16",
+  "name": "프로젝트(1)",
+  "createdAt": 1774078798884,
+  "topic": "편지의 메모가 바꾼 밤 문제로 주인공의 선택이 흔들리는 이야기 때 문제로 주인공의 선택이 흔들리는 이야기",
+  "projectNumber": 1,
+  "lastSavedAt": 1774078835407,
+  "settings": {
     "imageModel": "gemini-2.5-flash-image",
-    "audioProvider": "elevenlabs",
-    "audioModel": "eleven_multilingual_v2",
-    "ttsNarratorId": "rachel",
-    "backgroundMusicModel": "sample-ambient-v1",
-    "videoProvider": "fal",
-    "videoModel": "pixverse/v5.5"
+    "outputMode": "video",
+    "elevenLabsModel": "eleven_multilingual_v2"
   },
-  "providers": {},
-  "projects": [],
-  "projectIndex": [
-    {
-      "id": "project_1774078798884_k1if16",
-      "name": "프로젝트(1)",
-      "topic": "편지의 메모가 바꾼 밤 문제로 주인공의 선택이 흔들리는 이야기 때 문제로 주인공의 선택이 흔들리는 이야기",
-      "createdAt": 1774078798884,
-      "lastSavedAt": 1774078835407,
-      "projectNumber": 1,
-      "thumbnail": null,
-      "thumbnailTitle": null,
-      "selectedThumbnailId": null,
-      "assetCount": 0,
-      "imageCount": 0,
-      "videoCount": 0,
-      "audioCount": 0,
-      "workflowDraft": {
-        "updatedAt": 1774078835222,
-        "aspectRatio": "1:1",
-        "script": "이 대본은 약 30분 분량을 목표로 합니다. 주제는 편지의 메모가 바꾼 밤 문제로 주인공의 선택이 흔들리는 이야기 때 문제로 주인공의 선택이 흔들리는 이야기이고 분위기는 차분함, 배경은 골목길입니다.\n\n말투는 음슴체를 유지합니다.\n\n골목길에서 신입 직장인은 편지의 메모가 바꾼 밤 문제로 주인공의 선택이 흔들리는 이야기 때 문제로 주인공의 선택이 흔들리는 이야기의 조짐을 처음 마주한다. 차분함 톤으로 시작하지만, 화면 어딘가에는 이미 선택의 딜레마의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 신입 직장인의 일상은 흔들리기 시작한다. 드라마 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.\n\n결정적인 순간, 신입 직장인은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 선택의 딜레마가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다.\n\n마지막 장면은 해피엔딩 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 신입 직장인은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n마지막 장면은 해피엔딩 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, 신입 직장인은 이전과는 다른 표정으로 앞으로 걸어간다.\n\n골목길에서 신입 직장인은 편지의 메모가 바꾼 밤 문제로 주인공의 선택이 흔들리는 이야기 때 문제로 주인공의 선택이 흔들리는 이야기의 조짐을 처음 마주한다. 차분함 톤으로 시작하지만, 화면 어딘가에는 이미 선택의 딜레마의 그림자가 놓여 있다.\n\n처음엔 사소해 보였던 단서가 점점 커지면서 신입 직장인의 일상은 흔들리",
-        "selectedStyleImageId": null,
-        "selectedCharacterIds": [
-          "char_1774078822916_99fehi",
-          "char_1774078822916_1zbybm"
-        ]
-      },
-      "assets": [],
-      "backgroundMusicTracks": [],
-      "thumbnailHistory": []
-    }
-  ],
+  "assets": [],
+  "thumbnail": null,
+  "thumbnailTitle": null,
+  "thumbnailPrompt": null,
+  "thumbnailHistory": [],
+  "selectedThumbnailId": null,
+  "backgroundMusicTracks": [],
+  "previewMix": {
+    "narrationVolume": 1,
+    "backgroundMusicVolume": 0.28
+  },
   "workflowDraft": {
     "id": "workflow_1774078798884",
     "contentType": "story",
@@ -315,25 +282,11 @@
     },
     "updatedAt": 1774078835222
   },
-  "agentProfile": {
-    "name": "나만의 기본 제작 에이전트",
-    "mission": "초보 사용자도 스토리부터 장면, 나레이션, 영상까지 자연스럽게 따라오게 돕는다.",
-    "toneGuide": "선택형 옵션을 많이 보여주고, 직접 입력은 꼭 필요한 순간만 요청한다.",
-    "defaultWorkflow": "general_youtube"
-  },
-  "preferredPromptProfile": "general_youtube",
-  "providerRegistry": [
-    {
-      "id": "provider_seedance_direct",
-      "name": "Seedance 2.0 (직접 연결 슬롯)",
-      "kind": "video",
-      "baseUrl": "",
-      "modelHint": "seedance-2.0",
-      "apiKey": "",
-      "authScheme": "Authorization: Bearer YOUR_KEY",
-      "notes": "OpenRouter에 없는 외부 영상 모델을 저장하는 자리입니다.",
-      "enabled": false
-    }
-  ],
-  "lastContentType": "story"
+  "voicePreviewAsset": null,
+  "scriptPreviewAsset": null,
+  "finalVoiceAsset": null,
+  "backgroundMusicPreview": null,
+  "finalBackgroundMusic": null,
+  "musicVideoPreview": null,
+  "finalMusicVideo": null
 }

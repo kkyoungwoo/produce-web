@@ -721,7 +721,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     () => ({
       1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
       2: Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()),
-      3: Boolean(normalizedScript.trim() && selectedPromptTemplateId),
+      3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length),
       4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
       5: Boolean(selectedStyleImageId || styleImages[0]?.id),
     }),
@@ -737,6 +737,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       conflict,
       normalizedScript,
       selectedPromptTemplateId,
+      selectedCharacterIds,
       selectedCharacters.length,
       selectedCharacterStyleId,
       selectedCharactersReady,
@@ -844,8 +845,8 @@ const InputSection: React.FC<InputSectionProps> = ({
         ...payload.completedSteps,
         step1: completedStage >= 1 ? Boolean(hasSelectedContentType && hasSelectedAspectRatio) : payload.completedSteps.step1,
         step2: completedStage >= 2 ? Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()) : payload.completedSteps.step2,
-        step3: completedStage >= 3 ? Boolean(normalizedScript.trim() && selectedPromptTemplateId) : payload.completedSteps.step3,
-        step4: completedStage >= 4 ? Boolean(effectiveSelectedCharacterIds.length && selectedCharacterStyleId) : payload.completedSteps.step4,
+        step3: completedStage >= 3 ? Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length) : payload.completedSteps.step3,
+        step4: completedStage >= 4 ? Boolean(effectiveSelectedCharacterIds.length && selectedCharacterStyleId && selectedCharactersReady) : payload.completedSteps.step4,
         step5: completedStage >= 5 ? Boolean(selectedStyleImageId || styleImages[0]?.id) : payload.completedSteps.step5,
       },
     };
@@ -1257,7 +1258,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       const recommended = await recommendTopicCandidatesFromInput({
         contentType,
         inputText: topic,
-        count: 5,
+        count: 8,
         model: studioState?.routing?.scriptModel,
         allowAi: connectionSummary.text,
       });
@@ -1293,10 +1294,7 @@ const InputSection: React.FC<InputSectionProps> = ({
 
     const signature = extractedCharacters.map((item) => item.id).join('::');
     if (!signature) return;
-    if (autoSelectedCharacterSignatureRef.current === signature) return;
-
     autoSelectedCharacterSignatureRef.current = signature;
-    setSelectedCharacterIds(extractedCharacters.map((item) => item.id));
   }, [routeStep, openStage, extractedCharacters, selectedCharacterIds.length]);
 
   const refreshField = async (field: keyof StorySelectionState) => {
@@ -1536,7 +1534,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       });
 
       const preservedIds = options?.preserveSelection ? selectedCharacterIds.filter((id) => nextCharacters.some((item) => item.id === id)) : [];
-      const nextSelectedIds = preservedIds.length ? preservedIds : nextCharacters.map((item) => item.id);
+      const nextSelectedIds = preservedIds.length ? preservedIds : [];
       setExtractedCharacters(nextCharacters);
       setSelectedCharacterIds(nextSelectedIds);
       setCharacterCarouselIndices({});
@@ -1671,7 +1669,20 @@ const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const toggleCharacterSelection = (characterId: string) => {
-    setSelectedCharacterIds((prev) => prev.includes(characterId) ? prev.filter((id) => id !== characterId) : [...new Set([...prev, characterId])]);
+    let blockedRemoval = false;
+    setSelectedCharacterIds((prev) => {
+      if (!prev.includes(characterId)) {
+        return [...new Set([...prev, characterId])];
+      }
+      if (prev.length <= 1) {
+        blockedRemoval = true;
+        return prev;
+      }
+      return prev.filter((id) => id !== characterId);
+    });
+    if (blockedRemoval) {
+      setNotice('출연자는 최소 1명 이상 선택되어 있어야 합니다. 마지막 선택 출연자는 해제할 수 없습니다.');
+    }
   };
 
   const chooseCharacterImage = (characterId: string, image: PromptedImageAsset) => {
@@ -1816,6 +1827,41 @@ const InputSection: React.FC<InputSectionProps> = ({
     setNotice(`${name} 출연자를 캐릭터 카드로 추가했습니다. 선택된 프롬프트와 이미지가 4단계와 씬 제작까지 그대로 이어집니다.`);
   };
 
+  const createNewCharacterFromForm = ({
+    name,
+    position,
+    description,
+  }: {
+    name: string;
+    position: string;
+    description: string;
+  }) => {
+    const trimmedName = name.trim() || `${protagonist || '신규 캐릭터'} ${extractedCharacters.length + 1}`;
+    const trimmedPosition = position.trim() || '출연자';
+    const trimmedDescription = description.trim() || '직접 추가한 출연자';
+    const normalizedPosition = trimmedPosition.toLowerCase();
+    const inferredRole: CharacterProfile['role'] = normalizedPosition.includes('나레이터') || normalizedPosition.includes('내레이터') || normalizedPosition.includes('narrator')
+      ? 'narrator'
+      : extractedCharacters.some((item) => item.role === 'lead')
+        ? 'support'
+        : 'lead';
+    const prompt = buildCharacterStyledPrompt([trimmedName, `포지션: ${trimmedPosition}`, `설명: ${trimmedDescription}`].join('\n'));
+    const nextCharacter = createCharacterCardFromPrompt({
+      name: trimmedName,
+      prompt,
+      description: trimmedDescription,
+      sourceMode: 'ai',
+      role: inferredRole,
+      roleLabel: trimmedPosition,
+      castOrder: extractedCharacters.length + 1,
+    });
+    nextCharacter.visualStyle = selectedCharacterStyle?.label || nextCharacter.visualStyle;
+    setExtractedCharacters((prev) => [...prev, nextCharacter]);
+    setSelectedCharacterIds((prev) => [...new Set([...prev, nextCharacter.id])]);
+    setCharacterCarouselIndices((prev) => ({ ...prev, [nextCharacter.id]: 0 }));
+    setNotice(`${trimmedName} 출연자를 ${trimmedPosition} 포지션으로 추가했습니다. 입력한 설명은 캐릭터 카드와 다음 단계 이미지 흐름에 그대로 반영됩니다.`);
+  };
+
   const createNewStyleByPrompt = () => {
     const fallbackLabel = `${contentType === 'info_delivery' ? '정보 전달 화풍' : '신규 화풍'} ${styleImages.length + 1}`;
     const prompt = newStylePrompt.trim() || buildUploadPrompt(newStyleName || fallbackLabel, 'style');
@@ -1873,6 +1919,11 @@ const InputSection: React.FC<InputSectionProps> = ({
 
   const handleCharacterUploadForId = (characterId: string) => {
     setCharacterUploadTargetId(characterId);
+    characterUploadInputRef.current?.click();
+  };
+
+  const openCharacterUploadPicker = () => {
+    setCharacterUploadTargetId(null);
     characterUploadInputRef.current?.click();
   };
 
@@ -2279,6 +2330,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           isExtracting,
           hydrateCharactersForScript,
           handleCharacterUploadForId,
+          openCharacterUploadPicker,
           characterUploadInputRef,
           toggleCharacterSelection,
           selectCharacterImageById,
@@ -2338,6 +2390,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           setNewCharacterName,
           setNewCharacterPrompt,
           createNewCharacterByPrompt,
+          createNewCharacterFromForm,
           removeCharacter,
           previousRouteStep,
           moveRouteStep,
@@ -2428,6 +2481,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           newCharacterPrompt,
           setNewCharacterPrompt,
           createNewCharacterByPrompt,
+          createNewCharacterFromForm,
           extractedCharacters,
           characterStripRef,
           characterCarouselIndices,

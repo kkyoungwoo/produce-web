@@ -6,7 +6,7 @@ import {
   AiRoutingSettings,
   ProviderRegistryItem,
 } from '../types';
-import { createDefaultWorkflowDraft } from './workflowDraftService';
+import { compactWorkflowDraftForStorage, createDefaultWorkflowDraft } from './workflowDraftService';
 
 export const DEFAULT_STORAGE_DIR = './local-data/tubegen-studio';
 
@@ -67,7 +67,7 @@ function createDefaultRegistry(): ProviderRegistryItem[] {
 }
 
 export const createDefaultStudioState = (): StudioState => ({
-  version: 5,
+  version: 7,
   storageDir: '',
   isStorageConfigured: false,
   configuredAt: Date.now(),
@@ -77,6 +77,7 @@ export const createDefaultStudioState = (): StudioState => ({
   routing: { ...DEFAULT_ROUTING },
   providers: {},
   projects: [],
+  projectIndex: [],
   workflowDraft: createDefaultWorkflowDraft('story'),
   agentProfile: {
     name: '나만의 기본 제작 에이전트',
@@ -140,7 +141,7 @@ function createLightweightWorkflowDraft(draft: any) {
   };
 }
 
-function summarizeProject(project: any): SavedProject {
+export function summarizeProjectForIndex(project: any): SavedProject {
   const assets = Array.isArray(project?.assets) ? project.assets : [];
   const firstImage = assets.find((asset: any) => asset?.imageData)?.imageData || null;
   return {
@@ -166,16 +167,32 @@ function summarizeProject(project: any): SavedProject {
     cost: project?.cost,
     backgroundMusicTracks: [],
     previewMix: project?.previewMix,
-    workflowDraft: project?.workflowDraft ? { updatedAt: project.workflowDraft.updatedAt, aspectRatio: project.workflowDraft.aspectRatio, script: project.workflowDraft.script, selectedStyleImageId: project.workflowDraft.selectedStyleImageId, selectedCharacterIds: project.workflowDraft.selectedCharacterIds || [] } as any : null,
+    workflowDraft: project?.workflowDraft ? {
+      updatedAt: project.workflowDraft.updatedAt,
+      aspectRatio: project.workflowDraft.aspectRatio,
+      activeStage: project.workflowDraft.activeStage,
+      contentType: project.workflowDraft.contentType,
+      outputMode: project.workflowDraft.outputMode,
+      completedSteps: project.workflowDraft.completedSteps,
+      script: typeof project.workflowDraft.script === 'string' ? project.workflowDraft.script.slice(0, 800) : '',
+      topic: project.workflowDraft.topic || project.topic || '',
+      selectedStyleImageId: project.workflowDraft.selectedStyleImageId,
+      selectedCharacterIds: project.workflowDraft.selectedCharacterIds || [],
+    } as any : null,
   };
 }
 
 function createLightweightStudioState(state: StudioState): StudioState {
+  const projectIndex = Array.isArray((state as any).projectIndex)
+    ? (state as any).projectIndex.map(summarizeProjectForIndex)
+    : [];
+
   return {
     ...state,
-    projects: Array.isArray(state.projects) ? state.projects.map(summarizeProject) : [],
+    projects: Array.isArray(state.projects) ? state.projects.map(summarizeProjectForIndex) : projectIndex,
+    projectIndex,
     characters: Array.isArray(state.characters) ? state.characters.map(stripBinaryPayloadFromCharacter) : [],
-    workflowDraft: createLightweightWorkflowDraft(state.workflowDraft),
+    workflowDraft: createLightweightWorkflowDraft(compactWorkflowDraftForStorage(state.workflowDraft)),
   };
 }
 
@@ -222,7 +239,8 @@ function syncStudioStateToLocalCache(state: StudioState) {
         providers: lightState.providers,
         workflowDraft: lightState.workflowDraft,
         lastContentType: lightState.lastContentType,
-        projects: Array.isArray(lightState.projects) ? lightState.projects.map(summarizeProject) : [],
+        projects: Array.isArray(lightState.projects) ? lightState.projects.map(summarizeProjectForIndex) : [],
+        projectIndex: Array.isArray((lightState as any).projectIndex) ? (lightState as any).projectIndex.map(summarizeProjectForIndex) : [],
         characters: [],
       };
       localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE, JSON.stringify(emergencyState));
@@ -323,19 +341,20 @@ function buildLeanStatePayload(partial: Partial<StudioState>, cachedState?: Stud
     characters: Array.isArray(partial.characters) ? partial.characters : base.characters,
     routing: partial.routing ? { ...(base.routing || DEFAULT_ROUTING), ...partial.routing } : base.routing,
     providers: partial.providers ? { ...(base.providers || {}), ...partial.providers } : base.providers,
-    workflowDraft: Object.prototype.hasOwnProperty.call(partial, 'workflowDraft') ? partial.workflowDraft ?? null : base.workflowDraft,
+    workflowDraft: Object.prototype.hasOwnProperty.call(partial, 'workflowDraft') ? compactWorkflowDraftForStorage(partial.workflowDraft as any) ?? null : base.workflowDraft,
     agentProfile: partial.agentProfile || base.agentProfile,
     preferredPromptProfile: partial.preferredPromptProfile || base.preferredPromptProfile,
     providerRegistry: Array.isArray(partial.providerRegistry) ? partial.providerRegistry : base.providerRegistry,
     lastContentType: partial.lastContentType || base.lastContentType || 'story',
   };
 
-  if (Array.isArray(partial.projects) && haveProjectsMeaningfullyChanged(partial.projects, base.projects)) {
-    payload.projects = partial.projects;
-  }
+  const nextProjectIndex = Array.isArray((partial as any).projectIndex)
+    ? (partial as any).projectIndex.map(summarizeProjectForIndex)
+    : (Array.isArray(partial.projects) ? partial.projects.map(summarizeProjectForIndex) : undefined);
 
-  if (Array.isArray((partial as any).projectIndex) && haveProjectsMeaningfullyChanged((partial as any).projectIndex, (base as any).projectIndex)) {
-    (payload as any).projectIndex = (partial as any).projectIndex;
+  if (Array.isArray(nextProjectIndex) && haveProjectsMeaningfullyChanged(nextProjectIndex, (base as any).projectIndex || base.projects)) {
+    payload.projects = nextProjectIndex;
+    (payload as any).projectIndex = nextProjectIndex;
   }
 
   return payload;
@@ -366,7 +385,36 @@ export async function fetchStudioProjects(options?: { storageDir?: string }): Pr
   if (storageDir) query.set('storageDir', storageDir);
   query.set('includeProjects', '1');
   const state = await requestJson<StudioState>(`/api/local-storage/state?${query.toString()}`);
-  return Array.isArray(state.projects) ? state.projects : [];
+  return Array.isArray(state.projects) ? state.projects.map(summarizeProjectForIndex) : [];
+}
+
+export async function fetchStudioProjectById(projectId: string, options?: { storageDir?: string }): Promise<SavedProject | null> {
+  const storageDir = options?.storageDir || getCachedStorageDir();
+  const query = new URLSearchParams();
+  if (storageDir) query.set('storageDir', storageDir);
+  query.set('projectId', projectId);
+
+  try {
+    return await requestJson<SavedProject>(`/api/local-storage/project?${query.toString()}`);
+  } catch {
+    return null;
+  }
+}
+
+export async function saveStudioProject(project: SavedProject, options?: { storageDir?: string }): Promise<void> {
+  const storageDir = options?.storageDir || getCachedStorageDir();
+  await requestJson('/api/local-storage/project', {
+    method: 'POST',
+    body: JSON.stringify({ storageDir, project }),
+  });
+}
+
+export async function deleteStudioProjects(projectIds: string[], options?: { storageDir?: string }): Promise<void> {
+  const storageDir = options?.storageDir || getCachedStorageDir();
+  await requestJson('/api/local-storage/project', {
+    method: 'DELETE',
+    body: JSON.stringify({ storageDir, projectIds }),
+  });
 }
 
 export async function configureStorage(storageDir: string): Promise<StudioState> {
@@ -393,7 +441,8 @@ export async function saveStudioState(partial: Partial<StudioState>): Promise<St
           ...cachedState,
           ...payload,
           ...state,
-          projects: Array.isArray(partial.projects) ? partial.projects : (cachedState.projects || state.projects || []),
+          projects: Array.isArray(state.projects) ? state.projects : (Array.isArray(partial.projects) ? partial.projects.map(summarizeProjectForIndex) : (cachedState.projects || [])),
+          projectIndex: Array.isArray((state as any).projectIndex) ? (state as any).projectIndex : (Array.isArray((payload as any).projectIndex) ? (payload as any).projectIndex : ((cachedState as any)?.projectIndex || [])),
         }
       : state;
 
@@ -404,12 +453,14 @@ export async function saveStudioState(partial: Partial<StudioState>): Promise<St
       ? {
           ...cachedState,
           ...payload,
-          projects: Array.isArray(partial.projects) ? partial.projects : (cachedState.projects || []),
+          projects: Array.isArray(partial.projects) ? partial.projects.map(summarizeProjectForIndex) : (cachedState.projects || []),
+          projectIndex: Array.isArray((payload as any).projectIndex) ? (payload as any).projectIndex : ((cachedState as any)?.projectIndex || []),
         }
       : {
           ...createDefaultStudioState(),
           ...payload,
-          projects: Array.isArray(partial.projects) ? partial.projects : [],
+          projects: Array.isArray(partial.projects) ? partial.projects.map(summarizeProjectForIndex) : [],
+          projectIndex: Array.isArray((payload as any).projectIndex) ? (payload as any).projectIndex : [],
         }) as StudioState;
 
     syncStudioStateToLocalCache(optimisticState);
@@ -421,12 +472,13 @@ export async function saveStudioState(partial: Partial<StudioState>): Promise<St
 export async function saveProjectsToStudio(projects: SavedProject[]): Promise<StudioState> {
   const cachedState = getCachedStudioState() || createDefaultStudioState();
   if (!cachedState.isStorageConfigured || !cachedState.storageDir) {
-    throw new Error('저장 폴더가 아직 설정되지 않았습니다. 먼저 저장 폴더를 선택해 주세요.');
+    throw new Error('저장 위치가 아직 설정되지 않았습니다. 먼저 JSON 저장 위치를 선택해 주세요.');
   }
   return saveStudioState({
     storageDir: cachedState.storageDir,
     isStorageConfigured: true,
-    projects,
+    projects: projects.map(summarizeProjectForIndex),
+    projectIndex: projects.map(summarizeProjectForIndex),
     updatedAt: Date.now(),
   });
 }

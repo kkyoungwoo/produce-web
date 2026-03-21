@@ -2,6 +2,7 @@ import {
   ConstitutionAnalysisSummary,
   ContentType,
   CustomScriptSettings,
+  ScriptLanguageOption,
   ScriptSpeechStyle,
   StorySelectionState,
   WorkflowPromptTemplate,
@@ -34,6 +35,63 @@ function resolveSpeechStyle(style: ScriptSpeechStyle | undefined) {
   if (style === 'da') return 'da';
   if (style === 'yo') return 'yo';
   return 'default';
+}
+
+function formatSpeechStyleLabel(style: ScriptSpeechStyle | undefined) {
+  const speechStyle = resolveSpeechStyle(style);
+  if (speechStyle === 'da') return '다체';
+  if (speechStyle === 'eum') return '음슴체';
+  if (speechStyle === 'yo') return '요체';
+  return '기본체';
+}
+
+function formatSpeechStyleEnglish(style: ScriptSpeechStyle | undefined) {
+  const speechStyle = resolveSpeechStyle(style);
+  if (speechStyle === 'da') return 'Declarative Korean ending (다체)';
+  if (speechStyle === 'eum') return 'Terse informal Korean fragment style (음슴체)';
+  if (speechStyle === 'yo') return 'Polite Korean ending (요체)';
+  return 'Natural default Korean dialogue (기본체)';
+}
+
+function formatScriptLanguageLabel(language: ScriptLanguageOption | undefined) {
+  if (language === 'mute') return '무음';
+  if (language === 'en') return '영어';
+  if (language === 'ja') return '일본어';
+  if (language === 'zh') return '중국어';
+  if (language === 'vi') return '베트남어';
+  if (language === 'mn') return '몽골어';
+  if (language === 'th') return '태국어';
+  if (language === 'uz') return '우즈베크어';
+  return '한국어';
+}
+
+function formatScriptLanguageEnglish(language: ScriptLanguageOption | undefined) {
+  if (language === 'mute') return 'Silent mode (no spoken dialogue or narration)';
+  if (language === 'en') return 'English';
+  if (language === 'ja') return 'Japanese';
+  if (language === 'zh') return 'Chinese';
+  if (language === 'vi') return 'Vietnamese';
+  if (language === 'mn') return 'Mongolian';
+  if (language === 'th') return 'Thai';
+  if (language === 'uz') return 'Uzbek';
+  return 'Korean';
+}
+
+function createSilentFallback(topic: string, selections: StorySelectionState) {
+  return normalizeStoryText(`Scene 1
+오프닝 장면: ${topic || '이 이야기'}의 핵심 분위기를 ${selections.setting}에서 바로 보여준다.
+화면 자막: ${selections.conflict}
+연출 포인트: ${selections.mood} 톤으로 시선을 붙잡는다.
+
+Scene 2
+전개 장면: 주인공 ${selections.protagonist}의 행동과 표정으로 갈등을 이어 간다.
+화면 자막: 상황이 더 선명해지는 한 줄 메시지
+연출 포인트: 설명보다 장면 전환과 소품으로 정보를 전달한다.
+
+Scene 3
+엔딩 장면: ${selections.endingTone} 톤으로 마무리한다.
+화면 자막: 마지막 한 줄 행동 유도 또는 여운
+연출 포인트: 내레이션 없이도 이해되게 컷과 자막만 정리한다.`);
 }
 
 function createDialogueFallback(topic: string, selections: StorySelectionState, style: ScriptSpeechStyle) {
@@ -105,12 +163,16 @@ function buildLocalizedGuide(options: ScriptComposerOptions) {
   const languageGuides: Record<CustomScriptSettings['language'], string[]> = {
     ko: [
       `이 대본은 약 ${duration}분 분량을 목표로 합니다. 주제는 ${topic}이고 분위기는 ${options.selections.mood}, 배경은 ${options.selections.setting}입니다.`,
-      `말투는 ${speechStyle === 'default' ? '기본체' : speechStyle === 'da' ? '다체' : speechStyle === 'eum' ? '음슴체' : '요체'}를 유지합니다.`,
+      settings.language === 'mute'
+        ? '무음 영상용 구성으로 작성하고 내레이션이나 대사는 넣지 않습니다. 화면 자막과 행동 흐름 중심으로 정리합니다.'
+        : `말투는 ${formatSpeechStyleLabel(settings.speechStyle)}를 유지합니다.`,
       reference ? `참고 내용은 ${reference}${speechStyle === 'da' ? '를 반영한다.' : speechStyle === 'eum' ? ' 반영 바람.' : '를 반영해 주세요.'}` : '',
     ],
     en: [
       `This script targets about ${formatDuration(duration)}. The topic is ${topic}, with a ${options.selections.mood} mood in ${options.selections.setting}.`,
-      `Keep the speech style ${speechStyle === 'default' ? 'natural screenplay dialogue' : speechStyle === 'da' ? 'declarative' : speechStyle === 'eum' ? 'terse informal fragment style' : 'polite conversational'}.`,
+      settings.language === 'mute'
+        ? 'Create a silent visual script with no spoken dialogue or narration. Use scene actions and on-screen caption cues only.'
+        : `Keep the speech style ${speechStyle === 'default' ? 'natural screenplay dialogue' : speechStyle === 'da' ? 'declarative' : speechStyle === 'eum' ? 'terse informal fragment style' : 'polite conversational'}.`,
       reference ? `Reference notes: ${reference}` : '',
     ],
     ja: [
@@ -136,6 +198,11 @@ function buildLocalizedGuide(options: ScriptComposerOptions) {
     uz: [
       `Bu ssenariy taxminan ${duration} daqiqaga mo‘ljallangan. Mavzu ${topic}, kayfiyat ${options.selections.mood}, manzara esa ${options.selections.setting}.`,
       reference ? `Tayanch matn: ${reference}` : '',
+    ],
+    mute: [
+      `이 구성안은 약 ${duration}분 분량의 무음 영상용입니다. 주제는 ${topic}이고 분위기는 ${options.selections.mood}, 배경은 ${options.selections.setting}입니다.`,
+      '내레이션과 대사는 쓰지 말고 장면 설명, 화면 자막, 행동 흐름 중심으로 구성합니다.',
+      reference ? `참고 내용은 ${reference}를 반영합니다.` : '',
     ],
   };
 
@@ -169,16 +236,19 @@ function applyCustomFallback(baseText: string, options: ScriptComposerOptions) {
 
 function createFallback(options: ScriptComposerOptions) {
   const speechStyle = options.customSettings?.speechStyle || 'yo';
-  const baseText = options.conversationMode || options.template.mode === 'dialogue'
-    ? createDialogueFallback(options.topic, options.selections, speechStyle)
-    : normalizeStoryText(
-        options.currentScript?.trim() ||
-          buildSelectableStoryDraft({
-            contentType: options.contentType,
-            topic: options.topic,
-            ...options.selections,
-          })
-      );
+  const isSilentMode = options.customSettings?.language === 'mute';
+  const baseText = isSilentMode
+    ? createSilentFallback(options.topic, options.selections)
+    : options.conversationMode || options.template.mode === 'dialogue'
+      ? createDialogueFallback(options.topic, options.selections, speechStyle)
+      : normalizeStoryText(
+          options.currentScript?.trim() ||
+            buildSelectableStoryDraft({
+              contentType: options.contentType,
+              topic: options.topic,
+              ...options.selections,
+            })
+        );
 
   return applyCustomFallback(baseText, options);
 }
@@ -243,6 +313,73 @@ function extractScriptFromText(raw: string) {
   return normalizeStoryText(raw.trim());
 }
 
+function isVideoSectionHeading(line: string) {
+  return /^(scene\s*\d+|장면\s*\d+|paragraph\s*\d+|문단\s*\d+|sequence\s*\d+|컷\s*\d+|\[(intro|verse|pre-chorus|chorus|bridge|hook|outro)[^\]]*\])/i.test(line.trim());
+}
+
+function chunkSentencesForVideoScript(text: string, targetCount: number) {
+  const sentences = text
+    .split(/(?<=[.!?。！？])\s+|(?<=다\.)\s+|(?<=요\.)\s+|(?<=함\.)\s+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!sentences.length) return [text.trim()].filter(Boolean);
+
+  const chunkSize = Math.max(1, Math.ceil(sentences.length / Math.max(3, targetCount)));
+  const chunks: string[] = [];
+  for (let index = 0; index < sentences.length; index += chunkSize) {
+    chunks.push(sentences.slice(index, index + chunkSize).join(' '));
+  }
+  return chunks;
+}
+
+function ensureParagraphVideoScript(raw: string, options: ScriptComposerOptions) {
+  const cleaned = raw.replace(/\r/g, '').trim();
+  if (!cleaned) return '';
+
+  const explicitParagraphs = cleaned
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (explicitParagraphs.length >= 3) {
+    return normalizeStoryText(explicitParagraphs.join('\n\n'));
+  }
+
+  const lines = cleaned
+    .split('\n')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (lines.length >= 3) {
+    const grouped: string[] = [];
+    let bucket: string[] = [];
+    lines.forEach((line, index) => {
+      const heading = isVideoSectionHeading(line);
+      if (heading && bucket.length) {
+        grouped.push(bucket.join('\n'));
+        bucket = [];
+      }
+      bucket.push(line);
+      const nextLine = lines[index + 1] || '';
+      if (!nextLine) return;
+      if (isVideoSectionHeading(nextLine)) {
+        grouped.push(bucket.join('\n'));
+        bucket = [];
+        return;
+      }
+      if (!heading && bucket.length >= 3) {
+        grouped.push(bucket.join('\n'));
+        bucket = [];
+      }
+    });
+    if (bucket.length) grouped.push(bucket.join('\n'));
+    if (grouped.length >= 3) {
+      return normalizeStoryText(grouped.join('\n\n'));
+    }
+  }
+
+  const fallbackTarget = Math.max(3, Math.min(12, Math.round((options.customSettings?.expectedDurationMinutes || 3) * 1.2)));
+  return normalizeStoryText(chunkSentencesForVideoScript(cleaned, fallbackTarget).join('\n\n'));
+}
+
 function parseJsonObject(raw: string) {
   const trimmed = raw.trim();
   const fenceMatch = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
@@ -290,13 +427,14 @@ function parseConstitutionResponse(
   raw: string,
   fallbackScript: string,
   fallbackAnalysis: ConstitutionAnalysisSummary,
-  source: 'ai' | 'sample'
+  source: 'ai' | 'sample',
+  options: ScriptComposerOptions
 ): { text: string; analysis: ConstitutionAnalysisSummary } {
   const parsed = parseJsonObject(raw);
 
   if (!parsed || typeof parsed !== 'object') {
     return {
-      text: extractScriptFromText(raw || fallbackScript),
+      text: ensureParagraphVideoScript(extractScriptFromText(raw || fallbackScript), options),
       analysis: {
         ...fallbackAnalysis,
         source,
@@ -307,8 +445,8 @@ function parseConstitutionResponse(
 
   const record = parsed as Record<string, unknown>;
   const script = typeof record.script === 'string' && record.script.trim()
-    ? normalizeStoryText(record.script)
-    : extractScriptFromText(raw || fallbackScript);
+    ? ensureParagraphVideoScript(normalizeStoryText(record.script), options)
+    : ensureParagraphVideoScript(extractScriptFromText(raw || fallbackScript), options);
 
   const targetRecord = record.targetProfile && typeof record.targetProfile === 'object'
     ? record.targetProfile as Record<string, unknown>
@@ -350,7 +488,7 @@ function parseConstitutionResponse(
     updatedAt: Date.now(),
   };
 
-  return { text: script || fallbackScript, analysis };
+  return { text: script || ensureParagraphVideoScript(fallbackScript, options), analysis };
 }
 
 function buildConstitutionUserPayload(options: ScriptComposerOptions) {
@@ -365,8 +503,8 @@ function buildConstitutionUserPayload(options: ScriptComposerOptions) {
     `핵심 갈등: ${options.selections.conflict}`,
     `결말 톤: ${options.selections.endingTone}`,
     `예상 길이: ${Math.max(1, Math.min(30, options.customSettings?.expectedDurationMinutes || 3))}분`,
-    `대본 언어: ${options.customSettings?.language || 'ko'}`,
-    `선호 말투: ${resolveSpeechStyle(options.customSettings?.speechStyle) === 'da' ? '다체' : resolveSpeechStyle(options.customSettings?.speechStyle) === 'eum' ? '음슴체' : '요체'}`,
+    `대본 언어: ${formatScriptLanguageLabel(options.customSettings?.language)}`,
+    `선호 말투: ${formatSpeechStyleLabel(options.customSettings?.speechStyle)}`,
     `현재 초안: ${options.currentScript?.trim() || '없음'}`,
     `참고 텍스트: ${options.customSettings?.referenceText?.trim() || '없음'}`,
     additionBlock.length ? `[추가 가이드]\n${additionBlock.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
@@ -382,7 +520,6 @@ export async function composeScriptDraft(options: ScriptComposerOptions): Promis
     ? buildConstitutionFallbackAnalysis(options, 'sample')
     : null;
   const bundle = getPromptRegistry(options.contentType);
-  const resolvedSpeechStyle = resolveSpeechStyle(options.customSettings?.speechStyle);
 
   if (options.template.engine === 'channel_constitution_v32') {
     const result = await runTextAi({
@@ -402,7 +539,7 @@ export async function composeScriptDraft(options: ScriptComposerOptions): Promis
       }, null, 2),
     });
 
-    const parsed = parseConstitutionResponse(result.text || fallback, fallback, fallbackAnalysis || buildConstitutionFallbackAnalysis(options, result.source), result.source);
+    const parsed = parseConstitutionResponse(result.text || fallback, fallback, fallbackAnalysis || buildConstitutionFallbackAnalysis(options, result.source), result.source, options);
     return {
       text: parsed.text,
       source: result.source,
@@ -423,8 +560,9 @@ Ending tone: ${options.selections.endingTone}
 Prompt template: ${options.template.name}
 Prompt description: ${options.template.description}
 Expected duration: ${options.customSettings?.expectedDurationMinutes || 3} minutes
-Preferred speech style: ${resolvedSpeechStyle === 'da' ? 'Declarative Korean ending (다체)' : resolvedSpeechStyle === 'eum' ? 'Terse informal Korean fragment style (음슴체)' : 'Polite Korean ending (요체)'}
-Script language: ${options.customSettings?.language || 'ko'}
+Preferred speech style: ${formatSpeechStyleEnglish(options.customSettings?.speechStyle)}
+Script language: ${formatScriptLanguageEnglish(options.customSettings?.language)}
+Silent mode rule: ${options.customSettings?.language === 'mute' ? 'Do not write spoken dialogue or narration. Build the script around visual beats, actions, and short on-screen captions.' : 'Use normal spoken or narrated script flow.'}
 Reference notes: ${options.customSettings?.referenceText?.trim() || 'None'}
 
 [SELECTED PROMPT]
@@ -455,7 +593,7 @@ ${additionBlock.map((item, index) => `${index + 1}. ${item}`).join('\n')}`
   });
 
   return {
-    text: normalizeStoryText(result.text || fallback),
+    text: ensureParagraphVideoScript(result.text || fallback, options),
     source: result.source,
     analysis: null,
   };

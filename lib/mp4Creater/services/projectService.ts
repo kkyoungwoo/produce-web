@@ -7,7 +7,8 @@
 import { CONFIG } from '../config';
 import { SavedProject, GeneratedAsset, CostBreakdown, BackgroundMusicTrack, PreviewMixSettings, WorkflowDraft, AudioPreviewAsset, VideoPreviewAsset } from '../types';
 import { getSelectedImageModel } from './imageService';
-import { fetchStudioProjects, getCachedStudioState, saveProjectsToStudio } from './localFileApi';
+import { compactWorkflowDraftForStorage } from './workflowDraftService';
+import { deleteStudioProjects, fetchStudioProjectById, fetchStudioProjects, getCachedStudioState, saveProjectsToStudio, saveStudioProject, summarizeProjectForIndex } from './localFileApi';
 
 const DB_NAME = 'TubeGenAI';
 const DB_VERSION = 1;
@@ -232,9 +233,25 @@ function getCurrentSettings() {
   };
 }
 
+
+function resolveNextProjectNumber(projects: Array<Pick<SavedProject, 'projectNumber'>> = []) {
+  return projects.reduce((max, project) => (
+    typeof project?.projectNumber === 'number' && project.projectNumber > max ? project.projectNumber : max
+  ), 0) + 1;
+}
+
+async function getNextProjectNumber(): Promise<number> {
+  const cachedProjects = Array.isArray(getCachedStudioState()?.projects)
+    ? getCachedStudioState()!.projects
+    : [];
+  if (cachedProjects.length) return resolveNextProjectNumber(cachedProjects as SavedProject[]);
+  const indexed = await readIndexedProjects();
+  return resolveNextProjectNumber(indexed);
+}
+
 async function syncProjectsAcrossStorage(
   projects: SavedProject[],
-  options?: { immediateStudioSync?: boolean }
+  options?: { immediateStudioSync?: boolean; changedProjects?: SavedProject[]; removedProjectIds?: string[] }
 ): Promise<void> {
   await writeIndexedProjects(projects);
 
@@ -247,7 +264,14 @@ async function syncProjectsAcrossStorage(
     }
 
     try {
-      await saveProjectsToStudio(projects);
+      const syncTasks: Promise<unknown>[] = [saveProjectsToStudio(projects)];
+      if (Array.isArray(options?.changedProjects) && options.changedProjects.length) {
+        syncTasks.push(Promise.all(options.changedProjects.map((project) => saveStudioProject(project))));
+      }
+      if (Array.isArray(options?.removedProjectIds) && options.removedProjectIds.length) {
+        syncTasks.push(deleteStudioProjects(options.removedProjectIds));
+      }
+      await Promise.all(syncTasks);
     } catch (error) {
       console.warn('[Project] immediate local file sync failed. IndexedDB backup is still safe.', error);
     }
@@ -368,6 +392,19 @@ async function readIndexedProjectById(id: string): Promise<SavedProject | null> 
   }
 }
 
+async function readProjectsForMutation(): Promise<SavedProject[]> {
+  const indexed = await readIndexedProjects();
+  if (indexed.length) {
+    return indexed;
+  }
+
+  const cachedProjects = Array.isArray(getCachedStudioState()?.projects)
+    ? getCachedStudioState()!.projects.map(normalizeProject)
+    : [];
+
+  return cachedProjects.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
 export async function saveProject(
   topic: string,
   assets: GeneratedAsset[],
@@ -396,9 +433,7 @@ export async function saveProject(
   }
 
   const current = await readIndexedProjects();
-  const nextProjectNumber = current.reduce((max, project) => (
-    typeof project.projectNumber === 'number' && project.projectNumber > max ? project.projectNumber : max
-  ), 0) + 1;
+  const nextProjectNumber = await getNextProjectNumber();
 
   const project: SavedProject = {
     id,
@@ -420,7 +455,7 @@ export async function saveProject(
     cost,
     backgroundMusicTracks: extras?.backgroundMusicTracks || [],
     previewMix: extras?.previewMix,
-    workflowDraft: extras?.workflowDraft || null,
+    workflowDraft: compactWorkflowDraftForStorage(extras?.workflowDraft) || null,
     voicePreviewAsset: extras?.voicePreviewAsset || null,
     scriptPreviewAsset: extras?.scriptPreviewAsset || null,
     finalVoiceAsset: extras?.finalVoiceAsset || null,
@@ -431,7 +466,7 @@ export async function saveProject(
   };
 
   const next = [project, ...current].sort((a, b) => b.createdAt - a.createdAt);
-  await syncProjectsAcrossStorage(next, { immediateStudioSync: true });
+  await syncProjectsAcrossStorage(next, { immediateStudioSync: true, changedProjects: [project] });
 
   return (await readIndexedProjectById(project.id)) || project;
 }
@@ -460,7 +495,7 @@ export async function upsertWorkflowProject(options: {
     cost: options.cost,
     backgroundMusicTracks: options.backgroundMusicTracks || [],
     previewMix: options.previewMix,
-    workflowDraft: options.workflowDraft,
+    workflowDraft: compactWorkflowDraftForStorage(options.workflowDraft) || null,
     voicePreviewAsset: options.voicePreviewAsset || null,
     scriptPreviewAsset: options.scriptPreviewAsset || null,
     finalVoiceAsset: options.finalVoiceAsset || null,
@@ -485,7 +520,7 @@ export async function upsertWorkflowProject(options: {
     {
       backgroundMusicTracks: options.backgroundMusicTracks || [],
       previewMix: options.previewMix,
-      workflowDraft: options.workflowDraft,
+      workflowDraft: compactWorkflowDraftForStorage(options.workflowDraft) || null,
       outputMode: options.workflowDraft?.outputMode || 'video',
       voicePreviewAsset: options.voicePreviewAsset || null,
       scriptPreviewAsset: options.scriptPreviewAsset || null,
@@ -526,6 +561,9 @@ export async function updateProject(
   const nextProject: SavedProject = normalizeProject({
     ...target,
     ...patch,
+    workflowDraft: Object.prototype.hasOwnProperty.call(patch, 'workflowDraft')
+      ? compactWorkflowDraftForStorage(patch.workflowDraft as any)
+      : target.workflowDraft,
     id,
     lastSavedAt: Date.now(),
     settings: {
@@ -543,6 +581,9 @@ export async function updateProject(
     : (await readIndexedProjects()).filter((project) => project.id !== id);
   const syncPayload = mergeProjectsForStudioSync(nextProject, fallbackProjects);
   scheduleStudioSync(syncPayload);
+  void saveStudioProject(nextProject).catch((error) => {
+    console.warn('[Project] project detail sync failed. IndexedDB backup is still safe.', error);
+  });
   return nextProject;
 }
 
@@ -551,32 +592,45 @@ export async function getSavedProjects(options?: { forceSync?: boolean; localOnl
   const indexed = await readIndexedProjects();
   const cachedState = getCachedStudioState();
   const cachedProjects = Array.isArray(cachedState?.projects)
-    ? cachedState.projects.map(normalizeProject)
+    ? cachedState.projects.map(summarizeProjectForIndex).sort((a, b) => b.createdAt - a.createdAt)
     : [];
-  const mergedLocal = mergeSavedProjects(indexed, cachedProjects);
 
-  if (mergedLocal.length && !options?.forceSync) {
-    return mergedLocal;
+  const localProjects = indexed.length ? indexed : mergeSavedProjects(indexed, cachedProjects);
+  const summarizedLocal = localProjects.map(summarizeProjectForIndex).sort((a, b) => b.createdAt - a.createdAt);
+
+  if (summarizedLocal.length && !options?.forceSync) {
+    return summarizedLocal;
   }
+
   if (options?.localOnly) {
-    return mergedLocal;
+    return summarizedLocal;
   }
 
   try {
     const projects = (await fetchStudioProjects()).map(normalizeProject).sort((a, b) => b.createdAt - a.createdAt);
-    if (projects.length) {
-      await writeIndexedProjects(projects);
-      return projects;
+    const remoteExists = projects.length > 0;
+    if (remoteExists || options?.forceSync) {
+      const mergedRemote = mergeSavedProjects(indexed, projects);
+      await writeIndexedProjects(mergedRemote);
+      return mergedRemote.map(summarizeProjectForIndex).sort((a, b) => b.createdAt - a.createdAt);
     }
   } catch {}
 
-  return mergedLocal;
+  return summarizedLocal;
 }
 
 export async function getProjectById(id: string, options?: { forceSync?: boolean; localOnly?: boolean }): Promise<SavedProject | null> {
   const direct = await readIndexedProjectById(id);
-  if (direct) return direct;
-  if (options?.localOnly) return null;
+  const hasDirectDetail = Boolean(direct && (direct.assets?.length || direct.workflowDraft || direct.backgroundMusicTracks?.length));
+  if (direct && (!options?.forceSync || hasDirectDetail)) return direct;
+  if (options?.localOnly) return direct || null;
+
+  const remoteDetail = await fetchStudioProjectById(id);
+  if (remoteDetail) {
+    const normalized = normalizeProject(remoteDetail);
+    await writeIndexedProject(normalized);
+    return normalized;
+  }
 
   const projects = await getSavedProjects(options);
   const found = projects.find((project) => project.id === id);
@@ -597,9 +651,9 @@ export async function deleteProject(id: string): Promise<boolean> {
 export async function renameProject(id: string, newName: string): Promise<boolean> {
   const trimmed = newName.trim();
   if (!trimmed) return false;
-  const current = await getSavedProjects();
+  const current = await readProjectsForMutation();
   const next = current.map((project) => project.id === id ? { ...project, name: trimmed } : project);
-  await syncProjectsAcrossStorage(next, { immediateStudioSync: true });
+  await syncProjectsAcrossStorage(next, { immediateStudioSync: true, changedProjects: next.filter((project) => project.id === id) });
   return true;
 }
 
@@ -622,13 +676,13 @@ function buildCopiedProjectName(sourceName: string, existingNames: Set<string>) 
 }
 
 export async function duplicateProject(id: string): Promise<SavedProject | null> {
-  const current = await getSavedProjects();
-  const source = current.find((project) => project.id === id);
-  if (!source) return null;
+  const current = await readProjectsForMutation();
+  const summarySource = current.find((project) => project.id === id);
+  if (!summarySource) return null;
+  const remoteSource = (summarySource.assets?.length || summarySource.workflowDraft || summarySource.backgroundMusicTracks?.length) ? null : await fetchStudioProjectById(id);
+  const source = remoteSource ? normalizeProject(remoteSource) : summarySource;
 
-  const nextProjectNumber = current.reduce((max, project) => (
-    typeof project.projectNumber === 'number' && project.projectNumber > max ? project.projectNumber : max
-  ), 0) + 1;
+  const nextProjectNumber = await getNextProjectNumber();
 
   const existingNames = new Set(current.map((project) => project.name || ''));
   const copiedName = buildCopiedProjectName(source.name || '프로젝트', existingNames);
@@ -646,7 +700,7 @@ export async function duplicateProject(id: string): Promise<SavedProject | null>
   });
 
   const next = [copied, ...current].sort((a, b) => b.createdAt - a.createdAt);
-  await syncProjectsAcrossStorage(next, { immediateStudioSync: true });
+  await syncProjectsAcrossStorage(next, { immediateStudioSync: true, changedProjects: [copied] });
   return copied;
 }
 
@@ -691,7 +745,7 @@ export async function importProjectsFromFile(file: File): Promise<SavedProject[]
     throw new Error('불러올 프로젝트 데이터가 없습니다.');
   }
 
-  const current = await getSavedProjects();
+  const current = await readProjectsForMutation();
   let nextProjectNumber = current.reduce((max, project) => (
     typeof project.projectNumber === 'number' && project.projectNumber > max ? project.projectNumber : max
   ), 0) + 1;
@@ -713,16 +767,16 @@ export async function importProjectsFromFile(file: File): Promise<SavedProject[]
   });
 
   const next = [...prepared, ...current].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  await syncProjectsAcrossStorage(next, { immediateStudioSync: true });
+  await syncProjectsAcrossStorage(next, { immediateStudioSync: true, changedProjects: prepared });
   return prepared;
 }
 
 export async function deleteProjects(ids: string[]): Promise<number> {
   const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)));
   if (!uniqueIds.length) return 0;
-  const current = await getSavedProjects();
+  const current = await readProjectsForMutation();
   const next = current.filter((project) => !uniqueIds.includes(project.id));
-  await syncProjectsAcrossStorage(next, { immediateStudioSync: true });
+  await syncProjectsAcrossStorage(next, { immediateStudioSync: true, removedProjectIds: uniqueIds });
   return current.length - next.length;
 }
 
@@ -733,7 +787,7 @@ export async function migrateFromLocalStorage(): Promise<void> {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return;
     const normalized = parsed.map(normalizeProject);
-    await syncProjectsAcrossStorage(normalized);
+    await syncProjectsAcrossStorage(normalized, { changedProjects: normalized });
     localStorage.removeItem(CONFIG.STORAGE_KEYS.PROJECTS);
   } catch (error) {
     console.error('[Project] 로컬스토리지 마이그레이션 실패:', error);

@@ -1,6 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScriptLanguageOption, ScriptSpeechStyle } from '../../../types';
-import { OverlayModal } from '../ui';
 
 interface Step2PanelProps {
   topic: string;
@@ -19,6 +18,7 @@ interface Step2PanelProps {
 }
 
 const SCRIPT_LANGUAGE_OPTIONS: Array<{ value: ScriptLanguageOption; label: string; flag: string; hint: string }> = [
+  { value: 'mute', label: '무음', flag: '🔇', hint: '내레이션 없이 화면 흐름 중심' },
   { value: 'ko', label: '한국어', flag: '🇰🇷', hint: '자연스러운 한국어 대본' },
   { value: 'en', label: '영어', flag: '🇺🇸', hint: '글로벌 타깃 영어 대본' },
   { value: 'ja', label: '일본어', flag: '🇯🇵', hint: '일본어 흐름 반영' },
@@ -38,15 +38,196 @@ const SPEECH_STYLE_OPTIONS: Array<{ value: ScriptSpeechStyle; label: string; hin
   { value: 'eum', label: '음슴체', hint: '짧고 건조한 리듬감' },
 ];
 
-function MoreButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+const DEFAULT_TOPIC_RECOMMENDATIONS = [
+  '새벽 버스 정류장에서 우연히 다시 만난 두 사람이 한 번 미뤘던 선택을 끝내 마주하는 이야기.',
+  '도시 재개발 이슈를 생활권 변화와 체감 물가 흐름까지 한 번에 이해하게 만드는 설명형 영상.',
+  '비 오는 골목의 작은 분실물을 계기로 오래 끊겼던 관계가 다시 이어지는 감정 서사.',
+  '초보자도 바로 따라 할 수 있게 핵심 도구 사용 순서를 여덟 장면 안에 정리하는 가이드 영상.',
+  '막차 직전 플랫폼에서 같은 밤을 다르게 기억하는 두 인물이 진실을 맞춰 가는 전개.',
+  '조용한 사무실의 야근 풍경 속에서 한 통의 메시지가 하루의 방향을 바꾸는 이야기.',
+  '처음 시작하는 사람을 위해 복잡한 업무 프로세스를 실제 예시 중심으로 풀어 주는 요약 영상.',
+  '낡은 극장 무대에서 마지막 리허설을 준비하며 각자의 비밀이 드러나는 시네마틱 전개.',
+] as const;
+
+function ScrollArrow({
+  direction,
+  visible,
+  onClick,
+}: {
+  direction: 'left' | 'right';
+  visible: boolean;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
+      aria-label={direction === 'left' ? '왼쪽으로 이동' : '오른쪽으로 이동'}
+      tabIndex={visible ? 0 : -1}
       onClick={onClick}
-      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-500 transition hover:bg-slate-200 hover:text-slate-700"
+      className={`absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-700 shadow-sm backdrop-blur transition-all duration-300 ${direction === 'left' ? 'left-1.5' : 'right-1.5'} ${visible ? 'pointer-events-auto opacity-100 scale-100 hover:bg-slate-50' : 'pointer-events-none opacity-0 scale-95'}`}
     >
-      {children}
+      <span className="text-base font-black">{direction === 'left' ? '‹' : '›'}</span>
     </button>
+  );
+}
+
+function HorizontalOptionRail({
+  children,
+  step = 220,
+  selectedKey,
+}: {
+  children: React.ReactNode;
+  step?: number;
+  selectedKey?: string | number | null;
+}) {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const hideTimerRef = useRef<number | null>(null);
+  const draggingRef = useRef({ active: false, startX: 0, startScrollLeft: 0, moved: false, suppressClick: false });
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const [showArrows, setShowArrows] = useState(false);
+
+  const isInteractiveTarget = useCallback((target: EventTarget | null) => {
+    if (!(target instanceof Element)) return false;
+    return Boolean(target.closest('button, a, input, textarea, select, label, [role="button"], [data-no-drag="true"]'));
+  }, []);
+
+  const clearHideTimer = useCallback(() => {
+    if (hideTimerRef.current !== null) {
+      window.clearTimeout(hideTimerRef.current);
+      hideTimerRef.current = null;
+    }
+  }, []);
+
+  const updateScrollState = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+    setCanScrollLeft(container.scrollLeft > 2);
+    setCanScrollRight(container.scrollLeft < maxScrollLeft - 2);
+  }, []);
+
+  const revealArrowsTemporarily = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+    if (maxScrollLeft <= 2) {
+      setShowArrows(false);
+      clearHideTimer();
+      return;
+    }
+    setShowArrows(true);
+    clearHideTimer();
+    hideTimerRef.current = window.setTimeout(() => {
+      setShowArrows(false);
+      hideTimerRef.current = null;
+    }, 3000);
+  }, [clearHideTimer]);
+
+  useEffect(() => {
+    updateScrollState();
+    const container = containerRef.current;
+    if (!container) return;
+    const handleResize = () => updateScrollState();
+    const handleScroll = () => updateScrollState();
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    window.addEventListener('resize', handleResize);
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, [children, updateScrollState]);
+
+  useEffect(() => {
+    if (selectedKey === undefined || selectedKey === null) return;
+    revealArrowsTemporarily();
+  }, [selectedKey, revealArrowsTemporarily]);
+
+  useEffect(() => () => clearHideTimer(), [clearHideTimer]);
+
+  const scrollByDirection = (direction: 'left' | 'right') => {
+    const container = containerRef.current;
+    if (!container) return;
+    if (direction === 'left' && !canScrollLeft) return;
+    if (direction === 'right' && !canScrollRight) return;
+    revealArrowsTemporarily();
+    container.scrollBy({
+      left: direction === 'left' ? -step : step,
+      behavior: 'smooth',
+    });
+  };
+
+  return (
+    <div
+      className="relative"
+      onMouseEnter={() => revealArrowsTemporarily()}
+      onFocusCapture={() => revealArrowsTemporarily()}
+    >
+      <ScrollArrow direction="left" visible={showArrows && canScrollLeft} onClick={() => scrollByDirection('left')} />
+      <div
+        ref={containerRef}
+        style={{ touchAction: 'pan-x' }}
+        className={`flex gap-2 overflow-x-auto overscroll-x-contain scroll-smooth pb-1 pl-0.5 pr-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+        onPointerDown={(event) => {
+          if (event.button !== 0) return;
+          if (isInteractiveTarget(event.target)) return;
+          const container = containerRef.current;
+          if (!container) return;
+          draggingRef.current = {
+            active: true,
+            startX: event.clientX,
+            startScrollLeft: container.scrollLeft,
+            moved: false,
+            suppressClick: draggingRef.current.suppressClick,
+          };
+          container.setPointerCapture(event.pointerId);
+          revealArrowsTemporarily();
+        }}
+        onPointerMove={(event) => {
+          const container = containerRef.current;
+          if (!container || !draggingRef.current.active) return;
+          const deltaX = event.clientX - draggingRef.current.startX;
+          if (!draggingRef.current.moved && Math.abs(deltaX) < 8) return;
+          if (!draggingRef.current.moved) {
+            draggingRef.current.moved = true;
+            draggingRef.current.suppressClick = true;
+            setIsDragging(true);
+          }
+          revealArrowsTemporarily();
+          container.scrollLeft = draggingRef.current.startScrollLeft - deltaX;
+        }}
+        onPointerUp={(event) => {
+          const container = containerRef.current;
+          draggingRef.current.active = false;
+          setIsDragging(false);
+          if (container?.hasPointerCapture(event.pointerId)) {
+            container.releasePointerCapture(event.pointerId);
+          }
+          updateScrollState();
+          revealArrowsTemporarily();
+        }}
+        onPointerCancel={(event) => {
+          const container = containerRef.current;
+          draggingRef.current.active = false;
+          setIsDragging(false);
+          if (container?.hasPointerCapture(event.pointerId)) {
+            container.releasePointerCapture(event.pointerId);
+          }
+          updateScrollState();
+        }}
+        onClickCapture={(event) => {
+          if (!draggingRef.current.suppressClick) return;
+          event.preventDefault();
+          event.stopPropagation();
+          draggingRef.current.suppressClick = false;
+          draggingRef.current.moved = false;
+        }}
+      >
+        {children}
+      </div>
+      <ScrollArrow direction="right" visible={showArrows && canScrollRight} onClick={() => scrollByDirection('right')} />
+    </div>
   );
 }
 
@@ -56,62 +237,56 @@ function CompactOption({
   title,
   subtitle,
   leading,
+  minWidth = 'min-w-[112px]',
 }: {
   active: boolean;
   onClick: () => void;
   title: string;
   subtitle?: string;
   leading?: React.ReactNode;
+  minWidth?: string;
 }) {
   return (
     <button
       type="button"
+      data-no-drag="true"
       onClick={onClick}
-      className={`rounded-[20px] border px-3.5 py-3 text-left transition ${active ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+      className={`${minWidth} shrink-0 snap-start rounded-[18px] border px-3 py-2.5 text-left transition-all duration-200 ${active ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
     >
-      <div className="flex items-center gap-3">
-        {leading ? <div className="text-xl leading-none">{leading}</div> : null}
+      <div className="flex items-start gap-2.5">
+        {leading ? <div className="pt-0.5 text-lg leading-none">{leading}</div> : null}
         <div className="min-w-0">
           <div className={`text-[13px] font-black ${active ? 'text-violet-700' : 'text-slate-900'}`}>{title}</div>
-          {subtitle ? <div className="mt-1 text-[11px] leading-5 text-slate-500">{subtitle}</div> : null}
+          {subtitle ? <div className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{subtitle}</div> : null}
         </div>
       </div>
     </button>
   );
 }
 
-function SettingCard({
-  eyebrow,
-  title,
-  value,
-  description,
+function SettingBlock({
+  label,
+  selectedLabel,
+  helper,
   children,
-  accent = 'slate',
 }: {
-  eyebrow: string;
-  title: string;
-  value: React.ReactNode;
-  description: string;
+  label: string;
+  selectedLabel: React.ReactNode;
+  helper: string;
   children: React.ReactNode;
-  accent?: 'violet' | 'slate';
 }) {
-  const accentClass = accent === 'violet'
-    ? 'border-violet-100 bg-gradient-to-br from-violet-50 via-white to-indigo-50'
-    : 'border-slate-200 bg-slate-50';
-
   return (
-    <div className={`rounded-[22px] border p-4 shadow-sm ${accentClass}`}>
-      <div className="flex items-start justify-between gap-4">
+    <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">{eyebrow}</div>
-          <div className="mt-1.5 text-base font-black text-slate-900">{title}</div>
-          <p className="mt-1.5 text-[11px] leading-5 text-slate-500">{description}</p>
+          <div className="text-sm font-black text-slate-900">{label}</div>
+          <p className="mt-1 text-[11px] leading-4 text-slate-500">{helper}</p>
         </div>
-        <div className="shrink-0 rounded-[18px] bg-white px-3.5 py-2.5 text-right shadow-sm">
-          {value}
+        <div className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-violet-700 shadow-sm">
+          {selectedLabel}
         </div>
       </div>
-      <div className="mt-4">{children}</div>
+      <div className="mt-3">{children}</div>
     </div>
   );
 }
@@ -131,8 +306,6 @@ export default function Step2Panel({
   onCustomScriptSpeechStyleChange,
   onCustomScriptLanguageChange,
 }: Step2PanelProps) {
-  const [openModal, setOpenModal] = useState<'language' | 'speech' | 'duration' | null>(null);
-
   const selectedLanguage = useMemo(
     () => SCRIPT_LANGUAGE_OPTIONS.find((item) => item.value === customScriptLanguage) || SCRIPT_LANGUAGE_OPTIONS[0],
     [customScriptLanguage]
@@ -141,6 +314,7 @@ export default function Step2Panel({
     () => SPEECH_STYLE_OPTIONS.find((item) => item.value === customScriptSpeechStyle) || SPEECH_STYLE_OPTIONS[0],
     [customScriptSpeechStyle]
   );
+  const visibleRecommendations = topicRecommendations.length ? topicRecommendations.slice(0, 8) : [...DEFAULT_TOPIC_RECOMMENDATIONS];
 
   return (
     <div className="space-y-5">
@@ -148,82 +322,90 @@ export default function Step2Panel({
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">대본 설정</div>
-            <h2 className="mt-1.5 text-lg font-black text-slate-900">대본 길이, 대화체, 언어를 먼저 고르세요</h2>
-            <p className="mt-1.5 text-xs leading-5 text-slate-600">주제보다 먼저 틀을 잡아 두면 Step3 대본 생성 결과가 더 안정적으로 맞춰집니다.</p>
+            <h2 className="mt-1 text-lg font-black text-slate-900">Step3 생성 전에 핵심 설정만 빠르게 정하세요</h2>
+            <p className="mt-1.5 text-xs leading-5 text-slate-600">길이, 대화체, 언어만 먼저 잡아 두면 다음 단계 대본 방향이 더 안정적으로 맞춰집니다.</p>
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-3">
-          <SettingCard
-            eyebrow="영상 예상 길이"
-            title="몇 분짜리로 만들지 먼저 정하기"
-            description="자주 쓰는 길이는 바로 누르고, 길게 만들 때는 팝업에서 슬라이드로 고릅니다."
-            accent="violet"
-            value={
-              <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-violet-500">선택됨</div>
-                <div className="mt-1 text-2xl font-black text-violet-700">{customScriptDurationMinutes}<span className="ml-1 text-base">분</span></div>
-              </div>
-            }
+        <div className="mt-4 grid gap-3 xl:grid-cols-3">
+          <SettingBlock
+            label="영상 예상 길이"
+            helper="카드를 드래그하거나 화살표로 넘기며 길이를 정합니다. 클릭만 하면 바로 선택됩니다."
+            selectedLabel={<>{customScriptDurationMinutes}분</>}
           >
-            <div className="flex flex-wrap items-center gap-2">
+            <HorizontalOptionRail step={200} selectedKey={customScriptDurationMinutes}>
               {QUICK_DURATION_OPTIONS.map((value) => (
                 <button
                   key={value}
                   type="button"
+                  data-no-drag="true"
                   onClick={() => onCustomScriptDurationChange(value)}
-                  className={`rounded-full px-3 py-2 text-xs font-black transition ${customScriptDurationMinutes === value ? 'scale-[1.04] bg-violet-600 text-white shadow-lg shadow-violet-200' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}
+                  className={`shrink-0 snap-start rounded-full px-3 py-2 text-xs font-black transition-all duration-200 ${customScriptDurationMinutes === value ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}
                 >
                   {value}분
                 </button>
               ))}
-              <MoreButton onClick={() => setOpenModal('duration')}>전체 길이 보기</MoreButton>
-            </div>
-          </SettingCard>
-
-          <SettingCard
-            eyebrow="대화체"
-            title="말투 톤 먼저 고르기"
-            description="기본, 요체까지만 먼저 보이고 나머지는 팝업에서 고릅니다."
-            value={
-              <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">현재 말투</div>
-                <div className="mt-1 text-lg font-black text-slate-900">{selectedSpeech.label}</div>
+            </HorizontalOptionRail>
+            <div className="mt-3 rounded-[18px] border border-violet-100 bg-white px-3 py-3">
+              <input
+                type="range"
+                min={1}
+                max={30}
+                step={1}
+                value={customScriptDurationMinutes}
+                onChange={(event) => onCustomScriptDurationChange(Number(event.target.value))}
+                className="h-2.5 w-full cursor-pointer accent-violet-600"
+              />
+              <div className="mt-2 flex items-center justify-between text-[10px] font-black text-slate-400">
+                <span>1분</span>
+                <span>10분</span>
+                <span>20분</span>
+                <span>30분</span>
               </div>
-            }
+            </div>
+            <div className="mt-3">
+              <HorizontalOptionRail step={220} selectedKey={customScriptDurationMinutes}>
+                {DURATION_MARK_OPTIONS.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    data-no-drag="true"
+                    onClick={() => onCustomScriptDurationChange(value)}
+                    className={`shrink-0 snap-start rounded-full px-3 py-1.5 text-[11px] font-black transition-all duration-200 ${customScriptDurationMinutes === value ? 'bg-violet-100 text-violet-700' : 'border border-slate-200 bg-white text-slate-500 hover:bg-slate-100'}`}
+                  >
+                    {value}분
+                  </button>
+                ))}
+              </HorizontalOptionRail>
+            </div>
+          </SettingBlock>
+
+          <SettingBlock
+            label="대화체"
+            helper="카드를 드래그하거나 화살표 버튼으로 좌우 이동할 수 있고, 클릭만 해도 값이 바로 선택됩니다."
+            selectedLabel={<>{selectedSpeech.label}</>}
           >
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {SPEECH_STYLE_OPTIONS.slice(0, 2).map((item) => (
+            <HorizontalOptionRail step={240} selectedKey={customScriptSpeechStyle}>
+              {SPEECH_STYLE_OPTIONS.map((item) => (
                 <CompactOption
                   key={item.value}
                   active={customScriptSpeechStyle === item.value}
                   onClick={() => onCustomScriptSpeechStyleChange(item.value)}
                   title={item.label}
                   subtitle={item.hint}
+                  minWidth="min-w-[136px]"
                 />
               ))}
-            </div>
-            <div className="mt-3 flex justify-end">
-              <MoreButton onClick={() => setOpenModal('speech')}>다른 대화체 보기</MoreButton>
-            </div>
-          </SettingCard>
+            </HorizontalOptionRail>
+          </SettingBlock>
 
-          <SettingCard
-            eyebrow="대본 언어"
-            title="출력 언어 먼저 고르기"
-            description="한국어, 영어까지만 먼저 보이고 나머지는 팝업에서 확인합니다."
-            value={
-              <div className="flex items-center gap-2">
-                <span className="text-2xl leading-none">{selectedLanguage.flag}</span>
-                <div>
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">현재 언어</div>
-                  <div className="mt-1 text-lg font-black text-slate-900">{selectedLanguage.label}</div>
-                </div>
-              </div>
-            }
+          <SettingBlock
+            label="대본 언어"
+            helper="무음, 한국어를 먼저 두고 필요한 언어를 좌우로 넘겨 선택합니다. 화살표는 잠깐만 표시됩니다."
+            selectedLabel={<span className="inline-flex items-center gap-1.5"><span>{selectedLanguage.flag}</span><span>{selectedLanguage.label}</span></span>}
           >
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {SCRIPT_LANGUAGE_OPTIONS.slice(0, 2).map((item) => (
+            <HorizontalOptionRail step={260} selectedKey={customScriptLanguage}>
+              {SCRIPT_LANGUAGE_OPTIONS.map((item) => (
                 <CompactOption
                   key={item.value}
                   active={customScriptLanguage === item.value}
@@ -231,13 +413,11 @@ export default function Step2Panel({
                   title={item.label}
                   subtitle={item.hint}
                   leading={item.flag}
+                  minWidth="min-w-[148px]"
                 />
               ))}
-            </div>
-            <div className="mt-3 flex justify-end">
-              <MoreButton onClick={() => setOpenModal('language')}>전체 언어 보기</MoreButton>
-            </div>
-          </SettingCard>
+            </HorizontalOptionRail>
+          </SettingBlock>
         </div>
       </section>
 
@@ -260,122 +440,22 @@ export default function Step2Panel({
           placeholder="예: 비 오는 도시 골목에서 다시 만난 두 사람"
         />
         <p className="mt-3 text-xs text-slate-500">
-          입력한 텍스트를 기준으로 주제를 추천합니다. AI 미연결 상태에서는 샘플 추천이 랜덤으로 적용됩니다.
+          입력한 텍스트를 기준으로 한 문장 주제를 최대 8개 추천합니다. AI가 연결되어 있으면 AI 추천을, 연결되지 않았으면 샘플 추천을 보여줍니다.
         </p>
-        <div className="mt-4 space-y-2">
-          <div className="text-xs font-black text-slate-600">추천 주제</div>
-          <div className="flex flex-col gap-2">
-            {isInitialLoadingRecommendations ? (
-              Array.from({ length: 5 }).map((_, index) => (
-                <div key={`topic-skeleton-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                  <div className="h-4 w-[82%] animate-pulse rounded bg-slate-200" />
-                </div>
-              ))
-            ) : (
-              topicRecommendations.map((item, index) => (
-                <button
-                  key={`${item}-${index}`}
-                  type="button"
-                  onClick={() => onSelectTopicRecommendation(item)}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm text-slate-700 transition hover:bg-white"
-                >
-                  {item}
-                </button>
-              ))
-            )}
-          </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          {visibleRecommendations.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => onSelectTopicRecommendation(item)}
+              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-5 text-slate-600 hover:bg-slate-50"
+            >
+              {item}
+            </button>
+          ))}
         </div>
+        {isInitialLoadingRecommendations ? <p className="mt-3 text-xs text-violet-600">추천 주제를 불러오는 중입니다.</p> : null}
       </section>
-
-      <OverlayModal
-        open={openModal === 'duration'}
-        title="영상 예상 길이 선택"
-        description="마우스로 움직이며 1분부터 30분까지 원하는 길이를 바로 고를 수 있습니다."
-        onClose={() => setOpenModal(null)}
-      >
-        <div className="rounded-[28px] border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-5">
-          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-violet-500">현재 선택</div>
-          <div className="mt-2 text-5xl font-black text-violet-700">{customScriptDurationMinutes}<span className="ml-2 text-2xl">분</span></div>
-          <div className="mt-5 px-1">
-            <input
-              type="range"
-              min={1}
-              max={30}
-              step={1}
-              value={customScriptDurationMinutes}
-              onChange={(event) => onCustomScriptDurationChange(Number(event.target.value))}
-              className="h-3 w-full cursor-pointer accent-violet-600"
-            />
-            <div className="mt-3 flex items-center justify-between text-[11px] font-black text-slate-400">
-              <span>1분</span>
-              <span>10분</span>
-              <span>20분</span>
-              <span>30분</span>
-            </div>
-          </div>
-          <div className="mt-5 flex flex-wrap gap-2">
-            {DURATION_MARK_OPTIONS.map((value) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => onCustomScriptDurationChange(value)}
-                className={`rounded-full px-4 py-2 text-sm font-black transition ${customScriptDurationMinutes === value ? 'scale-[1.06] bg-violet-600 text-white shadow-lg shadow-violet-200' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-              >
-                {value}분
-              </button>
-            ))}
-          </div>
-        </div>
-      </OverlayModal>
-
-      <OverlayModal
-        open={openModal === 'speech'}
-        title="대화체 선택"
-        description="기본을 포함한 전체 대화체에서 원하는 톤을 고릅니다."
-        onClose={() => setOpenModal(null)}
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          {SPEECH_STYLE_OPTIONS.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => {
-                onCustomScriptSpeechStyleChange(item.value);
-                setOpenModal(null);
-              }}
-              className={`rounded-[24px] border px-4 py-4 text-left transition ${customScriptSpeechStyle === item.value ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
-            >
-              <div className="text-base font-black text-slate-900">{item.label}</div>
-              <div className="mt-2 text-xs leading-5 text-slate-500">{item.hint}</div>
-            </button>
-          ))}
-        </div>
-      </OverlayModal>
-
-      <OverlayModal
-        open={openModal === 'language'}
-        title="대본 언어 선택"
-        description="지원하는 언어 전체 목록에서 원하는 언어를 선택합니다."
-        onClose={() => setOpenModal(null)}
-      >
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {SCRIPT_LANGUAGE_OPTIONS.map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => {
-                onCustomScriptLanguageChange(item.value);
-                setOpenModal(null);
-              }}
-              className={`rounded-[24px] border px-4 py-4 text-left transition ${customScriptLanguage === item.value ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
-            >
-              <div className="text-2xl">{item.flag}</div>
-              <div className="mt-2 text-sm font-black text-slate-900">{item.label}</div>
-              <div className="mt-2 text-xs leading-5 text-slate-500">{item.hint}</div>
-            </button>
-          ))}
-        </div>
-      </OverlayModal>
     </div>
   );
 }

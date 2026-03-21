@@ -1,68 +1,64 @@
-[00:00:01.933] Server  LOG     ✓ Ready in 1616ms
-[00:00:12.127] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:00:21.167] Server  LOG     ○ Compiling /[locale]/mp4Creater ...
-[00:00:26.663] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:00:34.020] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:00:49.040] Server  LOG     ○ Compiling /[locale]/mp4Creater/step-1 ...
-[00:01:02.055] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:01:14.048] Server  LOG     ○ Compiling /[locale]/mp4Creater/step-2 ...
-[00:02:11.962] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:05:22.811] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:10:40.143] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:10:43.115] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
-[00:14:34.725] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:14:37.750] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
-[00:20:05.522] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:20:08.342] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:22:05.280] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:22:08.171] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:22:15.977] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:22:18.744] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:22:49.175] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:27:39.232] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:27:41.558] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
-[00:41:14.027] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:41:17.432] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:41:17.676] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:41:17.717] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:41:21.954] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:41:24.991] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:46:36.281] Browser ERROR   uncaughtError: TypeError: onNewCharacterNameChange is not a function
-[00:46:36.281] Browser ERROR   uncaughtError: TypeError: onNewCharacterNameChange is not a function
-[00:46:36.281] Browser ERROR   uncaughtError: TypeError: onNewCharacterNameChange is not a function
-[00:46:36.386] Browser ERROR   uncaughtError: TypeError: onNewCharacterPromptChange is not a function
-[00:46:36.386] Browser ERROR   uncaughtError: TypeError: onNewCharacterPromptChange is not a function
-[00:46:36.386] Browser ERROR   uncaughtError: TypeError: onNewCharacterPromptChange is not a function
-[00:47:40.992] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:47:41.221] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:47:44.271] Server  LOG     ○ Compiling /_error ...
-[00:47:49.848] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:47:50.016] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:16:07.795] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:16:10.000] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:16:11.473] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:16:12.885] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:17:52.794] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[01:17:56.056] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:17:58.152] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:17:59.875] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:01.927] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:03.587] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:05.762] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:07.408] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:09.492] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:11.138] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:13.352] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:15.167] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:17.038] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:18.766] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:20.848] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:22.631] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:24.166] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:18:25.504] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:20:52.307] Browser ERROR   uncaughtError: TypeError: setNewCharacterName is not a function
-[01:20:52.487] Browser ERROR   uncaughtError: TypeError: setNewCharacterName is not a function
-[01:20:52.624] Browser ERROR   uncaughtError: TypeError: setNewCharacterName is not a function
-[01:20:53.108] Browser ERROR   uncaughtError: TypeError: setNewCharacterPrompt is not a function
-[01:20:53.108] Browser ERROR   uncaughtError: TypeError: setNewCharacterPrompt is not a function
-[01:20:53.108] Browser ERROR   uncaughtError: TypeError: setNewCharacterPrompt is not a function
+[00:00:01.702] Server  LOG     ✓ Ready in 1419ms
+[00:03:20.863] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:05:12.426] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:09:28.835] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:20:27.528] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:37:10.315] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:37:18.480] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
+[00:37:18.484] Server  ERROR   ⨯ Failed to generate static paths for /[locale]/mp4Creater/step-1:
+[00:37:18.487] Server  ERROR   SyntaxError: Unexpected end of JSON input
+[00:37:18.489] Server  ERROR   ⨯ Failed to generate static paths for /[locale]/mp4Creater/step-1:
+[00:37:18.491] Server  ERROR   SyntaxError: Unexpected end of JSON input
+[00:37:21.114] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:37:21.295] Browser ERROR   uncaughtError: Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+      <LoadingBoundary name="step-1/" loading={null}>
+        <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+          <RedirectBoundary>
+            <RedirectErrorBoundary router={{...}}>
+              <InnerLayoutRouter url="/ko/mp4Cre..." tree={[...]} params={{locale:"ko"}} ...>
+                <SegmentViewNode type="page" pagePath="[locale]/m...">
+                  <SegmentTrieNode>
+                  <Mp4CreaterStep1Page>
+                    <ClientOnlyApp routeStep={1}>
+                      <App routeStep={1}>
+                        <div className="min-h-scre...">
+                          <LoadingOverlay>
+                          <Header>
+                          <SettingsDrawer>
+                          <ProviderQuickModal>
+                          <main className="py-8">
+                            <InputSection step="IDLE" studioState={{version:7, ...}} ...>
+                              <RouteStepView vm={{routeStep:1, ...}}>
+                                <div
++                                 className="mx-auto my-6 w-full max-w-[1520px] px-4 pb-32 sm:px-6 lg:px-8"
+-                                 className="mx-auto mb-6 max-w-6xl px-4"
+                                >
+                                  <div
++                                   className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"
+-                                   className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm"
+                                  >
+                                    <div
++                                     className="text-xs font-black uppercase tracking-[0.24em] text-blue-600"
+-                                     className="flex flex-wrap items-center justify-between gap-3"
+                                    >
++                                     1
+-                                     <div>
+                                      ...
+                                    ...
+                                  ...
+                ...
+              ...
+
