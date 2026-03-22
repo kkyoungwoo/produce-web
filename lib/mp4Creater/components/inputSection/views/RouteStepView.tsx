@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { StepId } from '../types';
 import { STEP_META } from '../constants';
 import { OverlayModal } from '../ui';
@@ -41,7 +41,6 @@ export default function RouteStepView({ vm }: { vm: any }) {
     sceneCount,
     storyScript,
     handleGenerateScriptClick,
-    extendScriptByChars,
     ensureProjectPromptTemplate,
     selectedPromptTemplate,
     syncedPromptTemplates,
@@ -120,6 +119,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
     handleCharacterVoiceDirectInputChange,
     handlePreviewCharacterVoice,
     getCharacterVoiceSummary,
+    step3CastSelectionHighlightTick,
     newCharacterName,
     newCharacterPrompt,
     setNewCharacterName,
@@ -130,9 +130,26 @@ export default function RouteStepView({ vm }: { vm: any }) {
     toggleCharacterSelection,
   } = vm;
 
+  const currentRouteStep = (routeStep || 1) as 1 | 2 | 3 | 4 | 5;
+  const [stepShellVisible, setStepShellVisible] = useState(false);
+
+  useEffect(() => {
+    if (currentRouteStep === 3) {
+      setStepShellVisible(true);
+      return;
+    }
+    setStepShellVisible(false);
+    const frame = window.requestAnimationFrame(() => setStepShellVisible(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, [currentRouteStep]);
+
   if (!routeStep) return null;
 
-  const currentRouteStep = routeStep as 1 | 2 | 3 | 4 | 5;
+
+  const normalizedSelectedCharacterIds = Array.isArray(selectedCharacterIds)
+    ? selectedCharacterIds.filter((characterId: any) => extractedCharacters.some((character: any) => character.id === characterId))
+    : [];
+  const selectedCharactersForStep4 = extractedCharacters.filter((character: any) => normalizedSelectedCharacterIds.includes(character.id));
 
   const renderRouteContent = () => {
     if (currentRouteStep === 1) {
@@ -143,14 +160,15 @@ export default function RouteStepView({ vm }: { vm: any }) {
           hasSelectedContentType={hasSelectedContentType}
           hasSelectedAspectRatio={hasSelectedAspectRatio}
           onSelectContentType={(value) => {
-            if (contentType === value && hasSelectedContentType) {
+            if (hasSelectedContentType && contentType === value) {
               setHasSelectedContentType(false);
               return;
             }
             applyContentTypeSelection(value);
+            setHasSelectedContentType(true);
           }}
           onSelectAspectRatio={(value) => {
-            if (aspectRatio === value && hasSelectedAspectRatio) {
+            if (hasSelectedAspectRatio && aspectRatio === value) {
               setHasSelectedAspectRatio(false);
               return;
             }
@@ -200,7 +218,6 @@ export default function RouteStepView({ vm }: { vm: any }) {
           selectedPromptTemplateName={selectedPromptTemplateName}
           selectedPromptTemplateEngine={selectedPromptTemplateEngine}
           onGenerateScript={handleGenerateScriptClick}
-          onExpandScript={(chars) => { void extendScriptByChars(chars); }}
           onViewPrompt={() => {
             const targetTemplate = selectedPromptTemplate || syncedPromptTemplates[0] || null;
             if (!targetTemplate) {
@@ -221,7 +238,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
           onRemoveReferenceLink={removeReferenceLink}
           onScriptModelChange={setSelectedScriptGenerationModel}
           extractedCharacters={extractedCharacters}
-          selectedCharacterIds={selectedCharacterIds || []}
+          selectedCharacterIds={normalizedSelectedCharacterIds}
           isHydratingCharacters={isExtracting}
           isLoadingVoiceCatalogs={isLoadingVoiceCatalogs}
           projectVoiceProvider={projectVoiceProvider}
@@ -243,6 +260,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
           onCreateNewCharacter={createNewCharacterByPrompt}
           onCreateCharacterFromForm={createNewCharacterFromForm}
           getCharacterVoiceSummary={getCharacterVoiceSummary}
+          castSelectionHighlightTick={step3CastSelectionHighlightTick}
         />
       );
     }
@@ -250,8 +268,8 @@ export default function RouteStepView({ vm }: { vm: any }) {
     if (currentRouteStep === 4) {
       return (
         <Step4Panel
-          extractedCharacters={extractedCharacters}
-          selectedCharacterIds={selectedCharacterIds || []}
+          extractedCharacters={selectedCharactersForStep4}
+          selectedCharacterIds={normalizedSelectedCharacterIds}
           selectedCharacterStyleId={selectedCharacterStyleId}
           characterStyleOptions={characterStyleOptions}
           isExtracting={isExtracting}
@@ -287,6 +305,25 @@ export default function RouteStepView({ vm }: { vm: any }) {
     );
   };
 
+  const handleNextRouteStep = () => {
+    if (currentRouteStep === 5) {
+      void handleOpenSceneStudioClick();
+      return;
+    }
+    if (!nextRouteStep) return;
+    if (currentRouteStep === 3) {
+      window.requestAnimationFrame(() => {
+        void completeStage(currentRouteStep, nextRouteStep as StepId);
+      });
+      return;
+    }
+    void completeStage(currentRouteStep, nextRouteStep as StepId);
+  };
+
+  const canMoveNext = currentRouteStep === 1
+    ? Boolean(hasSelectedContentType && hasSelectedAspectRatio)
+    : Boolean(routeStepCompleted[currentRouteStep]);
+
   return (
     <div className="mx-auto my-6 w-full max-w-[1520px] px-4 pb-32 sm:px-6 lg:px-8">
       <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
@@ -299,7 +336,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
           {notice}
         </div>
       )}
-      <div className="mt-6">{renderRouteContent()}</div>
+      <div className={`mt-6 min-h-[420px] ${currentRouteStep === 3 ? '' : 'transition-all duration-300'} ${stepShellVisible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}>{renderRouteContent()}</div>
       <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">
         <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-3 py-3 shadow-xl shadow-slate-200/70 backdrop-blur-md">
           <button
@@ -317,17 +354,9 @@ export default function RouteStepView({ vm }: { vm: any }) {
           </button>
           <button
             type="button"
-            onClick={() => {
-              if (currentRouteStep === 5) {
-                void handleOpenSceneStudioClick();
-                return;
-              }
-              if (nextRouteStep) {
-                void completeStage(currentRouteStep, nextRouteStep as StepId);
-              }
-            }}
-            disabled={currentRouteStep !== 3 && !routeStepCompleted[currentRouteStep]}
-            className={`min-w-[140px] rounded-full px-6 py-3 text-sm font-black transition ${routeStepCompleted[currentRouteStep] ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-slate-300 text-slate-100 hover:bg-slate-300'} disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100`}
+            onClick={handleNextRouteStep}
+            disabled={!canMoveNext}
+            className={`min-w-[140px] rounded-full px-6 py-3 text-sm font-black transition ${canMoveNext ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-slate-300 text-slate-100 hover:bg-slate-300'} disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100`}
           >
             {currentRouteStep === 5 ? '영상 제작하기' : '다음으로'}
           </button>

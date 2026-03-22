@@ -1,4 +1,4 @@
-﻿import {
+import {
   AspectRatio,
   CharacterProfile,
   ContentType,
@@ -7,15 +7,9 @@
 } from '../types';
 import { getAspectRatioPrompt } from '../utils/aspectRatio';
 import { runOpenRouterText } from './openRouterService';
+import { buildVariantSuffix, createCreativeDirection } from '../config/creativeVariance';
 
 const BASE_STYLE_TEXT = `Stylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.`;
-
-function buildSimilaritySuffix(kind: 'character' | 'style', index: number) {
-  if (kind === 'character') {
-    return `similar variant ${index + 1}, keep the same character identity, face mood, hairstyle direction, outfit family, and silhouette. Only make a near-match alternative pose or detail update, full body, clean silhouette, highly similar result`;
-  }
-  return `similar variant ${index + 1}, keep the same art direction, color palette family, lighting rhythm, texture density, mood, and composition language. Only make a near-match visual alternative, highly similar result`;
-}
 
 function hashCode(value: string) {
   return Array.from(value).reduce((acc, char, index) => {
@@ -135,7 +129,8 @@ function extractSupportNames(script: string) {
 }
 
 function buildCharacterPrompt(name: string, roleLabel: string, script: string, styleHint: string) {
-  return `${name} / ${roleLabel}\n${BASE_STYLE_TEXT}\nunique character design, varied outfit style, clean silhouette, based on the story mood: ${styleHint}. Scene context: ${script.slice(0, 220)}`;
+  const direction = createCreativeDirection(`${name}:${roleLabel}:${styleHint}:${script}`, 0);
+  return `${name} / ${roleLabel}\n${BASE_STYLE_TEXT}\nunique character design, varied outfit style, clean silhouette, based on the story mood: ${styleHint}. Fresh direction: ${direction.shotType}. ${direction.visualHook} Scene context: ${script.slice(0, 220)}`;
 }
 
 function makeCharacter(options: {
@@ -283,7 +278,8 @@ export function buildStyleRecommendations(
   const picked = fallbackPool.slice(0, Math.max(1, limit));
 
   return picked.map(([label, accent], index) => {
-    const prompt = `${label}. Create a cohesive full-scene visual style for the final video. Keep background direction, composition rhythm, lighting logic, color palette, texture density, and rendering finish consistent across scenes. ${getAspectRatioPrompt(aspectRatio)}. Variation seed ${seed + index + excludeLabels.length}. Story context: ${(script || contentType).slice(0, 220)}.`;
+    const direction = createCreativeDirection(`${label}:${script}:${contentType}`, index, contentType);
+    const prompt = `${label}. Create a cohesive full-scene visual style for the final video. Keep background direction, composition rhythm, lighting logic, color palette, texture density, and rendering finish consistent across scenes, but make this recommendation feel newly authored. ${getAspectRatioPrompt(aspectRatio)}. Variation seed ${seed + index + excludeLabels.length}. ${direction.shotType}. ${direction.paletteDirection}. Story context: ${(script || contentType).slice(0, 220)}.`;
     return buildPromptPreviewCard({
       label,
       subtitle: contentType === 'info_delivery' ? '최종 영상용 정보형 화풍' : '최종 영상용 비주얼 화풍',
@@ -305,15 +301,16 @@ export function createPromptVariants(options: {
   groupLabel?: string;
   sourceMode?: PromptedImageAsset['sourceMode'];
   existingCount?: number;
+  mode?: 'fresh' | 'similar';
 }): PromptedImageAsset[] {
   const total = options.count || 1;
   const offset = options.existingCount || 0;
   return Array.from({ length: total }).map((_, index) => {
     const variantIndex = offset + index;
-    const suffix = buildSimilaritySuffix(options.kind, variantIndex);
+    const suffix = buildVariantSuffix(options.kind, `${options.title}:${options.prompt}`, variantIndex, options.mode || 'fresh');
     return buildPromptPreviewCard({
-      label: `${options.title} 유사안 ${variantIndex + 1}`,
-      subtitle: options.kind === 'character' ? '선택 캐릭터와 비슷한 추천' : '선택 화풍과 비슷한 추천',
+      label: `${options.title} ${options.mode === 'similar' ? '유사안' : '새 안'} ${variantIndex + 1}`,
+      subtitle: options.kind === 'character' ? (options.mode === 'similar' ? '선택 캐릭터와 비슷한 추천' : '선택 캐릭터 기반 새 후보') : (options.mode === 'similar' ? '선택 화풍과 비슷한 추천' : '선택 화풍 기반 새 후보'),
       prompt: `${options.prompt}\n${suffix}`,
       accent: options.kind === 'character' ? '#8b5cf6' : '#2563eb',
       kind: options.kind,

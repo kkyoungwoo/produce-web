@@ -25,5 +25,5 @@ export async function generateImage(
   _referenceImages: ReferenceImages,
   _options?: { qualityMode?: 'draft' | 'final' }
 ): Promise<string | null> {
-  return makeScenePlaceholderImage(scene.sceneNumber, scene.narration || scene.visualPrompt || 'scene', scene.aspectRatio || '16:9');
+  return makeScenePlaceholderImage(scene.sceneNumber, scene.imagePrompt || scene.visualPrompt || scene.narration || 'scene', scene.aspectRatio || '16:9');
 }

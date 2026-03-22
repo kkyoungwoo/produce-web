@@ -18,7 +18,7 @@ import {
   ScriptSpeechStyle,
 } from '../types';
 import { CONFIG, IMAGE_MODELS, QWEN_TTS_PRESET_OPTIONS, SCRIPT_MODEL_OPTIONS } from '../config';
-import { getCharacterSamplePreset, getStyleSamplePreset } from '../samples/presetCatalog';
+import { WORKFLOW_CHARACTER_STYLE_OPTIONS, getCharacterSamplePreset, getStyleSamplePreset } from '../samples/presetCatalog';
 import {
   buildSelectableStoryDraft,
   normalizeStoryText,
@@ -72,80 +72,7 @@ import {
 import MainStepView from './inputSection/views/MainStepView';
 import RouteStepView from './inputSection/views/RouteStepView';
 
-const CHARACTER_STYLE_OPTIONS = [
-  {
-    id: 'character-realistic',
-    label: '실사형 캐릭터',
-    description: '자연스러운 얼굴 비율과 현실적인 조명, 또렷한 인물 중심 묘사',
-    prompt: 'Generate characters in a realistic human style with natural facial proportions, clean wardrobe details, grounded lighting, and believable textures while keeping a clear silhouette.',
-    accentFrom: 'from-slate-900',
-    accentTo: 'to-slate-600',
-  },
-  {
-    id: 'character-kdrama',
-    label: 'K-드라마 캐릭터',
-    description: '따뜻한 피부톤과 친근한 조명, 감정선이 잘 보이는 한국형 드라마 톤',
-    prompt: 'Generate characters in a warm Korean drama style with flattering skin tones, soft cinematic lighting, natural wardrobe details, and emotionally readable facial acting.',
-    accentFrom: 'from-rose-500',
-    accentTo: 'to-orange-400',
-  },
-  {
-    id: 'character-noir',
-    label: '느와르 캐릭터',
-    description: '강한 명암과 차가운 도시 야경, 범죄 스릴러 분위기에 어울리는 인물 연출',
-    prompt: 'Generate characters in a noir crime thriller style with hard contrast lighting, cold urban night tones, sharp silhouettes, and an intense cinematic presence.',
-    accentFrom: 'from-slate-800',
-    accentTo: 'to-blue-700',
-  },
-  {
-    id: 'character-futuristic',
-    label: 'SF 퓨처리스틱 캐릭터',
-    description: '메탈릭 질감과 네온 조명, 미래 도시 감성이 살아있는 하이테크 캐릭터',
-    prompt: 'Generate characters in a futuristic sci-fi style with neon reflections, sleek high-tech wardrobe cues, metallic material accents, and a polished cyber city atmosphere.',
-    accentFrom: 'from-cyan-500',
-    accentTo: 'to-violet-500',
-  },
-  {
-    id: 'character-anime',
-    label: '애니형 캐릭터',
-    description: '선명한 라인과 셀 셰이딩, 감정 표현이 또렷한 애니 감성',
-    prompt: 'Generate characters in a polished anime style with expressive eyes, clean line art, cel shading, and vibrant but controlled color accents.',
-    accentFrom: 'from-fuchsia-600',
-    accentTo: 'to-violet-500',
-  },
-  {
-    id: 'character-webtoon',
-    label: '웹툰형 캐릭터',
-    description: '웹툰 컷에 잘 어울리는 또렷한 외곽선과 리듬감 있는 채색',
-    prompt: 'Generate characters in a Korean webtoon style with crisp outlines, readable silhouettes, polished facial acting, and stylish but simplified coloring.',
-    accentFrom: 'from-blue-600',
-    accentTo: 'to-cyan-500',
-  },
-  {
-    id: 'character-royal-fantasy',
-    label: '로판 캐릭터',
-    description: '궁정 분위기와 장식성이 강조된 화려한 로맨스 판타지 캐릭터',
-    prompt: 'Generate characters in a romantic fantasy court style with luxurious costume details, elegant poses, decorative accessories, and graceful lighting.',
-    accentFrom: 'from-pink-500',
-    accentTo: 'to-fuchsia-500',
-  },
-  {
-    id: 'character-3d',
-    label: '3D형 캐릭터',
-    description: '입체감 있는 재질과 부드러운 조명, 장난감처럼 정리된 비율',
-    prompt: 'Generate characters in a stylized 3D illustration style with soft studio lighting, dimensional materials, and a polished cinematic finish.',
-    accentFrom: 'from-emerald-600',
-    accentTo: 'to-teal-500',
-  },
-  {
-    id: 'character-illustration',
-    label: '일러스트형 캐릭터',
-    description: '포스터처럼 깔끔한 구도와 감성적인 브러시 질감이 있는 캐릭터',
-    prompt: 'Generate characters in a premium illustration style with editorial composition, tasteful brush texture, elegant color design, and a strong silhouette.',
-    accentFrom: 'from-amber-500',
-    accentTo: 'to-orange-500',
-  },
-] as const;
+const CHARACTER_STYLE_OPTIONS = WORKFLOW_CHARACTER_STYLE_OPTIONS;
 
 const SCRIPT_DURATION_PRESETS = [1, 3, 5, 8, 10, 15, 20, 25, 30] as const;
 
@@ -217,7 +144,9 @@ const InputSection: React.FC<InputSectionProps> = ({
     script: initial.script || '',
   });
   const initialTemplates = resolveWorkflowPromptTemplates(initialContentType, initialPromptPack, initial.promptTemplates || []);
-  const initialStep1Selected = Boolean(initial.completedSteps?.step1 || initialStage > 1);
+  const initialHasSelectedContentType = Boolean(initial.hasSelectedContentType ?? initial.completedSteps?.step1 ?? (initialStage > 1));
+  const initialHasSelectedAspectRatio = Boolean(initial.hasSelectedAspectRatio ?? initial.completedSteps?.step1 ?? (initialStage > 1));
+  const step1SelectionRef = useRef({ contentType: initialHasSelectedContentType, aspectRatio: initialHasSelectedAspectRatio });
   const initialCustomScriptSettings = initial.customScriptSettings || {
     expectedDurationMinutes: 3,
     speechStyle: 'default' as ScriptSpeechStyle,
@@ -232,8 +161,15 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [contentType, setContentType] = useState<ContentType>(initialContentType);
   const [topic, setTopic] = useState(initial.topic || getTopicSuggestion(initialContentType, ''));
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>(initialAspectRatio);
-  const [hasSelectedContentType, setHasSelectedContentType] = useState(initialStep1Selected);
-  const [hasSelectedAspectRatio, setHasSelectedAspectRatio] = useState(initialStep1Selected);
+  const [hasSelectedContentType, setHasSelectedContentType] = useState(initialHasSelectedContentType);
+  const [hasSelectedAspectRatio, setHasSelectedAspectRatio] = useState(initialHasSelectedAspectRatio);
+
+  useEffect(() => {
+    step1SelectionRef.current = {
+      contentType: hasSelectedContentType,
+      aspectRatio: hasSelectedAspectRatio,
+    };
+  }, [hasSelectedContentType, hasSelectedAspectRatio]);
   const [storyScript, setStoryScript] = useState(initial.script || '');
   const [genre, setGenre] = useState(initialSelections.genre || FIELD_OPTIONS_BY_TYPE[initialContentType].genre[0]);
   const [mood, setMood] = useState(initialSelections.mood || FIELD_OPTIONS_BY_TYPE[initialContentType].mood[0]);
@@ -267,6 +203,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [characterLoadingProgress, setCharacterLoadingProgress] = useState<Record<string, number>>({});
   const [styleCarouselIndices, setStyleCarouselIndices] = useState<Record<string, number>>({});
   const [styleLoadingProgress, setStyleLoadingProgress] = useState<Record<string, number>>({});
+  const [step3CastSelectionHighlightTick, setStep3CastSelectionHighlightTick] = useState(0);
   const [newCharacterName, setNewCharacterName] = useState('');
   const [newCharacterPrompt, setNewCharacterPrompt] = useState('');
   const [characterUploadTargetId, setCharacterUploadTargetId] = useState<string | null>(null);
@@ -300,14 +237,33 @@ const InputSection: React.FC<InputSectionProps> = ({
     setOpenStage(nextStage);
   };
 
+  const workflowHydrationKey = routeStep
+    ? [
+        workflowDraft?.id || 'draft',
+        routeStep,
+        workflowDraft?.updatedAt || 0,
+        workflowDraft?.activeStage || 1,
+        workflowDraft?.contentType || '',
+        workflowDraft?.topic || '',
+        workflowDraft?.script || '',
+        (workflowDraft?.selectedCharacterIds || []).join(','),
+        workflowDraft?.selectedCharacterStyleId || '',
+        workflowDraft?.selectedStyleImageId || '',
+        workflowDraft?.extractedCharacters?.length || 0,
+        workflowDraft?.styleImages?.length || 0,
+      ].join('::')
+    : (workflowDraft?.id || 'draft');
+
   useEffect(() => {
-    const draftKey = workflowDraft?.id || 'draft';
-    if (hydratedDraftIdRef.current === draftKey) return;
-    hydratedDraftIdRef.current = draftKey;
+    if (hydratedDraftIdRef.current === workflowHydrationKey) return;
+    const previousDraftId = hydratedDraftIdRef.current.split('::')[0] || '';
+    hydratedDraftIdRef.current = workflowHydrationKey;
 
     const nextType = workflowDraft?.contentType || studioState?.lastContentType || 'story';
     const nextSelections = workflowDraft?.selections || FIELD_OPTIONS_BY_TYPE[nextType];
     const nextStage = normalizeStage(workflowDraft?.activeStage || 1);
+    const currentDraftId = workflowDraft?.id || 'draft';
+    const shouldPreserveStep1Selection = previousDraftId === currentDraftId;
     const nextPromptPack = buildWorkflowPromptPack({
       contentType: nextType,
       topic: workflowDraft?.topic || '',
@@ -320,8 +276,14 @@ const InputSection: React.FC<InputSectionProps> = ({
     setTopic(workflowDraft?.topic || getTopicSuggestion(nextType, ''));
     setAspectRatio(workflowDraft?.aspectRatio || '16:9');
     const step1Selected = Boolean(workflowDraft?.completedSteps?.step1 || nextStage > 1);
-    setHasSelectedContentType(step1Selected);
-    setHasSelectedAspectRatio(step1Selected);
+    const nextHasSelectedContentType = workflowDraft?.hasSelectedContentType !== undefined
+      ? workflowDraft.hasSelectedContentType
+      : (shouldPreserveStep1Selection ? step1SelectionRef.current.contentType : step1Selected);
+    const nextHasSelectedAspectRatio = workflowDraft?.hasSelectedAspectRatio !== undefined
+      ? workflowDraft.hasSelectedAspectRatio
+      : (shouldPreserveStep1Selection ? step1SelectionRef.current.aspectRatio : step1Selected);
+    setHasSelectedContentType(Boolean(nextHasSelectedContentType));
+    setHasSelectedAspectRatio(Boolean(nextHasSelectedAspectRatio));
     setStoryScript(workflowDraft?.script || '');
     setGenre(nextSelections.genre || FIELD_OPTIONS_BY_TYPE[nextType].genre[0]);
     setMood(nextSelections.mood || FIELD_OPTIONS_BY_TYPE[nextType].mood[0]);
@@ -361,7 +323,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setShowReferenceLinkInput(false);
     setSelectedScriptGenerationModel(workflowDraft?.customScriptSettings?.scriptModel || workflowDraft?.openRouterModel || SCRIPT_MODEL_OPTIONS[0].id);
     setConstitutionAnalysis(workflowDraft?.constitutionAnalysis || null);
-  }, [workflowDraft?.id, studioState?.lastContentType]);
+  }, [workflowHydrationKey, workflowDraft, studioState?.lastContentType]);
 
   useEffect(() => {
     let cancelled = false;
@@ -839,6 +801,8 @@ const InputSection: React.FC<InputSectionProps> = ({
     styleImages,
     characterImages: extractedCharacters.flatMap((item) => item.generatedImages || []),
     selectedCharacterIds: effectiveSelectedCharacterIds,
+    hasSelectedContentType,
+    hasSelectedAspectRatio,
     selectedCharacterStyleId: selectedCharacterStyle?.id || null,
     selectedCharacterStyleLabel: selectedCharacterStyle?.label || '',
     selectedCharacterStylePrompt: selectedCharacterStyle?.prompt || '',
@@ -857,11 +821,11 @@ const InputSection: React.FC<InputSectionProps> = ({
     },
     constitutionAnalysis,
     completedSteps: {
-      step1: stageStatus[1],
-      step2: stageStatus[2],
-      step3: stageStatus[3],
-      step4: stageStatus[4],
-      step5: stageStatus[5],
+      step1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
+      step2: Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()),
+      step3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
+      step4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
+      step5: Boolean(selectedStyleImageId || styleImages[0]?.id),
     },
   });
 
@@ -883,7 +847,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         ...payload.completedSteps,
         step1: completedStage >= 1 ? Boolean(hasSelectedContentType && hasSelectedAspectRatio) : payload.completedSteps.step1,
         step2: completedStage >= 2 ? Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()) : payload.completedSteps.step2,
-        step3: completedStage >= 3 ? Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length) : payload.completedSteps.step3,
+        step3: completedStage >= 3 ? Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection) : payload.completedSteps.step3,
         step4: completedStage >= 4 ? Boolean(effectiveSelectedCharacterIds.length && selectedCharacterStyleId && selectedCharactersReady) : payload.completedSteps.step4,
         step5: completedStage >= 5 ? Boolean(selectedStyleImageId || styleImages[0]?.id) : payload.completedSteps.step5,
       },
@@ -942,6 +906,8 @@ const InputSection: React.FC<InputSectionProps> = ({
     extractedCharacters,
     styleImages,
     selectedCharacterIds,
+    hasSelectedContentType,
+    hasSelectedAspectRatio,
     selectedCharacterStyleId,
     selectedStyleImageId,
     customScriptDurationMinutes,
@@ -1177,26 +1143,28 @@ const InputSection: React.FC<InputSectionProps> = ({
           1: '1단계에서 먼저 제작 유형과 화면 비율을 고른 뒤 2단계로 넘어가 주세요.',
           2: '2단계에서 주제와 핵심 선택값을 채워 프롬프트 / 대본 방향을 먼저 고정해 주세요.',
           3: '3단계에서는 프롬프트를 고르고 대본을 준비해야 4단계 캐릭터 생성으로 넘어갈 수 있습니다.',
-          4: '4단계에서는 출연자 카드와 공통 캐릭터 스타일을 함께 확정해야 5단계 화풍 선택으로 넘어갈 수 있습니다.',
+          4: '4단계에서는 출연자 선택과 공통 캐릭터 느낌만 확정하면 5단계 화풍 선택으로 넘어갈 수 있습니다.',
           5: '5단계에서는 최종 영상 화풍을 1개 선택한 뒤 프로젝트에 저장하고 씬 제작으로 넘어갈 수 있습니다.',
         }
       : {
           1: '1단계에서 먼저 제작 유형과 화면 비율을 고른 뒤 2단계로 넘어가 주세요.',
           2: '2단계에서 주제와 핵심 선택값을 채워 프롬프트 / 대본 방향을 먼저 고정해 주세요.',
           3: '3단계에서 프롬프트와 대본을 만든 뒤, 대본 기준 출연자 준비와 출연자 선택까지 마쳐 주세요.',
-          4: '4단계에서는 출연자 카드와 공통 캐릭터 스타일을 확정해 주세요.',
+          4: '4단계에서는 출연자 선택과 공통 캐릭터 느낌을 확정해 주세요.',
           5: '5단계에서는 최종 영상 화풍을 확인한 뒤 씬 제작으로 넘어가 주세요.',
         };
     const completionMap = routeStep ? routeStepCompleted : stepCompleted;
 
     if (!completionMap[stage]) {
       if (stage === 3 && normalizedScript.trim() && !selectedCharacterIds.length) {
+        setStep3CastSelectionHighlightTick((prev) => prev + 1);
         setNotice('대본은 준비되었습니다. 아래 출연자 선택에서 Step4로 넘길 출연자를 1명 이상 골라 주세요. 선택 위치까지 바로 내려갑니다.');
         openOnly(3);
         scrollToStep3CastSelection();
         return false;
       }
       if (stage === 3 && normalizedScript.trim() && selectedCharacterIds.length && !selectedCharactersHaveVoiceSelection) {
+        setStep3CastSelectionHighlightTick((prev) => prev + 1);
         setNotice('선택한 출연자의 TTS 설정을 먼저 골라 주세요. 출연자 카드 위치까지 바로 이동합니다.');
         openOnly(3);
         scrollToStep3CastSelection();
@@ -1212,16 +1180,25 @@ const InputSection: React.FC<InputSectionProps> = ({
       const nextActiveStage = normalizeStage(nextStage);
       let hydrationOverrides: Partial<Pick<WorkflowDraft, 'extractedCharacters' | 'selectedCharacterIds'>> | undefined;
       if (stage === 3 && nextActiveStage === 4) {
-        const hydrated = await hydrateCharactersForScript({ preserveSelection: true });
-        if (hydrated) {
+        const currentSelectedIds = selectedCharacterIds.filter((characterId) => extractedCharacters.some((character) => character.id === characterId));
+        if (extractedCharacters.length && currentSelectedIds.length) {
           hydrationOverrides = {
-            extractedCharacters: hydrated.characters,
-            selectedCharacterIds: hydrated.selectedIds,
+            extractedCharacters,
+            selectedCharacterIds: currentSelectedIds,
           };
+        } else {
+          const hydrated = await hydrateCharactersForScript({ preserveSelection: true });
+          if (hydrated) {
+            hydrationOverrides = {
+              extractedCharacters: hydrated.characters,
+              selectedCharacterIds: hydrated.selectedIds,
+            };
+          }
         }
       }
+      const navigationDraftPayload = buildNavigationDraftPayload(stage, nextStage, hydrationOverrides);
       if (onSaveWorkflowDraft) {
-        await onSaveWorkflowDraft(buildNavigationDraftPayload(stage, nextStage, hydrationOverrides));
+        await Promise.resolve(onSaveWorkflowDraft(navigationDraftPayload));
       }
       setNotice(`${stage}단계 완료. ${nextStage}단계로 이동합니다.`);
       if (routeStep) {
@@ -1398,6 +1375,14 @@ const InputSection: React.FC<InputSectionProps> = ({
       return changed ? next : prev;
     });
   }, [contentType, selectedCharacterIds.join('::')]);
+
+  useEffect(() => {
+    const validCharacterIds = new Set(extractedCharacters.map((item) => item.id));
+    setSelectedCharacterIds((prev) => {
+      const next = prev.filter((id) => validCharacterIds.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [extractedCharacters]);
 
   useEffect(() => {
     const isStep3Open = routeStep ? routeStep === 3 : openStage === 3;
@@ -1694,27 +1679,66 @@ const InputSection: React.FC<InputSectionProps> = ({
         allowAi,
       });
 
-      const normalizedCharacterKey = (character: CharacterProfile) => `${(character.name || '').trim().toLowerCase()}::${character.role || ''}`;
-      const previouslySelectedKeys = options?.preserveSelection
-        ? new Set(
-            extractedCharacters
-              .filter((item) => selectedCharacterIds.includes(item.id))
-              .map((item) => normalizedCharacterKey(item))
-              .filter(Boolean)
-          )
-        : new Set<string>();
+      const normalizedCharacterName = (character: CharacterProfile) => (character.name || '').trim().toLowerCase();
+      const normalizedCharacterKey = (character: CharacterProfile) => `${normalizedCharacterName(character)}::${character.role || ''}`;
+      const previousCharacters = Array.isArray(extractedCharacters) ? extractedCharacters : [];
+      const previousCharacterByKey = new Map(
+        previousCharacters
+          .map((item) => [normalizedCharacterKey(item), item] as const)
+          .filter(([key]) => Boolean(key))
+      );
+      const previousCharacterByName = new Map(
+        previousCharacters
+          .map((item) => [normalizedCharacterName(item), item] as const)
+          .filter(([key]) => Boolean(key))
+      );
+      const previouslySelectedCharacters = options?.preserveSelection
+        ? previousCharacters.filter((item) => selectedCharacterIds.includes(item.id))
+        : [];
+      const previouslySelectedKeys = new Set(
+        previouslySelectedCharacters
+          .map((item) => normalizedCharacterKey(item))
+          .filter(Boolean)
+      );
+      const previouslySelectedNames = new Set(
+        previouslySelectedCharacters
+          .map((item) => normalizedCharacterName(item))
+          .filter(Boolean)
+      );
       const preservedIds = options?.preserveSelection
         ? nextCharacters
-            .filter((item) => previouslySelectedKeys.has(normalizedCharacterKey(item)))
+            .filter((item) => previouslySelectedKeys.has(normalizedCharacterKey(item)) || previouslySelectedNames.has(normalizedCharacterName(item)))
             .map((item) => item.id)
         : [];
       const nextSelectedIds = preservedIds.length ? preservedIds : [];
-      const normalizedCharacters = nextCharacters.map((item) => ({
-        ...item,
-        ...(contentType === 'music_video' || !nextSelectedIds.includes(item.id) ? {} : buildCharacterVoicePatch('project-default')),
-        selectedImageId: null,
-        imageData: null,
-      }));
+      const normalizedCharacters = nextCharacters.map((item) => {
+        const previousCharacter = previousCharacterByKey.get(normalizedCharacterKey(item))
+          || previousCharacterByName.get(normalizedCharacterName(item))
+          || null;
+        const preservedGeneratedImages = Array.isArray(previousCharacter?.generatedImages) ? previousCharacter.generatedImages : [];
+        const preservedSelectedImageId = previousCharacter?.selectedImageId || null;
+        const preservedSelectedImage = preservedGeneratedImages.find((image) => image.id === preservedSelectedImageId) || preservedGeneratedImages[0] || null;
+        const nextCharacter: CharacterProfile = {
+          ...item,
+          prompt: previousCharacter?.prompt || item.prompt,
+          visualStyle: previousCharacter?.visualStyle || item.visualStyle,
+          voiceHint: previousCharacter?.voiceHint,
+          voiceProvider: previousCharacter?.voiceProvider,
+          voiceId: previousCharacter?.voiceId,
+          voiceName: previousCharacter?.voiceName,
+          voicePreviewUrl: previousCharacter?.voicePreviewUrl,
+          voiceLocale: previousCharacter?.voiceLocale,
+          generatedImages: preservedGeneratedImages,
+          selectedImageId: preservedSelectedImageId,
+          imageData: previousCharacter?.imageData || preservedSelectedImage?.imageData || null,
+        };
+
+        if (contentType !== 'music_video' && nextSelectedIds.includes(item.id) && !nextCharacter.voiceProvider) {
+          Object.assign(nextCharacter, buildCharacterVoicePatch('project-default'));
+        }
+
+        return nextCharacter;
+      });
       setExtractedCharacters(normalizedCharacters);
       setSelectedCharacterIds(nextSelectedIds);
       setCharacterCarouselIndices({});
@@ -1917,7 +1941,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setNotice(
       options?.note?.trim() || options?.sourceLabel
         ? `${character.name} 기준으로 요청한 느낌을 반영한 새 후보 1장을 추가했습니다.`
-        : `${character.name} 기준 추천 카드 1장을 오른쪽 슬롯에 추가했습니다. 새 후보는 현재 공통 캐릭터 스타일을 반영합니다.`
+        : `${character.name} 기준으로 새로운 후보 1장을 오른쪽 슬롯에 추가했습니다. 새 후보는 현재 공통 캐릭터 스타일을 반영하되 직전 후보와 다른 결을 우선합니다.`
     );
   };
 
@@ -1955,7 +1979,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       delete next[groupId];
       return next;
     });
-    setNotice(`${styleCard.groupLabel || styleCard.label} 화풍 기준 유사안 1장을 같은 카드 안에 추가했습니다.`);
+    setNotice(`${styleCard.groupLabel || styleCard.label} 화풍 기준으로 새로운 후보 1장을 같은 카드 안에 추가했습니다.`);
   };
 
   const buildUploadPrompt = (label: string, kind: 'character' | 'style') => buildUploadDrivenPrompt({
@@ -2626,6 +2650,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           handleCharacterVoiceDirectInputChange,
           handlePreviewCharacterVoice,
           getCharacterVoiceSummary,
+          step3CastSelectionHighlightTick,
           newCharacterName,
           newCharacterPrompt,
           setNewCharacterName,

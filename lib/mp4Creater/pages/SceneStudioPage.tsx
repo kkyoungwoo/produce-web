@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Header from '../components/Header';
 import SettingsDrawer from '../components/SettingsDrawer';
 import ProviderQuickModal from '../components/ProviderQuickModal';
-import ResultTable from '../components/ResultTable';
 import { LoadingOverlay } from '../components/LoadingOverlay';
 import { OverlayModal } from '../components/inputSection/ui';
 import {
@@ -38,10 +38,28 @@ import { estimateClipDuration, splitStoryIntoParagraphScenes } from '../utils/st
 import {
   applySelectionPromptsToScenes as applyDraftSelectionPromptsToScenes,
   createInitialSceneAssetsFromDraft,
+  createLightweightSceneAssetsFromDraft,
   createLocalScenesFromDraft,
 } from '../services/sceneAssemblyService';
 import { triggerBlobDownload } from '../utils/downloadHelpers';
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const MAX_SCENE_DURATION = 6;
+const clampSceneDuration = (value?: number | null) => Math.min(MAX_SCENE_DURATION, Math.max(3, Number((value || 3).toFixed(1))));
+
+const ResultTable = dynamic(() => import('../components/ResultTable'), {
+  ssr: false,
+  loading: () => (
+    <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">씬 제작 페이지</div>
+      <div className="mt-3 text-lg font-black text-slate-900">저장된 프로젝트를 불러와 작업판을 준비하는 중입니다.</div>
+      <div className="mt-4 grid gap-3">
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="h-[180px] animate-pulse rounded-[24px] border border-slate-200 bg-slate-100" />
+        ))}
+      </div>
+    </section>
+  ),
+});
 
 async function withSoftTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -62,39 +80,33 @@ function mergeAiScenesIntoLocalScenes(localScenes: ScriptScene[], aiScenes?: Scr
   return localScenes.map((scene, index) => ({
     ...scene,
     visualPrompt: aiScenes[index]?.visualPrompt || scene.visualPrompt,
+    imagePrompt: aiScenes[index]?.imagePrompt || aiScenes[index]?.visualPrompt || scene.imagePrompt || scene.visualPrompt,
+    videoPrompt: aiScenes[index]?.videoPrompt || scene.videoPrompt || '',
     analysis: aiScenes[index]?.analysis || scene.analysis,
   }));
 }
 
 function createEmptySceneAssetsFromDraft(draft: WorkflowDraft): GeneratedAsset[] {
-  return createInitialSceneAssetsFromDraft(draft).map((asset) => ({
-    ...asset,
-    imageData: null,
-    sourceMode: 'sample',
-    status: 'pending',
-    imageHistory: [],
-    videoData: null,
-    videoHistory: [],
-  }));
+  return createLightweightSceneAssetsFromDraft(draft);
 }
 
 function createBootstrapStudioState(projectId: string): StudioState {
   const cachedState = getCachedStudioState();
-  if (cachedState) return cachedState;
-
   const cachedProject = projectId ? readProjectNavigationProject(projectId) : null;
+
   if (cachedProject?.workflowDraft) {
     return {
-      ...createDefaultStudioState(),
+      ...(cachedState || createDefaultStudioState()),
       workflowDraft: cachedProject.workflowDraft,
-      projects: [cachedProject],
-      lastContentType: cachedProject.workflowDraft?.contentType || 'story',
+      projects: cachedProject ? [cachedProject, ...((cachedState?.projects || []).filter((item) => item.id !== cachedProject.id))] : (cachedState?.projects || []),
+      lastContentType: cachedProject.workflowDraft?.contentType || cachedState?.lastContentType || 'story',
       storageDir: cachedState?.storageDir || DEFAULT_STORAGE_DIR,
       isStorageConfigured: Boolean((cachedState?.storageDir || DEFAULT_STORAGE_DIR).trim()),
       updatedAt: Date.now(),
     };
   }
 
+  if (cachedState) return cachedState;
   return createDefaultStudioState();
 }
 
@@ -134,12 +146,14 @@ const SceneStudioPage: React.FC = () => {
   const [previewVideoMessage, setPreviewVideoMessage] = useState('결과보기에서 합본 영상 상태를 먼저 안내합니다.');
   const [taskProgressPercent, setTaskProgressPercent] = useState<number | null>(null);
   const [sceneProgressMap, setSceneProgressMap] = useState<Record<number, { percent: number; label: string }>>({});
+  const [projectLookupTick, setProjectLookupTick] = useState(0);
   const assetsRef = useRef<GeneratedAsset[]>([]);
   const studioStateRef = useRef<StudioState | null>(null);
   const isAbortedRef = useRef(false);
   const isProcessingRef = useRef(false);
   const autosaveTimerRef = useRef<number | null>(null);
   const projectQueryHandledRef = useRef('');
+  const projectQueryRetryTimerRef = useRef<number | null>(null);
   const currentCostRef = useRef<CostBreakdown>({ images: 0, tts: 0, videos: 0, total: 0, imageCount: 0, ttsCharacters: 0, videoCount: 0 });
   const autosaveSignatureRef = useRef('');
   const thumbnailToolbarRef = useRef<HTMLDivElement | null>(null);
@@ -152,20 +166,45 @@ const SceneStudioPage: React.FC = () => {
     } catch {}
 
     const cachedState = getCachedStudioState();
-    if (cachedState) {
+    const cachedProject = requestedProjectId ? readProjectNavigationProject(requestedProjectId) : null;
+    const bootstrapState = createBootstrapStudioState(requestedProjectId);
+
+    if (cachedProject?.workflowDraft) {
+      setStudioState(bootstrapState);
+      setBackgroundMusicTracks(cachedProject.backgroundMusicTracks || []);
+    } else if (cachedState) {
       setStudioState(cachedState);
       if (cachedState.workflowDraft) setBackgroundMusicTracks([]);
     }
 
     void (async () => {
-      const state = await fetchStudioState({ force: true });
+      const state = await withSoftTimeout(fetchStudioState({ force: true }), 2500, cachedState || bootstrapState);
       if (cancelled) return;
+
+      if (cachedProject?.workflowDraft) {
+        setStudioState((prev) => ({
+          ...(state || prev || createDefaultStudioState()),
+          workflowDraft: cachedProject.workflowDraft,
+          projects: cachedProject ? [cachedProject, ...(((state || prev || createDefaultStudioState()).projects || []).filter((item) => item.id !== cachedProject.id))] : ((state || prev || createDefaultStudioState()).projects || []),
+          lastContentType: cachedProject.workflowDraft?.contentType || (state || prev || createDefaultStudioState()).lastContentType || 'story',
+          storageDir: (state || prev || createDefaultStudioState()).storageDir || DEFAULT_STORAGE_DIR,
+          isStorageConfigured: Boolean(((state || prev || createDefaultStudioState()).storageDir || DEFAULT_STORAGE_DIR).trim()),
+          updatedAt: Date.now(),
+        }));
+        setBackgroundMusicTracks(cachedProject.backgroundMusicTracks || []);
+        return;
+      }
+
       setStudioState(state);
       if (state.workflowDraft) setBackgroundMusicTracks([]);
     })();
 
     return () => {
       cancelled = true;
+      if (projectQueryRetryTimerRef.current) {
+        window.clearTimeout(projectQueryRetryTimerRef.current);
+        projectQueryRetryTimerRef.current = null;
+      }
     };
   }, [requestedProjectId]);
 
@@ -459,15 +498,16 @@ const SceneStudioPage: React.FC = () => {
 
   useEffect(() => {
     if (!studioState) return;
-    const projectId = searchParams?.get('projectId') || '';
+    const projectId = requestedProjectId;
     if (!projectId) return;
-    const signature = projectId;
+    const signature = `${projectId}:${projectLookupTick}`;
     if (projectQueryHandledRef.current === signature) return;
     projectQueryHandledRef.current = signature;
 
     let cancelled = false;
 
     void (async () => {
+      setStep((prev) => (prev === GenerationStep.IDLE ? GenerationStep.ASSETS : prev));
       setProgressMessage('프로젝트 요약과 씬 카드를 먼저 붙이는 중...');
 
       const cachedProject = readProjectNavigationProject(projectId) || await getProjectById(projectId, { localOnly: true });
@@ -485,8 +525,17 @@ const SceneStudioPage: React.FC = () => {
         applyProjectToScreen(cachedProject, { message: `"${cachedProject.name}" 프로젝트를 빠르게 열었습니다. 저장본을 확인하는 동안 씬 카드는 먼저 보여 드립니다.` });
       }
 
-      const project = await getProjectById(projectId, { forceSync: !cachedProject });
-      if (cancelled || !project) return;
+      const project = await withSoftTimeout(getProjectById(projectId, { forceSync: !cachedProject }), 3500, cachedProject || null);
+      if (cancelled) return;
+      if (!project) {
+        projectQueryHandledRef.current = '';
+        setProgressMessage('저장 직후 프로젝트 상세 JSON을 다시 확인하는 중입니다...');
+        if (projectQueryRetryTimerRef.current) window.clearTimeout(projectQueryRetryTimerRef.current);
+        projectQueryRetryTimerRef.current = window.setTimeout(() => {
+          setProjectLookupTick((prev) => prev + 1);
+        }, 220);
+        return;
+      }
 
       const projectDraft = project.workflowDraft;
       if (projectDraft) {
@@ -506,18 +555,22 @@ const SceneStudioPage: React.FC = () => {
           } : prev);
         } else {
           const baseStudioState = studioStateRef.current || createDefaultStudioState();
-          const syncedState = await saveStudioState({
+          const syncedState = {
             ...baseStudioState,
             workflowDraft: projectDraft,
             lastContentType: projectDraft.contentType || baseStudioState.lastContentType || 'story',
             updatedAt: Date.now(),
-          });
+          };
           if (!cancelled) setStudioState(syncedState);
         }
       }
 
       applyProjectToScreen(project);
       clearProjectNavigationProject(projectId);
+      if (projectQueryRetryTimerRef.current) {
+        window.clearTimeout(projectQueryRetryTimerRef.current);
+        projectQueryRetryTimerRef.current = null;
+      }
       try {
         localStorage.removeItem(CONFIG.STORAGE_KEYS.PENDING_SCENE_AUTOSTART);
       } catch {}
@@ -525,8 +578,12 @@ const SceneStudioPage: React.FC = () => {
 
     return () => {
       cancelled = true;
+      if (projectQueryRetryTimerRef.current) {
+        window.clearTimeout(projectQueryRetryTimerRef.current);
+        projectQueryRetryTimerRef.current = null;
+      }
     };
-  }, [applyProjectToScreen, searchParams]);
+  }, [applyProjectToScreen, projectLookupTick, requestedProjectId]);
 
 
   const handleGenerate = useCallback(async (options?: { preserveExistingCards?: boolean; generateAudio?: boolean }) => {
@@ -574,7 +631,7 @@ const SceneStudioPage: React.FC = () => {
           ...existing,
           ...scene,
           aspectRatio: scene.aspectRatio || existing?.aspectRatio || draft.aspectRatio || '16:9',
-          targetDuration: existing?.targetDuration || scene.targetDuration || estimateClipDuration(scene.narration),
+          targetDuration: clampSceneDuration(existing?.targetDuration || scene.targetDuration || estimateClipDuration(scene.narration)),
           imageHistory: existing?.imageHistory || [],
           videoHistory: existing?.videoHistory || [],
           status: existing?.imageData ? 'completed' : 'pending',
@@ -631,6 +688,8 @@ const SceneStudioPage: React.FC = () => {
           sourceMode,
           status: 'completed',
           aspectRatio: currentAspectRatio,
+          targetDuration: clampSceneDuration(assetsRef.current[i].targetDuration || estimateClipDuration(assetsRef.current[i].narration)),
+          selectedVisualType: 'image',
         });
         setSceneProgress(i, isTtsAvailable ? 72 : 100, isTtsAvailable ? '오디오 대기 중' : '이미지 준비 완료');
 
@@ -648,7 +707,7 @@ const SceneStudioPage: React.FC = () => {
                 audioData: audio.audioData,
                 subtitleData: audio.subtitleData,
                 audioDuration: audio.estimatedDuration,
-                targetDuration: Math.max(assetsRef.current[i].targetDuration || 0, audio.estimatedDuration || 0, 3),
+                targetDuration: clampSceneDuration(assetsRef.current[i].targetDuration || audio.estimatedDuration || 3),
               });
               addCost('tts', PRICING.TTS.perCharacter * assetsRef.current[i].narration.length, assetsRef.current[i].narration.length);
             }
@@ -919,6 +978,7 @@ const SceneStudioPage: React.FC = () => {
           imageHistory: appendImageHistory(assetsRef.current[index], imageData, usesSampleImageFlow ? 'sample' : 'ai', usesSampleImageFlow ? '샘플 / 저부하 초안 이미지' : 'AI 재생성 이미지'),
           sourceMode: usesSampleImageFlow ? 'sample' : 'ai',
           status: 'completed',
+          selectedVisualType: 'image',
         });
         if (!usesSampleImageFlow) {
           const price = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
@@ -937,6 +997,7 @@ const SceneStudioPage: React.FC = () => {
         sourceMode: 'sample',
         status: 'completed',
         aspectRatio: assetsRef.current[index].aspectRatio || draft.aspectRatio || '16:9',
+        selectedVisualType: 'image',
       });
       setSceneProgress(index, 100, '샘플 이미지로 교체 완료');
     }
@@ -975,20 +1036,15 @@ const SceneStudioPage: React.FC = () => {
 
   const handleGenerateAnimation = async (index: number) => {
     const falKey = studioState?.providers?.falApiKey || getFalApiKey();
-    if (!falKey) {
-      setTaskProgressPercent(null);
-      openApiModal({ title: '영상 변환용 API가 필요합니다', description: 'FAL 키나 직접 연결한 외부 영상 공급자 키를 등록하면 이 씬만 영상으로 변환할 수 있습니다.', focusField: 'fal' });
-      return;
-    }
     if (!assetsRef.current[index]?.imageData) return;
     if (animatingIndices.has(index)) return;
 
     try {
       setAnimatingIndices((prev) => new Set(prev).add(index));
       setTaskProgressPercent(10);
-      setSceneProgress(index, 20, '영상 프롬프트 생성');
-      const motionPrompt = await generateMotionPrompt(assetsRef.current[index].narration, assetsRef.current[index].visualPrompt);
-      const videoUrl = await generateVideoFromImage(
+      setSceneProgress(index, 20, falKey ? '영상 프롬프트 생성' : '샘플 영상 준비');
+      const motionPrompt = (assetsRef.current[index].videoPrompt || '').trim() || await generateMotionPrompt(assetsRef.current[index].narration, assetsRef.current[index].imagePrompt || assetsRef.current[index].visualPrompt);
+      const videoResult = await generateVideoFromImage(
         assetsRef.current[index].imageData!,
         motionPrompt,
         falKey,
@@ -996,15 +1052,18 @@ const SceneStudioPage: React.FC = () => {
         'preview',
         selectedVideoModel,
       );
-      if (videoUrl) {
+      if (videoResult?.videoUrl) {
         updateAssetAt(index, {
-          videoData: videoUrl,
-          videoHistory: appendVideoHistory(assetsRef.current[index], videoUrl, 'ai', 'AI 영상 변환'),
+          videoData: videoResult.videoUrl,
+          videoHistory: appendVideoHistory(assetsRef.current[index], videoResult.videoUrl, videoResult.sourceMode, videoResult.sourceMode === 'ai' ? 'AI 영상 변환' : '샘플 영상'),
           videoDuration: CONFIG.ANIMATION.VIDEO_DURATION,
+          selectedVisualType: 'video',
         });
-        addCost('video', PRICING.VIDEO.perVideo, 1);
+        if (videoResult.sourceMode === 'ai') {
+          addCost('video', PRICING.VIDEO.perVideo, 1);
+        }
       }
-      setSceneProgress(index, 100, '영상 변환 완료');
+      setSceneProgress(index, 100, videoResult?.sourceMode === 'sample' ? '샘플 영상 준비 완료' : '영상 변환 완료');
       setTaskProgressPercent(100);
     } finally {
       setAnimatingIndices((prev) => {
@@ -1018,11 +1077,6 @@ const SceneStudioPage: React.FC = () => {
 
   const handleGenerateAllVideos = useCallback(async () => {
     const falKey = studioState?.providers?.falApiKey || getFalApiKey();
-    if (!falKey) {
-      setTaskProgressPercent(null);
-      openApiModal({ title: '영상 변환용 API가 필요합니다', description: 'FAL 키나 연결한 외부 영상 공급자 키를 등록하면 전체 씬 영상을 한 번에 만들 수 있습니다.', focusField: 'fal' });
-      return;
-    }
     const availableIndices = assetsRef.current
       .map((asset, index) => ({ asset, index }))
       .filter(({ asset }) => Boolean(asset.imageData));
@@ -1037,10 +1091,10 @@ const SceneStudioPage: React.FC = () => {
       for (let order = 0; order < availableIndices.length; order += 1) {
         const { asset, index } = availableIndices[order];
         setTaskProgressPercent(10 + Math.round((order / Math.max(1, availableIndices.length)) * 78));
-        setSceneProgress(index, 24, '영상 프롬프트 생성');
-        setProgressMessage(`씬 ${order + 1}/${availableIndices.length} 전체 영상 생성 중...`);
-        const motionPrompt = await generateMotionPrompt(asset.narration, asset.visualPrompt);
-        const videoUrl = await generateVideoFromImage(
+        setSceneProgress(index, 24, falKey ? '영상 프롬프트 생성' : '샘플 영상 준비');
+        setProgressMessage(`씬 ${order + 1}/${availableIndices.length} ${falKey ? '전체 영상 생성' : '샘플 영상 준비'} 중...`);
+        const motionPrompt = (asset.videoPrompt || '').trim() || await generateMotionPrompt(asset.narration, asset.imagePrompt || asset.visualPrompt);
+        const videoResult = await generateVideoFromImage(
           asset.imageData!,
           motionPrompt,
           falKey,
@@ -1048,19 +1102,22 @@ const SceneStudioPage: React.FC = () => {
           'preview',
           selectedVideoModel,
         );
-        if (videoUrl) {
+        if (videoResult?.videoUrl) {
           updateAssetAt(index, {
-            videoData: videoUrl,
-            videoHistory: appendVideoHistory(assetsRef.current[index], videoUrl, 'ai', '전체 일괄 영상 생성'),
+            videoData: videoResult.videoUrl,
+            videoHistory: appendVideoHistory(assetsRef.current[index], videoResult.videoUrl, videoResult.sourceMode, videoResult.sourceMode === 'ai' ? '전체 일괄 영상 생성' : '샘플 영상'),
             videoDuration: CONFIG.ANIMATION.VIDEO_DURATION,
+            selectedVisualType: 'video',
           });
-          addCost('video', PRICING.VIDEO.perVideo, 1);
+          if (videoResult.sourceMode === 'ai') {
+            addCost('video', PRICING.VIDEO.perVideo, 1);
+          }
         }
-        setSceneProgress(index, 100, '영상 변환 완료');
+        setSceneProgress(index, 100, videoResult?.sourceMode === 'sample' ? '샘플 영상 준비 완료' : '영상 변환 완료');
         await wait(120);
       }
       setTaskProgressPercent(100);
-      setProgressMessage('모든 씬의 영상 변환을 마쳤습니다. 미리보기에서 바로 확인할 수 있습니다.');
+      setProgressMessage(falKey ? '모든 씬의 영상 변환을 마쳤습니다. 미리보기에서 바로 확인할 수 있습니다.' : '모든 씬에 샘플 영상을 채웠습니다. API 없이도 영상 흐름을 바로 확인할 수 있습니다.');
     } finally {
       setIsGeneratingAllVideos(false);
       window.setTimeout(() => setTaskProgressPercent(null), 900);
@@ -1086,11 +1143,25 @@ const SceneStudioPage: React.FC = () => {
   }, [draft.topic, isPreparingPreviewVideo, isVideoGenerating, renderMergedVideo]);
 
   const handleNarrationChange = (index: number, narration: string) => {
-    updateAssetAt(index, { narration, targetDuration: Math.max(assetsRef.current[index].targetDuration || 0, estimateClipDuration(narration)) });
+    updateAssetAt(index, { narration, targetDuration: clampSceneDuration(estimateClipDuration(narration)) });
+  };
+
+  const handleImagePromptChange = (index: number, prompt: string) => {
+    updateAssetAt(index, { imagePrompt: prompt, visualPrompt: prompt || assetsRef.current[index].visualPrompt });
+  };
+
+  const handleVideoPromptChange = (index: number, prompt: string) => {
+    updateAssetAt(index, { videoPrompt: prompt });
+  };
+
+  const handleSelectedVisualTypeChange = (index: number, mode: 'image' | 'video') => {
+    const asset = assetsRef.current[index];
+    const safeMode = mode === 'video' && asset?.videoData ? 'video' : 'image';
+    updateAssetAt(index, { selectedVisualType: safeMode });
   };
 
   const handleDurationChange = (index: number, duration: number) => {
-    updateAssetAt(index, { targetDuration: duration });
+    updateAssetAt(index, { targetDuration: clampSceneDuration(duration) });
   };
 
   const handleGenerateThumbnail = useCallback(async () => {
@@ -1377,6 +1448,9 @@ const SceneStudioPage: React.FC = () => {
           onExportVideo={triggerVideoExport}
           onGenerateAnimation={handleGenerateAnimation}
           onNarrationChange={handleNarrationChange}
+          onImagePromptChange={handleImagePromptChange}
+          onVideoPromptChange={handleVideoPromptChange}
+          onSelectedVisualTypeChange={handleSelectedVisualTypeChange}
           onDurationChange={handleDurationChange}
           onOpenSettings={() => setShowSettings(true)}
           onRequestProviderSetup={(kind) => openApiModal({

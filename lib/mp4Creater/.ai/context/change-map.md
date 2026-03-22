@@ -17,6 +17,12 @@
 - `app/api/local-storage/_shared.ts`
 - `app/api/local-storage/state/route.ts`
 - `app/api/local-storage/config/route.ts`
+- `app/api/local-storage/project/route.ts`
+
+핵심 포인트:
+- 실제 저장 구조는 `studio-state.json` + `projects/<projectId>.json`
+- `storageDir`가 비어 있어도 기본 저장 경로 fallback을 우선 고려
+- 상세 JSON이 잠시 없어도 `projectIndex` 요약 fallback으로 첫 진입 복원 가능해야 함
 
 ## 3. prompt 구조 변경
 반드시 같이 볼 파일:
@@ -49,10 +55,15 @@
 - `lib/mp4Creater/services/localFileApi.ts`
 - `app/api/local-storage/*`
 
+핵심 포인트:
+- 새 프로젝트 생성 시 optimistic project와 실제 저장 결과를 자연스럽게 치환
+- first-entry blank screen을 막기 위해 로딩 skeleton과 navigation cache를 같이 확인
+- query 기반 `projectId` 복원은 cache → localOnly → forceSync 순으로 점검
+
 ## 7. sample asset 추가/삭제
 반드시 같이 볼 파일:
 - `public/mp4Creater/samples/README.md`
-- `public/mp4Creater/samples/manifest.template.json`
+- `public/mp4Creater/samples/project-folder-template/README.md`
 - `scripts/generate-mp4-sample-manifest.mjs`
 - `scripts/check-mp4-sample-layout.mjs`
 - `lib/mp4Creater/.ai/rules/sample-asset-rules.md`
@@ -70,11 +81,12 @@
 - 스켈레톤과 실제 카드 레이아웃 동기화
 - 삭제/정렬 애니메이션이 "저릿함" 없이 자연스럽게 동작해야 함
 - 이름 변경 affordance는 프로젝트 이름 위치에 붙여 관리
-- Gallery -> 상세 -> 뒤로가기 히스토리 흐름 유지
+- Gallery → 상세 → 뒤로가기 히스토리 흐름 유지
 
 ## 9. Step 라우팅/복원 규칙 변경
 반드시 같이 볼 파일:
 - `app/[locale]/mp4Creater/page.tsx`
+- `app/[locale]/mp4Creater/loading.tsx`
 - `app/[locale]/mp4Creater/step-1/page.tsx`
 - `app/[locale]/mp4Creater/step-6/page.tsx`
 - `app/[locale]/mp4Creater/scene-studio/page.tsx`
@@ -87,6 +99,7 @@
 - 최종 씬 제작은 `step-6` 기준
 - `scene-studio`는 레거시 redirect/보조 진입으로만 유지
 - 썸네일 제작은 `thumbnail-studio` 전용 페이지 기준
+- 첫 진입/신규 생성 직후 loading route가 `null`을 반환하지 않도록 유지
 
 ## 10. hydration/SSR 회귀 대응
 반드시 같이 볼 파일:
@@ -112,6 +125,8 @@
 - Step 3 대본 입력 후 출연자 미선택이면 Step 4로 넘어가지 않고 출연자 선택 영역으로 안내 스크롤
 - Step 4 캐릭터 느낌 선택 시 상단 스크롤
 - 복원된 프로젝트는 저장된 캐릭터 느낌 상태를 유지한 채 출연자별 제작 영역으로 바로 이어짐
+- Step 4에는 선택된 출연자만 표시
+- Step 4 workspace 진입 시 첫 이미지 자동 선택 또는 자동 첫 생성 시작
 - 캐릭터 후보는 `+` 카드 선두, 새 카드 오른쪽 누적, 화살표 탐색, 생성 직후 포커스 이동
 
 ## 12. Thumbnail Studio / 대표 썸네일 저장 변경

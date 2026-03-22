@@ -17,4 +17,13 @@
 3. `node scripts/check-mp4-sample-layout.mjs` 실행
 
 ## 실제 프로젝트 결과물과의 구분
-실제 제작 결과물은 이 폴더가 아니라 사용자가 지정한 `storageDir/projects/project-0001-.../` 아래에 저장됩니다.
+실제 제작 결과물은 이 폴더가 아니라 사용자가 지정한 아래 구조에 저장됩니다.
+
+```text
+<storageDir>/
+  studio-state.json
+  projects/
+    <projectId>.json
+```
+
+예전 `projects/project-0001-.../` 폴더형 저장 설명은 현재 런타임 기준이 아닙니다.

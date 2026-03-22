@@ -1,5 +1,8 @@
 # MP4CREATER index/detail split patch notes
 
+이 문서는 현재 저장 구조의 요약 메모입니다.
+현재 기준의 저장 구조 진실은 **`studio-state.json` + `projects/<projectId>.json` 분리 저장**입니다.
+
 ## 핵심 변경
 - `studio-state.json`은 전역 설정 + `projectIndex`만 저장
 - 각 프로젝트 전체 데이터는 `projects/<projectId>.json` 개별 파일로 저장
@@ -25,4 +28,4 @@
 
 ## 확인한 것
 - 수정 파일들은 TypeScript transpile parse 기준으로 문법 오류 없이 통과
-- 이 환경에는 프로젝트 의존성이 없어서 `npm run build` 전체 검증은 미실행
+- 이 메모는 저장 구조 설명용 문서이며, 실제 규칙의 상세판은 `MP4CREATER_PROJECT_STORAGE_RULES.md`를 우선합니다.

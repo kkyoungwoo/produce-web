@@ -1,5 +1,5 @@
 import { SavedProject } from '../types';
-import { compactWorkflowDraftForStorage } from './workflowDraftService';
+import { createSelectedWorkflowDraftForTransport } from './workflowDraftService';
 
 const PROJECT_NAVIGATION_CACHE_KEY = 'mp4creater_scene_project_cache';
 
@@ -9,25 +9,30 @@ type ProjectNavigationCachePayload = {
   project: SavedProject;
 };
 
-function stripPromptedImages(items: any) {
+function clonePromptedImages(items: any) {
   if (!Array.isArray(items)) return [];
   return items.map((item) => ({
     ...item,
-    imageData: '',
+    imageData: null,
+    data: undefined,
+    thumbnailData: undefined,
+    imageHistory: [],
+    videoHistory: [],
   }));
 }
 
-function stripWorkflowDraftBinary(draft: any) {
+function cloneWorkflowDraftForNavigation(draft: any) {
   if (!draft || typeof draft !== 'object') return draft;
+  const selectedDraft = createSelectedWorkflowDraftForTransport(draft as any) || draft;
   return {
-    ...draft,
-    styleImages: stripPromptedImages(draft.styleImages),
-    characterImages: stripPromptedImages(draft.characterImages),
-    extractedCharacters: Array.isArray(draft.extractedCharacters)
-      ? draft.extractedCharacters.map((character: any) => ({
+    ...selectedDraft,
+    styleImages: clonePromptedImages(selectedDraft.styleImages),
+    characterImages: clonePromptedImages(selectedDraft.characterImages),
+    extractedCharacters: Array.isArray(selectedDraft.extractedCharacters)
+      ? selectedDraft.extractedCharacters.map((character: any) => ({
           ...character,
           imageData: null,
-          generatedImages: stripPromptedImages(character?.generatedImages),
+          generatedImages: clonePromptedImages(character?.generatedImages),
         }))
       : [],
   };
@@ -52,7 +57,7 @@ function stripProjectBinary(project: SavedProject): SavedProject {
           audioData: null,
         }))
       : [],
-    workflowDraft: compactWorkflowDraftForStorage(stripWorkflowDraftBinary(project.workflowDraft) as any) as any,
+    workflowDraft: cloneWorkflowDraftForNavigation(project.workflowDraft) as any,
   };
 }
 

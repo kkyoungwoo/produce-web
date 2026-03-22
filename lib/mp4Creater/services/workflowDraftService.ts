@@ -3,6 +3,7 @@ import {
   DEFAULT_ASPECT_RATIO,
   DEFAULT_REFERENCE_IMAGES,
   ProjectOutputMode,
+  PromptedImageAsset,
   StorySelectionState,
   StudioState,
   WorkflowDraft,
@@ -72,6 +73,8 @@ export function createDefaultWorkflowDraft(contentType: ContentType = 'story', o
     styleImages: [],
     characterImages: [],
     selectedCharacterIds: [],
+    hasSelectedContentType: false,
+    hasSelectedAspectRatio: false,
     selectedCharacterStyleId: null,
     selectedCharacterStyleLabel: '',
     selectedCharacterStylePrompt: '',
@@ -153,6 +156,55 @@ export function compactWorkflowDraftForStorage(draft?: WorkflowDraft | null): Wo
   };
 }
 
+function pickSingleImage(items: PromptedImageAsset[] | undefined, preferredId?: string | null): PromptedImageAsset[] {
+  if (!Array.isArray(items) || !items.length) return [];
+  const picked = items.find((item) => item.id === preferredId) || items[0];
+  return picked ? [{ ...picked, selected: true }] : [];
+}
+
+export function createSelectedWorkflowDraftForTransport(draft?: WorkflowDraft | null): WorkflowDraft | null {
+  const compacted = compactWorkflowDraftForStorage(draft);
+  if (!compacted) return null;
+
+  const selectedCharacterIds = Array.from(new Set(
+    (Array.isArray(compacted.selectedCharacterIds) && compacted.selectedCharacterIds.length
+      ? compacted.selectedCharacterIds
+      : compacted.extractedCharacters.map((item) => item.id)
+    ).filter(Boolean)
+  ));
+
+  const extractedCharacters = compacted.extractedCharacters
+    .filter((item) => selectedCharacterIds.includes(item.id))
+    .map((item) => {
+      const generatedImages = pickSingleImage(item.generatedImages, item.selectedImageId);
+      const selectedImage = generatedImages[0] || null;
+      return {
+        ...item,
+        generatedImages,
+        selectedImageId: selectedImage?.id || item.selectedImageId || null,
+        imageData: item.imageData || selectedImage?.imageData || null,
+      };
+    });
+
+  const styleImages = pickSingleImage(compacted.styleImages, compacted.selectedStyleImageId);
+  const selectedStyleImageId = styleImages[0]?.id || compacted.selectedStyleImageId || null;
+  const selectedPromptTemplates = Array.isArray(compacted.promptTemplates)
+    ? compacted.promptTemplates
+      .filter((template) => template?.id && template.id === compacted.selectedPromptTemplateId)
+      .map((template) => ({ ...template }))
+    : [];
+
+  return {
+    ...compacted,
+    extractedCharacters,
+    characterImages: extractedCharacters.flatMap((item) => item.generatedImages || []).map((item) => ({ ...item })),
+    selectedCharacterIds,
+    styleImages,
+    selectedStyleImageId,
+    promptTemplates: selectedPromptTemplates,
+  };
+}
+
 export function ensureWorkflowDraft(studioState?: StudioState | null): WorkflowDraft {
   const existing = studioState?.workflowDraft;
   if (!existing) return createDefaultWorkflowDraft(studioState?.lastContentType || 'story');
@@ -181,6 +233,8 @@ export function ensureWorkflowDraft(studioState?: StudioState | null): WorkflowD
       ...DEFAULT_REFERENCE_IMAGES,
       ...existing.referenceImages,
     },
+    hasSelectedContentType: existing.hasSelectedContentType ?? Boolean(existing.completedSteps?.step1),
+    hasSelectedAspectRatio: existing.hasSelectedAspectRatio ?? Boolean(existing.completedSteps?.step1),
     completedSteps: {
       step1: Boolean(existing.completedSteps?.step1),
       step2: Boolean(existing.completedSteps?.step2),

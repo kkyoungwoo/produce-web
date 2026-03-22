@@ -7,7 +7,7 @@
 import { CONFIG } from '../config';
 import { SavedProject, GeneratedAsset, CostBreakdown, BackgroundMusicTrack, PreviewMixSettings, WorkflowDraft, AudioPreviewAsset, VideoPreviewAsset } from '../types';
 import { getSelectedImageModel } from './imageService';
-import { compactWorkflowDraftForStorage } from './workflowDraftService';
+import { compactWorkflowDraftForStorage, createSelectedWorkflowDraftForTransport } from './workflowDraftService';
 import { deleteStudioProjects, fetchStudioProjectById, fetchStudioProjects, getCachedStudioState, saveProjectsToStudio, saveStudioProject, summarizeProjectForIndex } from './localFileApi';
 
 const DB_NAME = 'TubeGenAI';
@@ -73,6 +73,8 @@ function normalizeAsset(asset: any, index: number): GeneratedAsset {
     sceneNumber: typeof asset?.sceneNumber === 'number' ? asset.sceneNumber : index + 1,
     narration: typeof asset?.narration === 'string' ? asset.narration : '',
     visualPrompt: typeof asset?.visualPrompt === 'string' ? asset.visualPrompt : '',
+    imagePrompt: typeof asset?.imagePrompt === 'string' ? asset.imagePrompt : (typeof asset?.visualPrompt === 'string' ? asset.visualPrompt : ''),
+    videoPrompt: typeof asset?.videoPrompt === 'string' ? asset.videoPrompt : '',
     analysis: asset?.analysis,
     imageData: typeof asset?.imageData === 'string' ? asset.imageData : null,
     audioData: typeof asset?.audioData === 'string' ? asset.audioData : null,
@@ -84,6 +86,7 @@ function normalizeAsset(asset: any, index: number): GeneratedAsset {
     aspectRatio: asset?.aspectRatio === '1:1' || asset?.aspectRatio === '9:16' ? asset.aspectRatio : '16:9',
     imageHistory: normalizeAssetHistory(asset?.imageHistory, 'image'),
     videoHistory: normalizeAssetHistory(asset?.videoHistory, 'video'),
+    selectedVisualType: asset?.selectedVisualType === 'video' ? 'video' : 'image',
     status: asset?.status === 'generating' || asset?.status === 'completed' || asset?.status === 'error' ? asset.status : 'pending',
     sourceMode: asset?.sourceMode === 'ai' ? 'ai' : 'sample',
   };
@@ -411,6 +414,7 @@ export async function saveProject(
   customName?: string,
   cost?: CostBreakdown,
   extras?: {
+    projectId?: string | null;
     backgroundMusicTracks?: BackgroundMusicTrack[];
     previewMix?: PreviewMixSettings;
     workflowDraft?: WorkflowDraft | null;
@@ -424,7 +428,7 @@ export async function saveProject(
     finalMusicVideo?: VideoPreviewAsset | null;
   }
 ): Promise<SavedProject> {
-  const id = `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  const id = extras?.projectId?.trim() || `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   const now = Date.now();
   let thumbnail: string | null = null;
   const firstImageAsset = assets.find(a => a.imageData);
@@ -518,6 +522,7 @@ export async function upsertWorkflowProject(options: {
     `${safeTopic.slice(0, 30)}${safeTopic.length > 30 ? '...' : ''}`,
     options.cost,
     {
+      projectId: options.projectId || null,
       backgroundMusicTracks: options.backgroundMusicTracks || [],
       previewMix: options.previewMix,
       workflowDraft: compactWorkflowDraftForStorage(options.workflowDraft) || null,
@@ -664,6 +669,14 @@ function cloneValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function sanitizeProjectForTransport(project: SavedProject): SavedProject {
+  const normalized = normalizeProject(project);
+  return normalizeProject({
+    ...cloneValue(normalized),
+    workflowDraft: createSelectedWorkflowDraftForTransport(normalized.workflowDraft || null),
+  });
+}
+
 function buildCopiedProjectName(sourceName: string, existingNames: Set<string>) {
   const baseName = (sourceName || '프로젝트').replace(/\s*복사\(\d+\)\s*$/u, '').trim() || '프로젝트';
   let index = 1;
@@ -707,7 +720,7 @@ export async function duplicateProject(id: string): Promise<SavedProject | null>
 
 export function buildProjectsExportPayload(projects: SavedProject[]) {
   const normalizedProjects = Array.isArray(projects)
-    ? projects.map((project) => cloneValue(normalizeProject(project)))
+    ? projects.map((project) => sanitizeProjectForTransport(project))
     : [];
 
   return {
@@ -752,7 +765,7 @@ export async function importProjectsFromFile(file: File): Promise<SavedProject[]
   let timestampCursor = Date.now();
 
   const prepared = importedProjects.map((project) => {
-    const normalized = normalizeProject({
+    const normalized = sanitizeProjectForTransport(normalizeProject({
       ...cloneValue(project),
       id: createImportedProjectId(),
       createdAt: timestampCursor,
@@ -760,7 +773,7 @@ export async function importProjectsFromFile(file: File): Promise<SavedProject[]
       folderName: undefined,
       folderPath: undefined,
       lastSavedAt: timestampCursor,
-    });
+    }));
     nextProjectNumber += 1;
     timestampCursor += 1;
     return normalized;

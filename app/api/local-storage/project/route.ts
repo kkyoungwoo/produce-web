@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createDefaultState, deleteProjectDetails, normalizeProjectSummary, readProjectDetail, readStoredState, writeProjectDetail, writeState } from '../_shared';
+import { DEFAULT_STORAGE_DIR, createDefaultState, deleteProjectDetails, normalizeProjectSummary, readProjectDetail, readStoredState, writeProjectDetail, writeState } from '../_shared';
+
+function resolveProjectStorageDir(currentStorageDir?: string, requestedStorageDir?: string) {
+  const current = currentStorageDir?.trim();
+  if (current) return current;
+  const requested = requestedStorageDir?.trim();
+  if (requested) return requested;
+  return DEFAULT_STORAGE_DIR;
+}
 
 export async function GET(request: NextRequest) {
   const storageDir = request.nextUrl.searchParams.get('storageDir') || undefined;
@@ -11,11 +19,18 @@ export async function GET(request: NextRequest) {
 
   try {
     const state = await readStoredState(storageDir);
-    const project = await readProjectDetail(state.storageDir, projectId);
-    if (!project) {
-      return NextResponse.json({ message: 'Project not found.' }, { status: 404 });
+    const resolvedStorageDir = resolveProjectStorageDir(state.storageDir, storageDir);
+    const project = await readProjectDetail(resolvedStorageDir, projectId);
+    if (project) {
+      return NextResponse.json(project);
     }
-    return NextResponse.json(project);
+
+    const fallbackProject = (Array.isArray(state.projectIndex) ? state.projectIndex : []).find((item) => item?.id === projectId);
+    if (fallbackProject) {
+      return NextResponse.json(fallbackProject);
+    }
+
+    return NextResponse.json({ message: 'Project not found.' }, { status: 404 });
   } catch (error) {
     console.warn('[local-storage/project] GET failed', error);
     return NextResponse.json({ message: 'Failed to load project.' }, { status: 500 });
@@ -38,7 +53,8 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    await writeProjectDetail(current.storageDir, project);
+    const resolvedStorageDir = resolveProjectStorageDir(current.storageDir, body?.storageDir);
+    await writeProjectDetail(resolvedStorageDir, project);
     const nextIndex = [
       normalizeProjectSummary(project),
       ...(Array.isArray(current.projectIndex) ? current.projectIndex : []).filter((item) => item?.id !== project.id),
@@ -46,6 +62,9 @@ export async function POST(request: NextRequest) {
 
     const savedState = await writeState({
       ...current,
+      storageDir: resolvedStorageDir,
+      isStorageConfigured: true,
+      projects: nextIndex,
       projectIndex: nextIndex,
       updatedAt: Date.now(),
     });
@@ -77,10 +96,13 @@ export async function DELETE(request: NextRequest) {
   }
 
   try {
-    const deletedCount = await deleteProjectDetails(current.storageDir, projectIds);
+    const resolvedStorageDir = resolveProjectStorageDir(current.storageDir, body?.storageDir);
+    const deletedCount = await deleteProjectDetails(resolvedStorageDir, projectIds);
     const nextProjectIndex = (current.projectIndex || []).filter((item) => !projectIds.includes(item.id));
     const savedState = await writeState({
       ...current,
+      storageDir: resolvedStorageDir,
+      isStorageConfigured: true,
       projects: nextProjectIndex,
       projectIndex: nextProjectIndex,
       updatedAt: Date.now(),

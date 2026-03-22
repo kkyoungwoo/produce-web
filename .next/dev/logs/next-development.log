@@ -1,59 +1,20 @@
-[00:00:01.793] Server  LOG     ✓ Ready in 1502ms
-[00:02:02.481] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:02:59.615] Browser ERROR   In HTML, %s cannot be a descendant of <%s>.
-This will cause a hydration error.%s <button> button 
-
-  ...
-    <App routeStep={4}>
-      <div className="min-h-scre...">
-        <LoadingOverlay>
-        <Header>
-        <SettingsDrawer>
-        <ProviderQuickModal>
-        <main className="py-8">
-          <InputSection step="COMPLETED" studioState={{version:7, ...}} workflowDraft={{id:"workfl...", ...}} ...>
-            <RouteStepView vm={{routeStep:4, ...}}>
-              <div className="mx-auto my...">
-                <div>
-                <div className="mt-6">
-                  <Step4Panel extractedCharacters={[...]} selectedCharacterIds={[...]} ...>
-                    <div className="space-y-6">
-                      <section className="rounded-[2...">
-                        <div>
-                        <div>
-                        <div className="mt-5 space...">
-                          <div className="rounded-[2...">
-                            <div>
-                            <div className="mt-4 flex ...">
-                              <button>
-                              <div ref={function ref} className="flex min-w...">
-                                <button>
->                               <button
->                                 type="button"
->                                 data-character-image-card="prompted_1774107993050_6zshmh"
->                                 onClick={function onClick}
->                                 className="w-[220px] shrink-0 snap-start overflow-hidden rounded-[22px] border bg-wh..."
->                               >
-                                  <img>
-                                  <div className="p-3">
-                                    <div>
-                                    <div className="mt-3">
->                                     <button
->                                       type="button"
->                                       onClick={function onClick}
->                                       disabled={false}
->                                       className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-x..."
->                                     >
-                              ...
-                          ...
-                ...
-
-[00:02:59.615] Browser ERROR   <%s> cannot contain a nested %s.
-See this log for the ancestor stack trace. button <button>
-[00:03:26.352] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:03:29.160] Server  ERROR   ⨯ Error: aborted
-[00:03:29.999] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:03:30.225] Browser ERROR   uncaughtError: Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+[00:00:02.316] Server  LOG     ✓ Ready in 2.1s
+[00:00:05.573] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:04:53.126] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
+[00:04:54.615] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:04:55.259] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
+[00:04:58.243] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:04:59.612] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
+[00:05:00.280] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:05:13.006] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
+[00:05:14.034] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:05:23.746] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
+[00:05:24.718] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:14:02.497] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
+[00:14:03.273] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:24:20.486] Server  WARN    [local-storage/project] readStoredState failed in POST, using fallback current state Error: EBUSY: resource busy or locked, unlink 'C:\Users\gorhr\.tubegen-studio\projects\project_1774175998515_jzvhuf.json'
+[00:24:25.976] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:24:25.976] Browser ERROR   uncaughtError: Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
 
 - A server/client branch `if (typeof window !== 'undefined')`.
 - Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
@@ -66,64 +27,43 @@ It can also happen if the client has a browser extension installed which messes 
 https://react.dev/link/hydration-mismatch
 
   ...
-    <SegmentViewNode type="page" pagePath="[locale]/m...">
-      <SegmentTrieNode>
-      <ClientPageRoot Component={function Mp4CreaterStep6Page} serverProvidedParams={{...}}>
-        <Mp4CreaterStep6Page params={Promise} searchParams={Promise}>
-          <Step6Page>
-            <SceneStudioPage>
-              <div className="min-h-scre...">
-                <LoadingOverlay>
-                <Header projectCount={5} selectedCharacterName="" storageDir="./local-da..." ...>
-                  <header className="sticky top...">
-                    <div className="mx-auto fl...">
-                      <div className="flex flex-...">
-                        <div className="flex min-w...">
-                          <div>
-                          <div className="min-w-0">
-                            <div>
-                            <div className="mt-1 trunc...">
-+                             {" · 저장 위치: ./local-data/tubegen-studio"}
--                             {" · 저장 위치 미설정"}
-                        ...
-                ...
-    ...
+    <ScrollAndFocusHandler segmentPath={[...]}>
+      <InnerScrollAndFocusHandler segmentPath={[...]} focusAndScrollRef={{apply:false, ...}}>
+        <ErrorBoundary errorComponent={undefined} errorStyles={undefined} errorScripts={undefined}>
+          <LoadingBoundary name="step-4/" loading={null}>
+            <HTTPAccessFallbackBoundary notFound={undefined} forbidden={undefined} unauthorized={undefined}>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <InnerLayoutRouter url="/ko/mp4Cre..." tree={[...]} params={{locale:"ko"}} ...>
+                    <SegmentViewNode type="page" pagePath="[locale]/m...">
+                      <SegmentTrieNode>
+                      <Mp4CreaterStep4Page>
+                        <ClientOnlyApp routeStep={4}>
+                          <App routeStep={4}>
+                            <div className="min-h-scre...">
+                              <LoadingOverlay>
+                              <Header>
+                              <SettingsDrawer>
+                              <ProviderQuickModal>
+                              <main className="py-8">
+                                <div
++                                 className="mx-auto max-w-[1520px] px-4 sm:px-6 lg:px-8"
+-                                 className="mx-auto mb-6 max-w-6xl px-4"
+                                >
+                                  <div
++                                   className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm"
+-                                   className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm"
+                                  >
+                                    <div
++                                     className="text-[11px] font-black uppercase tracking-[0.22em] text-blue-600"
+-                                     className="flex flex-wrap items-center justify-between gap-3"
+                                    >
++                                     프로젝트 복원 중
+-                                     저장 위치 필요JSON 저장 위치를 정해야 프로젝트와 프롬프트, 미디어 메타데이터가 한 번에 안정적으로 저장됩니다.저장 위치 정하기
+                                    ...
+                    ...
+                  ...
+        ...
 
-[00:03:30.225] Browser ERROR   An empty string ("") was passed to the %s attribute. This may cause the browser to download the whole page again over the network. To fix this, either do not render the element at all or pass null to %s instead of an empty string. src src
-[00:13:29.889] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:13:30.082] Browser ERROR   uncaughtError: Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
-
-- A server/client branch `if (typeof window !== 'undefined')`.
-- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
-- Date formatting in a user's locale which doesn't match the server.
-- External changing data without sending a snapshot of it along with the HTML.
-- Invalid HTML tag nesting.
-
-It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
-
-https://react.dev/link/hydration-mismatch
-
-  ...
-    <SegmentViewNode type="page" pagePath="[locale]/m...">
-      <SegmentTrieNode>
-      <ClientPageRoot Component={function Mp4CreaterStep6Page} serverProvidedParams={{...}}>
-        <Mp4CreaterStep6Page params={Promise} searchParams={Promise}>
-          <Step6Page>
-            <SceneStudioPage>
-              <div className="min-h-scre...">
-                <LoadingOverlay>
-                <Header projectCount={5} selectedCharacterName="" storageDir="./local-da..." ...>
-                  <header className="sticky top...">
-                    <div className="mx-auto fl...">
-                      <div className="flex flex-...">
-                        <div className="flex min-w...">
-                          <div>
-                          <div className="min-w-0">
-                            <div>
-                            <div className="mt-1 trunc...">
-+                             {" · 저장 위치: ./local-data/tubegen-studio"}
--                             {" · 저장 위치 미설정"}
-                        ...
-                ...
-    ...
-
+[00:25:06.901] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:25:12.029] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

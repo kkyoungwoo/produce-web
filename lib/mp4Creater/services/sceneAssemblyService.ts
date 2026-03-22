@@ -1,4 +1,5 @@
 import { AspectRatio, GeneratedAsset, ScriptScene, WorkflowDraft } from '../types';
+import { buildFreshIdeaRule, createCreativeDirection } from '../config/creativeVariance';
 import {
   buildLocalVisualPrompt,
   estimateClipDuration,
@@ -13,6 +14,8 @@ export function createLocalScenesFromDraft(draft: WorkflowDraft): ScriptScene[] 
     sceneNumber: index + 1,
     narration: paragraph,
     visualPrompt: buildLocalVisualPrompt(paragraph, index + 1, draft.contentType, aspectRatio),
+    imagePrompt: buildLocalVisualPrompt(paragraph, index + 1, draft.contentType, aspectRatio),
+    videoPrompt: '',
     analysis: {
       composition_type: paragraph.length > 85 ? 'STANDARD' : 'MICRO',
       sentiment: 'NEUTRAL',
@@ -72,10 +75,11 @@ export function applySelectionPromptsToScenes(scenes: ScriptScene[], draft: Work
   return scenes.map((scene, index) => {
     const previousScene = scenes[index - 1];
     const nextScene = scenes[index + 1];
+    const direction = createCreativeDirection(`${draft.contentType}:${scene.sceneNumber}:${scene.narration}`, index, draft.contentType);
     return {
       ...scene,
       visualPrompt: [
-        scene.visualPrompt,
+        scene.imagePrompt || scene.visualPrompt,
         selectionSummary,
         promptContext.promptTemplateName ? `[SELECTED SCRIPT TEMPLATE] ${promptContext.promptTemplateName}` : '',
         promptContext.promptTemplatePrompt ? `[SELECTED TEMPLATE PROMPT]\n${promptContext.promptTemplatePrompt}` : '',
@@ -85,9 +89,15 @@ export function applySelectionPromptsToScenes(scenes: ScriptScene[], draft: Work
         promptContext.characterPromptBlock ? `[SELECTED CHARACTER PROMPTS]\n${promptContext.characterPromptBlock}` : '',
         promptContext.stylePrompt ? `[SELECTED STYLE PROMPT]\n${promptContext.stylePrompt}` : '',
         promptContext.styleLabel ? `[STYLE LABEL] ${promptContext.styleLabel}` : '',
+        buildFreshIdeaRule('scene'),
+        `[SCENE ANGLE] ${direction.narrativeAngle}`,
+        `[SHOT TYPE] ${direction.shotType}`,
+        `[LIGHTING / PALETTE] ${direction.lightingDirection} / ${direction.paletteDirection}`,
+        `[VISUAL HOOK] ${direction.visualHook}`,
+        `[SUBTITLE RHYTHM] ${direction.subtitleTone}`,
         previousScene?.narration ? `[PREVIOUS SCENE CONTEXT] ${previousScene.narration}` : '',
         nextScene?.narration ? `[NEXT SCENE CONTEXT] ${nextScene.narration}` : '',
-        `[SCENE RULE] Scene ${index + 1} must keep the selected character roles, selected prompt template, selected style prompt, and visual continuity with adjacent scenes consistently.`,
+        `[SCENE RULE] Scene ${index + 1} must keep the selected character roles, selected prompt template, and selected style prompt consistent, but it must not reuse the exact same framing or visual hook as the previous scene.`,
       ]
         .filter(Boolean)
         .join('\n\n'),
@@ -95,11 +105,10 @@ export function applySelectionPromptsToScenes(scenes: ScriptScene[], draft: Work
   });
 }
 
-export function createInitialSceneAssetsFromDraft(draft: WorkflowDraft): GeneratedAsset[] {
-  const aspectRatio: AspectRatio = draft.aspectRatio || '16:9';
+export function createLightweightSceneAssetsFromDraft(draft: WorkflowDraft): GeneratedAsset[] {
   return applySelectionPromptsToScenes(createLocalScenesFromDraft(draft), draft).map((scene) => ({
     ...scene,
-    imageData: makeScenePlaceholderImage(scene.sceneNumber, scene.narration, aspectRatio),
+    imageData: null,
     audioData: null,
     audioDuration: null,
     subtitleData: null,
@@ -107,8 +116,17 @@ export function createInitialSceneAssetsFromDraft(draft: WorkflowDraft): Generat
     videoDuration: null,
     targetDuration: scene.targetDuration || estimateClipDuration(scene.narration),
     sourceMode: 'sample',
+    selectedVisualType: 'image',
     status: 'pending',
     imageHistory: [],
     videoHistory: [],
+  }));
+}
+
+export function createInitialSceneAssetsFromDraft(draft: WorkflowDraft): GeneratedAsset[] {
+  const aspectRatio: AspectRatio = draft.aspectRatio || '16:9';
+  return createLightweightSceneAssetsFromDraft(draft).map((scene) => ({
+    ...scene,
+    imageData: makeScenePlaceholderImage(scene.sceneNumber, scene.narration, aspectRatio),
   }));
 }

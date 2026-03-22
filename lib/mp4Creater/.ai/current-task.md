@@ -1,65 +1,56 @@
 # current-task.md
 
 ## 작업명
-mp4Creater Step 3~5 UX 안정화 + Character/Thumbnail Studio 흐름 정리
+mp4Creater v3: 첫 진입/신규 생성 안정화 + Step 3 → Step 4 출연자 handoff 문서 기준
 
 ## 현재 우선순위
-1. Step 3에서 대본이 있는 상태로 다음을 눌렀을 때, 출연자 선택 누락이면 Step 4로 덜컥 넘기지 말고 출연자 선택 영역으로 스크롤 안내한다.
-2. Step 4에서 캐릭터 느낌 선택, 기존 프로젝트 복원, 새 캐릭터 생성 후 포커스 이동 흐름을 안정화한다.
-3. Step 5 스타일 선택 시 불필요한 상태 동기화/재마운트 루프를 제거한다.
-4. Project Gallery의 이름 변경 affordance와 썸네일 제작 전용 진입을 정리한다.
-5. `thumbnail-studio`에서 프로젝트 대본/캐릭터/화풍 기반 AI 썸네일 생성, 선택, 대표 썸네일 저장까지 완결한다.
+1. `/mp4Creater` 첫 진입과 새 프로젝트 생성 직후 blank screen이 다시 생기지 않게 유지한다.
+2. 새 프로젝트 생성 시 저장 지연이 있어도 `step-1?projectId=...`가 즉시 열리도록 optimistic project + navigation cache + project API fallback 흐름을 유지한다.
+3. Step 3에서 고른 출연자 id가 Step 4에서 그대로 유지되도록 한다.
+4. Step 4에서는 선택된 출연자만 표시하고, 각 출연자별 대표 이미지 선택 흐름이 자동으로 시작되게 유지한다.
+5. 문서와 테스트 규칙을 현재 코드 흐름에 맞춰 정리하고, 더 이상 사용하지 않는 폴더형 저장 구조 설명은 제거한다.
 
-## 최신 반영 기준 (v3 문서 기준)
+## 최신 반영 기준 (v3)
 
-### Step 3 안내 스크롤
-- 대본이 채워진 상태에서 출연자 선택 없이 `다음으로`를 누르면 출연자 선택 섹션으로 스크롤한다.
-- 단순 비활성 버튼보다, 왜 다음 단계로 못 가는지 자연스럽게 안내하는 동작을 우선한다.
+### 첫 진입 / 신규 생성 안정화
+- `App.tsx`는 새 프로젝트 생성 시 optimistic project를 만들고 `rememberProjectNavigationProject()`로 먼저 세션 캐시에 넣는다.
+- 가능한 경우 `upsertWorkflowProject()`로 실제 프로젝트를 먼저 저장하고, 실패하면 `saveStudioProject()` fallback을 시도한다.
+- 둘 다 지연돼도 Step 1은 optimistic project 기준으로 먼저 열 수 있어야 한다.
+- `app/[locale]/mp4Creater/loading.tsx`는 `null`이 아니라 skeleton 화면을 반환한다.
+- `/api/local-storage/project` GET은 상세 JSON이 없으면 `projectIndex` 요약으로 한 번 더 복원한다.
 
-### Step 4 캐릭터 제작 UX
-- 캐릭터 느낌 카드를 선택하면 `scrollTop = 0` 기준으로 상단으로 올린다.
-- 프로젝트를 다시 열거나 이전으로 돌아왔을 때 캐릭터 느낌이 이미 저장돼 있으면, Step 3 다음 클릭 시 Step 4의 출연자별 제작 영역으로 바로 진입한다.
-- 캐릭터 카드 레이아웃은 `+` 생성 카드가 맨 앞, 새 결과는 계속 오른쪽 누적을 기준으로 한다.
-- 좌우 화살표는 후보 카드 양옆에 둔다.
-- 새 이미지 생성 직후에는 방금 생성된 후보가 보이는 방향으로 포인트를 이동한다.
-- `재생성`은 같은 정체성을 유지한 유사 변형 생성 버튼으로 취급한다.
+### Step 3 → Step 4 출연자 handoff
+- Step 4 이동 직전에는 현재 `selectedCharacterIds`를 우선 보존한다.
+- 현재 추출 목록에 선택된 출연자가 없을 때만 `hydrateCharactersForScript({ preserveSelection: true })`를 다시 시도한다.
+- `completeStage(3, 4)`에서 생성하는 navigation draft는 보존된 선택값을 그대로 `selectedCharacterIds`에 넣어 저장한다.
 
-### Step 5 안정화
-- 화풍 선택 쪽에서 effect가 서로를 다시 덮어쓰며 새로고침처럼 보이는 현상이 없어야 한다.
-- 선택 상태 동기화는 값이 실제로 달라질 때만 반영하도록 유지한다.
+### Step 4 이미지 시작 규칙
+- `Step4Panel.tsx`는 `selectedCharacterStyleId`가 있으면 바로 workspace로 열린다.
+- workspace 진입 후 선택된 출연자에게 `selectedImageId`가 없고 기존 이미지가 있으면 첫 이미지를 자동 대표값으로 선택한다.
+- 기존 이미지도 없으면 그 출연자만 첫 후보 이미지 생성을 자동 시작한다.
+- Step 4에는 선택된 출연자만 렌더되고, 선택되지 않은 출연자는 이미지 제작 대상에서 제외된다.
 
-### Project Gallery
-- 이름 수정은 별도 하단 버튼이 아니라 프로젝트 이름 위치의 hover/focus/click affordance로 노출한다.
-- 기존 이름 수정 자리의 액션은 `썸네일 제작` 버튼으로 전환한다.
-- 카드 상세 진입과 갤러리 복귀는 브라우저 뒤로가기와 충돌하지 않도록 히스토리 기반 이동을 우선 확인한다.
-
-### Thumbnail Studio
-- 전용 페이지에서 현재 프로젝트의 대본, 선택 캐릭터 이미지, 화풍을 기준으로 AI 썸네일을 여러 개 만든다.
-- 입력 항목은 최소한 다음을 포함한다.
-  - 배경
-  - 주인공
-  - 썸네일 문구
-- 썸네일 문구는 사용자가 직접 수정 가능해야 한다.
-- 생성 UI는 캐릭터 제작과 비슷한 카드형 후보 탐색 UX를 우선한다.
-- 최종 선택한 썸네일이 프로젝트 저장소 카드 대표 썸네일로 보이도록 저장한다.
+### 저장 구조 기준
+- 실제 저장 구조는 `storageDir/studio-state.json` + `storageDir/projects/<projectId>.json`이다.
+- 예전의 `project-0001-프로젝트명/metadata/prompts/images/...` 폴더형 저장 규칙은 현재 런타임 기준이 아니다.
+- 샘플 라이브러리 문서와 테스트 규칙도 이 저장 구조 기준으로 맞춰야 한다.
 
 ## 금지/주의 사항
-- `db-cleanup`, `workbench`는 명시 요청 없으면 수정 금지.
-- 기본 프롬프트 원본 텍스트는 수정 금지(프로젝트 복사본만 변경).
-- AI/API 미연결 상태에서도 샘플 fallback 흐름은 유지.
-- `types.ts` 변경 시 InputSection/Step4/Step5/ThumbnailStudioPage/서비스 호출부를 함께 점검.
-- 썸네일 기능을 Scene Studio 한 화면 안에 계속 불려 넣는 방식보다, 전용 페이지 분리를 우선한다.
+- `mp4Creater` 외 다른 기능 수정 금지.
+- 이미 안정화된 Step 4~6 UI를 불필요하게 다시 건드리지 않는다.
+- 저장 구조를 예전 프로젝트 폴더형으로 되돌리지 않는다.
+- 샘플 모드 결과를 AI 성공처럼 기록하지 않는다.
+- 문서 업데이트는 현재 코드 흐름과 실제 반영 내용을 기준으로만 적는다.
 
 ## 검증 명령
 - `npx tsc --noEmit --pretty false`
 - `npm run build`
-- `npm run lint` (현재 repo 전역 UTF-8 BOM 검증 실패 항목이 있으면 별도 기록)
+- `npm run lint`
 
 ## 수동 시나리오 체크
-1. Step 3에서 대본 입력 후 출연자 미선택 상태로 `다음으로`를 눌렀을 때 출연자 선택 영역으로 스크롤되는지
-2. Step 4에서 캐릭터 느낌 선택 시 상단으로 스크롤되는지
-3. 캐릭터 느낌이 이미 저장된 프로젝트를 다시 열면 Step 3 다음으로 바로 Step 4 제작 영역으로 이어지는지
-4. Step 4에서 새 캐릭터 생성 시 새 카드가 오른쪽에 추가되고 포인트가 그쪽으로 이동하는지
-5. Step 5에서 스타일 클릭 시 새로고침처럼 보이는 반복 렌더가 없는지
-6. Project Gallery에서 프로젝트 이름 hover/focus/click 시 `이름 변경` affordance가 이름 위치에 보이는지
-7. Thumbnail Studio에서 썸네일 여러 개 생성, 최종 1개 선택, 갤러리 카드 썸네일 반영이 되는지
+1. `/mp4Creater` 첫 진입 시 빈 화면 대신 skeleton 또는 실제 UI가 바로 보이는지
+2. `제작하기`로 새 프로젝트 생성 시 blank screen 없이 Step 1이 열리는지
+3. 새로고침 후에도 방금 만든 프로젝트가 `projectId` 기준으로 다시 열리는지
+4. Step 3에서 선택한 출연자가 Step 4에 그대로 보이는지
+5. Step 4 진입 직후 선택된 출연자별 첫 이미지 생성이 자동 시작되거나, 기존 첫 이미지가 자동 선택되는지
+6. Step 5와 `step-6` 진입까지 `projectId` 쿼리가 유지되는지

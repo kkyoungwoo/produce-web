@@ -27,7 +27,7 @@
 ## 공개 샘플과 로컬 샘플의 차이
 - 공개 샘플: `public/mp4Creater/samples/`
 - 로컬 개발 전용 샘플: `local-data/tubegen-studio/sample-library/`
-- 실제 사용자 결과물: 사용자가 고른 `storageDir` 아래 `projects/project-0001-.../`
+- 실제 사용자 결과물: 사용자가 고른 `storageDir` 아래 `studio-state.json` + `projects/<projectId>.json`
 
 셋은 서로 섞지 않습니다.
 
@@ -39,19 +39,12 @@
 - 캐릭터: `characters/char-heroine-v1.svg`, `characters/char-host-v1.svg`
 - 화풍: `styles/style-animation-pop-v1.svg`, `styles/style-beauty-soft-v1.svg`, `styles/style-cinematic-night-v1.svg`, `styles/style-news-clean-v1.svg`
 
-## 실제 프로젝트 저장 폴더 예시
-```
+## 실제 프로젝트 저장 구조 참고
+```text
 <storageDir>/
   studio-state.json
   projects/
-    project-0001-sample/
-      project.json
-      metadata/
-      prompts/
-      images/
-      videos/
-      audio/
-      thumbnails/
-      characters/
-      styles/
+    <projectId>.json
 ```
+
+> 예전 프로젝트 폴더 템플릿 설명은 더 이상 현재 런타임 저장 구조 기준이 아닙니다.

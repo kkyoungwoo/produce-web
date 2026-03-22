@@ -28,6 +28,7 @@ import {
   getCachedStudioState,
   DEFAULT_STORAGE_DIR,
   summarizeProjectForIndex,
+  saveStudioProject,
 } from './services/localFileApi';
 import {
   getProjectById,
@@ -41,11 +42,11 @@ import {
   upsertWorkflowProject,
 } from './services/projectService';
 import { estimateClipDuration } from './utils/storyHelpers';
-import { createInitialSceneAssetsFromDraft } from './services/sceneAssemblyService';
+import { createLightweightSceneAssetsFromDraft } from './services/sceneAssemblyService';
 import { createSampleBackgroundTrack, getDefaultPreviewMix } from './services/musicService';
-import { createDefaultWorkflowDraft, ensureWorkflowDraft } from './services/workflowDraftService';
+import { createDefaultWorkflowDraft, createSelectedWorkflowDraftForTransport, ensureWorkflowDraft } from './services/workflowDraftService';
 import { CONFIG } from './config';
-import { rememberProjectNavigationProject } from './services/projectNavigationCache';
+import { readProjectNavigationProject, rememberProjectNavigationProject } from './services/projectNavigationCache';
 
 function normalizeLoadedAssets(assets: GeneratedAsset[]): GeneratedAsset[] {
   return assets.map((asset) => ({
@@ -58,15 +59,7 @@ function normalizeLoadedAssets(assets: GeneratedAsset[]): GeneratedAsset[] {
 }
 
 function createEmptySceneAssetsFromDraft(draft: WorkflowDraft): GeneratedAsset[] {
-  return createInitialSceneAssetsFromDraft(draft).map((asset) => ({
-    ...asset,
-    imageData: null,
-    sourceMode: 'sample',
-    status: 'pending',
-    imageHistory: [],
-    videoData: null,
-    videoHistory: [],
-  }));
+  return createLightweightSceneAssetsFromDraft(draft);
 }
 
 function hasSceneStudioProgressFromAssets(assets?: GeneratedAsset[] | null): boolean {
@@ -87,6 +80,107 @@ const resolveAppViewMode = (params: ReturnType<typeof useSearchParams>) => {
   if (params?.get('new') || params?.get('projectId') || params?.get('returnTo')) return 'main' as const;
   return 'gallery' as const;
 };
+
+function createOptimisticProjectId() {
+  return `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function createOptimisticWorkflowProject(options: {
+  projectId?: string | null;
+  topic: string;
+  workflowDraft: WorkflowDraft;
+  assets?: GeneratedAsset[];
+  backgroundMusicTracks?: BackgroundMusicTrack[];
+  previewMix?: PreviewMixSettings;
+}): SavedProject {
+  const now = Date.now();
+  const safeTopic = options.topic?.trim() || '새 프로젝트';
+  return {
+    id: options.projectId?.trim() || createOptimisticProjectId(),
+    name: `${safeTopic.slice(0, 30)}${safeTopic.length > 30 ? '...' : ''}`,
+    createdAt: now,
+    topic: safeTopic,
+    lastSavedAt: now,
+    settings: {
+      imageModel: CONFIG.DEFAULT_IMAGE_MODEL,
+      outputMode: options.workflowDraft?.outputMode || 'video',
+      elevenLabsModel: CONFIG.DEFAULT_ELEVENLABS_MODEL,
+    },
+    assets: Array.isArray(options.assets) ? options.assets.map((asset) => ({ ...asset })) : [],
+    thumbnail: null,
+    thumbnailTitle: null,
+    thumbnailPrompt: null,
+    thumbnailHistory: [],
+    selectedThumbnailId: null,
+    backgroundMusicTracks: options.backgroundMusicTracks || [],
+    previewMix: options.previewMix,
+    workflowDraft: options.workflowDraft,
+    voicePreviewAsset: null,
+    scriptPreviewAsset: null,
+    finalVoiceAsset: null,
+    backgroundMusicPreview: null,
+    finalBackgroundMusic: null,
+    musicVideoPreview: null,
+    finalMusicVideo: null,
+  };
+}
+
+
+function hasDetailedWorkflowDraft(draft?: WorkflowDraft | null) {
+  if (!draft) return false;
+  return Boolean(
+    (Array.isArray(draft.extractedCharacters) && draft.extractedCharacters.length)
+    || (Array.isArray(draft.styleImages) && draft.styleImages.length)
+    || (Array.isArray(draft.characterImages) && draft.characterImages.length)
+    || (Array.isArray(draft.selectedCharacterIds) && draft.selectedCharacterIds.length)
+    || draft.selectedCharacterStyleId
+    || draft.selectedStyleImageId
+  );
+}
+
+function hasDetailedProjectPayload(project?: SavedProject | null) {
+  if (!project) return false;
+  return Boolean(
+    (Array.isArray(project.assets) && project.assets.length)
+    || (Array.isArray(project.backgroundMusicTracks) && project.backgroundMusicTracks.length)
+    || hasDetailedWorkflowDraft(project.workflowDraft || null)
+  );
+}
+
+function mergeLoadedWorkflowDraft(baseDraft?: WorkflowDraft | null, incomingDraft?: WorkflowDraft | null): WorkflowDraft | null {
+  if (!incomingDraft) return null;
+
+  const fallbackBase = baseDraft
+    ? ensureWorkflowDraft({ workflowDraft: baseDraft, lastContentType: baseDraft.contentType } as StudioState)
+    : createDefaultWorkflowDraft(incomingDraft.contentType || 'story');
+  const ensuredIncoming = ensureWorkflowDraft({ workflowDraft: incomingDraft, lastContentType: incomingDraft.contentType || fallbackBase.contentType } as StudioState);
+
+  return {
+    ...fallbackBase,
+    ...ensuredIncoming,
+    extractedCharacters: Array.isArray(ensuredIncoming.extractedCharacters) && ensuredIncoming.extractedCharacters.length
+      ? ensuredIncoming.extractedCharacters
+      : (fallbackBase.extractedCharacters || []),
+    styleImages: Array.isArray(ensuredIncoming.styleImages) && ensuredIncoming.styleImages.length
+      ? ensuredIncoming.styleImages
+      : (fallbackBase.styleImages || []),
+    characterImages: Array.isArray(ensuredIncoming.characterImages) && ensuredIncoming.characterImages.length
+      ? ensuredIncoming.characterImages
+      : (fallbackBase.characterImages || []),
+    selectedCharacterIds: Array.isArray(ensuredIncoming.selectedCharacterIds) && ensuredIncoming.selectedCharacterIds.length
+      ? ensuredIncoming.selectedCharacterIds
+      : (fallbackBase.selectedCharacterIds || []),
+    selectedCharacterStyleId: ensuredIncoming.selectedCharacterStyleId ?? fallbackBase.selectedCharacterStyleId ?? null,
+    selectedCharacterStyleLabel: ensuredIncoming.selectedCharacterStyleLabel || fallbackBase.selectedCharacterStyleLabel || '',
+    selectedCharacterStylePrompt: ensuredIncoming.selectedCharacterStylePrompt || fallbackBase.selectedCharacterStylePrompt || '',
+    selectedStyleImageId: ensuredIncoming.selectedStyleImageId ?? fallbackBase.selectedStyleImageId ?? null,
+    promptTemplates: Array.isArray(ensuredIncoming.promptTemplates) && ensuredIncoming.promptTemplates.length
+      ? ensuredIncoming.promptTemplates
+      : (fallbackBase.promptTemplates || []),
+    selectedPromptTemplateId: ensuredIncoming.selectedPromptTemplateId || fallbackBase.selectedPromptTemplateId,
+    updatedAt: ensuredIncoming.updatedAt || Date.now(),
+  };
+}
 
 const resolveBasePath = (pathname?: string | null) => {
   const fallback = '/mp4Creater';
@@ -131,6 +225,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   const basePath = useMemo(() => resolveBasePath(pathname), [pathname]);
   const newProjectHandledRef = useRef('');
   const queryProjectHandledRef = useRef('');
+  const queryProjectLoadingRef = useRef('');
+  const queryProjectRetryTimerRef = useRef<number | null>(null);
   const studioStateRef = useRef<StudioState | null>(null);
   const workflowDraftSaveTimerRef = useRef<number | null>(null);
   const pendingWorkflowDraftRef = useRef<StudioState['workflowDraft'] | null>(null);
@@ -156,11 +252,43 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   const [progressMessage, setProgressMessage] = useState('');
   const [currentCost, setCurrentCost] = useState<CostBreakdown | null>(null);
   const [navigationOverlay, setNavigationOverlay] = useState<{ title: string; description: string; mode?: 'panel' | 'gray' } | null>(null);
+  const [projectLookupTick, setProjectLookupTick] = useState(0);
   const autosaveTimerRef = useRef<number | null>(null);
   const projectDraftSyncTimerRef = useRef<number | null>(null);
   const lastWorkflowDraftSignatureRef = useRef('');
 
   const storageReady = Boolean(studioState?.isStorageConfigured && studioState?.storageDir?.trim());
+  const requestedProjectId = searchParams?.get('projectId') || '';
+
+  const buildNavigationSnapshotProject = useCallback((workflowDraftOverride?: WorkflowDraft | null) => {
+    if (!currentProjectId) return null;
+    const existingProject = savedProjects.find((item) => item.id === currentProjectId) || null;
+    const topic = workflowDraftOverride?.topic || currentTopic || existingProject?.topic || existingProject?.name || '새 프로젝트';
+    const fallbackDraft = workflowDraftOverride
+      || studioStateRef.current?.workflowDraft
+      || createDefaultWorkflowDraft(studioStateRef.current?.lastContentType || 'story');
+    const baseProject = createOptimisticWorkflowProject({
+      projectId: currentProjectId,
+      topic,
+      workflowDraft: fallbackDraft,
+      assets: generatedData,
+      backgroundMusicTracks,
+      previewMix,
+    });
+
+    return {
+      ...baseProject,
+      ...existingProject,
+      id: currentProjectId,
+      topic,
+      workflowDraft: fallbackDraft,
+      assets: generatedData.length ? normalizeLoadedAssets(generatedData) : (existingProject?.assets || []),
+      backgroundMusicTracks: backgroundMusicTracks.length ? backgroundMusicTracks : (existingProject?.backgroundMusicTracks || []),
+      previewMix: previewMix || existingProject?.previewMix,
+      lastSavedAt: Date.now(),
+      cost: currentCost || existingProject?.cost,
+    } as SavedProject;
+  }, [backgroundMusicTracks, currentCost, currentProjectId, currentTopic, generatedData, previewMix, savedProjects]);
 
   const applyProjectListSnapshot = useCallback((projects: SavedProject[] = []) => {
     const nextProjects = [...projects]
@@ -200,6 +328,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   useEffect(() => () => {
     if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
     if (projectDraftSyncTimerRef.current) window.clearTimeout(projectDraftSyncTimerRef.current);
+    if (queryProjectRetryTimerRef.current) window.clearTimeout(queryProjectRetryTimerRef.current);
   }, []);
 
   const effectiveWorkflowDraft = useMemo(() => ensureWorkflowDraft(studioState), [studioState]);
@@ -298,7 +427,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
     pendingWorkflowDraftRef.current = null;
 
-    const shouldUseOverlay = Boolean(navigateToStep1 && viewMode !== 'gallery');
+    const shouldUseOverlay = false;
     try {
       if (shouldUseOverlay) {
         setNavigationOverlay({
@@ -327,10 +456,23 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         lastContentType: nextDraft.contentType,
       };
 
+      const optimisticProject = navigateToStep1
+        ? createOptimisticWorkflowProject({
+            topic,
+            workflowDraft: nextDraft,
+            assets: [],
+            backgroundMusicTracks: [],
+            previewMix: nextPreviewMix,
+          })
+        : null;
+      const optimisticProjectList = optimisticProject
+        ? [optimisticProject, ...savedProjects.filter((item) => item.id !== optimisticProject.id)]
+        : undefined;
+
       setStudioState(pendingStateForSave);
       setGeneratedData([]);
-      setCurrentTopic('');
-      setCurrentProjectId(null);
+      setCurrentTopic(optimisticProject?.topic || '');
+      setCurrentProjectId(optimisticProject?.id || null);
       setBackgroundMusicTracks([]);
       setPreviewMix(nextPreviewMix);
       setCurrentCost(null);
@@ -339,13 +481,73 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         setViewMode('main');
       }
 
-      const saveStatePromise = saveStudioState(pendingStateForSave)
+      const saveStatePromise = saveStudioState({
+        ...pendingStateForSave,
+        ...(optimisticProjectList
+          ? {
+              projects: optimisticProjectList,
+              projectIndex: optimisticProjectList,
+            }
+          : {}),
+      })
         .then((nextState) => {
           setStudioState(nextState);
         })
         .catch((error) => {
           console.warn('[mp4Creater] initial studio state save failed', error);
         });
+
+      if (navigateToStep1 && optimisticProject) {
+        let project: SavedProject | null = null;
+        let lastError: unknown = null;
+
+        rememberProjectNavigationProject(optimisticProject);
+        applyProjectListSnapshot(optimisticProjectList || [optimisticProject]);
+        setViewMode('main');
+
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const created = await upsertWorkflowProject({
+              projectId: optimisticProject.id,
+              topic,
+              workflowDraft: nextDraft,
+              assets: [],
+              backgroundMusicTracks: [],
+              previewMix: nextPreviewMix,
+            });
+            project = created;
+            break;
+          } catch (error) {
+            lastError = error;
+          }
+        }
+
+        if (!project) {
+          try {
+            await saveStudioProject(optimisticProject);
+            project = optimisticProject;
+          } catch (fallbackError) {
+            lastError = fallbackError;
+          }
+        }
+
+        if (!project) {
+          console.error('[mp4Creater] project_create_failed', lastError || new Error('project_create_failed'));
+          project = optimisticProject;
+          setProgressMessage('프로젝트 저장이 잠시 지연되어도 Step1은 바로 열리도록 임시 상태로 먼저 진행합니다.');
+        }
+
+        setCurrentProjectId(project.id);
+        setCurrentTopic(project.topic || topic);
+        rememberProjectNavigationProject(project);
+        applyProjectListSnapshot([project, ...savedProjects.filter((item) => item.id !== project.id && item.id !== optimisticProject.id)]);
+        await saveStatePromise;
+        setNavigationOverlay(null);
+        try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
+        router.push(`${basePath}/step-1?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+        void refreshProjects({ silent: true });
+        return;
+      }
 
       let project: SavedProject | null = null;
       let lastError: unknown = null;
@@ -370,8 +572,9 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       void saveStatePromise;
       setCurrentProjectId(project.id);
       rememberProjectNavigationProject(project);
-      applyProjectListSnapshot([project!, ...savedProjects.filter((item) => item.id !== project!.id)]);
+      applyProjectListSnapshot([project, ...savedProjects.filter((item) => item.id !== project.id)]);
 
+      setNavigationOverlay(null);
       if (navigateToStep1) {
         setViewMode('main');
         router.push(`${basePath}/step-1?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
@@ -382,7 +585,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       setNavigationOverlay(null);
       throw error;
     }
-  }, [basePath, ensureRuntimeStorageReady, refreshProjects, router, studioState, viewMode]);
+  }, [applyProjectListSnapshot, basePath, ensureRuntimeStorageReady, refreshProjects, router, savedProjects, studioState]);
 
   useEffect(() => {
     setViewMode(routeStep ? 'main' : resolveAppViewMode(searchParams));
@@ -394,6 +597,19 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       window.scrollTo({ top: 0, behavior: 'auto' });
     } catch {}
   }, [routeStep, pathname]);
+
+  useEffect(() => {
+    if (!routeStep) return;
+    const projectQuery = currentProjectId ? `?projectId=${encodeURIComponent(currentProjectId)}` : '';
+    const candidates = [routeStep - 1, routeStep + 1]
+      .filter((step): step is number => step >= 1 && step <= 6);
+
+    candidates.forEach((step) => {
+      try {
+        router.prefetch(`${basePath}/step-${step}${projectQuery}`);
+      } catch {}
+    });
+  }, [routeStep, currentProjectId, router, basePath]);
 
   useEffect(() => {
     if (routeStep) return;
@@ -494,7 +710,6 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         assets: generatedData,
         backgroundMusicTracks,
         previewMix,
-        workflowDraft: studioState?.workflowDraft || null,
       });
       if (updated) {
         applyProjectListSnapshot([updated, ...savedProjects.filter((item) => item.id !== updated.id)]);
@@ -504,7 +719,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     return () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
-  }, [currentProjectId, generatedData, backgroundMusicTracks, previewMix, studioState?.workflowDraft, savedProjects, storageReady]);
+  }, [currentProjectId, generatedData, backgroundMusicTracks, previewMix, savedProjects, storageReady]);
 
   const handleDeleteProjects = async (ids: string[]) => {
     const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)));
@@ -580,6 +795,9 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     pendingWorkflowDraftRef.current = null;
 
     const safeAssets = normalizeLoadedAssets(Array.isArray(project.assets) ? project.assets : []);
+    const sameProjectDraft = currentProjectId === project.id ? studioStateRef.current?.workflowDraft : null;
+    const mergedWorkflowDraft = mergeLoadedWorkflowDraft(sameProjectDraft || null, project.workflowDraft || null);
+
     setGeneratedData([...safeAssets]);
     setCurrentTopic(project.topic || project.name || '불러온 프로젝트');
     setCurrentProjectId(project.id);
@@ -590,35 +808,59 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
     setViewMode('main');
 
-    if (project.workflowDraft) {
+    if (mergedWorkflowDraft) {
       const nextState = {
         ...(studioStateRef.current || createDefaultStudioState()),
-        workflowDraft: project.workflowDraft,
-        lastContentType: project.workflowDraft.contentType || studioStateRef.current?.lastContentType || 'story',
+        workflowDraft: mergedWorkflowDraft,
+        lastContentType: mergedWorkflowDraft.contentType || studioStateRef.current?.lastContentType || 'story',
         updatedAt: Date.now(),
       };
       setStudioState(nextState);
-      pendingWorkflowDraftRef.current = project.workflowDraft;
+      pendingWorkflowDraftRef.current = mergedWorkflowDraft;
       if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
       workflowDraftSaveTimerRef.current = window.setTimeout(() => {
         void commitPendingWorkflowDraft();
       }, 180);
     }
-  }, [commitPendingWorkflowDraft]);
+  }, [commitPendingWorkflowDraft, currentProjectId]);
 
   useEffect(() => {
     const projectId = searchParams?.get('projectId') || '';
     const returnTo = searchParams?.get('returnTo') || '';
     if (!projectId || viewMode !== 'main') return;
     const signature = `${basePath}:${projectId}:${returnTo}`;
-    if (queryProjectHandledRef.current === signature) return;
-    queryProjectHandledRef.current = signature;
+    if (queryProjectHandledRef.current === signature || queryProjectLoadingRef.current === signature) return;
+    queryProjectLoadingRef.current = signature;
+
+    let cancelled = false;
 
     void (async () => {
-      const project = (await getProjectById(projectId, { localOnly: true }))
-        || (await getProjectById(projectId, { forceSync: true }));
-      if (!project) return;
+      const cachedNavigationProject = readProjectNavigationProject(projectId);
+      const localDetailedProject = await getProjectById(projectId, { localOnly: true });
+      const syncedDetailedProject = localDetailedProject ? null : await getProjectById(projectId, { forceSync: true });
+      const cachedListedProject = savedProjects.find((item) => item.id === projectId) || null;
+      const project = hasDetailedProjectPayload(cachedNavigationProject)
+        ? cachedNavigationProject
+        : localDetailedProject
+          || syncedDetailedProject
+          || cachedNavigationProject
+          || cachedListedProject;
+
+      if (cancelled) return;
+
+      if (!project) {
+        queryProjectLoadingRef.current = '';
+        if (queryProjectRetryTimerRef.current) window.clearTimeout(queryProjectRetryTimerRef.current);
+        queryProjectRetryTimerRef.current = window.setTimeout(() => {
+          setProjectLookupTick((prev) => prev + 1);
+        }, 180);
+        return;
+      }
+
+      queryProjectHandledRef.current = signature;
+      queryProjectLoadingRef.current = '';
       handleLoadProject(project);
+      setNavigationOverlay(null);
       if (returnTo === 'workflow') {
         setProgressMessage('');
       }
@@ -629,7 +871,14 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       if (isSameRoute) return;
       router.replace(clearQueryPath, { scroll: false });
     })();
-  }, [searchParams, viewMode, basePath, router, handleLoadProject, routeStep, resolveDraftStep, pathname]);
+
+    return () => {
+      cancelled = true;
+      if (queryProjectLoadingRef.current === signature) {
+        queryProjectLoadingRef.current = '';
+      }
+    };
+  }, [searchParams, viewMode, basePath, router, handleLoadProject, routeStep, resolveDraftStep, pathname, savedProjects, projectLookupTick]);
 
 
   const handleStartupComplete = async (payload: {
@@ -709,6 +958,11 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       lastContentType: nextDraft.contentType || prev.lastContentType || 'story',
     } : prev));
 
+    const navigationSnapshotProject = buildNavigationSnapshotProject(nextDraft);
+    if (navigationSnapshotProject) {
+      rememberProjectNavigationProject(navigationSnapshotProject);
+    }
+
     if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
     workflowDraftSaveTimerRef.current = window.setTimeout(() => {
       void commitPendingWorkflowDraft();
@@ -749,20 +1003,12 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     } catch {}
 
     try {
-      const saveStatePromise = saveStudioState({
-        ...currentState,
+      setStudioState((prev) => ({
+        ...(prev || currentState),
         workflowDraft: nextDraft,
         lastContentType: nextDraft.contentType || currentState.lastContentType || 'story',
         updatedAt: Date.now(),
-      })
-        .then((nextState) => {
-          setStudioState(nextState);
-          return nextState;
-        })
-        .catch((error) => {
-          console.warn('[mp4Creater] scene studio state save failed', error);
-          return null;
-        });
+      }));
 
       const initialSceneAssets = nextDraft.script?.trim()
         ? createEmptySceneAssetsFromDraft(nextDraft)
@@ -770,13 +1016,12 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
       const nextBackgroundTracks = backgroundMusicTracks.length ? backgroundMusicTracks : [createSampleBackgroundTrack(nextDraft)];
       const nextPreviewMix = previewMix || getDefaultPreviewMix();
-
-      const project = await upsertWorkflowProject({
+      const projectDraftForScene = createSelectedWorkflowDraftForTransport(nextDraft) || nextDraft;
+      const optimisticSceneProject = createOptimisticWorkflowProject({
         projectId: currentProjectId,
         topic: nextDraft.topic || '새 프로젝트',
-        workflowDraft: nextDraft,
+        workflowDraft: projectDraftForScene,
         assets: initialSceneAssets,
-        cost: currentCost || undefined,
         backgroundMusicTracks: nextBackgroundTracks,
         previewMix: nextPreviewMix,
       });
@@ -784,16 +1029,33 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       setGeneratedData(normalizeLoadedAssets(initialSceneAssets));
       setBackgroundMusicTracks(nextBackgroundTracks);
       setPreviewMix(nextPreviewMix);
+      setCurrentProjectId(optimisticSceneProject.id);
+      rememberProjectNavigationProject(optimisticSceneProject);
 
-      setCurrentProjectId(project.id);
-      rememberProjectNavigationProject(project);
-      void saveStatePromise;
-      void refreshProjects({ silent: true });
       try {
         localStorage.removeItem(CONFIG.STORAGE_KEYS.PENDING_SCENE_AUTOSTART);
       } catch {}
       try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
-      router.push(`${basePath}/step-6?projectId=${encodeURIComponent(project.id)}`, { scroll: true });
+
+      void upsertWorkflowProject({
+        projectId: optimisticSceneProject.id,
+        topic: nextDraft.topic || '새 프로젝트',
+        workflowDraft: projectDraftForScene,
+        assets: initialSceneAssets,
+        cost: currentCost || undefined,
+        backgroundMusicTracks: nextBackgroundTracks,
+        previewMix: nextPreviewMix,
+      })
+        .then((project) => {
+          rememberProjectNavigationProject(project);
+          setCurrentProjectId(project.id);
+          void refreshProjects({ silent: true });
+        })
+        .catch((saveError) => {
+          console.error('[mp4Creater] scene studio background save failed', saveError);
+        });
+
+      router.push(`${basePath}/step-6?projectId=${encodeURIComponent(optimisticSceneProject.id)}`, { scroll: true });
     } catch (error) {
       console.error('[mp4Creater] scene studio open failed', error);
       setNavigationOverlay(null);
@@ -805,12 +1067,12 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     setGeneratedData((prev) => prev.map((item, itemIndex) => itemIndex === index ? {
       ...item,
       narration,
-      targetDuration: Math.max(item.targetDuration || 0, estimateClipDuration(narration)),
+      targetDuration: Math.min(6, Math.max(3, estimateClipDuration(narration))),
     } : item));
   };
 
   const handleDurationChange = (index: number, duration: number) => {
-    setGeneratedData((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, targetDuration: duration } : item));
+    setGeneratedData((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, targetDuration: Math.min(6, Math.max(3, duration)) } : item));
   };
 
   return (
@@ -888,6 +1150,24 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
               </div>
             </div>
           )}
+          {routeStep && requestedProjectId && currentProjectId !== requestedProjectId ? (
+            <div className="mx-auto max-w-[1520px] px-4 sm:px-6 lg:px-8">
+              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="text-[11px] font-black uppercase tracking-[0.22em] text-blue-600">프로젝트 복원 중</div>
+                <div className="mt-2 text-2xl font-black text-slate-900">선택한 Step 데이터를 먼저 정확히 맞추고 있습니다</div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">Step3 출연자 선택, Step4 캐릭터 이미지, Step5 화풍 선택이 요약본으로 덮이지 않도록 프로젝트 상세 JSON 또는 세션 캐시를 먼저 읽은 뒤 화면을 엽니다.</p>
+                <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-3 text-xs font-black text-slate-600">
+                    <span>Step 데이터 준비 상태</span>
+                    <span>28%</span>
+                  </div>
+                  <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
+                    <div className="h-full w-[28%] rounded-full bg-gradient-to-r from-blue-500 to-cyan-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
           <InputSection
             step={step}
             studioState={studioState}
@@ -899,10 +1179,16 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
               if (pendingWorkflowDraftRef.current) {
                 void commitPendingWorkflowDraft();
               }
+              if (currentDraft) {
+                const navigationSnapshotProject = buildNavigationSnapshotProject(currentDraft);
+                if (navigationSnapshotProject) {
+                  rememberProjectNavigationProject(navigationSnapshotProject);
+                }
+              }
               if (currentProjectId && storageReady && currentDraft) {
                 void updateProject(currentProjectId, {
                   workflowDraft: currentDraft,
-                  topic: currentDraft.topic || currentTopic || '???꾨줈?앺듃',
+                  topic: currentDraft.topic || currentTopic || '새 프로젝트',
                 });
               }
               const projectQuery = currentProjectId ? `?projectId=${encodeURIComponent(currentProjectId)}` : '';
@@ -919,6 +1205,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
             onSaveWorkflowDraft={handleSaveWorkflowDraft}
             onOpenSceneStudio={handleOpenSceneStudio}
           />
+          )}
 
           {!routeStep && generatedData.length > 0 && (
             <ResultTable

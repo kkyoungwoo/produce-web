@@ -348,20 +348,10 @@ export async function exportCapCutDragBundle(
     });
 
     const sceneSrt = timelineClip.clipSrt.trim();
-    if (sceneSrt) {
-      zipEntries.push({
-        path: `03_subtitles/${clipBase}.srt`,
-        bytes: bytesFromText(sceneSrt),
-      });
-    } else {
-      const textOnly = buildSceneSubtitleText(asset);
-      if (textOnly) {
-        zipEntries.push({
-          path: `03_subtitles/${clipBase}.txt`,
-          bytes: bytesFromText(textOnly),
-        });
-      }
-    }
+    zipEntries.push({
+      path: `03_subtitles/${clipBase}.srt`,
+      bytes: bytesFromText(sceneSrt),
+    });
 
     const narrationBlob = extractNarrationBlob(asset);
     if (narrationBlob) {
@@ -387,12 +377,10 @@ export async function exportCapCutDragBundle(
   }
 
   const masterSrt = await generateSrtContent(validAssets).catch(() => '');
-  if (masterSrt.trim()) {
-    zipEntries.push({
-      path: '03_subtitles/000_master_timeline.srt',
-      bytes: bytesFromText(masterSrt),
-    });
-  }
+  zipEntries.push({
+    path: '03_subtitles/000_master_timeline.srt',
+    bytes: bytesFromText(masterSrt.trim()),
+  });
 
   zipEntries.push({
     path: '03_subtitles/001_scene_text_map.txt',

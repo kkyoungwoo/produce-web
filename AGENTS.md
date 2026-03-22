@@ -26,7 +26,7 @@
 2. `docs/agent/task-playbooks.md` (DB 섹션)
 3. `docs/agent/file-reference-map.md` (DB 표)
 
-### B. mp4Creater 작업 (난이도 높음)
+### B. mp4Creater 작업
 1. `lib/mp4Creater/AGENTS.md`
 2. `lib/mp4Creater/.ai/current-task.md`
 3. `lib/mp4Creater/.ai/rules/edit-rules.md`

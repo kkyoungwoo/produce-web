@@ -1,3 +1,4 @@
+import { parseDataUrl } from '../utils/downloadHelpers';
 
 import { AspectRatio, BackgroundMusicTrack, GeneratedAsset, PreviewMixSettings, SubtitleData, SubtitleConfig, DEFAULT_SUBTITLE_CONFIG } from '../types';
 
@@ -38,6 +39,70 @@ interface RenderProfile {
   height: number;
   fps: number;
   bitrate: number;
+}
+
+function resolvePreferredImageSources(value: string): string[] {
+  if (!value) return [];
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  if (trimmed.startsWith('data:') || trimmed.startsWith('blob:') || trimmed.startsWith('/') || trimmed.startsWith('http')) return [trimmed];
+
+  const candidates = [
+    `data:image/png;base64,${trimmed}`,
+    `data:image/jpeg;base64,${trimmed}`,
+    `data:image/webp;base64,${trimmed}`,
+  ];
+
+  const parsed = parseDataUrl(trimmed, 'image/png');
+  if (parsed) {
+    try {
+      const blob = new Blob([parsed.bytes], { type: parsed.mime || 'image/png' });
+      candidates.unshift(URL.createObjectURL(blob));
+    } catch {}
+  }
+
+  return Array.from(new Set(candidates));
+}
+
+async function loadSceneImage(img: HTMLImageElement, asset: GeneratedAsset, sceneIndex: number): Promise<void> {
+  const candidates = resolvePreferredImageSources(asset.imageData || '');
+  if (!candidates.length) throw new Error('Image source missing');
+
+  let lastError: Error | null = null;
+  for (const candidate of candidates) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const cleanup = () => {
+          img.onload = null;
+          img.onerror = null;
+        };
+        const timer = window.setTimeout(() => {
+          cleanup();
+          reject(new Error('Image load timeout'));
+        }, 5000);
+        img.onload = () => {
+          cleanup();
+          window.clearTimeout(timer);
+          if (!img.width || !img.height) {
+            reject(new Error('Image has zero dimensions'));
+            return;
+          }
+          resolve();
+        };
+        img.onerror = () => {
+          cleanup();
+          window.clearTimeout(timer);
+          reject(new Error('Image load failed'));
+        };
+        img.src = candidate;
+      });
+      return;
+    } catch (error: any) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  throw lastError || new Error(`Scene ${sceneIndex + 1} image load failed`);
 }
 
 /**
@@ -336,26 +401,10 @@ export const generateVideo = async (
     // 이미지 로드 (폴백용으로 항상 필요) - 에러 핸들링 추가
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    img.src = asset.imageData.startsWith('data:') || asset.imageData.startsWith('/') || asset.imageData.startsWith('http') ? asset.imageData : `data:image/jpeg;base64,${asset.imageData}`;
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => {
-        if (img.width === 0 || img.height === 0) {
-          console.error(`[Video] 씬 ${i + 1}: 이미지 크기가 0 - 로드 실패`);
-          reject(new Error('Image has zero dimensions'));
-        } else {
-          console.log(`[Video] 씬 ${i + 1}: 이미지 로드 완료 (${img.width}x${img.height})`);
-          resolve();
-        }
-      };
-      img.onerror = () => {
-        console.error(`[Video] 씬 ${i + 1}: 이미지 로드 에러`);
-        reject(new Error('Image load failed'));
-      };
-      // 타임아웃 (5초)
-      setTimeout(() => reject(new Error('Image load timeout')), 5000);
-    }).catch(e => {
+    await loadSceneImage(img, asset, i).then(() => {
+      console.log(`[Video] 씬 ${i + 1}: 이미지 로드 완료 (${img.width}x${img.height})`);
+    }).catch((e) => {
       console.warn(`[Video] 씬 ${i + 1}: ${e.message}, 플레이스홀더 사용`);
-      // 플레이스홀더 이미지 생성
       const placeholderCanvas = document.createElement('canvas');
       placeholderCanvas.width = renderProfile.width;
       placeholderCanvas.height = renderProfile.height;
@@ -368,14 +417,14 @@ export const generateVideo = async (
         pCtx.textAlign = 'center';
         pCtx.fillText(`씬 ${i + 1}`, placeholderCanvas.width / 2, placeholderCanvas.height / 2);
       }
-      img.src = placeholderCanvas.toDataURL();
+      img.src = placeholderCanvas.toDataURL('image/png');
     });
 
     // 애니메이션 영상 로드 (있는 경우)
     let video: HTMLVideoElement | null = null;
     let isAnimated = false;
 
-    if (useSceneVideos && asset.videoData) {
+    if (useSceneVideos && asset.selectedVisualType !== 'image' && asset.videoData) {
       try {
         video = document.createElement('video');
         video.crossOrigin = 'anonymous';

@@ -39,6 +39,23 @@ export const DEFAULT_ROUTING: AiRoutingSettings = {
 };
 
 let studioStateMemoryCache: StudioState | null = null;
+let studioStateSaveFailureCount = 0;
+let studioStateSaveCooldownUntil = 0;
+
+function shouldBypassStudioStateSaveRequest() {
+  return typeof window !== 'undefined' && Date.now() < studioStateSaveCooldownUntil;
+}
+
+function markStudioStateSaveSuccess() {
+  studioStateSaveFailureCount = 0;
+  studioStateSaveCooldownUntil = 0;
+}
+
+function markStudioStateSaveFailure() {
+  studioStateSaveFailureCount += 1;
+  const backoffMs = Math.min(15000, 1200 * (2 ** Math.max(0, studioStateSaveFailureCount - 1)));
+  studioStateSaveCooldownUntil = Date.now() + backoffMs;
+}
 
 export const createDefaultCharacter = (): CharacterProfile => ({
   id: `char_${Date.now()}`,
@@ -430,6 +447,26 @@ export async function saveStudioState(partial: Partial<StudioState>): Promise<St
   const cachedState = getCachedStudioState();
   const payload = buildLeanStatePayload(partial, cachedState);
 
+  const buildOptimisticState = () => (cachedState
+    ? {
+        ...cachedState,
+        ...payload,
+        projects: Array.isArray(partial.projects) ? partial.projects.map(summarizeProjectForIndex) : (cachedState.projects || []),
+        projectIndex: Array.isArray((payload as any).projectIndex) ? (payload as any).projectIndex : ((cachedState as any)?.projectIndex || []),
+      }
+    : {
+        ...createDefaultStudioState(),
+        ...payload,
+        projects: Array.isArray(partial.projects) ? partial.projects.map(summarizeProjectForIndex) : [],
+        projectIndex: Array.isArray((payload as any).projectIndex) ? (payload as any).projectIndex : [],
+      }) as StudioState;
+
+  if (shouldBypassStudioStateSaveRequest()) {
+    const optimisticState = buildOptimisticState();
+    syncStudioStateToLocalCache(optimisticState);
+    return optimisticState;
+  }
+
   try {
     const state = await requestJson<StudioState>('/api/local-storage/state', {
       method: 'POST',
@@ -446,23 +483,12 @@ export async function saveStudioState(partial: Partial<StudioState>): Promise<St
         }
       : state;
 
+    markStudioStateSaveSuccess();
     syncStudioStateToLocalCache(nextMemoryState as StudioState);
     return nextMemoryState as StudioState;
   } catch (error) {
-    const optimisticState = (cachedState
-      ? {
-          ...cachedState,
-          ...payload,
-          projects: Array.isArray(partial.projects) ? partial.projects.map(summarizeProjectForIndex) : (cachedState.projects || []),
-          projectIndex: Array.isArray((payload as any).projectIndex) ? (payload as any).projectIndex : ((cachedState as any)?.projectIndex || []),
-        }
-      : {
-          ...createDefaultStudioState(),
-          ...payload,
-          projects: Array.isArray(partial.projects) ? partial.projects.map(summarizeProjectForIndex) : [],
-          projectIndex: Array.isArray((payload as any).projectIndex) ? (payload as any).projectIndex : [],
-        }) as StudioState;
-
+    markStudioStateSaveFailure();
+    const optimisticState = buildOptimisticState();
     syncStudioStateToLocalCache(optimisticState);
     console.warn('[mp4Creater] saveStudioState failed, keeping local cache only', error);
     return optimisticState;

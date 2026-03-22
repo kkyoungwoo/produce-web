@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import os from 'os';
 import path from 'path';
 
 export type StudioState = {
@@ -95,6 +96,29 @@ export type StudioState = {
 export const DEFAULT_STORAGE_DIR = './local-data/tubegen-studio';
 const STUDIO_STATE_FILENAME = 'studio-state.json';
 const PROJECTS_DIRNAME = 'projects';
+const SAFE_DEFAULT_STORAGE_DIR = path.join(os.homedir(), '.tubegen-studio');
+
+function isLegacyDefaultStorageDir(input?: string) {
+  const value = input?.trim();
+  return !value || value === DEFAULT_STORAGE_DIR;
+}
+
+async function ensureSafeDefaultStorageDirReady(storageDir?: string) {
+  if (!isLegacyDefaultStorageDir(storageDir)) return;
+
+  const legacyDir = path.join(process.cwd(), DEFAULT_STORAGE_DIR);
+  const safeDir = SAFE_DEFAULT_STORAGE_DIR;
+
+  if (path.normalize(legacyDir) === path.normalize(safeDir)) return;
+
+  const legacyExists = await pathExists(legacyDir);
+  const safeExists = await pathExists(safeDir);
+
+  if (!legacyExists || safeExists) return;
+
+  await fs.mkdir(path.dirname(safeDir), { recursive: true });
+  await fs.cp(legacyDir, safeDir, { recursive: true });
+}
 
 export const createDefaultState = (storageDir = '', options?: { configured?: boolean }): StudioState => ({
   version: 7,
@@ -149,8 +173,20 @@ export const createDefaultState = (storageDir = '', options?: { configured?: boo
 
 export const resolveStorageDir = (input?: string) => {
   const value = input?.trim();
-  const safeValue = value || DEFAULT_STORAGE_DIR;
-  return path.isAbsolute(safeValue) ? safeValue : path.join(process.cwd(), safeValue);
+
+  if (isLegacyDefaultStorageDir(value)) {
+    return SAFE_DEFAULT_STORAGE_DIR;
+  }
+
+  if (value === '~') {
+    return os.homedir();
+  }
+
+  if (value?.startsWith('~/') || value?.startsWith('~\\')) {
+    return path.join(os.homedir(), value.slice(2));
+  }
+
+  return path.isAbsolute(value || '') ? (value as string) : path.join(process.cwd(), value || '');
 };
 
 export const stateFilePath = (storageDir: string) => path.join(resolveStorageDir(storageDir), STUDIO_STATE_FILENAME);
@@ -291,6 +327,7 @@ export function serializeStateForClient(state: StudioState, _options?: { include
 }
 
 export async function readStoredState(storageDir?: string): Promise<StudioState> {
+  await ensureSafeDefaultStorageDirReady(storageDir);
   const explicitStorageDir = storageDir?.trim() || '';
   const effectiveStorageDir = explicitStorageDir || DEFAULT_STORAGE_DIR;
   const filePath = stateFilePath(effectiveStorageDir);
@@ -320,6 +357,7 @@ type WriteStateOptions = {
 };
 
 export async function writeState(state: StudioState, _options?: WriteStateOptions): Promise<StudioState> {
+  await ensureSafeDefaultStorageDirReady(state?.storageDir);
   const normalized = normalizeState(state);
 
   if (!normalized.isStorageConfigured || !normalized.storageDir?.trim()) {
@@ -334,6 +372,7 @@ export async function writeState(state: StudioState, _options?: WriteStateOption
 }
 
 export async function readProjectDetail(storageDir: string, projectId: string): Promise<any | null> {
+  await ensureSafeDefaultStorageDirReady(storageDir);
   const safeProjectId = projectId?.trim();
   if (!safeProjectId) return null;
   const filePath = projectDetailFilePath(storageDir, safeProjectId);
@@ -343,6 +382,7 @@ export async function readProjectDetail(storageDir: string, projectId: string): 
 }
 
 export async function writeProjectDetail(storageDir: string, project: any): Promise<any> {
+  await ensureSafeDefaultStorageDirReady(storageDir);
   if (!project?.id) {
     throw new Error('project_id_required');
   }
@@ -353,6 +393,7 @@ export async function writeProjectDetail(storageDir: string, project: any): Prom
 }
 
 export async function deleteProjectDetails(storageDir: string, projectIds: string[]): Promise<number> {
+  await ensureSafeDefaultStorageDirReady(storageDir);
   let deleted = 0;
   for (const projectId of projectIds) {
     const safeProjectId = projectId?.trim();

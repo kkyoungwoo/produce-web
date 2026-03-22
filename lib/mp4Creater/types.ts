@@ -73,6 +73,8 @@ export interface ScriptScene {
   sceneNumber: number;
   narration: string;
   visualPrompt: string;
+  imagePrompt?: string;
+  videoPrompt?: string;
   analysis?: SceneAnalysis;
   targetDuration?: number | null;
   aspectRatio?: AspectRatio;
@@ -137,6 +139,7 @@ export interface GeneratedAsset extends ScriptScene {
   sourceMode?: 'ai' | 'sample';
   imageHistory?: AssetHistoryItem[];
   videoHistory?: AssetHistoryItem[];
+  selectedVisualType?: 'image' | 'video';
   status: 'pending' | 'generating' | 'completed' | 'error';
 }
 
@@ -337,6 +340,8 @@ export interface WorkflowDraft {
   styleImages: PromptedImageAsset[];
   characterImages: PromptedImageAsset[];
   selectedCharacterIds: string[];
+  hasSelectedContentType?: boolean;
+  hasSelectedAspectRatio?: boolean;
   selectedCharacterStyleId?: string | null;
   selectedCharacterStyleLabel?: string;
   selectedCharacterStylePrompt?: string;

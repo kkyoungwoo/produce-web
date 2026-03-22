@@ -37,7 +37,6 @@ interface Step3PanelProps {
   newCharacterName: string;
   newCharacterPrompt: string;
   onGenerateScript: () => void;
-  onExpandScript: (chars: number) => void;
   onViewPrompt: () => void;
   onStoryScriptChange: (value: string) => void;
   onSaveStoryScript: () => void;
@@ -60,6 +59,7 @@ interface Step3PanelProps {
   onCreateNewCharacter: () => void;
   onCreateCharacterFromForm: (payload: { name: string; position: string; description: string }) => void;
   getCharacterVoiceSummary: (character: CharacterProfile) => string;
+  castSelectionHighlightTick?: number;
 }
 
 const QWEN_VOICE_OPTIONS = [
@@ -87,7 +87,6 @@ export default function Step3Panel({
   activeVoicePreviewCharacterId,
   voicePreviewMessage,
   onGenerateScript,
-  onExpandScript,
   onViewPrompt,
   onStoryScriptChange,
   onSaveStoryScript,
@@ -100,9 +99,11 @@ export default function Step3Panel({
   onPreviewCharacterVoice,
   onCreateCharacterFromForm,
   getCharacterVoiceSummary,
+  castSelectionHighlightTick = 0,
 }: Step3PanelProps) {
   const [isEditingScript, setIsEditingScript] = useState(false);
   const [isCharacterModalOpen, setIsCharacterModalOpen] = useState(false);
+  const [highlightCastSelection, setHighlightCastSelection] = useState(false);
   const [manualCharacterName, setManualCharacterName] = useState('');
   const [manualCharacterPosition, setManualCharacterPosition] = useState('');
   const [manualCharacterDescription, setManualCharacterDescription] = useState('');
@@ -118,11 +119,36 @@ export default function Step3Panel({
     }
   }, [isGeneratingScript]);
 
+  useEffect(() => {
+    if (!castSelectionHighlightTick) return;
+    setHighlightCastSelection(true);
+    const timer = window.setTimeout(() => setHighlightCastSelection(false), 1800);
+    return () => window.clearTimeout(timer);
+  }, [castSelectionHighlightTick]);
+
   const closeCharacterModal = () => {
     setIsCharacterModalOpen(false);
     setManualCharacterName('');
     setManualCharacterPosition('');
     setManualCharacterDescription('');
+  };
+
+  const stopCardToggle = (event: React.SyntheticEvent) => {
+    event.stopPropagation();
+  };
+
+  const handleCharacterCardClick = (event: React.SyntheticEvent, characterId: string) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('button, input, select, textarea, label, a')) {
+      return;
+    }
+    onCharacterToggle(characterId);
+  };
+
+  const handleCharacterSelectButtonClick = (event: React.SyntheticEvent, characterId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    onCharacterToggle(characterId);
   };
 
   return (
@@ -178,39 +204,23 @@ export default function Step3Panel({
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">{sceneCount}문단</span>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">{scriptCharacterCount}자</span>
               {storyScript.trim() ? (
-                <>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    {[500, 1000, 2000].map((count) => (
-                      <button
-                        key={count}
-                        type="button"
-                        onClick={() => onExpandScript(count)}
-                        disabled={isGeneratingScript}
-                        className="rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-black text-violet-700 transition hover:bg-violet-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                      >
-                        +{count}자
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isEditingScript) {
-                        onSaveStoryScript();
-                        setIsEditingScript(false);
-                        return;
-                      }
-                      setIsEditingScript(true);
-                    }}
-                    className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
-                  >
-                    {isEditingScript ? (isHydratingCharacters ? '저장 중...' : '저장하기') : '수정하기'}
-                  </button>
-                </>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isEditingScript) {
+                      onSaveStoryScript();
+                      setIsEditingScript(false);
+                      return;
+                    }
+                    setIsEditingScript(true);
+                  }}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+                >
+                  {isEditingScript ? (isHydratingCharacters ? '저장 중...' : '저장하기') : '수정하기'}
+                </button>
               ) : null}
             </div>
           </div>
-          {storyScript.trim() ? <p className="mb-3 text-xs leading-6 text-slate-500">짧게 느껴지면 +500자, +1000자, +2000자로 현재 대본을 이어서 확장할 수 있습니다. 새로 생성하지 않고 지금 텍스트 뒤를 자연스럽게 이어갑니다.</p> : null}
           <textarea
             value={storyScript}
             onChange={(e) => onStoryScriptChange(e.target.value)}
@@ -220,7 +230,14 @@ export default function Step3Panel({
           />
         </section>
 
-        <section data-step3-cast-section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+        <section
+          data-step3-cast-section
+          className={`rounded-[28px] border bg-white p-5 shadow-sm transition-all duration-300 ${
+            highlightCastSelection
+              ? 'border-amber-400 ring-4 ring-amber-100 animate-pulse shadow-amber-100'
+              : 'border-slate-200'
+          }`}
+        >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">출연자 선택</div>
@@ -244,6 +261,12 @@ export default function Step3Panel({
             </div>
           </div>
 
+          {highlightCastSelection ? (
+            <div className="mt-4 rounded-[20px] border border-amber-300 bg-amber-50 px-4 py-3 text-sm font-black leading-6 text-amber-900">
+              여기에서 Step4로 넘길 출연자를 먼저 선택해 주세요.
+            </div>
+          ) : null}
+
           {extractedCharacters.length > 0 && !selectedCount ? (
             <div className="mt-4 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-800">
               출연자를 1명 이상 선택해야 다음 단계로 넘어갈 수 있습니다. 자동 추출 후에도 기본 선택은 하지 않습니다. 대본을 다 쓴 뒤 다음으로를 누르면 이 구역으로 다시 안내됩니다.
@@ -262,7 +285,6 @@ export default function Step3Panel({
                 const qwenVoiceId = character.voiceProvider === 'qwen3Tts' ? (currentVoiceId || 'qwen-default') : 'qwen-default';
                 const elevenVoiceId = character.voiceProvider === 'elevenLabs' ? (currentVoiceId || elevenLabsVoices[0]?.voice_id || '') : (elevenLabsVoices[0]?.voice_id || '');
                 const heygenVoiceId = character.voiceProvider === 'heygen' ? (currentVoiceId || heygenVoices[0]?.voice_id || '') : (heygenVoices[0]?.voice_id || '');
-                const isPreviewing = activeVoicePreviewCharacterId === character.id;
                 const selected = selectedCharacterIds.includes(character.id);
 
                 return (
@@ -270,14 +292,14 @@ export default function Step3Panel({
                     key={character.id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => onCharacterToggle(character.id)}
+                    onClick={(event) => handleCharacterCardClick(event, character.id)}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter' || event.key === ' ') {
                         event.preventDefault();
                         onCharacterToggle(character.id);
                       }
                     }}
-                    className={`rounded-[22px] border px-4 py-3 transition ${selected ? 'border-blue-300 bg-blue-50/80 shadow-sm ring-2 ring-blue-100' : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'}`}
+                    className={`cursor-pointer rounded-[22px] border px-4 py-3 transition focus:outline-none focus:ring-2 focus:ring-blue-200 ${selected ? 'border-blue-300 bg-blue-50/80 shadow-sm ring-2 ring-blue-100' : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'}`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -289,7 +311,7 @@ export default function Step3Panel({
                         <button
                           type="button"
                           onClick={(event) => {
-                            event.stopPropagation();
+                            stopCardToggle(event);
                             onCharacterRemove(character.id);
                           }}
                           className="rounded-full border border-rose-200 bg-white px-2.5 py-1 text-[10px] font-black text-rose-600 transition hover:bg-rose-50"
@@ -298,10 +320,12 @@ export default function Step3Panel({
                         </button>
                         <button
                           type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            onCharacterToggle(character.id);
-                          }}
+                          onPointerDown={stopCardToggle}
+                          onMouseDown={stopCardToggle}
+                          onTouchStart={stopCardToggle}
+                          onClickCapture={stopCardToggle}
+                          onClick={(event) => handleCharacterSelectButtonClick(event, character.id)}
+                          aria-pressed={selected}
                           className={`rounded-full px-3 py-1.5 text-[11px] font-black transition ${selected ? 'bg-blue-600 text-white hover:bg-blue-500' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100'}`}
                         >
                           {selected ? '출연자 선택됨' : '출연자 선택하기'}
@@ -316,7 +340,8 @@ export default function Step3Panel({
                             <div className="mb-1 text-[11px] font-black text-slate-700">보이스 API</div>
                             <select
                               value={voiceProvider}
-                              onClick={(event) => event.stopPropagation()}
+                              onClick={stopCardToggle}
+                              onKeyDown={stopCardToggle}
                               onChange={(e) => onCharacterVoiceProviderChange(character.id, e.target.value as 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen')}
                               className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
                             >
@@ -334,7 +359,8 @@ export default function Step3Panel({
                             ) : voiceProvider === 'qwen3Tts' ? (
                               <select
                                 value={qwenVoiceId}
-                                onClick={(event) => event.stopPropagation()}
+                                onClick={stopCardToggle}
+                                onKeyDown={stopCardToggle}
                                 onChange={(e) => onCharacterVoiceChoiceChange(character.id, 'qwen3Tts', e.target.value)}
                                 className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
                               >
@@ -344,7 +370,8 @@ export default function Step3Panel({
                               <div className="grid gap-2">
                                 <select
                                   value={elevenVoiceId}
-                                  onClick={(event) => event.stopPropagation()}
+                                  onClick={stopCardToggle}
+                                  onKeyDown={stopCardToggle}
                                   onChange={(e) => onCharacterVoiceChoiceChange(character.id, 'elevenLabs', e.target.value)}
                                   className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
                                 >
@@ -352,7 +379,8 @@ export default function Step3Panel({
                                 </select>
                                 <input
                                   value={currentVoiceId}
-                                  onClick={(event) => event.stopPropagation()}
+                                  onClick={stopCardToggle}
+                                  onKeyDown={stopCardToggle}
                                   onChange={(e) => onCharacterVoiceDirectInputChange(character.id, 'elevenLabs', e.target.value)}
                                   className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-violet-400"
                                   placeholder="또는 ElevenLabs voice_id 직접 입력"
@@ -362,7 +390,8 @@ export default function Step3Panel({
                               <div className="grid gap-2">
                                 <select
                                   value={heygenVoiceId}
-                                  onClick={(event) => event.stopPropagation()}
+                                  onClick={stopCardToggle}
+                                  onKeyDown={stopCardToggle}
                                   onChange={(e) => onCharacterVoiceChoiceChange(character.id, 'heygen', e.target.value)}
                                   className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
                                 >
@@ -370,7 +399,8 @@ export default function Step3Panel({
                                 </select>
                                 <input
                                   value={currentVoiceId}
-                                  onClick={(event) => event.stopPropagation()}
+                                  onClick={stopCardToggle}
+                                  onKeyDown={stopCardToggle}
                                   onChange={(e) => onCharacterVoiceDirectInputChange(character.id, 'heygen', e.target.value)}
                                   className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-violet-400"
                                   placeholder="또는 HeyGen voice_id 직접 입력"
@@ -392,14 +422,20 @@ export default function Step3Panel({
                           <button
                             type="button"
                             onClick={(event) => {
-                              event.stopPropagation();
+                              stopCardToggle(event);
                               onPreviewCharacterVoice(character.id);
                             }}
-                            className="rounded-2xl bg-slate-900 px-3 py-2 text-[11px] font-black text-white hover:bg-slate-800"
+                            className={`rounded-full px-3 py-1.5 text-[11px] font-black transition ${activeVoicePreviewCharacterId === character.id ? 'bg-slate-900 text-white hover:bg-slate-800' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}
                           >
-                            {isPreviewing ? '미리듣기 정지' : '미리듣기'}
+                            {activeVoicePreviewCharacterId === character.id ? '미리 듣기 정지' : '보이스 미리 듣기'}
                           </button>
                         </div>
+
+                        {activeVoicePreviewCharacterId === character.id ? (
+                          <div className="mt-2 rounded-[18px] border border-violet-200 bg-violet-50 px-3 py-2 text-[11px] leading-5 text-violet-700">
+                            {voicePreviewMessage || '보이스 미리 듣기를 준비하는 중입니다.'}
+                          </div>
+                        ) : null}
                       </>
                     ) : null}
                   </div>
@@ -409,7 +445,6 @@ export default function Step3Panel({
           )}
 
           {isHydratingCharacters ? <p className="mt-4 text-xs leading-6 text-violet-600">대본 변경을 기준으로 출연자를 다시 정리하고 있습니다.</p> : null}
-          {!isMusicVideo && voicePreviewMessage ? <p className="mt-2 text-xs leading-6 text-slate-500">{voicePreviewMessage}</p> : null}
         </section>
       </div>
 

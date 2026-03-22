@@ -5,7 +5,7 @@
 
 1. UI에서 보여주는 고정 공개 샘플
 2. 개발자가 테스트용으로 넣는 로컬 샘플
-3. 실제 사용자가 저장한 프로젝트 결과물
+3. 실제 사용자가 저장한 프로젝트 JSON 결과물
 
 이 셋을 분리해야 에이전트와 개발자가 덜 헷갈립니다.
 
@@ -48,8 +48,9 @@
 원칙:
 - 샘플 라이브러리로 되돌려 섞지 않는다
 - 운영/사용자 결과물은 참조용 샘플과 분리한다
-- 실제 프로젝트는 `projects/project-0001-프로젝트명/` 형태의 번호 폴더로 저장한다
-- 한 프로젝트의 이미지, 영상, 오디오, 프롬프트, 워크플로우 draft, 썸네일은 모두 같은 프로젝트 폴더 안에 저장한다
+- 실제 프로젝트 상세는 `storageDir/projects/<projectId>.json`으로 저장한다
+- 전역 인덱스/설정은 `storageDir/studio-state.json`으로 저장한다
+- 예전 `project-0001-프로젝트명/metadata/prompts/images/...` 폴더형 저장 구조를 현재 기준으로 다시 가정하지 않는다
 
 ## 파일 이름 규칙
 가능하면 아래 패턴을 따른다.
@@ -80,24 +81,15 @@
 
 ## 실제 프로젝트 저장 구조 예시
 
-```
+```text
 storageDir/
   studio-state.json
   projects/
-    project-0001-my-first-project/
-      project.json
-      metadata/
-      prompts/
-      images/
-      videos/
-      audio/
-      thumbnails/
-      characters/
-      styles/
+    <projectId>.json
 ```
 
-## 2026-03-20 샘플/폴백 동작 기준
-- API가 없어도 Step2 추천, Step3 대본 생성, Step6 미디어 흐름이 중단되지 않게 샘플 폴백을 유지합니다.
+## 2026-03-22 샘플/폴백 동작 기준
+- API가 없어도 Step2 추천, Step3 대본 생성, Step4 캐릭터 후보 시작, Step6 미디어 흐름이 중단되지 않게 샘플 폴백을 유지합니다.
 - 무료 옵션(예: qwen3-tts, 샘플 BGM)은 유료모드 여부와 관계없이 재생 가능해야 합니다.
 - 샘플 데이터는 "기능이 살아 있는 체험" 목적이며, 실제 저장 결과물과 같은 경로로 섞지 않습니다.
-- 샘플 기반 결과를 프로젝트에 저장할 때도 프로젝트 번호/폴더 규칙은 동일하게 지켜야 합니다.
+- 샘플 기반 결과를 프로젝트에 저장할 때도 실제 저장 구조는 `studio-state.json` + `projects/<projectId>.json` 규칙을 지킵니다.

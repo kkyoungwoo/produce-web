@@ -41,6 +41,71 @@ function buildBaseSummary(topic: string, selections: StorySelectionState) {
   ].join('\n');
 }
 
+function buildConceptLock(contentType: ContentType) {
+  if (contentType === 'music_video') {
+    return [
+      '- Step 1 concept is locked to music video.',
+      '- Write singable lyrics and visual rhythm, not prose explanation.',
+      '- Keep hook, chorus lift, and repeatable emotional phrases obvious.',
+    ].join('\n');
+  }
+
+  if (contentType === 'news') {
+    return [
+      '- Step 1 concept is locked to cinematic movie-style storytelling.',
+      '- Every paragraph should feel like a visible scene with action, tension, and mood.',
+      '- Avoid explainer tone or planning-note phrasing inside the final script body.',
+    ].join('\n');
+  }
+
+  if (contentType === 'info_delivery') {
+    return [
+      '- Step 1 concept is locked to explainer / information-delivery format.',
+      '- Open with the key question or why-now context, then explain through order, example, comparison, or numbers.',
+      '- Avoid dramatic movie prose when a clear explanation would work better.',
+    ].join('\n');
+  }
+
+  return [
+    '- Step 1 concept is locked to narrative storytelling.',
+    '- Each paragraph should push the story forward through emotion, action, and scene progression.',
+    '- Avoid turning the script into abstract explanation or planning notes.',
+  ].join('\n');
+}
+
+function buildParagraphFlowGuide(contentType: ContentType) {
+  if (contentType === 'music_video') {
+    return [
+      '- Use lyric blocks separated by blank lines.',
+      '- Prefer 4 to 6 short blocks such as Intro / Verse / Chorus / Bridge / Outro.',
+      '- Keep each line singable and visually evocative.',
+    ].join('\n');
+  }
+
+  if (contentType === 'news') {
+    return [
+      '- Use 4 to 6 blank-line-separated cinematic paragraphs.',
+      '- Each paragraph should read like one scene beat with visible motion, setting, and emotional pressure.',
+      '- Script body only. Do not print labels like Goal, Topic, Genre, Mood, or Notes.',
+    ].join('\n');
+  }
+
+  if (contentType === 'info_delivery') {
+    return [
+      '- Use 4 to 6 blank-line-separated explainer paragraphs.',
+      '- Paragraph 1 introduces the key question or why-now context.',
+      '- Middle paragraphs should use order, example, comparison, or numbers.',
+      '- Final paragraph closes with summary and next action.',
+    ].join('\n');
+  }
+
+  return [
+    '- Use 4 to 6 blank-line-separated story paragraphs.',
+    '- Each paragraph should feel like a new beat, not a planning memo.',
+    '- Script body only. Do not print labels like Goal, Topic, Genre, Mood, or Notes.',
+  ].join('\n');
+}
+
 function buildConceptOutputGuide(contentType: ContentType) {
   if (contentType === 'music_video') {
     return [
@@ -67,6 +132,7 @@ function buildConceptOutputGuide(contentType: ContentType) {
       '- 결과는 영화처럼 장면이 보이는 시네마틱 문단형 대본으로 작성한다.',
       '- 각 문단은 새 장면처럼 읽혀야 하며 감정과 행동이 함께 보여야 한다.',
       '- 설명만 나열하지 말고 화면이 그려지는 문장으로 쓴다.',
+      '- 목표, 주제, 장르 같은 메타 문구는 본문에 넣지 않는다.',
       '',
       '[최종 예시]',
       '젖은 골목 끝에 선 주인공은 오래전 약속의 흔적을 다시 발견한다. 네온은 흔들리고, 표정은 대답보다 먼저 무너진다.',
@@ -80,6 +146,7 @@ function buildConceptOutputGuide(contentType: ContentType) {
       '- 첫 문단에서 핵심 질문 또는 핵심 맥락을 바로 제시한다.',
       '- 중간 문단은 순서, 예시, 숫자, 비교가 보이게 정리한다.',
       '- 마지막 문단은 요약과 다음 행동으로 마무리한다.',
+      '- 목표, 주제, 장르 같은 메타 문구는 본문에 넣지 않는다.',
       '',
       '[최종 예시]',
       '오늘은 왜 이 변화가 중요한지부터 짚고 시작한다. 먼저 일정과 비용을 보고, 그다음 실제 생활비 체감이 어디서 달라지는지 예시로 확인한다.',
@@ -91,6 +158,7 @@ function buildConceptOutputGuide(contentType: ContentType) {
     '- 결과는 이야기형 문단 대본으로 작성한다.',
     '- 각 문단은 다음 장면이 궁금해지도록 감정과 사건을 함께 전개한다.',
     '- 설명보다 장면과 행동이 먼저 보이게 쓴다.',
+    '- 목표, 주제, 장르 같은 메타 문구는 본문에 넣지 않는다.',
     '',
     '[최종 예시]',
     '편의점 문이 닫히기 직전, 주인공은 끝내 보내지 못한 메시지를 다시 열어 본다. 작은 숨 한 번이 오늘 밤의 방향을 바꾼다.',
@@ -108,16 +176,30 @@ export function buildWorkflowPromptPack(options: {
   const currentDraft = options.script?.trim() || 'No draft';
 
   const outputGuide = buildConceptOutputGuide(options.contentType);
+  const conceptLock = buildConceptLock(options.contentType);
+  const paragraphGuide = buildParagraphFlowGuide(options.contentType);
   const storyPrompt = `${bundle.story}
+
+[CONCEPT LOCK]
+${conceptLock}
+
+[PARAGRAPH FLOW]
+${paragraphGuide}
 
 ${outputGuide}
 
-[INPUT]
+[PROJECT BRIEF]
 ${summary}
 
 [CURRENT DRAFT]
 ${currentDraft}`;
   const lyricsPrompt = `${bundle.story}
+
+[CONCEPT LOCK]
+${buildConceptLock('music_video')}
+
+[PARAGRAPH FLOW]
+${buildParagraphFlowGuide('music_video')}
 
 ${buildConceptOutputGuide('music_video')}
 
@@ -128,6 +210,12 @@ ${summary}
 ${currentDraft}`;
   const characterPrompt = `${bundle.story}
 
+[CONCEPT LOCK]
+${conceptLock}
+
+[PARAGRAPH FLOW]
+${paragraphGuide}
+
 ${outputGuide}
 
 [CHARACTERS]
@@ -136,6 +224,12 @@ ${summary}
 [SCRIPT]
 ${currentDraft}`;
   const scenePrompt = `${bundle.story}
+
+[CONCEPT LOCK]
+${conceptLock}
+
+[PARAGRAPH FLOW]
+${paragraphGuide}
 
 ${outputGuide}
 
@@ -146,11 +240,23 @@ ${summary}
 ${currentDraft}`;
   const actionPrompt = `${bundle.story}
 
+[CONCEPT LOCK]
+${conceptLock}
+
+[PARAGRAPH FLOW]
+${paragraphGuide}
+
 ${outputGuide}
 
 [SCENE ACTIONS]
 ${summary}`;
   const persuasionStoryPrompt = `${bundle.story}
+
+[CONCEPT LOCK]
+${conceptLock}
+
+[PARAGRAPH FLOW]
+${paragraphGuide}
 
 ${outputGuide}
 
@@ -178,11 +284,13 @@ export function createBuiltInWorkflowPromptTemplates(
 
 추가 규칙:
 - 대화와 내레이션을 자연스럽게 섞어주세요.
+- Step 1에서 고른 콘셉트 톤을 흐리지 말고 유지해주세요.
 - 시각적이고 구체적인 문장을 우선해주세요.`;
   const sceneHeavyPrompt = `${promptPack.scenePrompt}
 
 추가 규칙:
 - 각 문단은 눈에 보이는 장면 전환으로 시작해주세요.
+- Step 1 콘셉트에 맞는 장면 결을 끝까지 유지해주세요.
 - 구체적인 시각적 포인트를 추가해주세요.`;
   const templates: WorkflowPromptTemplate[] = [
     {

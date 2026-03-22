@@ -100,7 +100,7 @@ export async function generateSrtContent(assets: GeneratedAsset[]): Promise<stri
   for (const asset of validAssets) {
     // videoService와 100% 동일한 duration 계산 로직
     // 오디오가 있으면 디코딩해서 실제 길이 사용, 없으면 기본 3초
-    let sceneDuration = DEFAULT_DURATION;
+    let sceneDuration = asset.targetDuration || DEFAULT_DURATION;
 
     if (asset.audioData) {
       try {
@@ -114,7 +114,15 @@ export async function generateSrtContent(assets: GeneratedAsset[]): Promise<stri
     // videoService와 동일: 오디오 없으면 기본 3초 (다른 폴백 없음)
 
     if (!asset.subtitleData || asset.subtitleData.words.length === 0) {
-      // 자막 없는 씬은 오디오 길이만큼 건너뜀
+      const fallbackText = (asset.narration || '').trim();
+      if (fallbackText) {
+        allChunks.push({
+          index: globalIndex++,
+          startTime: timelinePointer,
+          endTime: timelinePointer + sceneDuration,
+          text: fallbackText,
+        });
+      }
       timelinePointer += sceneDuration;
       continue;
     }
@@ -163,7 +171,7 @@ export async function downloadSrt(assets: GeneratedAsset[], filename: string = '
   const srtContent = await generateSrtContent(assets);
 
   if (!srtContent.trim()) {
-    alert('자막 데이터가 없습니다. ElevenLabs로 오디오를 생성해주세요.');
+    alert('내보낼 자막 텍스트가 없습니다. 씬 대본이나 오디오를 먼저 준비해 주세요.');
     return;
   }
 

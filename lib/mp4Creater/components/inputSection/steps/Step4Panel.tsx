@@ -54,6 +54,17 @@ function buildSampleStylePreview(id: string, label: string, description: string)
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
+function resolveCharacterPreview(character: CharacterProfile) {
+  const selectedImage = (character.generatedImages || []).find((image) => image.id === character.selectedImageId);
+  if (selectedImage?.imageData) return selectedImage.imageData;
+  if (character.imageData) return character.imageData;
+  return (character.generatedImages || []).find((image) => image.imageData)?.imageData || '';
+}
+
+function getCharacterInitial(name: string) {
+  return (name || '?').trim().slice(0, 1).toUpperCase();
+}
+
 interface Step4PanelProps {
   extractedCharacters: CharacterProfile[];
   selectedCharacterIds: string[];
@@ -90,6 +101,7 @@ export default function Step4Panel({
   const [localStage, setLocalStage] = useState<'style' | 'workspace'>(selectedCharacterStyleId ? 'workspace' : 'style');
   const stripRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const previousImageCountRef = useRef<Record<string, number>>({});
+  const autoStartedCharacterIdsRef = useRef<Record<string, boolean>>({});
 
   const selectedStyle = useMemo(
     () => characterStyleOptions.find((item) => item.id === selectedCharacterStyleId) || null,
@@ -120,6 +132,26 @@ export default function Step4Panel({
       previousImageCountRef.current[character.id] = currentCount;
     });
   }, [selectedCharacters]);
+
+  useEffect(() => {
+    if (localStage !== 'workspace') return;
+
+    selectedCharacters.forEach((character) => {
+      const images = character.generatedImages || [];
+      if (!character.selectedImageId && images[0]?.id) {
+        onSelectCharacterImage(character.id, images[0].id);
+      }
+
+      if (images.length || characterLoadingProgress[character.id] !== undefined || autoStartedCharacterIdsRef.current[character.id]) {
+        return;
+      }
+
+      autoStartedCharacterIdsRef.current[character.id] = true;
+      onCreateVariants(character, {
+        note: `Generate the first reference image for ${character.name} using the saved shared character style.`,
+      });
+    });
+  }, [localStage, selectedCharacters, characterLoadingProgress, onCreateVariants, onSelectCharacterImage]);
 
   const scrollStripBy = (characterId: string, direction: 'left' | 'right') => {
     const container = stripRefs.current[characterId];
@@ -192,15 +224,49 @@ export default function Step4Panel({
               <button type="button" onClick={() => setLocalStage('style')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
                 느낌 다시 선택
               </button>
-              <button type="button" onClick={() => onHydrateCharacters(false)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                {isExtracting ? '출연자 갱신 중...' : '출연자 갱신'}
-              </button>
-              <button type="button" onClick={onUploadNewCharacterImage} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500">
-                이미지 등록
-              </button>
               {uploadInput}
             </div>
           </div>
+
+          {!!selectedCharacters.length && (
+            <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">선택된 출연자 미리보기</div>
+                  <div className="mt-1 text-sm font-black text-slate-900">Step3에서 고른 출연자만 유지되며, 각 출연자 카드에서 바로 이미지 등록과 대표 이미지 선택을 이어갑니다</div>
+                </div>
+                <div className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600">
+                  대표 이미지 선택 {resolvedCount}/{selectedCharacterIds.length}
+                </div>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
+                {selectedCharacters.map((character) => {
+                  const previewSrc = resolveCharacterPreview(character);
+                  const hasSelectedImage = Boolean(character.selectedImageId);
+                  return (
+                    <div
+                      key={`${character.id}-preview`}
+                      className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 ${hasSelectedImage ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
+                    >
+                      {previewSrc ? (
+                        <img src={previewSrc} alt={`${character.name} 미리보기`} className="h-12 w-12 rounded-xl object-cover" />
+                      ) : (
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200 text-sm font-black text-slate-600">
+                          {getCharacterInitial(character.name)}
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-sm font-black text-slate-900">{character.name}</div>
+                        <div className={`text-[11px] font-black ${hasSelectedImage ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          {hasSelectedImage ? '대표 이미지 선택 완료' : '대표 이미지 선택 필요'}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -231,9 +297,22 @@ export default function Step4Panel({
                 return (
                   <div key={character.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="text-lg font-black text-slate-900">{character.name}</div>
-                        <div className="mt-1 text-xs text-slate-500">{character.roleLabel || (character.role === 'lead' ? '주인공' : character.role === 'support' ? '조연' : '출연자')} · 후보 {images.length}장</div>
+                      <div className="flex items-start gap-3">
+                        {resolveCharacterPreview(character) ? (
+                          <img
+                            src={resolveCharacterPreview(character)}
+                            alt={`${character.name} 대표 미리보기`}
+                            className="h-16 w-16 rounded-2xl object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-200 text-lg font-black text-slate-600">
+                            {getCharacterInitial(character.name)}
+                          </div>
+                        )}
+                        <div>
+                          <div className="text-lg font-black text-slate-900">{character.name}</div>
+                          <div className="mt-1 text-xs text-slate-500">{character.roleLabel || (character.role === 'lead' ? '주인공' : character.role === 'support' ? '조연' : '출연자')} · 후보 {images.length}장</div>
+                        </div>
                       </div>
                       <div className="flex flex-wrap items-center justify-end gap-2">
                         <button
@@ -281,12 +360,19 @@ export default function Step4Panel({
                         {images.map((image) => {
                           const selected = image.id === character.selectedImageId;
                           return (
-                            <button
+                            <div
                               key={image.id}
-                              type="button"
+                              role="button"
+                              tabIndex={0}
                               data-character-image-card={image.id}
                               onClick={() => onSelectCharacterImage(character.id, image.id)}
-                              className={`w-[220px] shrink-0 snap-start overflow-hidden rounded-[22px] border bg-white text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'}`}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  onSelectCharacterImage(character.id, image.id);
+                                }
+                              }}
+                              className={`w-[220px] shrink-0 snap-start overflow-hidden rounded-[22px] border bg-white text-left shadow-sm transition focus:outline-none focus:ring-2 focus:ring-violet-200 ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'}`}
                             >
                               <img src={image.imageData} alt={image.label} className="aspect-[4/5] w-full object-cover" />
                               <div className="p-3">
@@ -311,7 +397,7 @@ export default function Step4Panel({
                                   </button>
                                 </div>
                               </div>
-                            </button>
+                            </div>
                           );
                         })}
                       </div>
