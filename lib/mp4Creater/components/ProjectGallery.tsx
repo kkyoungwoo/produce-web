@@ -109,6 +109,7 @@ const resolveLastWorkedStep = (project: SavedProject): 1 | 2 | 3 | 4 | 5 | 6 => 
   if (!draft) return 1;
   const completed = draft.completedSteps || { step1: false, step2: false, step3: false, step4: false, step5: false };
 
+  if ((draft.activeStage || 0) >= 6) return 6;
   if (completed.step5 || (draft.activeStage || 0) >= 5) return 5;
   if (completed.step4 || (draft.activeStage || 0) >= 4) return 4;
   if (completed.step3 || (draft.activeStage || 0) >= 3) return 3;
@@ -416,9 +417,9 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
               type="button"
               disabled={isInteractionLocked}
               onClick={() => openProjectScene(project)}
-              className="col-span-2 rounded-xl bg-blue-600 px-2 py-2 text-[11px] font-black text-white transition-colors hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+              className="col-span-2 rounded-[18px] border border-white/70 bg-white/70 px-2 py-2 text-[11px] font-black text-slate-900 shadow-[0_12px_32px_rgba(15,23,42,0.10)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
             >
-              상세 보기
+              제작하기
             </button>
             <button
               type="button"

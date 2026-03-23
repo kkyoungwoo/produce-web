@@ -5,9 +5,8 @@ interface DavinciSceneRecord {
   sceneNumber: number;
   narration: string;
   duration: number;
-  startTimeSec: number;
-  endTimeSec: number;
-  gapBeforeSec: number;
+  timelineStartSec: number;
+  timelineEndSec: number;
   aspectRatio: string;
   visualType: 'image' | 'video' | 'none';
   mediaFile: string | null;
@@ -59,7 +58,7 @@ interface ZipEntryInput {
 
 const textEncoder = new TextEncoder();
 const BRIDGE_SCHEME = 'mp4creater-davinci://import';
-const AUTO_IMPORT_PAYLOAD_LIMIT = 55 * 1024 * 1024;
+const AUTO_IMPORT_PAYLOAD_LIMIT = 180 * 1024 * 1024;
 
 function sanitizeFilename(name: string): string {
   return `${name || 'mp4Creater'}`
@@ -223,14 +222,12 @@ function buildMasterSrt(assets: GeneratedAsset[]): string {
   let pointer = 0;
   let index = 1;
   const rows: string[] = [];
-
   assets.forEach((asset) => {
     const text = `${asset.subtitleData?.fullText || asset.narration || ''}`.trim();
     const duration = Math.max(asset.audioDuration || 0, asset.targetDuration || 0, 3);
     if (text) rows.push(`${index++}\n${formatSrtTime(pointer)} --> ${formatSrtTime(pointer + duration)}\n${text}\n`);
     pointer += duration;
   });
-
   return rows.join('\n');
 }
 
@@ -240,41 +237,6 @@ function resolveVisualType(asset: GeneratedAsset): 'image' | 'video' | 'none' {
   if (asset.videoData) return 'video';
   if (asset.imageData) return 'image';
   return 'none';
-}
-
-function buildPackageManifest(options: { assets: GeneratedAsset[]; topic: string; backgroundTracks?: BackgroundMusicTrack[]; previewMix: PreviewMixSettings; projectId?: string | null; projectNumber?: number | null; }): DavinciPackageManifest {
-  const aspectRatio = options.assets[0]?.aspectRatio || '16:9';
-  const primaryBgm = options.backgroundTracks?.find((item) => item.audioData) || null;
-  let timelinePointer = 0;
-  const scenes = options.assets.map((asset, index) => {
-    const sceneNumber = asset.sceneNumber || index + 1;
-    const sceneNo = String(sceneNumber).padStart(3, '0');
-    const visualType = resolveVisualType(asset);
-    const mediaFile = visualType === 'video' ? `media/${sceneNo}_scene_${sceneNo}_video.${guessExtension(asset.videoData, 'video/mp4', 'mp4')}` : visualType === 'image' ? `media/${sceneNo}_scene_${sceneNo}_image.${guessExtension(asset.imageData, 'image/png', 'png')}` : null;
-    const audioFile = asset.audioData ? `audio/${sceneNo}_scene_${sceneNo}_narration.${guessExtension(asset.audioData, 'audio/mpeg', 'mp3')}` : null;
-    const subtitleFile = (asset.subtitleData?.fullText || asset.narration) ? `subtitles/${sceneNo}_scene_${sceneNo}.srt` : null;
-    const duration = Math.max(asset.audioDuration || 0, asset.targetDuration || 0, 3);
-    const startTimeSec = timelinePointer;
-    const endTimeSec = startTimeSec + duration;
-    timelinePointer = endTimeSec;
-    return { sceneNumber, narration: `${asset.narration || ''}`.trim(), duration, startTimeSec, endTimeSec, gapBeforeSec: 0, aspectRatio: asset.aspectRatio || aspectRatio, visualType, mediaFile, audioFile, subtitleFile, imagePrompt: `${asset.imagePrompt || asset.visualPrompt || ''}`.trim(), videoPrompt: `${asset.videoPrompt || ''}`.trim() } satisfies DavinciSceneRecord;
-  });
-  return { packageVersion: 1, packageType: 'mp4creater-davinci-import', generatedAt: new Date().toISOString(), projectName: options.topic || 'mp4Creater Project', projectId: options.projectId || null, projectNumber: typeof options.projectNumber === 'number' ? options.projectNumber : null, sceneCount: scenes.length, aspectRatio, previewMix: options.previewMix, backgroundMusicFile: primaryBgm?.audioData ? `music/000_project_bgm.${guessExtension(primaryBgm.audioData, 'audio/wav', 'wav')}` : null, scenes };
-}
-
-function buildSceneCsv(manifest: DavinciPackageManifest): string {
-  const header = ['scene_number', 'timeline_start_sec', 'timeline_end_sec', 'gap_before_sec', 'duration_sec', 'aspect_ratio', 'visual_type', 'media_file', 'audio_file', 'subtitle_file', 'narration'];
-  const rows = manifest.scenes.map((scene) => [scene.sceneNumber, scene.startTimeSec.toFixed(2), scene.endTimeSec.toFixed(2), scene.gapBeforeSec.toFixed(2), scene.duration.toFixed(2), scene.aspectRatio, scene.visualType, scene.mediaFile || '', scene.audioFile || '', scene.subtitleFile || '', csvEscape(scene.narration)].join(','));
-  return [header.join(','), ...rows].join('\n');
-}
-
-function csvEscape(value: string): string {
-  const normalized = `${value || ''}`.replace(/\r?\n/g, ' ');
-  return `"${normalized.replace(/"/g, '""')}"`;
-}
-
-function buildReadme(manifest: DavinciPackageManifest, packagePath?: string): string {
-  return [`프로젝트: ${manifest.projectName}`, manifest.projectNumber ? `프로젝트 번호: #${manifest.projectNumber}` : '', `씬 수: ${manifest.sceneCount}`, `화면 비율: ${manifest.aspectRatio}`, packagePath ? `패키지 위치: ${packagePath}` : '', '', '다빈치 리졸브 가져오기 우선 순서', '1. mp4Creater 브리지가 설치되어 있다면 open_with_mp4creater_bridge.cmd, .ps1, .url 중 하나로 자동 Import를 먼저 시도합니다.', '2. 브리지가 없다면 media, audio, music, subtitles 폴더를 번호 순서대로 드래그해도 바로 편집할 수 있습니다.', '3. scenes.csv와 resolve-import-manifest.json에는 타임라인 시작/종료 시각과 자막 파일명이 함께 정리됩니다.', '4. drag_order.txt에는 수동 드래그 순서가 적혀 있습니다.', '', '폴더 규칙', '- media: 씬별 이미지 또는 영상', '- audio: 씬별 내레이션', '- music: 프로젝트 배경음', '- subtitles: 씬별 SRT와 master_timeline.srt'].filter(Boolean).join('\n');
 }
 
 function guessExtension(value: string | null | undefined, fallbackMime: string, fallbackExt: string): string {
@@ -309,7 +271,12 @@ async function normalizeToDataUrl(value: string | null | undefined, fallbackMime
 }
 
 async function normalizeAssetsForExport(assets: GeneratedAsset[]): Promise<GeneratedAsset[]> {
-  return Promise.all(assets.map(async (asset) => ({ ...asset, imageData: await normalizeToDataUrl(asset.imageData, 'image/png'), audioData: await normalizeToDataUrl(asset.audioData, 'audio/mpeg'), videoData: await normalizeToDataUrl(asset.videoData, 'video/mp4') })));
+  return Promise.all(assets.map(async (asset) => ({
+    ...asset,
+    imageData: await normalizeToDataUrl(asset.imageData, 'image/png'),
+    audioData: await normalizeToDataUrl(asset.audioData, 'audio/mpeg'),
+    videoData: await normalizeToDataUrl(asset.videoData, 'video/mp4'),
+  })));
 }
 
 async function normalizeBackgroundTracks(tracks: BackgroundMusicTrack[]): Promise<BackgroundMusicTrack[]> {
@@ -318,14 +285,124 @@ async function normalizeBackgroundTracks(tracks: BackgroundMusicTrack[]): Promis
 
 function estimatePayloadSize(assets: GeneratedAsset[], tracks: BackgroundMusicTrack[]): number {
   let total = 0;
-  assets.forEach((asset) => { total += asset.imageData?.length || 0; total += asset.audioData?.length || 0; total += asset.videoData?.length || 0; });
-  tracks.forEach((track) => { total += track.audioData?.length || 0; });
+  assets.forEach((asset) => {
+    total += asset.imageData?.length || 0;
+    total += asset.audioData?.length || 0;
+    total += asset.videoData?.length || 0;
+  });
+  tracks.forEach((track) => {
+    total += track.audioData?.length || 0;
+  });
   return total;
 }
 
 function dataBytes(value: string | null | undefined, fallbackMime: string): Uint8Array | null {
   const parsed = parseDataUrl(value, fallbackMime);
   return parsed?.bytes || null;
+}
+
+function csvEscape(value: string): string {
+  const normalized = `${value || ''}`.replace(/\r?\n/g, ' ');
+  return `"${normalized.replace(/"/g, '""')}"`;
+}
+
+function buildDavinciBridgeUri(packagePath: string, packageName: string): string {
+  const params = new URLSearchParams({ packagePath, packageName, source: 'mp4Creater-web' });
+  return `${BRIDGE_SCHEME}?${params.toString()}`;
+}
+
+function buildPackageManifest(options: { assets: GeneratedAsset[]; topic: string; backgroundTracks?: BackgroundMusicTrack[]; previewMix: PreviewMixSettings; projectId?: string | null; projectNumber?: number | null; }): DavinciPackageManifest {
+  const aspectRatio = options.assets[0]?.aspectRatio || '16:9';
+  const primaryBgm = options.backgroundTracks?.find((item) => item.audioData) || null;
+  let timelinePointer = 0;
+  const scenes = options.assets.map((asset, index) => {
+    const sceneNumber = asset.sceneNumber || index + 1;
+    const sceneNo = String(sceneNumber).padStart(3, '0');
+    const visualType = resolveVisualType(asset);
+    const duration = Math.max(asset.audioDuration || 0, asset.targetDuration || 0, 3);
+    const timelineStartSec = timelinePointer;
+    const timelineEndSec = timelinePointer + duration;
+    timelinePointer = timelineEndSec;
+    return {
+      sceneNumber,
+      narration: `${asset.narration || ''}`.trim(),
+      duration,
+      timelineStartSec,
+      timelineEndSec,
+      aspectRatio: asset.aspectRatio || aspectRatio,
+      visualType,
+      mediaFile: visualType === 'video'
+        ? `media/${sceneNo}_scene_${sceneNo}_video.${guessExtension(asset.videoData, 'video/mp4', 'mp4')}`
+        : visualType === 'image'
+          ? `media/${sceneNo}_scene_${sceneNo}_image.${guessExtension(asset.imageData, 'image/png', 'png')}`
+          : null,
+      audioFile: asset.audioData ? `audio/${sceneNo}_scene_${sceneNo}_narration.${guessExtension(asset.audioData, 'audio/mpeg', 'mp3')}` : null,
+      subtitleFile: (asset.subtitleData?.fullText || asset.narration) ? `subtitles/${sceneNo}_scene_${sceneNo}.srt` : null,
+      imagePrompt: `${asset.imagePrompt || asset.visualPrompt || ''}`.trim(),
+      videoPrompt: `${asset.videoPrompt || ''}`.trim(),
+    } satisfies DavinciSceneRecord;
+  });
+
+  return {
+    packageVersion: 1,
+    packageType: 'mp4creater-davinci-import',
+    generatedAt: new Date().toISOString(),
+    projectName: options.topic || 'mp4Creater Project',
+    projectId: options.projectId || null,
+    projectNumber: typeof options.projectNumber === 'number' ? options.projectNumber : null,
+    sceneCount: scenes.length,
+    aspectRatio,
+    previewMix: options.previewMix,
+    backgroundMusicFile: primaryBgm?.audioData ? `music/000_project_bgm.${guessExtension(primaryBgm.audioData, 'audio/wav', 'wav')}` : null,
+    scenes,
+  };
+}
+
+function buildSceneCsv(manifest: DavinciPackageManifest): string {
+  const header = ['scene_number', 'start_sec', 'end_sec', 'duration_sec', 'aspect_ratio', 'visual_type', 'media_file', 'audio_file', 'subtitle_file', 'narration'];
+  const rows = manifest.scenes.map((scene) => [
+    scene.sceneNumber,
+    scene.timelineStartSec.toFixed(2),
+    scene.timelineEndSec.toFixed(2),
+    scene.duration.toFixed(2),
+    scene.aspectRatio,
+    scene.visualType,
+    scene.mediaFile || '',
+    scene.audioFile || '',
+    scene.subtitleFile || '',
+    csvEscape(scene.narration),
+  ].join(','));
+  return [header.join(','), ...rows].join('\n');
+}
+
+function buildDragOrderText(manifest: DavinciPackageManifest): string {
+  return manifest.scenes.map((scene) => {
+    const rows = [
+      `Scene ${String(scene.sceneNumber).padStart(3, '0')}`,
+      `  start: ${scene.timelineStartSec.toFixed(2)} sec`,
+      `  end: ${scene.timelineEndSec.toFixed(2)} sec`,
+    ];
+    if (scene.mediaFile) rows.push(`  visual: ${scene.mediaFile}`);
+    if (scene.audioFile) rows.push(`  audio: ${scene.audioFile}`);
+    if (scene.subtitleFile) rows.push(`  subtitle: ${scene.subtitleFile}`);
+    return rows.join('\n');
+  }).join('\n\n');
+}
+
+function buildReadme(manifest: DavinciPackageManifest, packagePath?: string): string {
+  return [
+    `프로젝트: ${manifest.projectName}`,
+    manifest.projectNumber ? `프로젝트 번호: #${manifest.projectNumber}` : '',
+    `씬 수: ${manifest.sceneCount}`,
+    `화면 비율: ${manifest.aspectRatio}`,
+    packagePath ? `패키지 위치: ${packagePath}` : '',
+    '',
+    '다빈치 리졸브 가져오기 우선 순서',
+    '1. 브리지가 설치되어 있다면 open_with_mp4creater_bridge 파일로 자동 Import를 먼저 시도합니다.',
+    '2. 자동 Import가 바로 열리지 않으면 same folder의 .cmd / .ps1 / .url 파일 중 하나를 실행합니다.',
+    '3. 그래도 안 되면 drag_order.txt 순서대로 media, audio, music, subtitles 폴더를 드래그합니다.',
+    '4. manifest/scenes.csv와 resolve-import-manifest.json에는 시작/종료 시각이 함께 정리되어 있습니다.',
+  ].filter(Boolean).join('\n');
 }
 
 async function buildDavinciZipEntries(options: { assets: GeneratedAsset[]; topic: string; backgroundTracks: BackgroundMusicTrack[]; previewMix: PreviewMixSettings; projectId?: string | null; projectNumber?: number | null; }): Promise<{ entries: ZipEntryInput[]; packageName: string; sceneCount: number }> {
@@ -335,9 +412,10 @@ async function buildDavinciZipEntries(options: { assets: GeneratedAsset[]; topic
   const root = packageName;
   entries.push({ path: `${root}/manifest/resolve-import-manifest.json`, bytes: bytesFromText(JSON.stringify(manifest, null, 2)) });
   entries.push({ path: `${root}/manifest/scenes.csv`, bytes: bytesFromText(buildSceneCsv(manifest)) });
-  entries.push({ path: `${root}/manifest/drag_order.txt`, bytes: bytesFromText(buildDragOrder(manifest)) });
+  entries.push({ path: `${root}/manifest/drag_order.txt`, bytes: bytesFromText(buildDragOrderText(manifest)) });
   entries.push({ path: `${root}/subtitles/master_timeline.srt`, bytes: bytesFromText(buildMasterSrt(options.assets)) });
   entries.push({ path: `${root}/README_IMPORT.txt`, bytes: bytesFromText(buildReadme(manifest)) });
+
   manifest.scenes.forEach((scene, index) => {
     const asset = options.assets[index];
     if (scene.mediaFile) {
@@ -351,15 +429,68 @@ async function buildDavinciZipEntries(options: { assets: GeneratedAsset[]; topic
     }
     if (scene.subtitleFile) entries.push({ path: `${root}/${scene.subtitleFile}`, bytes: bytesFromText(buildSceneSrt(asset)) });
   });
+
   const bgm = options.backgroundTracks.find((track) => track.audioData) || null;
   if (bgm?.audioData && manifest.backgroundMusicFile) {
     const bytes = dataBytes(bgm.audioData, 'audio/wav');
     if (bytes) entries.push({ path: `${root}/${manifest.backgroundMusicFile}`, bytes });
   }
+
   return { entries, packageName, sceneCount: manifest.sceneCount };
 }
 
-async function downloadDavinciResolvePackage(options: DavinciPrepareOptions): Promise<DavinciPrepareResult> {
+async function tryLaunchExternalUri(uri: string): Promise<boolean> {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+
+  const attemptIframe = () => new Promise<boolean>((resolve) => {
+    let done = false;
+    const iframe = document.createElement('iframe');
+    const cleanup = () => {
+      window.removeEventListener('blur', onSignal, true);
+      document.removeEventListener('visibilitychange', onVisibility, true);
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    };
+    const finish = (value: boolean) => {
+      if (done) return;
+      done = true;
+      cleanup();
+      resolve(value);
+    };
+    const onSignal = () => finish(true);
+    const onVisibility = () => {
+      if (document.hidden) finish(true);
+    };
+    iframe.style.display = 'none';
+    window.addEventListener('blur', onSignal, true);
+    document.addEventListener('visibilitychange', onVisibility, true);
+    document.body.appendChild(iframe);
+    iframe.src = uri;
+    window.setTimeout(() => finish(false), 1200);
+  });
+
+  if (await attemptIframe()) return true;
+
+  try {
+    const anchor = document.createElement('a');
+    anchor.href = uri;
+    anchor.style.display = 'none';
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  } catch {}
+
+  await new Promise((resolve) => window.setTimeout(resolve, 280));
+  if (document.hidden) return true;
+
+  try {
+    window.location.href = uri;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function downloadDavinciResolvePackageFallback(options: DavinciPrepareOptions): Promise<DavinciPrepareResult> {
   const normalizedAssets = await normalizeAssetsForExport(options.assets || []);
   const normalizedTracks = await normalizeBackgroundTracks(options.backgroundTracks || []);
   const previewMix = options.previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 };
@@ -370,68 +501,78 @@ async function downloadDavinciResolvePackage(options: DavinciPrepareOptions): Pr
   return { mode: 'zip', packageName: built.packageName, sceneCount: built.sceneCount, launchAttempted: false, launchSucceeded: false, downloadFilename: filename };
 }
 
-async function tryLaunchExternalUri(uri: string): Promise<boolean> {
-  if (typeof window === 'undefined' || typeof document === 'undefined') return false;
-
-  const trySingleLaunch = async (): Promise<boolean> => new Promise<boolean>((resolve) => {
-    let finished = false;
-    const iframe = document.createElement('iframe');
-    const anchor = document.createElement('a');
-    const cleanup = () => {
-      window.removeEventListener('blur', onSignal, true);
-      document.removeEventListener('visibilitychange', onVisibility, true);
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-      if (anchor.parentNode) anchor.parentNode.removeChild(anchor);
-    };
-    const done = (value: boolean) => {
-      if (finished) return;
-      finished = true;
-      cleanup();
-      resolve(value);
-    };
-    const onSignal = () => done(true);
-    const onVisibility = () => { if (document.hidden) done(true); };
-    iframe.style.display = 'none';
-    anchor.style.display = 'none';
-    anchor.href = uri;
-    window.addEventListener('blur', onSignal, true);
-    document.addEventListener('visibilitychange', onVisibility, true);
-    document.body.appendChild(iframe);
-    document.body.appendChild(anchor);
-    try { iframe.src = uri; } catch {}
-    window.setTimeout(() => { try { anchor.click(); } catch {} }, 90);
-    window.setTimeout(() => { try { window.location.assign(uri); } catch {} }, 240);
-    window.setTimeout(() => done(false), 2200);
-  });
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    if (await trySingleLaunch()) return true;
-    if (attempt < 2) await pause(420);
-  }
-  return false;
-}
-
 export async function prepareDavinciResolveImport(options: DavinciPrepareOptions): Promise<DavinciPrepareResult> {
   const normalizedAssets = await normalizeAssetsForExport(options.assets || []);
   const normalizedTracks = await normalizeBackgroundTracks(options.backgroundTracks || []);
   const previewMix = options.previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 };
   const payloadSize = estimatePayloadSize(normalizedAssets, normalizedTracks);
   if (!options.storageDir?.trim() || payloadSize > AUTO_IMPORT_PAYLOAD_LIMIT) {
-    return downloadDavinciResolvePackage({ ...options, assets: normalizedAssets, backgroundTracks: normalizedTracks, previewMix });
+    return saveDavinciResolvePackageZip({ ...options, assets: normalizedAssets, backgroundTracks: normalizedTracks, previewMix });
   }
-  const response = await fetch('/api/mp4Creater/davinci-resolve/package', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ storageDir: options.storageDir, projectId: options.projectId, projectNumber: options.projectNumber, topic: options.topic, assets: normalizedAssets, backgroundTracks: normalizedTracks, previewMix }) });
+
+  const response = await fetch('/api/mp4Creater/davinci-resolve/package', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      storageDir: options.storageDir,
+      projectId: options.projectId,
+      projectNumber: options.projectNumber,
+      topic: options.topic,
+      assets: normalizedAssets,
+      backgroundTracks: normalizedTracks,
+      previewMix,
+      launchBridge: true,
+    }),
+  });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(payload?.error || '다빈치 리졸브 패키지 준비에 실패했습니다.');
+
   const launchUri = typeof payload?.launchUri === 'string' ? payload.launchUri : '';
-  const launchSucceeded = launchUri ? await tryLaunchExternalUri(launchUri) : false;
-  return { mode: 'bridge', packageName: typeof payload?.packageName === 'string' ? payload.packageName : safeBasename(options.topic || 'project'), sceneCount: typeof payload?.sceneCount === 'number' ? payload.sceneCount : normalizedAssets.length, packagePath: typeof payload?.packagePath === 'string' ? payload.packagePath : undefined, launchUri: launchUri || undefined, launchAttempted: Boolean(launchUri), launchSucceeded };
+  const serverLaunchSucceeded = Boolean(payload?.launchSucceeded);
+  const browserLaunchSucceeded = !serverLaunchSucceeded && launchUri ? await tryLaunchExternalUri(launchUri) : false;
+
+  return {
+    mode: 'bridge',
+    packageName: typeof payload?.packageName === 'string' ? payload.packageName : safeBasename(options.topic || 'project'),
+    sceneCount: typeof payload?.sceneCount === 'number' ? payload.sceneCount : normalizedAssets.length,
+    packagePath: typeof payload?.packagePath === 'string' ? payload.packagePath : undefined,
+    launchUri: launchUri || undefined,
+    launchAttempted: Boolean(launchUri),
+    launchSucceeded: serverLaunchSucceeded || browserLaunchSucceeded,
+  };
 }
 
 export async function saveDavinciResolvePackageZip(options: DavinciPrepareOptions): Promise<DavinciPrepareResult> {
-  return downloadDavinciResolvePackage(options);
+  const normalizedAssets = await normalizeAssetsForExport(options.assets || []);
+  const normalizedTracks = await normalizeBackgroundTracks(options.backgroundTracks || []);
+  const previewMix = options.previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 };
+
+  try {
+    const response = await fetch('/api/mp4Creater/davinci-resolve/package', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        topic: options.topic,
+        projectId: options.projectId,
+        projectNumber: options.projectNumber,
+        assets: normalizedAssets,
+        backgroundTracks: normalizedTracks,
+        previewMix,
+        downloadZip: true,
+      }),
+    });
+
+    if (response.ok && response.headers.get('content-type')?.includes('application/zip')) {
+      const blob = await response.blob();
+      const disposition = response.headers.get('content-disposition') || '';
+      const matchedFilename = disposition.match(/filename\*=UTF-8''([^;]+)|filename=\"?([^\";]+)\"?/i);
+      const downloadFilename = decodeURIComponent(matchedFilename?.[1] || matchedFilename?.[2] || `${safeBasename(options.topic || 'project')}_davinci_resolve_import.zip`);
+      triggerBlobDownload(blob, downloadFilename);
+      return { mode: 'zip', packageName: safeBasename(options.topic || 'project'), sceneCount: normalizedAssets.length, launchAttempted: false, launchSucceeded: false, downloadFilename };
+    }
+  } catch {}
+
+  return downloadDavinciResolvePackageFallback({ ...options, assets: normalizedAssets, backgroundTracks: normalizedTracks, previewMix });
 }
 
-export function buildDavinciBridgeUri(packagePath: string, packageName: string): string {
-  const params = new URLSearchParams({ packagePath, packageName, source: 'mp4Creater-web' });
-  return `${BRIDGE_SCHEME}?${params.toString()}`;
-}
+export { buildDavinciBridgeUri };

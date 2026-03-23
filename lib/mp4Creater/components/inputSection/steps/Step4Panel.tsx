@@ -16,14 +16,17 @@ const SAMPLE_STYLE_PALETTE: Record<string, { from: string; to: string; badge: st
   anime: { from: '#c026d3', to: '#7c3aed', badge: '애니메이션' },
   webtoon: { from: '#2563eb', to: '#06b6d4', badge: '웹툰·코믹' },
   threeD: { from: '#059669', to: '#14b8a6', badge: '3D 스타일' },
+  object: { from: '#f59e0b', to: '#f97316', badge: '오브젝트 캐릭터' },
   illustration: { from: '#f59e0b', to: '#f97316', badge: '아트·포스터' },
 };
 
 function getStylePalette(id: string, label: string) {
-  if (id.includes('real') || label.includes('실사')) return SAMPLE_STYLE_PALETTE.realistic;
+  if (id.includes('photo') || id.includes('real') || label.includes('실사')) return SAMPLE_STYLE_PALETTE.realistic;
+  if (id.includes('retro') || label.includes('90년대') || label.includes('일본 만화')) return SAMPLE_STYLE_PALETTE.anime;
   if (id.includes('anime') || label.includes('애니')) return SAMPLE_STYLE_PALETTE.anime;
   if (id.includes('webtoon') || label.includes('웹툰')) return SAMPLE_STYLE_PALETTE.webtoon;
   if (id.includes('3d') || label.includes('3D')) return SAMPLE_STYLE_PALETTE.threeD;
+  if (id.includes('object') || label.includes('의인화')) return SAMPLE_STYLE_PALETTE.object;
   return SAMPLE_STYLE_PALETTE.illustration;
 }
 
@@ -202,7 +205,7 @@ export default function Step4Panel({
                   className={`overflow-hidden rounded-[24px] border text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'}`}
                 >
                   <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
-                    <img src={style.sampleImage || buildSampleStylePreview(style.id, style.label, style.description)} alt={`${style.label} 샘플`} className="aspect-[16/10] w-full object-cover" />
+                    <img src={style.sampleImage || buildSampleStylePreview(style.id, style.label, style.description)} alt={`${style.label} 샘플`} className="aspect-[16/10] w-full object-cover" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = buildSampleStylePreview(style.id, style.label, style.description); }} />
                   </div>
                   <div className="p-4">
                     <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">캐릭터 느낌</div>

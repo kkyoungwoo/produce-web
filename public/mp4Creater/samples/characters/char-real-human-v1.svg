@@ -1,8 +1,0 @@
-﻿<svg xmlns="http://www.w3.org/2000/svg" width="960" height="560" viewBox="0 0 960 560">
-  <rect width="960" height="560" fill="#f8fafc"/>
-  <rect x="40" y="40" width="880" height="480" rx="28" fill="#ffffff" stroke="#cbd5e1"/>
-  <circle cx="260" cy="190" r="70" fill="#e2e8f0"/>
-  <rect x="190" y="270" width="140" height="170" rx="55" fill="#cbd5e1"/>
-  <text x="420" y="200" font-size="44" font-family="Arial" font-weight="700" fill="#0f172a">Real Human Style</text>
-  <text x="420" y="255" font-size="28" font-family="Arial" fill="#334155">Sample character card</text>
-</svg>

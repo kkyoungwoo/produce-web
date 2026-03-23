@@ -346,6 +346,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     if (hasSceneStudioProgressFromAssets(assets)) return 6;
     if (!draft) return 1;
     const completed = draft.completedSteps || { step1: false, step2: false, step3: false, step4: false, step5: false };
+    if ((draft.activeStage || 0) >= 6) return 6;
     if (completed.step5 || (draft.activeStage || 0) >= 5) return 5;
     if (completed.step4 || (draft.activeStage || 0) >= 4) return 4;
     if (completed.step3 || (draft.activeStage || 0) >= 3) return 3;

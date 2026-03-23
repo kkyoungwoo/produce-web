@@ -13,10 +13,20 @@ export function triggerBlobDownload(blob: Blob, filename: string): void {
   link.href = url;
   link.download = sanitizeDownloadName(filename);
   link.rel = 'noopener';
+  link.style.display = 'none';
   document.body.appendChild(link);
-  link.click();
-  link.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const trigger = () => {
+    link.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+  };
+  if (typeof window.requestAnimationFrame === 'function') {
+    window.requestAnimationFrame(trigger);
+  } else {
+    trigger();
+  }
+  window.setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 1600);
 }
 
 export function triggerTextDownload(content: string, filename: string, mime = 'text/plain;charset=utf-8'): void {

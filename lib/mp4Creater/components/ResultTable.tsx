@@ -20,7 +20,7 @@ interface ResultTableProps {
   onRegenerateImage?: (index: number) => void;
   onRegenerateAudio?: (index: number) => void;
   onExportVideo?: (options: { enableSubtitles: boolean; qualityMode: 'preview' | 'final' }) => void;
-  onGenerateAnimation?: (index: number, options?: { sourceImageData?: string | null; sourceImageLabel?: string | null }) => void;
+  onGenerateAnimation?: (index: number, options?: { sourceImageData?: string | null }) => void | Promise<void>;
   onNarrationChange?: (index: number, narration: string) => void;
   onImagePromptChange?: (index: number, prompt: string) => void;
   onVideoPromptChange?: (index: number, prompt: string) => void;
@@ -88,8 +88,8 @@ const resolveVideoSrc = (value?: string | null) => {
 };
 
 const getPreferredVisualType = (row: GeneratedAsset): 'image' | 'video' => {
-  if (row.selectedVisualType === 'video') return 'video';
-  if (row.selectedVisualType === 'image') return 'image';
+  if (row.selectedVisualType === 'video' && row.videoData) return 'video';
+  if (row.selectedVisualType === 'image' && row.imageData) return 'image';
   if (row.videoData) return 'video';
   return 'image';
 };
@@ -295,6 +295,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [sceneAudioRates, setSceneAudioRates] = useState<Record<number, number>>({});
   const [sceneMediaIndices, setSceneMediaIndices] = useState<Record<string, number>>({});
   const [sceneMediaShift, setSceneMediaShift] = useState<Record<string, number>>({});
+  const [sceneActionLocks, setSceneActionLocks] = useState<Record<string, boolean>>({});
+  const sceneActionLocksRef = useRef<Record<string, boolean>>({});
   const previewQueueRef = useRef<Set<string>>(new Set());
 
   const summary = useMemo(() => {
@@ -328,7 +330,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
         setDavinciStatusMessage(`다빈치 리졸브 자동 Import 신호를 보냈습니다. 패키지 경로는 ${result.packagePath || '로컬 exports 폴더'}입니다.`);
         return;
       }
-      setDavinciStatusMessage(`패키지는 준비됐지만 mp4Creater 다빈치 브리지를 찾지 못했습니다. ${result.packagePath || 'exports/davinci-resolve'} 폴더를 다빈치로 드래그하거나, open_with_mp4creater_bridge.cmd / .ps1 / .url 파일 중 하나를 다시 실행해 주세요.`);
+      setDavinciStatusMessage(`패키지는 준비됐지만 mp4Creater 다빈치 브리지를 찾지 못했습니다. ${result.packagePath || 'exports/davinci-resolve'} 폴더를 다빈치로 드래그하거나, open_with_mp4creater_bridge 파일을 나중에 다시 실행해 주세요.`);
     } catch (error) {
       setDavinciStatusMessage(error instanceof Error ? error.message : '다빈치 리졸브 패키지 준비에 실패했습니다.');
       setDavinciPackagePath(null);
@@ -384,15 +386,6 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const activeOverallProgress = typeof progressPercent === 'number'
     ? Math.max(0, Math.min(100, Math.round(progressPercent)))
     : null;
-
-  const hasBlockingGeneration = isGenerating
-    || Boolean(isGeneratingAllVideos)
-    || Boolean(isExporting)
-    || Boolean(isPreparingPreviewVideo)
-    || Boolean(isDavinciPreparing)
-    || Boolean(animatingIndices?.size)
-    || Object.values(sceneProgressMap || {}).some((entry: { percent: number; label: string }) => (entry?.percent ?? 100) < 100)
-    || data.some((row) => row.status === 'generating');
 
   const activeSceneIndex = useMemo(() => data.findIndex((row, index) => {
     const sceneProgress = sceneProgressMap?.[index];
@@ -459,9 +452,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
           const orderedEntries = collectOrderedMediaHistory(row, kind);
           if (!orderedEntries.length) return;
           const key = getSceneMediaKey(index, kind);
-          const latestId = orderedEntries[orderedEntries.length - 1]?.id || '';
+          const latestEntry = orderedEntries[orderedEntries.length - 1] || null;
           const signatureKey = `${key}__sig`;
-          const signature = `${latestId}:${orderedEntries.length}`;
+          const signature = `${latestEntry?.id || ''}:${latestEntry?.data?.slice(0, 48) || ''}:${orderedEntries.length}`;
           if ((next as Record<string, unknown>)[signatureKey] !== signature) {
             next[key] = orderedEntries.length - 1;
             (next as Record<string, unknown>)[signatureKey] = signature;
@@ -534,6 +527,25 @@ const ResultTable: React.FC<ResultTableProps> = ({
     window.setTimeout(() => {
       setSceneMediaShift((prev) => ({ ...prev, [key]: 0 }));
     }, 220);
+  };
+
+
+  const runSceneAction = async (key: string, task: () => void | Promise<void>) => {
+    if (sceneActionLocksRef.current[key] || sceneActionLocks[key]) return;
+    sceneActionLocksRef.current[key] = true;
+    setSceneActionLocks((prev) => ({ ...prev, [key]: true }));
+    try {
+      await task();
+    } finally {
+      window.setTimeout(() => {
+        delete sceneActionLocksRef.current[key];
+        setSceneActionLocks((prev) => {
+          const next = { ...prev };
+          delete next[key];
+          return next;
+        });
+      }, 0);
+    }
   };
 
   const sceneEditorMeta: Record<SceneEditorMode, { label: string; placeholder: string; badgeClass: string }> = {
@@ -708,45 +720,15 @@ const ResultTable: React.FC<ResultTableProps> = ({
             </div>
           </div>
 
-          <div className="grid gap-2 lg:grid-cols-4">
+          <div className="grid gap-2 lg:grid-cols-3">
             <button type="button" onClick={() => setPreviewOpen(true)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white hover:bg-slate-800">미리보기</button>
             {onGenerateAllImages && (
-              <button type="button" onClick={() => void onGenerateAllImages?.()} disabled={hasBlockingGeneration} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{hasBlockingGeneration && isGenerating ? '이미지 생성 중...' : '전체 이미지 생성'}</button>
+              <button type="button" onClick={() => void onGenerateAllImages?.()} disabled={isGenerating} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isGenerating ? '이미지 생성 중...' : '전체 이미지 생성'}</button>
             )}
             {onGenerateAllVideos && (
-              <button type="button" onClick={() => void onGenerateAllVideos?.()} disabled={hasBlockingGeneration} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500">{isGeneratingAllVideos ? '영상 생성 중...' : hasBlockingGeneration ? '잠시 대기' : '전체 영상 생성'}</button>
-            )}
-            {onExportVideo && (
-              <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: true, qualityMode: downloadQuality })} disabled={isExporting || hasBlockingGeneration} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isExporting ? '영상 저장 중...' : 'MP4 저장'}</button>
+              <button type="button" onClick={() => void onGenerateAllVideos?.()} disabled={Boolean(isGeneratingAllVideos) || isGenerating} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500">{isGeneratingAllVideos ? '영상 생성 중...' : '전체 영상 생성'}</button>
             )}
           </div>
-
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={() => void handlePrepareDavinciImport()} disabled={isDavinciPreparing || hasBlockingGeneration} className="rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-black text-white hover:bg-indigo-500 disabled:bg-slate-300 disabled:text-slate-500">{isDavinciPreparing ? '다빈치 패키지 준비 중...' : '다빈치 자동 Import'}</button>
-            <button type="button" onClick={() => void handleDownloadDavinciPackage()} disabled={isDavinciPreparing || hasBlockingGeneration} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">다빈치 패키지 ZIP</button>
-            <button onClick={() => exportAssetsToZip(data, 'mp4Creater_storyboard')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">결과표 XLSX</button>
-            <button onClick={() => downloadProjectZip(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">CSV / ZIP</button>
-            <button onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">SRT</button>
-          </div>
-        </div>
-        {isDavinciPreparing ? (
-          <div className="mt-4 rounded-[24px] border border-indigo-200 bg-indigo-50 px-4 py-4 text-sm leading-6 text-indigo-900">
-            <div className="flex items-center gap-3">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
-              <div>
-                <div className="font-black">다빈치 리졸브 패키지를 정리하고 브리지 호출을 시도하는 중입니다.</div>
-                <div className="mt-1 text-xs font-semibold text-indigo-800">패키지 생성과 외부 앱 열기 신호를 차례대로 처리합니다. 완료될 때까지 버튼은 잠깐 잠가 둡니다.</div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-        {davinciStatusMessage ? (
-          <div className="mt-4 rounded-[24px] border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm leading-6 text-indigo-900">
-            <div className="font-black">{davinciStatusMessage}</div>
-            {davinciPackagePath ? <div className="mt-2 break-all text-xs font-bold text-indigo-800">패키지 경로: {davinciPackagePath}</div> : null}
-            {davinciLaunchUri ? <div className="mt-1 break-all text-[11px] font-semibold text-indigo-700">브리지 호출 URI: {davinciLaunchUri}</div> : null}
-          </div>
-        ) : null}
         {false && (
           <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${isGenerating || activeOverallProgress !== null ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
             <div className="flex items-center gap-3">
@@ -869,7 +851,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
           const audioSrc = resolveNarrationAudioSrc(row.audioData);
           const isAnimating = animatingIndices?.has(index) || false;
           const sceneProgress = sceneProgressMap?.[index] || null;
-          const isSceneWorking = isAnimating || row.status === 'generating' || Boolean(sceneProgress && sceneProgress.percent < 100);
+          const isSceneWorking = Boolean(sceneActionLocks[`image-${index}`] || sceneActionLocks[`video-${index}`] || sceneActionLocks[`audio-${index}`]) || isAnimating || row.status === 'generating' || Boolean(sceneProgress && sceneProgress.percent < 100);
           const editorMode = getSceneEditorMode(row, index);
           const editorMeta = sceneEditorMeta[editorMode];
           const editorValue = getSceneEditorValue(row, editorMode);
@@ -878,23 +860,11 @@ const ResultTable: React.FC<ResultTableProps> = ({
           const visualEntries = collectOrderedMediaHistory(row, activeHistoryKind);
           const visualEntryIndex = getSceneMediaIndex(index, activeHistoryKind, visualEntries.length);
           const visualEntry = visualEntries[visualEntryIndex] || null;
-          const imageEntries = collectOrderedMediaHistory(row, 'image');
-          const imageEntryIndex = getSceneMediaIndex(index, 'image', imageEntries.length);
-          const imageEntry = imageEntries[imageEntryIndex] || null;
-          const currentImageSource = imageEntry?.data || row.imageData || null;
           const visualPayload = activeHistoryKind === 'video'
             ? { kind: 'video' as const, src: resolveVideoSrc(visualEntry?.data || row.videoData) }
             : { kind: 'image' as const, src: resolveImageSrc(visualEntry?.data || row.imageData) };
           const displayImageSrc = visualPayload.kind === 'image' && visualPayload.src ? getDisplayImageSrc(visualPayload.src) : '';
           const sceneMediaOffset = sceneMediaShift[getSceneMediaKey(index, activeHistoryKind)] || 0;
-          const sceneProgressPercent = Math.max(0, Math.min(100, Math.round(sceneProgress?.percent ?? (isAnimating ? 28 : 0))));
-          const sceneVisualBadge = isAnimating || (selectedVisualType === 'video' && !row.videoData)
-            ? { text: '영상 준비', className: 'bg-violet-100 text-violet-700' }
-            : selectedVisualType === 'video' && row.videoData
-              ? { text: '영상', className: 'bg-emerald-100 text-emerald-700' }
-              : row.imageData
-                ? { text: '이미지', className: 'bg-blue-100 text-blue-700' }
-                : { text: '빈 씬', className: 'bg-slate-200 text-slate-700' };
 
           return (
             <div
@@ -908,10 +878,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <div className="border-b border-slate-200 bg-slate-50 p-3 xl:border-b-0 xl:border-r">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-black text-white">씬 {row.sceneNumber}</span>
-                    <span className={`rounded-full px-3 py-1 text-xs font-black ${sceneVisualBadge.className}`}>{sceneVisualBadge.text}</span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-black ${selectedVisualType === 'video' && row.videoData ? 'bg-emerald-100 text-emerald-700' : row.imageData ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-700'}`}>{selectedVisualType === 'video' && row.videoData ? '영상' : row.imageData ? '이미지' : '빈 씬'}</span>
                   </div>
 
-                  <div className="relative flex h-[190px] items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white px-2 py-2 xl:h-[172px]">
+                  <div className="group/scene-preview relative flex h-[190px] items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white px-2 py-2 xl:h-[172px]">
                     {visualPayload.kind === 'video' && visualPayload.src ? (
                       <video className="max-h-full max-w-full rounded-2xl object-contain transition-all duration-200" style={{ transform: `translateX(${sceneMediaOffset * 10}px)`, opacity: 1 }} playsInline muted controls preload="metadata">
                         <source src={visualPayload.src} type="video/mp4" />
@@ -925,19 +895,41 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     )}
                     {isSceneWorking && (
                       <div className="absolute inset-0 flex flex-col justify-end bg-white/75 p-4 backdrop-blur-[1px]">
-                        <div className="rounded-2xl border border-slate-200 bg-white/95 p-3">
-                          <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
-                            <span>{sceneProgress?.label || (isAnimating ? '영상 만드는 중' : '생성 중')}</span>
-                            <span>{sceneProgress?.percent ?? (isAnimating ? 88 : 52)}%</span>
+                        {isAnimating ? (
+                          <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white/92">
+                            <div className="relative h-20 w-20">
+                              <svg viewBox="0 0 80 80" className="h-20 w-20 -rotate-90">
+                                <circle cx="40" cy="40" r="32" className="fill-none stroke-slate-200" strokeWidth="6" />
+                                <circle
+                                  cx="40"
+                                  cy="40"
+                                  r="32"
+                                  className="fill-none stroke-violet-600 transition-all duration-300"
+                                  strokeWidth="6"
+                                  strokeLinecap="round"
+                                  strokeDasharray={201}
+                                  strokeDashoffset={201 - ((sceneProgress?.percent ?? 12) / 100) * 201}
+                                />
+                              </svg>
+                              <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-slate-900">{sceneProgress?.percent ?? 12}%</div>
+                            </div>
+                            <div className="px-4 text-center text-xs font-black text-slate-700">{sceneProgress?.label || '영상 만드는 중'}</div>
                           </div>
-                          <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${sceneProgress?.percent ?? (isAnimating ? 88 : 52)}%` }} />
+                        ) : (
+                          <div className="rounded-2xl border border-slate-200 bg-white/95 p-3">
+                            <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
+                              <span>{sceneProgress?.label || '생성 중'}</span>
+                              <span>{sceneProgress?.percent ?? 52}%</span>
+                            </div>
+                            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                              <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${sceneProgress?.percent ?? 52}%` }} />
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     )}
                     {visualEntries.length > 1 && !isSceneWorking && (
-                      <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-between gap-2">
+                      <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-between gap-2 opacity-100 transition-opacity duration-200">
                         <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, -1)} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white">←</button>
                         <div className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-black text-slate-700 shadow-sm">{visualEntryIndex + 1}/{visualEntries.length}</div>
                         <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, 1)} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white">→</button>
@@ -947,7 +939,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   {visualEntries.length > 1 && (
                     <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold text-slate-600">
                       <span>{activeHistoryKind === 'video' ? '영상 히스토리' : '이미지 히스토리'}</span>
-                      <span>{visualEntry?.label || `생성본 ${visualEntryIndex + 1}`} · {visualEntryIndex + 1}/{visualEntries.length}</span>
+                      <span>{visualEntry?.label || `생성본 ${visualEntryIndex + 1}`}</span>
                     </div>
                   )}
 
@@ -962,7 +954,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     </button>
                     <button
                       type="button"
-                      disabled={!hasRenderableVideo(row) && !isAnimating}
+                      disabled={!hasRenderableVideo(row)}
                       onClick={() => onSelectedVisualTypeChange?.(index, 'video')}
                       className={`flex-1 rounded-2xl px-3 py-2 text-sm font-black transition ${selectedVisualType === 'video' ? 'bg-violet-600 text-white' : 'text-slate-600 hover:bg-slate-50'} disabled:cursor-not-allowed disabled:text-slate-300`}
                     >
@@ -994,7 +986,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   <textarea
                     value={editorValue}
                     placeholder={editorMeta.placeholder}
-                    disabled={hasBlockingGeneration}
+                    disabled={isSceneWorking}
                     onChange={(e) => handleSceneEditorChange(row, index, editorMode, e.target.value)}
                     className="min-h-[96px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400 xl:h-[98px]"
                   />
@@ -1046,17 +1038,17 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <div className="border-t border-slate-200 bg-slate-50 p-3 xl:border-l xl:border-t-0 xl:overflow-hidden">
                   <div className="grid h-full auto-rows-fr grid-cols-2 gap-2 xl:grid-cols-1">
                     {onRegenerateImage && (
-                      <button type="button" disabled={hasBlockingGeneration} onClick={() => onRegenerateImage?.(index)} className="rounded-2xl bg-blue-600 px-3 py-2.5 text-[13px] font-black leading-tight text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">
+                      <button type="button" disabled={isSceneWorking} onClick={() => { void runSceneAction(`image-${index}`, async () => { await Promise.resolve(onRegenerateImage?.(index)); }); }} className="rounded-2xl bg-blue-600 px-3 py-2.5 text-[13px] font-black leading-tight text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">
                         {row.imageData ? '이미지 다시 생성' : '이미지 생성'}
                       </button>
                     )}
                     {onGenerateAnimation && (
-                      <button type="button" disabled={hasBlockingGeneration || !currentImageSource} onClick={() => onGenerateAnimation?.(index, { sourceImageData: currentImageSource, sourceImageLabel: imageEntry?.label || null })} className="rounded-2xl bg-violet-600 px-3 py-2.5 text-[13px] font-black leading-tight text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">
+                      <button type="button" disabled={isSceneWorking || !row.imageData} onClick={() => { void runSceneAction(`video-${index}`, async () => { await Promise.resolve(onGenerateAnimation?.(index, { sourceImageData: activeHistoryKind === 'image' ? (visualEntry?.data || row.imageData || null) : (row.imageData || null) })); }); }} className="rounded-2xl bg-violet-600 px-3 py-2.5 text-[13px] font-black leading-tight text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">
                         {isAnimating ? '영상 생성 중...' : '영상 생성'}
                       </button>
                     )}
                     {onRegenerateAudio && (
-                      <button type="button" disabled={hasBlockingGeneration} onClick={() => onRegenerateAudio?.(index)} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">오디오 생성</button>
+                      <button type="button" disabled={isSceneWorking} onClick={() => { void runSceneAction(`audio-${index}`, async () => { await Promise.resolve(onRegenerateAudio?.(index)); }); }} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">오디오 생성</button>
                     )}
                   </div>
                 </div>
@@ -1065,6 +1057,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
           );
         })}
       </div>
+    </div>
 
       {mediaViewer && (
         <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/75 p-4" onClick={() => setMediaViewer(null)}>
@@ -1122,17 +1115,17 @@ const ResultTable: React.FC<ResultTableProps> = ({
       )}
 
       {imageLightbox && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center overflow-hidden bg-slate-950/75 p-4" onClick={() => setImageLightbox(null)}>
-          <div className="relative flex h-[min(92vh,980px)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/75 p-4" onClick={() => setImageLightbox(null)}>
+          <div className="relative max-h-[92vh] w-full max-w-5xl rounded-[28px] border border-slate-200 bg-white p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">이미지 크게 보기</div>
                 <div className="mt-1 text-lg font-black text-slate-900">{imageLightbox.title}</div>
               </div>
               <button type="button" onClick={() => setImageLightbox(null)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
             </div>
-            <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-slate-950 p-4 sm:p-6">
-              <img src={imageLightbox.src} alt={imageLightbox.title} className="max-h-full max-w-full rounded-2xl object-contain" />
+            <div className="flex max-h-[78vh] items-center justify-center overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50 p-3">
+              <img src={imageLightbox.src} alt={imageLightbox.title} className={`${getAspectRatioClass(imageLightbox.aspectRatio || '16:9')} mx-auto max-h-[74vh] max-w-full rounded-2xl object-contain`} />
             </div>
           </div>
         </div>
@@ -1207,6 +1200,42 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   <p className="mt-3 text-sm leading-6 text-slate-700">
                     {previewVideoMessage || (finalVideoUrl ? '합본 영상이 준비되었습니다.' : '결과보기를 열면 여기에서 합본 영상 상태를 먼저 안내합니다.')}
                   </p>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button type="button" onClick={() => exportAssetsToZip(data, 'mp4Creater_storyboard')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">결과표 XLSX</button>
+                    <button type="button" onClick={() => downloadProjectZip(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">CSV / ZIP</button>
+                    <button type="button" onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">SRT</button>
+                    <button
+                      type="button"
+                      onClick={() => void handlePrepareDavinciImport()}
+                      disabled={isDavinciPreparing}
+                      className="rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-black text-white hover:bg-indigo-500 disabled:bg-slate-300 disabled:text-slate-500"
+                    >
+                      {isDavinciPreparing ? '다빈치 자동 Import 준비 중...' : '다빈치 자동 Import'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleDownloadDavinciPackage()}
+                      disabled={isDavinciPreparing}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      다빈치 패키지 ZIP
+                    </button>
+                    {onExportVideo && (
+                      <>
+                        <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: true, qualityMode: downloadQuality })} disabled={isExporting} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isExporting ? '렌더링 중...' : '최종 출력 (자막 O)'}</button>
+                        <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: false, qualityMode: downloadQuality })} disabled={isExporting} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">최종 출력 (자막 X)</button>
+                      </>
+                    )}
+                  </div>
+
+                  {davinciStatusMessage ? (
+                    <div className="mt-4 rounded-[24px] border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm leading-6 text-indigo-900">
+                      <div className="font-black">{davinciStatusMessage}</div>
+                      {davinciPackagePath ? <div className="mt-2 break-all text-xs font-bold text-indigo-800">패키지 경로: {davinciPackagePath}</div> : null}
+                      {davinciLaunchUri ? <div className="mt-1 break-all text-[11px] font-semibold text-indigo-700">브리지 호출 URI: {davinciLaunchUri}</div> : null}
+                    </div>
+                  ) : null}
 
                   {false && (
                     <div className="mt-3 rounded-2xl border border-white/70 bg-white/70 p-3">
@@ -1382,47 +1411,18 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <button type="button" onClick={() => void onGenerateThumbnail?.()} disabled={isThumbnailGenerating} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500">{isThumbnailGenerating ? '썸네일 생성 중...' : 'AI 썸네일 생성'}</button>
               )}
               {onGenerateAllImages && (
-                <button type="button" onClick={() => void onGenerateAllImages?.()} disabled={hasBlockingGeneration} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGenerating ? '전체 생성 중...' : '전체 이미지 생성'}</button>
+                <button type="button" onClick={() => void onGenerateAllImages?.()} disabled={isGenerating} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGenerating ? '전체 생성 중...' : '전체 이미지 생성'}</button>
               )}
               {onGenerateAllVideos && (
-                <button type="button" onClick={() => void onGenerateAllVideos?.()} disabled={hasBlockingGeneration} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGeneratingAllVideos ? '모든 영상 생성 중...' : '모든 씬 영상 생성'}</button>
+                <button type="button" onClick={() => void onGenerateAllVideos?.()} disabled={Boolean(isGeneratingAllVideos) || isGenerating} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGeneratingAllVideos ? '모든 영상 생성 중...' : '모든 씬 영상 생성'}</button>
               )}
-              <button type="button" onClick={() => exportAssetsToZip(data, 'mp4Creater_storyboard')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">스토리보드 XLSX</button>
-              <button type="button" onClick={() => downloadProjectZip(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">CSV / ZIP</button>
-              <button type="button" onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">SRT 저장</button>
-              <button
-                type="button"
-                onClick={() => void handlePrepareDavinciImport()}
-                disabled={isDavinciPreparing}
-                className="rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-black text-white hover:bg-indigo-500 disabled:bg-slate-300 disabled:text-slate-500"
-              >
-                {isDavinciPreparing ? '다빈치 패키지 준비 중...' : '다빈치 자동 Import'}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDownloadDavinciPackage()}
-                disabled={isDavinciPreparing}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
-              >
-                다빈치 패키지 ZIP
-              </button>
               {onExportVideo && (
                 <>
-                  <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: true, qualityMode: downloadQuality })} disabled={isExporting || hasBlockingGeneration} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isExporting ? '렌더링 중...' : '최종 출력 (자막 O)'}</button>
+                  <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: true, qualityMode: downloadQuality })} disabled={isExporting} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isExporting ? '렌더링 중...' : '최종 출력 (자막 O)'}</button>
                   <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: false, qualityMode: downloadQuality })} disabled={isExporting} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">최종 출력 (자막 X)</button>
                 </>
               )}
             </div>
-
-            {davinciStatusMessage ? (
-              <div className="px-5 pt-4 sm:px-6">
-                <div className="rounded-[24px] border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm leading-6 text-indigo-900">
-                  <div className="font-black">{davinciStatusMessage}</div>
-                  {davinciPackagePath ? <div className="mt-2 break-all text-xs font-bold text-indigo-800">패키지 경로: {davinciPackagePath}</div> : null}
-                  {davinciLaunchUri ? <div className="mt-1 break-all text-[11px] font-semibold text-indigo-700">브리지 호출 URI: {davinciLaunchUri}</div> : null}
-                </div>
-              </div>
-            ) : null}
 
             <div className="px-5 py-5 sm:px-6">
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">

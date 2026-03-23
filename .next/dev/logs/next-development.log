@@ -1,4 +1,84 @@
-[00:00:01.517] Server  LOG     ✓ Ready in 1279ms
-[00:00:02.898] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:08:18.163] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:08:18.652] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:01.393] Server  LOG     ✓ Ready in 1161ms
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.145] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.145] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.146] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.146] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.146] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.146] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.146] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.146] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.146] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.146] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.146] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.146] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.146] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.146] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.146] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.146] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.146] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.146] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.146] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:02.146] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
+[00:00:02.146] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
+[00:00:04.396] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:04.407] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
