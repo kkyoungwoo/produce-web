@@ -1168,7 +1168,7 @@ export default function TubeGenMergedStudioSingleFile() {
                 <div className="max-w-xl text-center">
                   <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-cyan-400/10 text-3xl">🎬</div>
                   <h2 className="text-2xl font-semibold">컨셉부터 고르고 바로 시작하세요</h2>
-                  <p className="mt-3 text-sm leading-6 text-slate-300">뮤직비디오, 정보 공유, 이야기, 시네마틱 중 하나를 고르면 주제, 비율, 대본 방향, 샘플 값이 자동으로 채워집니다.</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">뮤직비디오, 이야기, 영화, 정보 전달 중 하나를 고르면 주제, 비율, 대본 방향, 샘플 값이 자동으로 채워집니다.</p>
                   <div className="mt-6 flex flex-wrap justify-center gap-3">
                     <button onClick={() => setShowProjectModal(true)} className={primaryButton}>새 프로젝트</button>
                     <button onClick={startWithSample} className={secondaryButton}>샘플 시작</button>

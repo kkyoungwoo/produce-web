@@ -2,10 +2,10 @@ import { ContentType, StorySelectionState } from '../../types';
 import { StepId } from './types';
 
 export const CONTENT_TYPE_CARDS: Array<{ id: ContentType; title: string; desc: string; badge: string }> = [
-  { id: 'music_video', title: '뮤직비디오', desc: '음악 중심 장면 구성', badge: 'MV' },
-  { id: 'story', title: '이야기', desc: '서사 중심 스토리 구성', badge: 'STORY' },
-  { id: 'news', title: '영화', desc: '영화 같은 장면 연출과 감정선 구성', badge: 'FILM' },
-  { id: 'info_delivery', title: '정보 전달', desc: '설명형 콘텐츠 전달', badge: 'INFO' },
+  { id: 'music_video', title: '뮤직비디오', desc: '음악 중심 장면 연출', badge: 'MV' },
+  { id: 'story', title: '이야기', desc: '기승전결 스토리 연출', badge: 'STORY' },
+  { id: 'cinematic', title: '영화', desc: '영화 같은 장면 연출', badge: 'FILM' },
+  { id: 'info_delivery', title: '정보 전달', desc: '지식 전달 연출', badge: 'INFO' },
 ];
 
 export const FIELD_OPTIONS_BY_TYPE: Record<ContentType, Record<keyof StorySelectionState, string[]>> = {
@@ -25,7 +25,7 @@ export const FIELD_OPTIONS_BY_TYPE: Record<ContentType, Record<keyof StorySelect
     protagonist: ['신입 직장인', '학생', '기획자', '관찰자'],
     conflict: ['선택의 딜레마', '세대 갈등', '시간 부족', '비밀 노출'],
   },
-  news: {
+  cinematic: {
     genre: ['시네마틱 드라마', '감정선 중심 영화', '느와르 무드', '서사형 영화'],
     mood: ['묵직한', '몰입감 있는', '감성적인', '긴장감 있는'],
     endingTone: ['여운 있는 결말', '강한 반전', '열린 결말', '먹먹한 마무리'],
@@ -45,10 +45,10 @@ export const FIELD_OPTIONS_BY_TYPE: Record<ContentType, Record<keyof StorySelect
 
 export const STEP_META: Array<{ id: StepId; title: string; subtitle: string }> = [
   { id: 1, title: '콘셉트 선택', subtitle: '유형과 화면비율 선택' },
-  { id: 2, title: '스토리 입력', subtitle: '주제와 대본 설정 정리' },
-  { id: 3, title: '대본 구성', subtitle: '최종 대본과 출연자 확정' },
-  { id: 4, title: '캐릭터 연출', subtitle: '선택 출연자 이미지 정리' },
-  { id: 5, title: '화풍 선택', subtitle: '스타일 확정 후 이동' },
+  { id: 2, title: '스토리 입력', subtitle: '주제와 대본 설정' },
+  { id: 3, title: '대본 구성', subtitle: '최종 대본과 출연자 선택' },
+  { id: 4, title: '캐릭터 연출', subtitle: '이미지 컨셉 확정' },
+  { id: 5, title: '화풍 선택', subtitle: '컨텐츠 스타일 선택' },
 ];
 
 export const MAX_UPLOAD_FILE_COUNT = 4;

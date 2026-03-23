@@ -37,6 +37,7 @@ import {
 } from '../services/workflowPromptBuilder';
 import {
   buildStyleRecommendations,
+  buildImageAwareUploadPrompt,
   buildPromptPreviewCard,
   buildUploadDrivenPrompt,
   createCharacterCardFromPrompt,
@@ -908,6 +909,42 @@ const InputSection: React.FC<InputSectionProps> = ({
   const selectedImageModel = studioState?.routing?.imageModel || IMAGE_MODELS[0].id;
   const textModelReady = connectionSummary.text;
   const imageModelReady = connectionSummary.text;
+  const pendingDraftSaveReasonRef = useRef<'input' | 'action' | null>(null);
+  const pendingDraftSaveTokenRef = useRef(0);
+
+  const requestWorkflowDraftSave = (reason: 'input' | 'action' = 'action') => {
+    pendingDraftSaveReasonRef.current = reason;
+    pendingDraftSaveTokenRef.current += 1;
+  };
+
+  const handleInteractionCapture = (event: React.SyntheticEvent<HTMLElement>) => {
+    const nativeEvent = event.nativeEvent as Event & { isTrusted?: boolean };
+    if (nativeEvent?.isTrusted === false) return;
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    const tagName = target.tagName.toLowerCase();
+    const inputType = target instanceof HTMLInputElement ? `${target.type || ''}`.toLowerCase() : '';
+
+    if (tagName === 'textarea') {
+      requestWorkflowDraftSave('input');
+      return;
+    }
+
+    if (tagName === 'input') {
+      if (['checkbox', 'radio', 'file', 'range'].includes(inputType)) {
+        requestWorkflowDraftSave('action');
+        return;
+      }
+      if (!['button', 'submit', 'reset'].includes(inputType)) {
+        requestWorkflowDraftSave('input');
+        return;
+      }
+    }
+
+    if (tagName === 'select' || tagName === 'button' || Boolean(target.closest('button'))) {
+      requestWorkflowDraftSave('action');
+    }
+  };
 
   const promptTextAiSetup = (message?: string) => {
     onOpenApiModal?.({
@@ -919,10 +956,16 @@ const InputSection: React.FC<InputSectionProps> = ({
 
   useEffect(() => {
     if (!onSaveWorkflowDraft) return;
+    if (!pendingDraftSaveReasonRef.current) return;
     if (autoSaveTimer.current) window.clearTimeout(autoSaveTimer.current);
+
+    const saveReason = pendingDraftSaveReasonRef.current;
+    const saveToken = pendingDraftSaveTokenRef.current;
     autoSaveTimer.current = window.setTimeout(() => {
+      if (pendingDraftSaveTokenRef.current !== saveToken) return;
       onSaveWorkflowDraft(buildDraftPayload());
-    }, 350);
+      pendingDraftSaveReasonRef.current = null;
+    }, saveReason === 'input' ? 1000 : 180);
 
     return () => {
       if (autoSaveTimer.current) window.clearTimeout(autoSaveTimer.current);
@@ -1054,6 +1097,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     });
     setEditingPromptId(null);
     setPromptPreviewId(null);
+    requestWorkflowDraftSave('action');
     setNotice('프롬프트 수정을 저장했습니다. 이후 대본 생성과 씬 제작에 바로 반영됩니다.');
   };
 
@@ -1311,7 +1355,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     }
 
 
-    if (contentType === 'news') {
+    if (contentType === 'cinematic') {
       setTopic('비 오는 도시 골목에서 다시 마주친 마지막 약속');
       setGenre('시네마틱 드라마');
       setMood('몰입감 있는');
@@ -1936,12 +1980,31 @@ const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const chooseCharacterImage = (characterId: string, image: PromptedImageAsset) => {
-    setExtractedCharacters((prev) =>
-      prev.map((item) => item.id === characterId ? { ...item, selectedImageId: image.id, imageData: image.imageData, prompt: image.prompt || item.prompt } : item)
-    );
-    const targetCharacter = extractedCharacters.find((item) => item.id === characterId);
+    const nextCharacters = extractedCharactersRef.current.map((item) => (
+      item.id === characterId
+        ? { ...item, selectedImageId: image.id, imageData: image.imageData, prompt: image.prompt || item.prompt }
+        : item
+    ));
+    const nextSelectedCharacterIds = selectedCharacterIdsRef.current.includes(characterId)
+      ? selectedCharacterIdsRef.current
+      : [...selectedCharacterIdsRef.current, characterId];
+
+    extractedCharactersRef.current = nextCharacters;
+    selectedCharacterIdsRef.current = nextSelectedCharacterIds;
+    setExtractedCharacters(nextCharacters);
+    setSelectedCharacterIds(nextSelectedCharacterIds);
+
+    if (onSaveWorkflowDraft) {
+      onSaveWorkflowDraft({
+        extractedCharacters: nextCharacters,
+        selectedCharacterIds: nextSelectedCharacterIds,
+      });
+    }
+
+    const targetCharacter = nextCharacters.find((item) => item.id === characterId);
     const nextIndex = Math.max(0, (targetCharacter?.generatedImages || []).findIndex((item) => item.id === image.id));
     setCharacterCarouselIndices((prev) => ({ ...prev, [characterId]: nextIndex }));
+    requestWorkflowDraftSave('action');
   };
 
   const createCharacterVariants = async (
@@ -1987,6 +2050,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setSelectedCharacterIds((prev) => (prev.includes(character.id) ? prev : [...prev, character.id]));
     setCharacterCarouselIndices((prev) => ({ ...prev, [character.id]: pendingIndex }));
     setCharacterLoadingProgress((prev) => { const next = { ...prev }; delete next[character.id]; return next; });
+    requestWorkflowDraftSave('action');
     setNotice(
       options?.note?.trim() || options?.sourceLabel
         ? `${character.name} 기준으로 요청한 느낌을 반영한 새 후보 1장을 추가했습니다.`
@@ -2028,6 +2092,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       delete next[groupId];
       return next;
     });
+    requestWorkflowDraftSave('action');
     setNotice(`${styleCard.groupLabel || styleCard.label} 화풍 기준으로 새로운 후보 1장을 같은 카드 안에 추가했습니다.`);
   };
 
@@ -2092,6 +2157,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     createCharacterFromPrompt(name, prompt, 'ai');
     setNewCharacterName('');
     setNewCharacterPrompt('');
+    requestWorkflowDraftSave('action');
     setNotice(`${name} 출연자를 캐릭터 카드로 추가했습니다. 선택된 프롬프트와 이미지가 4단계와 씬 제작까지 그대로 이어집니다.`);
   };
 
@@ -2132,6 +2198,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setExtractedCharacters((prev) => [...prev, nextCharacter]);
     setSelectedCharacterIds((prev) => [...new Set([...prev, nextCharacter.id])]);
     setCharacterCarouselIndices((prev) => ({ ...prev, [nextCharacter.id]: 0 }));
+    requestWorkflowDraftSave('action');
     setNotice(`${trimmedName} 출연자를 ${trimmedPosition} 포지션으로 추가했습니다. 입력한 설명은 캐릭터 카드와 다음 단계 이미지 흐름에 그대로 반영됩니다.`);
   };
 
@@ -2188,6 +2255,32 @@ const InputSection: React.FC<InputSectionProps> = ({
     );
     setSelectedCharacterIds((prev) => (prev.includes(characterId) ? prev : [...prev, characterId]));
     setNotice(`${preset.name} 기본 예시를 ${extractedCharacters.find((item) => item.id === characterId)?.name || '출연자'} 카드에 적용했습니다.`);
+  };
+
+  const applyStyleSampleFromPreset = (sampleId: string) => {
+    const preset = getStyleSamplePreset(sampleId);
+    if (!preset) return;
+    const nextStyle = {
+      ...createStyleCardFromPrompt({
+        label: preset.label,
+        prompt: preset.prompt,
+        imageData: preset.imageData,
+        sourceMode: 'sample',
+        groupId: preset.id,
+        groupLabel: preset.label,
+      }),
+      id: preset.id,
+      groupId: preset.id,
+      groupLabel: preset.label,
+      imageData: preset.imageData,
+      sourceMode: 'sample' as const,
+      createdAt: Date.now(),
+    };
+    setStyleImages([nextStyle]);
+    setSelectedStyleImageId(nextStyle.id);
+    setStyleCarouselIndices({ [preset.id]: 0 });
+    requestWorkflowDraftSave('action');
+    setNotice(`${preset.label} 화풍 1개를 최종 영상 스타일로 선택했습니다. 다음 단계에는 이 화풍만 전달됩니다.`);
   };
 
   const handleCharacterUploadForId = (characterId: string) => {
@@ -2373,13 +2466,6 @@ const InputSection: React.FC<InputSectionProps> = ({
     }
   };
 
-  const applyStyleSampleFromPreset = (sampleId: string) => {
-    const preset = getStyleSamplePreset(sampleId);
-    if (!preset) return;
-    createStyleFromPrompt(preset.label, preset.prompt, 'sample', preset.imageData);
-    setNotice(`${preset.label} 샘플 화풍을 추가했습니다.`);
-  };
-
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>, mode: 'character' | 'style') => {
     const files = e.target.files;
     if (!files?.length) return;
@@ -2405,20 +2491,33 @@ const InputSection: React.FC<InputSectionProps> = ({
           new Promise<PromptedImageAsset>((resolve) => {
             const reader = new FileReader();
             reader.onloadend = () => {
-              const basePrompt = buildUploadPrompt(file.name.replace(/\.[^.]+$/, ''), mode);
-              const prompt = mode === 'character' ? buildCharacterStyledPrompt(basePrompt) : basePrompt;
-              const preview = buildPromptPreviewCard({
-                label: file.name.replace(/\.[^.]+$/, ''),
-                subtitle: mode === 'character' ? '업로드 감성 캐릭터' : '업로드 감성 화풍',
-                prompt,
-                accent: mode === 'character' ? '#2563eb' : '#8b5cf6',
+              const label = file.name.replace(/\.[^.]+$/, '');
+              const imageData = String(reader.result);
+              Promise.resolve(buildImageAwareUploadPrompt({
+                imageData,
+                label,
                 kind: mode,
-                sourceMode: 'upload',
-              });
-              resolve({
-                ...preview,
-                imageData: String(reader.result),
-                sourceMode: 'upload',
+                topic,
+                mood,
+                setting,
+                protagonist,
+                contentType,
+                aspectRatio,
+              })).catch(() => buildUploadPrompt(label, mode)).then((basePrompt) => {
+                const prompt = mode === 'character' ? buildCharacterStyledPrompt(basePrompt) : basePrompt;
+                const preview = buildPromptPreviewCard({
+                  label,
+                  subtitle: mode === 'character' ? '업로드 감성 캐릭터' : '업로드 감성 화풍',
+                  prompt,
+                  accent: mode === 'character' ? '#2563eb' : '#8b5cf6',
+                  kind: mode,
+                  sourceMode: 'upload',
+                });
+                resolve({
+                  ...preview,
+                  imageData,
+                  sourceMode: 'upload',
+                });
               });
             };
             reader.readAsDataURL(file);
@@ -2442,6 +2541,7 @@ const InputSection: React.FC<InputSectionProps> = ({
             };
           }));
           setSelectedCharacterIds((prev) => (prev.includes(characterUploadTargetId) ? prev : [...prev, characterUploadTargetId]));
+          requestWorkflowDraftSave('action');
           setNotice('업로드한 이미지를 선택한 출연자 카드에 추가했고, 그 이미지를 기준으로 유사 이미지도 이어서 만들 수 있게 했습니다.');
         }
         setCharacterUploadTargetId(null);
@@ -2465,6 +2565,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           ...prev,
           ...Object.fromEntries(uploadedCharacters.map((item) => [item.id, 0])),
         }));
+        requestWorkflowDraftSave('action');
         setNotice('업로드한 이미지를 출연자 캐릭터 카드로 추가했고, 해당 느낌의 프롬프트도 함께 저장했습니다.');
       }
     } else {
@@ -2477,6 +2578,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         ...prev,
         ...Object.fromEntries(images.map((item) => [item.groupId || item.id, 0])),
       }));
+      requestWorkflowDraftSave('action');
       setNotice('업로드한 이미지를 Step5 최종 영상 화풍 카드로 추가했고, 해당 느낌의 프롬프트도 함께 저장했습니다.');
     }
 
@@ -2598,7 +2700,8 @@ const InputSection: React.FC<InputSectionProps> = ({
   const nextRouteStep = footerStage < 5 ? ((footerStage + 1) as 1 | 2 | 3 | 4 | 5) : null;
   if (routeStep) {
     return (
-      <RouteStepView
+      <div onClickCapture={handleInteractionCapture} onChangeCapture={handleInteractionCapture} onInputCapture={handleInteractionCapture}>
+        <RouteStepView
         vm={{
           routeStep,
           contentType,
@@ -2721,12 +2824,13 @@ const InputSection: React.FC<InputSectionProps> = ({
           promptPreviewDraft,
           updatePromptTemplate,
         }}
-      />
+        />
+      </div>
     );
   }
 
   return (
-    <div className="mp4-editor-shell mx-auto my-6 w-full max-w-[1520px] px-4 sm:px-6 lg:px-8">
+    <div className="mp4-editor-shell mx-auto my-6 w-full max-w-[1520px] px-4 sm:px-6 lg:px-8" onClickCapture={handleInteractionCapture} onChangeCapture={handleInteractionCapture} onInputCapture={handleInteractionCapture}>
       <MainStepView
         vm={{
           routeStep,

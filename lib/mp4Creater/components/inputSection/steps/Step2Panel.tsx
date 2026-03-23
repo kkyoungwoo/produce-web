@@ -75,10 +75,14 @@ function HorizontalOptionRail({
   children,
   step = 220,
   selectedKey,
+  selectedIndex,
+  itemCount,
 }: {
   children: React.ReactNode;
   step?: number;
   selectedKey?: string | number | null;
+  selectedIndex?: number;
+  itemCount?: number;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hideTimerRef = useRef<number | null>(null);
@@ -143,6 +147,35 @@ function HorizontalOptionRail({
     if (selectedKey === undefined || selectedKey === null) return;
     revealArrowsTemporarily();
   }, [selectedKey, revealArrowsTemporarily]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    if (selectedIndex === undefined || itemCount === undefined) return;
+
+    const selectedElement = container.querySelector<HTMLElement>(`[data-option-index="${selectedIndex}"]`);
+    if (!selectedElement) return;
+
+    const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
+    let nextScrollLeft = 0;
+
+    if (selectedIndex === 0) {
+      nextScrollLeft = 0;
+    } else if (selectedIndex === itemCount - 1) {
+      nextScrollLeft = maxScrollLeft;
+    } else {
+      const containerWidth = container.clientWidth;
+      const targetLeft = selectedElement.offsetLeft - (containerWidth / 2) + (selectedElement.offsetWidth / 2);
+      nextScrollLeft = Math.min(Math.max(0, targetLeft), maxScrollLeft);
+    }
+
+    container.scrollTo({
+      left: nextScrollLeft,
+      behavior: 'smooth',
+    });
+
+    revealArrowsTemporarily();
+  }, [selectedIndex, itemCount, selectedKey, revealArrowsTemporarily]);
 
   useEffect(() => () => clearHideTimer(), [clearHideTimer]);
 
@@ -238,6 +271,7 @@ function CompactOption({
   subtitle,
   leading,
   minWidth = 'min-w-[112px]',
+  index,
 }: {
   active: boolean;
   onClick: () => void;
@@ -245,13 +279,15 @@ function CompactOption({
   subtitle?: string;
   leading?: React.ReactNode;
   minWidth?: string;
+  index?: number;
 }) {
   return (
     <button
       type="button"
       data-no-drag="true"
+      data-option-index={index}
       onClick={onClick}
-      className={`${minWidth} shrink-0 snap-start rounded-[18px] border px-3 py-2.5 text-left transition-all duration-200 ${active ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+      className={`${minWidth} shrink-0 snap-start rounded-[18px] border px-3 py-2.5 text-left transition-all duration-300 ${active ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
     >
       <div className="flex items-start gap-2.5">
         {leading ? <div className="pt-0.5 text-lg leading-none">{leading}</div> : null}
@@ -279,13 +315,13 @@ function SettingBlock({
     <div className="rounded-[20px] border border-slate-200 bg-slate-50 p-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-sm font-black text-slate-900 mb-4">
-        {label}
-        <span className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-violet-700 shadow-sm ml-3">
-          {selectedLabel}
-        </span>
-        </div>
-
+          <div className="mb-4 text-sm font-black text-slate-900">
+            {label}
+            <span className="ml-3 rounded-full bg-white px-3 py-1.5 text-xs font-black text-violet-700 shadow-sm">
+              {selectedLabel}
+            </span>
+          </div>
+          <p className="text-xs text-slate-500">{helper}</p>
         </div>
       </div>
       <div className="mt-3">{children}</div>
@@ -312,11 +348,18 @@ export default function Step2Panel({
     () => SCRIPT_LANGUAGE_OPTIONS.find((item) => item.value === customScriptLanguage) || SCRIPT_LANGUAGE_OPTIONS[0],
     [customScriptLanguage]
   );
+
   const selectedSpeech = useMemo(
     () => SPEECH_STYLE_OPTIONS.find((item) => item.value === customScriptSpeechStyle) || SPEECH_STYLE_OPTIONS[0],
     [customScriptSpeechStyle]
   );
-  const visibleRecommendations = topicRecommendations.length ? topicRecommendations.slice(0, 8) : [...DEFAULT_TOPIC_RECOMMENDATIONS];
+
+  const visibleRecommendations = topicRecommendations.length
+    ? topicRecommendations.slice(0, 8)
+    : [...DEFAULT_TOPIC_RECOMMENDATIONS];
+
+  const selectedSpeechIndex = SPEECH_STYLE_OPTIONS.findIndex((item) => item.value === customScriptSpeechStyle);
+  const selectedLanguageIndex = SCRIPT_LANGUAGE_OPTIONS.findIndex((item) => item.value === customScriptLanguage);
 
   return (
     <div className="space-y-5">
@@ -351,19 +394,23 @@ export default function Step2Panel({
                 <span>30분</span>
               </div>
             </div>
-            <div className="mt-3">
-            </div>
           </SettingBlock>
 
           <SettingBlock
             label="대화체"
-            helper="카드를 드래그하거나 화살표 버튼으로 좌우 이동할 수 있고, 클릭만 해도 값이 바로 선택됩니다."
+            helper="처음은 맨 앞으로, 끝은 맨 뒤로, 그 외는 가운데로 부드럽게 이동합니다."
             selectedLabel={<>{selectedSpeech.label}</>}
           >
-            <HorizontalOptionRail step={240} selectedKey={customScriptSpeechStyle}>
-              {SPEECH_STYLE_OPTIONS.map((item) => (
+            <HorizontalOptionRail
+              step={240}
+              selectedKey={customScriptSpeechStyle}
+              selectedIndex={selectedSpeechIndex}
+              itemCount={SPEECH_STYLE_OPTIONS.length}
+            >
+              {SPEECH_STYLE_OPTIONS.map((item, index) => (
                 <CompactOption
                   key={item.value}
+                  index={index}
                   active={customScriptSpeechStyle === item.value}
                   onClick={() => onCustomScriptSpeechStyleChange(item.value)}
                   title={item.label}
@@ -376,13 +423,24 @@ export default function Step2Panel({
 
           <SettingBlock
             label="대본 언어"
-            helper="무음, 한국어를 먼저 두고 필요한 언어를 좌우로 넘겨 선택합니다. 화살표는 잠깐만 표시됩니다."
-            selectedLabel={<span className="inline-flex items-center gap-1.5"><span>{selectedLanguage.flag}</span><span>{selectedLanguage.label}</span></span>}
+            helper="처음은 맨 앞으로, 끝은 맨 뒤로, 그 외는 가운데로 부드럽게 이동합니다."
+            selectedLabel={
+              <span className="inline-flex items-center gap-1.5">
+                <span>{selectedLanguage.flag}</span>
+                <span>{selectedLanguage.label}</span>
+              </span>
+            }
           >
-            <HorizontalOptionRail step={260} selectedKey={customScriptLanguage}>
-              {SCRIPT_LANGUAGE_OPTIONS.map((item) => (
+            <HorizontalOptionRail
+              step={260}
+              selectedKey={customScriptLanguage}
+              selectedIndex={selectedLanguageIndex}
+              itemCount={SCRIPT_LANGUAGE_OPTIONS.length}
+            >
+              {SCRIPT_LANGUAGE_OPTIONS.map((item, index) => (
                 <CompactOption
                   key={item.value}
+                  index={index}
                   active={customScriptLanguage === item.value}
                   onClick={() => onCustomScriptLanguageChange(item.value)}
                   title={item.label}
@@ -408,32 +466,42 @@ export default function Step2Panel({
             {isRefreshingTopic ? '추천 중...' : '주제 새로고침'}
           </button>
         </div>
+
         <input
           value={topic}
           onChange={(e) => onTopicChange(e.target.value)}
           className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400"
           placeholder="예: 비 오는 도시 골목에서 다시 만난 두 사람"
         />
+
         <p className="mt-3 text-xs text-slate-500">
-          입력한 텍스트를 기준으로 한 문장 주제를 최대 8개 추천합니다. AI가 연결되어 있으면 AI 추천을, 연결되지 않았으면 샘플 추천을 보여줍니다.
+          입력한 텍스트를 기준으로 한 문장 주제를 추천합니다
         </p>
-        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-500">
-          <span className="inline-block h-2 w-2 rounded-full bg-slate-400" aria-hidden="true" />
-          기본 추천 문구
-        </div>
+
         <div className="mt-2 flex flex-wrap gap-2">
-          {visibleRecommendations.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => onSelectTopicRecommendation(item)}
-              className="rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-bold leading-5 text-slate-700 transition hover:bg-slate-200"
-            >
-              {item}
-            </button>
-          ))}
+          {visibleRecommendations.map((item) => {
+            const isActive = topic === item;
+
+            return (
+              <button
+                key={item}
+                type="button"
+                onClick={() => onSelectTopicRecommendation(item)}
+                className={`rounded-full border px-3 py-2 text-xs font-bold leading-5 transition ${
+                  isActive
+                    ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                    : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                {item}
+              </button>
+            );
+          })}
         </div>
-        {isInitialLoadingRecommendations ? <p className="mt-3 text-xs text-violet-600">추천 주제를 불러오는 중입니다.</p> : null}
+
+        {isInitialLoadingRecommendations ? (
+          <p className="mt-3 text-xs text-violet-600">추천 주제를 불러오는 중입니다.</p>
+        ) : null}
       </section>
     </div>
   );

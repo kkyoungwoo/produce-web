@@ -10,7 +10,7 @@ export function buildScriptPromptByContentType(
   sourceText: string
 ): string {
   if (contentType === 'music_video') return buildMusicVideoPrompt(topic, sourceText);
-  if (contentType === 'news') return buildNewsPrompt(topic, sourceText);
+  if (contentType === 'cinematic') return buildNewsPrompt(topic, sourceText);
   if (contentType === 'info_delivery') return buildInfoDeliveryPrompt(topic, sourceText);
   return buildStoryPrompt(topic, sourceText);
 }

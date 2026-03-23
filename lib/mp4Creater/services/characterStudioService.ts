@@ -9,8 +9,40 @@ import { getAspectRatioPrompt } from '../utils/aspectRatio';
 import { runOpenRouterText } from './openRouterService';
 import { buildVariantSuffix, createCreativeDirection } from '../config/creativeVariance';
 import { STYLE_SAMPLE_PRESETS } from '../samples/presetCatalog';
+import { CONFIG } from '../config';
 
 const BASE_STYLE_TEXT = `Stylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.`;
+
+function getGoogleAiStudioApiKey(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY)
+    || process.env.NEXT_PUBLIC_GEMINI_API_KEY
+    || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY
+    || '';
+}
+
+function extractMimeAndBase64(dataUrl: string): { mimeType: string; data: string } | null {
+  const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return {
+    mimeType: match[1] || 'image/png',
+    data: match[2] || '',
+  };
+}
+
+function extractTextFromGeminiResponse(json: any): string {
+  const candidates = Array.isArray(json?.candidates) ? json.candidates : [];
+  for (const candidate of candidates) {
+    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
+    const text = parts
+      .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+    if (text) return text;
+  }
+  return '';
+}
 
 function hashCode(value: string) {
   return Array.from(value).reduce((acc, char, index) => {
@@ -313,6 +345,79 @@ export function createPromptVariants(options: {
       groupLabel: options.groupLabel || options.title,
     });
   });
+}
+
+export async function buildImageAwareUploadPrompt(options: {
+  imageData: string;
+  label: string;
+  kind: 'character' | 'style';
+  topic: string;
+  mood?: string;
+  setting?: string;
+  protagonist?: string;
+  contentType: ContentType;
+  aspectRatio?: AspectRatio;
+}): Promise<string> {
+  const fallbackPrompt = buildUploadDrivenPrompt(options);
+  const apiKey = getGoogleAiStudioApiKey();
+  const inlineImage = extractMimeAndBase64(options.imageData);
+  if (!apiKey || !inlineImage?.data) return fallbackPrompt;
+
+  try {
+    const userInstruction = options.kind === 'character'
+      ? [
+          'Analyze this uploaded character reference image and write one production-ready image generation prompt in English.',
+          'Preserve the same overall vibe, age impression, hairstyle family, facial mood, silhouette, outfit direction, color impression, material feel, and lighting mood from the reference.',
+          'Do not mention camera UI, watermark, text, collage, split layout, or background removal.',
+          'Keep it suitable for consistent character regeneration and close variants.',
+          `Project topic: ${options.topic || 'untitled project'}.`,
+          `Mood: ${options.mood || 'balanced'}.`,
+          `Setting: ${options.setting || 'cinematic background'}.`,
+          `Main role hint: ${options.protagonist || 'story lead'}.`,
+          `Content type: ${options.contentType}.`,
+          'Return only the final prompt text.'
+        ].join('\n')
+      : [
+          'Analyze this uploaded style reference image and write one production-ready visual style prompt in English.',
+          'Preserve the same mood, palette, lighting rhythm, texture density, rendering finish, atmosphere, and composition energy from the reference.',
+          'The result should work as a reusable full-scene style direction for generating new images with a similar feeling.',
+          'Do not mention camera UI, watermark, text, collage, or split layout.',
+          `Project topic: ${options.topic || 'untitled project'}.`,
+          `Mood: ${options.mood || 'balanced'}.`,
+          `Setting: ${options.setting || 'cinematic background'}.`,
+          `Content type: ${options.contentType}.`,
+          `Aspect ratio target: ${options.aspectRatio || '16:9'}.`,
+          'Return only the final prompt text.'
+        ].join('\n');
+
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(CONFIG.DEFAULT_SCRIPT_MODEL)}:generateContent`, {
+      method: 'POST',
+      headers: {
+        'x-goog-api-key': apiKey,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [{
+          role: 'user',
+          parts: [
+            { text: userInstruction },
+            { inlineData: inlineImage },
+          ],
+        }],
+        generationConfig: {
+          temperature: 0.35,
+          maxOutputTokens: 300,
+        },
+      }),
+    });
+
+    if (!response.ok) return fallbackPrompt;
+    const json = await response.json();
+    const analyzedPrompt = extractTextFromGeminiResponse(json).trim();
+    return analyzedPrompt || fallbackPrompt;
+  } catch {
+    return fallbackPrompt;
+  }
 }
 
 export function buildUploadDrivenPrompt(options: {

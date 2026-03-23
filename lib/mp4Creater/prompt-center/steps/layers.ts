@@ -32,7 +32,7 @@ export const STEP_LAYERS: Record<ContentType, PromptStudioBundleMap[ContentType]
     scene: sharedSceneRules,
     action: ['컷 전환마다 박자감이 느껴지는 동작과 카메라 리듬을 넣습니다.'],
   },
-  news: {
+  cinematic: {
     script: [
       '설명이 아니라 영화 장면처럼 읽히는 문단을 우선하고, 감정의 압력과 선택의 무게가 보이게 씁니다.',
       '콘셉트 샘플 키워드는 오프닝 숏과 엔딩 잔상에 먼저 배치합니다.',

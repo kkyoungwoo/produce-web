@@ -5,10 +5,40 @@ import {
   CharacterProfile,
   AiRoutingSettings,
   ProviderRegistryItem,
+  WorkflowDraft,
+  normalizeContentType,
 } from '../types';
 import { compactWorkflowDraftForStorage, createDefaultWorkflowDraft } from './workflowDraftService';
 
 export const DEFAULT_STORAGE_DIR = './local-data/tubegen-studio';
+
+
+function normalizeWorkflowDraftContentType(draft: any): WorkflowDraft | null {
+  if (!draft || typeof draft !== 'object') return null;
+  return {
+    ...draft,
+    contentType: normalizeContentType(draft.contentType),
+  } as WorkflowDraft;
+}
+
+function normalizeProjectContentTypes(project: any): SavedProject {
+  if (!project || typeof project !== 'object') return summarizeProjectForIndex(project);
+  return {
+    ...project,
+    workflowDraft: project.workflowDraft ? normalizeWorkflowDraftContentType(project.workflowDraft) : null,
+  } as SavedProject;
+}
+
+function normalizeStudioStateContentTypes(state: StudioState | null | undefined): StudioState {
+  if (!state) return createDefaultStudioState();
+  return {
+    ...state,
+    workflowDraft: state.workflowDraft ? normalizeWorkflowDraftContentType(state.workflowDraft) : null,
+    projects: Array.isArray(state.projects) ? state.projects.map(normalizeProjectContentTypes) : [],
+    projectIndex: Array.isArray((state as any).projectIndex) ? (state as any).projectIndex.map(normalizeProjectContentTypes) : [],
+    lastContentType: normalizeContentType(state.lastContentType || state.workflowDraft?.contentType || 'story'),
+  };
+}
 
 export const DEFAULT_ROUTING: AiRoutingSettings = {
   scriptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
@@ -188,7 +218,7 @@ export function summarizeProjectForIndex(project: any): SavedProject {
       updatedAt: project.workflowDraft.updatedAt,
       aspectRatio: project.workflowDraft.aspectRatio,
       activeStage: project.workflowDraft.activeStage,
-      contentType: project.workflowDraft.contentType,
+      contentType: normalizeContentType(project.workflowDraft.contentType),
       outputMode: project.workflowDraft.outputMode,
       completedSteps: project.workflowDraft.completedSteps,
       script: typeof project.workflowDraft.script === 'string' ? project.workflowDraft.script.slice(0, 800) : '',
@@ -218,7 +248,7 @@ function readStudioStateCacheFromLocalStorage(): StudioState | null {
   const cached = localStorage.getItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE);
   if (!cached) return null;
   try {
-    return JSON.parse(cached) as StudioState;
+    return normalizeStudioStateContentTypes(JSON.parse(cached) as StudioState);
   } catch {
     return null;
   }
@@ -235,10 +265,11 @@ export function getCachedStudioState(): StudioState | null {
 }
 
 function syncStudioStateToLocalCache(state: StudioState) {
-  studioStateMemoryCache = state;
+  const normalizedState = normalizeStudioStateContentTypes(state);
+  studioStateMemoryCache = normalizedState;
   if (typeof window === 'undefined') return;
 
-  const lightState = createLightweightStudioState(state);
+  const lightState = createLightweightStudioState(normalizedState);
 
   try {
     localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE, JSON.stringify(lightState));
@@ -266,68 +297,68 @@ function syncStudioStateToLocalCache(state: StudioState) {
     }
   }
 
-  if (state.isStorageConfigured && state.storageDir) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STORAGE_DIR, state.storageDir);
+  if (normalizedState.isStorageConfigured && normalizedState.storageDir) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STORAGE_DIR, normalizedState.storageDir);
   } else {
     localStorage.removeItem(CONFIG.STORAGE_KEYS.STUDIO_STORAGE_DIR);
   }
-  localStorage.setItem(CONFIG.STORAGE_KEYS.LAST_CONTENT_TYPE, state.lastContentType || 'story');
+  localStorage.setItem(CONFIG.STORAGE_KEYS.LAST_CONTENT_TYPE, normalizedState.lastContentType || 'story');
 
-  if (state.providers?.openRouterApiKey) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY, state.providers.openRouterApiKey);
+  if (normalizedState.providers?.openRouterApiKey) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY, normalizedState.providers.openRouterApiKey);
   } else {
     localStorage.removeItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY);
   }
 
-  if (state.providers?.elevenLabsApiKey) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY, state.providers.elevenLabsApiKey);
+  if (normalizedState.providers?.elevenLabsApiKey) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY, normalizedState.providers.elevenLabsApiKey);
   } else {
     localStorage.removeItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY);
   }
 
-  if (state.providers?.heygenApiKey) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.HEYGEN_API_KEY, state.providers.heygenApiKey);
+  if (normalizedState.providers?.heygenApiKey) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.HEYGEN_API_KEY, normalizedState.providers.heygenApiKey);
   } else {
     localStorage.removeItem(CONFIG.STORAGE_KEYS.HEYGEN_API_KEY);
   }
 
-  if (state.routing?.imageModel) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.IMAGE_MODEL, state.routing.imageModel);
+  if (normalizedState.routing?.imageModel) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.IMAGE_MODEL, normalizedState.routing.imageModel);
   }
 
-  if (state.routing?.audioModel) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_MODEL, state.routing.audioModel);
+  if (normalizedState.routing?.audioModel) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.ELEVENLABS_MODEL, normalizedState.routing.audioModel);
   }
 
-  if (state.routing?.ttsProvider) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.TTS_PROVIDER, state.routing.ttsProvider);
+  if (normalizedState.routing?.ttsProvider) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.TTS_PROVIDER, normalizedState.routing.ttsProvider);
   }
-  if (state.routing?.qwenVoicePreset) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.QWEN_VOICE_PRESET, state.routing.qwenVoicePreset);
+  if (normalizedState.routing?.qwenVoicePreset) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.QWEN_VOICE_PRESET, normalizedState.routing.qwenVoicePreset);
   }
-  if (state.routing?.heygenVoiceId) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.HEYGEN_VOICE_ID, state.routing.heygenVoiceId);
+  if (normalizedState.routing?.heygenVoiceId) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.HEYGEN_VOICE_ID, normalizedState.routing.heygenVoiceId);
   } else {
     localStorage.removeItem(CONFIG.STORAGE_KEYS.HEYGEN_VOICE_ID);
   }
-  if (state.routing?.qwenStylePreset) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.QWEN_STYLE_PRESET, state.routing.qwenStylePreset);
+  if (normalizedState.routing?.qwenStylePreset) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.QWEN_STYLE_PRESET, normalizedState.routing.qwenStylePreset);
   }
-  if (state.routing?.backgroundMusicProvider) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.BGM_PROVIDER, state.routing.backgroundMusicProvider);
+  if (normalizedState.routing?.backgroundMusicProvider) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.BGM_PROVIDER, normalizedState.routing.backgroundMusicProvider);
   }
-  if (state.routing?.backgroundMusicStyle) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.BGM_STYLE, state.routing.backgroundMusicStyle);
+  if (normalizedState.routing?.backgroundMusicStyle) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.BGM_STYLE, normalizedState.routing.backgroundMusicStyle);
   }
-  if (state.routing?.musicVideoProvider) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.MUSIC_VIDEO_PROVIDER, state.routing.musicVideoProvider);
+  if (normalizedState.routing?.musicVideoProvider) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.MUSIC_VIDEO_PROVIDER, normalizedState.routing.musicVideoProvider);
   }
-  if (state.routing?.musicVideoMode) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.MUSIC_VIDEO_MODE, state.routing.musicVideoMode);
+  if (normalizedState.routing?.musicVideoMode) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.MUSIC_VIDEO_MODE, normalizedState.routing.musicVideoMode);
   }
 
-  if (state.selectedCharacterId) {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.SELECTED_CHARACTER_ID, state.selectedCharacterId);
+  if (normalizedState.selectedCharacterId) {
+    localStorage.setItem(CONFIG.STORAGE_KEYS.SELECTED_CHARACTER_ID, normalizedState.selectedCharacterId);
   } else {
     localStorage.removeItem(CONFIG.STORAGE_KEYS.SELECTED_CHARACTER_ID);
   }
@@ -361,11 +392,11 @@ function buildLeanStatePayload(partial: Partial<StudioState>, cachedState?: Stud
     agentProfile: partial.agentProfile || base.agentProfile,
     preferredPromptProfile: partial.preferredPromptProfile || base.preferredPromptProfile,
     providerRegistry: Array.isArray(partial.providerRegistry) ? partial.providerRegistry : base.providerRegistry,
-    lastContentType: partial.lastContentType || base.lastContentType || 'story',
+    lastContentType: normalizeContentType(partial.lastContentType || base.lastContentType || 'story'),
   };
 
   if (Object.prototype.hasOwnProperty.call(partial, 'workflowDraft')) {
-    payload.workflowDraft = compactWorkflowDraftForStorage(partial.workflowDraft as any) ?? null;
+    payload.workflowDraft = compactWorkflowDraftForStorage(normalizeWorkflowDraftContentType(partial.workflowDraft as any)) ?? null;
   }
 
   const nextProjectIndex = Array.isArray((partial as any).projectIndex)
@@ -390,7 +421,7 @@ export async function fetchStudioState(options?: { force?: boolean; storageDir?:
 
   try {
     const query = cachedDir ? `?storageDir=${encodeURIComponent(cachedDir)}` : '';
-    const state = await requestJson<StudioState>(`/api/local-storage/state${query}`);
+    const state = normalizeStudioStateContentTypes(await requestJson<StudioState>(`/api/local-storage/state${query}`));
     syncStudioStateToLocalCache(state);
     return state;
   } catch {
@@ -404,7 +435,7 @@ export async function fetchStudioProjects(options?: { storageDir?: string }): Pr
   const query = new URLSearchParams();
   if (storageDir) query.set('storageDir', storageDir);
   query.set('includeProjects', '1');
-  const state = await requestJson<StudioState>(`/api/local-storage/state?${query.toString()}`);
+  const state = normalizeStudioStateContentTypes(await requestJson<StudioState>(`/api/local-storage/state?${query.toString()}`));
   return Array.isArray(state.projects) ? state.projects.map(summarizeProjectForIndex) : [];
 }
 
@@ -415,7 +446,7 @@ export async function fetchStudioProjectById(projectId: string, options?: { stor
   query.set('projectId', projectId);
 
   try {
-    return await requestJson<SavedProject>(`/api/local-storage/project?${query.toString()}`);
+    return normalizeProjectContentTypes(await requestJson<SavedProject>(`/api/local-storage/project?${query.toString()}`));
   } catch {
     return null;
   }
@@ -425,7 +456,7 @@ export async function saveStudioProject(project: SavedProject, options?: { stora
   const storageDir = options?.storageDir || getCachedStorageDir();
   await requestJson('/api/local-storage/project', {
     method: 'POST',
-    body: JSON.stringify({ storageDir, project }),
+    body: JSON.stringify({ storageDir, project: normalizeProjectContentTypes(project) }),
   });
 }
 
@@ -438,10 +469,10 @@ export async function deleteStudioProjects(projectIds: string[], options?: { sto
 }
 
 export async function configureStorage(storageDir: string): Promise<StudioState> {
-  const state = await requestJson<StudioState>('/api/local-storage/config', {
+  const state = normalizeStudioStateContentTypes(await requestJson<StudioState>('/api/local-storage/config', {
     method: 'POST',
     body: JSON.stringify({ storageDir }),
-  });
+  }));
   syncStudioStateToLocalCache(state);
   return state;
 }
@@ -464,10 +495,11 @@ export async function saveStudioState(partial: Partial<StudioState>): Promise<St
         projectIndex: Array.isArray((payload as any).projectIndex) ? (payload as any).projectIndex : [],
       }) as StudioState;
 
+  const normalizedOptimisticState = normalizeStudioStateContentTypes(buildOptimisticState());
+
   if (shouldBypassStudioStateSaveRequest()) {
-    const optimisticState = buildOptimisticState();
-    syncStudioStateToLocalCache(optimisticState);
-    return optimisticState;
+    syncStudioStateToLocalCache(normalizedOptimisticState);
+    return normalizedOptimisticState;
   }
 
   try {
@@ -476,7 +508,7 @@ export async function saveStudioState(partial: Partial<StudioState>): Promise<St
       body: JSON.stringify(payload),
     });
 
-    const nextMemoryState = cachedState
+    const nextMemoryState = normalizeStudioStateContentTypes(cachedState
       ? {
           ...cachedState,
           ...payload,
@@ -484,17 +516,16 @@ export async function saveStudioState(partial: Partial<StudioState>): Promise<St
           projects: Array.isArray(state.projects) ? state.projects : (Array.isArray(partial.projects) ? partial.projects.map(summarizeProjectForIndex) : (cachedState.projects || [])),
           projectIndex: Array.isArray((state as any).projectIndex) ? (state as any).projectIndex : (Array.isArray((payload as any).projectIndex) ? (payload as any).projectIndex : ((cachedState as any)?.projectIndex || [])),
         }
-      : state;
+      : state);
 
     markStudioStateSaveSuccess();
     syncStudioStateToLocalCache(nextMemoryState as StudioState);
     return nextMemoryState as StudioState;
   } catch (error) {
     markStudioStateSaveFailure();
-    const optimisticState = buildOptimisticState();
-    syncStudioStateToLocalCache(optimisticState);
+    syncStudioStateToLocalCache(normalizedOptimisticState);
     console.warn('[mp4Creater] saveStudioState failed, keeping local cache only', error);
-    return optimisticState;
+    return normalizedOptimisticState;
   }
 }
 

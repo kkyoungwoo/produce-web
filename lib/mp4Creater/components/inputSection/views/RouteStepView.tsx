@@ -425,7 +425,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
         <textarea
           value={promptPreviewDraft || syncedPromptTemplates.find((item: any) => item.id === promptPreviewId)?.prompt || selectedPromptTemplate?.prompt || ''}
           onChange={(event) => setPromptPreviewDraft(event.target.value)}
-          className="min-h-[420px] w-full rounded-2xl border border-blue-400 bg-blue-600 px-4 py-4 text-sm leading-7 text-white outline-none placeholder:text-blue-100"
+          className="min-h-[420px] w-full rounded-2xl border border-blue-400 px-4 py-4 text-sm leading-7 text-black outline-none placeholder:text-blue-100"
           placeholder="프롬프트를 불러오는 중입니다."
         />
       </OverlayModal>

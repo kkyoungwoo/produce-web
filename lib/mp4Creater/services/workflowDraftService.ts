@@ -1,6 +1,7 @@
 import { CONFIG } from '../config';
 import {
   ContentType,
+  normalizeContentType,
   DEFAULT_ASPECT_RATIO,
   DEFAULT_REFERENCE_IMAGES,
   ProjectOutputMode,
@@ -33,7 +34,7 @@ export const DEFAULT_SELECTIONS: Record<ContentType, StorySelectionState> = {
     protagonist: '초보 창작자',
     conflict: '잊고 있던 약속',
   },
-  news: {
+  cinematic: {
     genre: '시네마틱 드라마',
     mood: '몰입감 있는',
     endingTone: '긴 여운으로 마무리',
@@ -52,18 +53,19 @@ export const DEFAULT_SELECTIONS: Record<ContentType, StorySelectionState> = {
 };
 
 export function createDefaultWorkflowDraft(contentType: ContentType = 'story', outputMode: ProjectOutputMode = 'video'): WorkflowDraft {
-  const selections = DEFAULT_SELECTIONS[contentType];
+  const normalizedContentType = normalizeContentType(contentType);
+  const selections = DEFAULT_SELECTIONS[normalizedContentType];
   const promptPack = buildWorkflowPromptPack({
-    contentType,
+    contentType: normalizedContentType,
     topic: '',
     selections,
     script: '',
   });
-  const promptTemplates = resolveWorkflowPromptTemplates(contentType, promptPack, []);
+  const promptTemplates = resolveWorkflowPromptTemplates(normalizedContentType, promptPack, []);
 
   return {
     id: `workflow_${Date.now()}`,
-    contentType,
+    contentType: normalizedContentType,
     aspectRatio: DEFAULT_ASPECT_RATIO,
     topic: '',
     outputMode,
@@ -83,7 +85,7 @@ export function createDefaultWorkflowDraft(contentType: ContentType = 'story', o
     referenceImages: { ...DEFAULT_REFERENCE_IMAGES },
     promptPack,
     promptTemplates,
-    selectedPromptTemplateId: getDefaultWorkflowPromptTemplateId(contentType),
+    selectedPromptTemplateId: getDefaultWorkflowPromptTemplateId(normalizedContentType),
     promptAdditions: [],
     customScriptSettings: {
       expectedDurationMinutes: 3,
@@ -143,8 +145,10 @@ function compactPromptTemplatesForStorage(templates?: WorkflowPromptTemplate[]):
 
 export function compactWorkflowDraftForStorage(draft?: WorkflowDraft | null): WorkflowDraft | null {
   if (!draft) return null;
+  const contentType = normalizeContentType(draft.contentType);
   return {
     ...draft,
+    contentType,
     promptPack: {
       storyPrompt: '',
       lyricsPrompt: '',
@@ -208,9 +212,9 @@ export function createSelectedWorkflowDraftForTransport(draft?: WorkflowDraft | 
 
 export function ensureWorkflowDraft(studioState?: StudioState | null): WorkflowDraft {
   const existing = studioState?.workflowDraft;
-  if (!existing) return createDefaultWorkflowDraft(studioState?.lastContentType || 'story');
+  if (!existing) return createDefaultWorkflowDraft(normalizeContentType(studioState?.lastContentType || 'story'));
 
-  const contentType = existing.contentType || studioState?.lastContentType || 'story';
+  const contentType = normalizeContentType(existing.contentType || studioState?.lastContentType || 'story');
   const selections = {
     ...DEFAULT_SELECTIONS[contentType],
     ...existing.selections,
@@ -279,22 +283,24 @@ export function buildWorkflowDraftPatch(draft: Partial<WorkflowDraft> & {
   selections: StorySelectionState;
   script: string;
 }): Partial<WorkflowDraft> {
+  const contentType = normalizeContentType(draft.contentType);
   const promptPack = buildWorkflowPromptPack({
-    contentType: draft.contentType,
+    contentType,
     topic: draft.topic,
     selections: draft.selections,
     script: draft.script,
   });
-  const promptTemplates = resolveWorkflowPromptTemplates(draft.contentType, promptPack, draft.promptTemplates || []);
+  const promptTemplates = resolveWorkflowPromptTemplates(contentType, promptPack, draft.promptTemplates || []);
 
   return {
     ...draft,
+    contentType,
     promptPack,
     promptTemplates,
     selectedPromptTemplateId:
       promptTemplates.some((item) => item.id === draft.selectedPromptTemplateId)
-        ? draft.selectedPromptTemplateId || getDefaultWorkflowPromptTemplateId(draft.contentType)
-        : getDefaultWorkflowPromptTemplateId(draft.contentType),
+        ? draft.selectedPromptTemplateId || getDefaultWorkflowPromptTemplateId(contentType)
+        : getDefaultWorkflowPromptTemplateId(contentType),
     updatedAt: Date.now(),
   };
 }

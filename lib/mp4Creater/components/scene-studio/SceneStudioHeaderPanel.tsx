@@ -68,6 +68,8 @@ const SceneStudioHeaderPanel: React.FC<SceneStudioHeaderPanelProps> = ({
         title="입력 요약"
         description="Step1부터 Step6까지 저장된 값과 실제 전달되는 프롬프트를 구분별 버튼으로 확인합니다."
         onClose={onCloseSummary}
+        dialogClassName="max-w-6xl"
+        bodyClassName="max-h-[76vh] overflow-y-auto"
       >
         <div className="space-y-4">
           <div className="flex flex-wrap gap-2">

@@ -21,7 +21,7 @@ const WORKFLOW_TEMPLATE_IDS = {
 
 function getContentTypePromptLabel(contentType: ContentType) {
   if (contentType === 'music_video') return '뮤직비디오';
-  if (contentType === 'news') return '영화';
+  if (contentType === 'cinematic') return '영화';
   if (contentType === 'info_delivery') return '정보 전달';
   return '이야기';
 }
@@ -51,7 +51,7 @@ function buildConceptLock(contentType: ContentType) {
     ].join('\n');
   }
 
-  if (contentType === 'news') {
+  if (contentType === 'cinematic') {
     return [
       '- Step 1 concept is locked to cinematic movie-style storytelling.',
       '- Every paragraph should feel like a visible scene with action, tension, and mood.',
@@ -83,7 +83,7 @@ function buildParagraphFlowGuide(contentType: ContentType) {
     ].join('\n');
   }
 
-  if (contentType === 'news') {
+  if (contentType === 'cinematic') {
     return [
       '- Use 4 to 6 blank-line-separated cinematic paragraphs.',
       '- Each paragraph should read like one scene beat with visible motion, setting, and emotional pressure.',
@@ -127,7 +127,7 @@ function buildConceptOutputGuide(contentType: ContentType) {
     ].join('\n');
   }
 
-  if (contentType === 'news') {
+  if (contentType === 'cinematic') {
     return [
       '[출력 규칙]',
       '- 결과는 영화처럼 장면이 보이는 시네마틱 문단형 대본으로 작성한다.',

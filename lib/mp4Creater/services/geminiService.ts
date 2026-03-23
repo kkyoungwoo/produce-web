@@ -20,7 +20,7 @@ function getFallbackScript(topic: string, contentType: ContentType): string {
 
 마지막 장면에서 그는 멀어지던 관계 대신 앞으로 걸어갈 이유를 발견한다.`;
   }
-  if (contentType === 'news') {
+  if (contentType === 'cinematic') {
     return `비에 젖은 도시의 밤, 주인공은 오래 숨겨 둔 단서가 다시 움직이기 시작했다는 사실을 알아차린다. ${direction.visualHook}
 
 사라진 약속과 남겨진 흔적이 같은 장소로 모이면서, 관계와 목적이 뒤엉킨 긴장이 점점 선명해진다. ${direction.narrativeAngle}

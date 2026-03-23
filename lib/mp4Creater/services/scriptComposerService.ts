@@ -193,7 +193,7 @@ function buildOutputFormatReminder(options: ScriptComposerOptions) {
     return '출력 형식: 4~6개의 문단형 정보 전달 대본으로 쓰고 첫 문단은 핵심 질문, 중간은 설명/예시/비교 블록, 마지막은 요약과 다음 행동으로 끝낸다. 대본 본문만 출력하고 목표, 주제, 장르, 설명 메모 같은 메타 문구는 본문에 쓰지 않는다.';
   }
 
-  if (options.contentType === 'news') {
+  if (options.contentType === 'cinematic') {
     return '출력 형식: 4~6개의 장면형 영화 대본으로 쓰고 각 문단이 하나의 시네마틱 장면처럼 읽히게 한다. 대본 본문만 출력하고 목표, 주제, 장르, 설명 메모 같은 메타 문구는 본문에 쓰지 않는다.';
   }
 
@@ -205,7 +205,7 @@ function buildConceptLockGuide(options: ScriptComposerOptions) {
     return 'Step 1 concept lock: music video. The final body must stay as singable lyrics with visible rhythm and chorus lift.';
   }
 
-  if (options.contentType === 'news') {
+  if (options.contentType === 'cinematic') {
     return 'Step 1 concept lock: cinematic movie-style storytelling. The final body must feel like visible scenes, not an explainer article.';
   }
 
@@ -225,7 +225,7 @@ function buildParagraphCountGuide(options: ScriptComposerOptions) {
     return 'Target structure: 4 to 6 blank-line-separated explainer paragraphs.';
   }
 
-  if (options.contentType === 'news') {
+  if (options.contentType === 'cinematic') {
     return 'Target structure: 4 to 6 blank-line-separated cinematic scene paragraphs.';
   }
 
@@ -392,12 +392,12 @@ function createFallback(options: ScriptComposerOptions): string {
 function buildConstitutionFallbackAnalysis(options: ScriptComposerOptions, source: 'ai' | 'sample'): ConstitutionAnalysisSummary {
   const mood = options.selections.mood || '몰입형';
   const topic = options.topic || '이번 프로젝트';
-  const targetName = options.contentType === 'news'
+  const targetName = options.contentType === 'cinematic'
     ? '2030 시네마 몰입형'
     : options.contentType === 'info_delivery'
       ? '2030 실전 학습형'
       : '2030 호기심 몰입형';
-  const structureId = options.contentType === 'news' ? '005' : options.contentType === 'info_delivery' ? '010' : '005';
+  const structureId = options.contentType === 'cinematic' ? '005' : options.contentType === 'info_delivery' ? '010' : '005';
   const titles = [
     `${topic}에서 가장 먼저 보이는 장면`,
     `${topic}가 빠르게 먹히는 포인트`,

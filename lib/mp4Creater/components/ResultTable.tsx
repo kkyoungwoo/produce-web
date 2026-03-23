@@ -289,6 +289,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const bgmStripRef = useRef<HTMLDivElement | null>(null);
   const sceneStripRef = useRef<HTMLDivElement | null>(null);
   const sceneCardRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const sceneMediaStripRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const lastAutoFocusedSceneRef = useRef<number | null>(null);
   const [previewImageMap, setPreviewImageMap] = useState<Record<string, string>>({});
   const [sceneEditorModes, setSceneEditorModes] = useState<Record<number, SceneEditorMode>>({});
@@ -468,11 +469,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
   const getDisplayImageSrc = (src: string) => previewImageMap[src] || src;
 
-  const getSceneEditorMode = (row: GeneratedAsset, index: number): SceneEditorMode => {
+  const getSceneEditorMode = (_row: GeneratedAsset, index: number): SceneEditorMode => {
     const savedMode = sceneEditorModes[index];
     if (savedMode) return savedMode;
-    if (!row.imageData) return 'image';
-    if (!row.videoData && row.imageData) return 'video';
     return 'narration';
   };
 
@@ -550,8 +549,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
   const sceneEditorMeta: Record<SceneEditorMode, { label: string; placeholder: string; badgeClass: string }> = {
     narration: {
-      label: '대본',
-      placeholder: '이 씬에서 읽을 문단을 입력하세요',
+      label: '대사',
+      placeholder: '이 씬에서 사용할 대사만 입력하세요',
       badgeClass: 'bg-slate-900 text-white',
     },
     image: {
@@ -599,6 +598,21 @@ const ResultTable: React.FC<ResultTableProps> = ({
     const target = container.querySelector<HTMLElement>(`[data-scene-chip-id="${activeSceneIndex}"]`);
     if (target) scrollElementIntoView(target);
   }, [activeSceneIndex]);
+
+  useEffect(() => {
+    data.forEach((row, index) => {
+      (['image', 'video'] as const).forEach((kind) => {
+        const entries = collectOrderedMediaHistory(row, kind);
+        if (!entries.length) return;
+        const mediaKey = getSceneMediaKey(index, kind);
+        const selectedIndex = getSceneMediaIndex(index, kind, entries.length);
+        const container = sceneMediaStripRefs.current[mediaKey];
+        if (!container) return;
+        const target = container.querySelector<HTMLElement>(`[data-scene-media-card="${mediaKey}-${selectedIndex}"]`);
+        if (target) scrollElementIntoView(target);
+      });
+    });
+  }, [data, sceneMediaIndices]);
 
   useEffect(() => {
     if (isGenerating) return;
@@ -864,7 +878,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
             ? { kind: 'video' as const, src: resolveVideoSrc(visualEntry?.data || row.videoData) }
             : { kind: 'image' as const, src: resolveImageSrc(visualEntry?.data || row.imageData) };
           const displayImageSrc = visualPayload.kind === 'image' && visualPayload.src ? getDisplayImageSrc(visualPayload.src) : '';
-          const sceneMediaOffset = sceneMediaShift[getSceneMediaKey(index, activeHistoryKind)] || 0;
+          const sceneMediaKey = getSceneMediaKey(index, activeHistoryKind);
+          const sceneMediaOffset = sceneMediaShift[sceneMediaKey] || 0;
+          const hasPrevVisualEntry = visualEntryIndex > 0;
+          const hasNextVisualEntry = visualEntryIndex < visualEntries.length - 1;
 
           return (
             <div
@@ -928,18 +945,72 @@ const ResultTable: React.FC<ResultTableProps> = ({
                         )}
                       </div>
                     )}
-                    {visualEntries.length > 1 && !isSceneWorking && (
+                    {visualEntries.length > 1 && !isSceneWorking && (hasPrevVisualEntry || hasNextVisualEntry) && (
                       <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-between gap-2 opacity-100 transition-opacity duration-200">
-                        <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, -1)} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white">←</button>
+                        {hasPrevVisualEntry ? (
+                          <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, -1)} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white">←</button>
+                        ) : <span className="h-8 w-8" aria-hidden="true" />}
                         <div className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-black text-slate-700 shadow-sm">{visualEntryIndex + 1}/{visualEntries.length}</div>
-                        <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, 1)} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white">→</button>
+                        {hasNextVisualEntry ? (
+                          <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, 1)} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white">→</button>
+                        ) : <span className="h-8 w-8" aria-hidden="true" />}
                       </div>
                     )}
                   </div>
-                  {visualEntries.length > 1 && (
-                    <div className="mt-2 flex items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-bold text-slate-600">
-                      <span>{activeHistoryKind === 'video' ? '영상 히스토리' : '이미지 히스토리'}</span>
-                      <span>{visualEntry?.label || `생성본 ${visualEntryIndex + 1}`}</span>
+                  {visualEntries.length > 0 && (
+                    <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
+                      <div className="flex items-center justify-between gap-2 px-1 pb-2 text-[11px] font-bold text-slate-600">
+                        <span>{activeHistoryKind === 'video' ? '영상 히스토리' : '이미지 히스토리'} · 오른쪽으로 누적</span>
+                        <div className="flex items-center gap-2">
+                          {hasPrevVisualEntry ? (
+                            <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, -1)} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-700 hover:bg-slate-100">←</button>
+                          ) : null}
+                          <span>{visualEntry?.label || `생성본 ${visualEntryIndex + 1}`}</span>
+                          {hasNextVisualEntry ? (
+                            <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, 1)} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-700 hover:bg-slate-100">→</button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div
+                        ref={(node) => {
+                          sceneMediaStripRefs.current[sceneMediaKey] = node;
+                        }}
+                        onWheel={(event) => handleHorizontalWheel(event, 0.9)}
+                        className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                      >
+                        {visualEntries.map((entry, entryIndex) => {
+                          const selectedEntry = entryIndex === visualEntryIndex;
+                          const entryImageSrc = activeHistoryKind === 'image' ? getDisplayImageSrc(resolveImageSrc(entry.data)) : '';
+                          const entryVideoSrc = activeHistoryKind === 'video' ? resolveVideoSrc(entry.data) : '';
+                          return (
+                            <button
+                              key={entry.id || `${sceneMediaKey}-${entryIndex}`}
+                              type="button"
+                              data-scene-media-card={`${sceneMediaKey}-${entryIndex}`}
+                              onClick={() => {
+                                setSceneMediaIndices((prev) => ({ ...prev, [sceneMediaKey]: entryIndex }));
+                              }}
+                              className={`w-[110px] shrink-0 overflow-hidden rounded-2xl border text-left transition ${selectedEntry ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-200'}`}
+                            >
+                              <div className={`flex h-[72px] items-center justify-center overflow-hidden ${activeHistoryKind === 'video' ? 'bg-slate-900' : 'bg-slate-100'}`}>
+                                {activeHistoryKind === 'video' && entryVideoSrc ? (
+                                  <video className="h-full w-full object-cover" playsInline muted preload="metadata">
+                                    <source src={entryVideoSrc} type="video/mp4" />
+                                  </video>
+                                ) : entryImageSrc ? (
+                                  <img src={entryImageSrc} alt={entry.label || `씬 ${row.sceneNumber} 미디어 ${entryIndex + 1}`} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="px-2 text-center text-[10px] font-black text-slate-400">미리보기 없음</div>
+                                )}
+                              </div>
+                              <div className="space-y-1 px-2 py-2">
+                                <div className="truncate text-[11px] font-black text-slate-800">{entry.label || `생성본 ${entryIndex + 1}`}</div>
+                                <div className="text-[10px] text-slate-500">{entry.sourceMode === 'sample' ? '샘플' : 'AI'} · {entryIndex + 1}/{visualEntries.length}</div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
                   )}
 

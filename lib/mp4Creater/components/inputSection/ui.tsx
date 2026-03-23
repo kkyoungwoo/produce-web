@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { StepId } from './types';
 
 export function StepChip({
@@ -187,6 +188,8 @@ export function OverlayModal({
   onClose,
   children,
   footer,
+  dialogClassName = '',
+  bodyClassName = '',
 }: {
   open: boolean;
   title: string;
@@ -194,28 +197,35 @@ export function OverlayModal({
   onClose: () => void;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  dialogClassName?: string;
+  bodyClassName?: string;
 }) {
   if (!open) return null;
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/55 px-4 py-6 backdrop-blur-sm"
+      className="fixed inset-0 z-[120] overflow-y-auto bg-slate-950/55 px-4 py-6 backdrop-blur-sm"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-3xl rounded-[30px] border border-slate-200 bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">팝업</div>
-            <h3 className="mt-2 text-2xl font-black text-slate-900">{title}</h3>
-            {description && <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>}
+      <div className="flex min-h-full items-center justify-center">
+        <div className={`my-4 w-full max-w-3xl overflow-hidden rounded-[30px] border border-slate-200 bg-white shadow-2xl ${dialogClassName}`.trim()} onMouseDown={(event) => event.stopPropagation()}>
+          <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+            <div>
+              <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">팝업</div>
+              <h3 className="mt-2 text-2xl font-black text-slate-900">{title}</h3>
+              {description && <p className="mt-2 text-sm leading-6 text-slate-600">{description}</p>}
+            </div>
+            <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
           </div>
-          <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
+          <div className={`px-6 py-6 ${bodyClassName}`.trim()}>{children}</div>
+          {footer && <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 px-6 py-5">{footer}</div>}
         </div>
-        <div className="px-6 py-6">{children}</div>
-        {footer && <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-200 px-6 py-5">{footer}</div>}
       </div>
     </div>
   );
+
+  if (typeof document === 'undefined') return modal;
+  return createPortal(modal, document.body);
 }

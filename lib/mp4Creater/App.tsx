@@ -256,6 +256,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   const autosaveTimerRef = useRef<number | null>(null);
   const projectDraftSyncTimerRef = useRef<number | null>(null);
   const lastWorkflowDraftSignatureRef = useRef('');
+  const pendingProjectSaveReasonRef = useRef<'input' | 'action' | null>(null);
+  const pendingProjectSaveTokenRef = useRef(0);
 
   const storageReady = Boolean(studioState?.isStorageConfigured && studioState?.storageDir?.trim());
   const requestedProjectId = searchParams?.get('projectId') || '';
@@ -370,6 +372,40 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     setApiModalFocusField(options?.focusField || null);
     setShowApiModal(true);
   }, []);
+
+  const requestProjectSave = useCallback((reason: 'input' | 'action' = 'action') => {
+    pendingProjectSaveReasonRef.current = reason;
+    pendingProjectSaveTokenRef.current += 1;
+  }, []);
+
+  const handleProjectInteractionCapture = useCallback((event: React.SyntheticEvent<HTMLElement>) => {
+    const nativeEvent = event.nativeEvent as Event & { isTrusted?: boolean };
+    if (nativeEvent?.isTrusted === false) return;
+    const target = event.target as HTMLElement | null;
+    if (!target) return;
+    const tagName = target.tagName.toLowerCase();
+    const inputType = target instanceof HTMLInputElement ? `${target.type || ''}`.toLowerCase() : '';
+
+    if (tagName === 'textarea') {
+      requestProjectSave('input');
+      return;
+    }
+
+    if (tagName === 'input') {
+      if (['checkbox', 'radio', 'file', 'range'].includes(inputType)) {
+        requestProjectSave('action');
+        return;
+      }
+      if (!['button', 'submit', 'reset'].includes(inputType)) {
+        requestProjectSave('input');
+        return;
+      }
+    }
+
+    if (tagName === 'select' || tagName === 'button' || Boolean(target.closest('button'))) {
+      requestProjectSave('action');
+    }
+  }, [requestProjectSave]);
 
   const refreshProjects = useCallback(async (options?: { forceSync?: boolean; silent?: boolean }) => {
     if (!options?.silent) setIsProjectsLoading(true);
@@ -716,8 +752,13 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     if (!currentProjectId) return;
     if (!generatedData.length) return;
     if (!storageReady) return;
+    if (!pendingProjectSaveReasonRef.current) return;
     if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
+
+    const saveReason = pendingProjectSaveReasonRef.current;
+    const saveToken = pendingProjectSaveTokenRef.current;
     autosaveTimerRef.current = window.setTimeout(async () => {
+      if (pendingProjectSaveTokenRef.current !== saveToken) return;
       const updated = await updateProject(currentProjectId, {
         assets: generatedData,
         backgroundMusicTracks,
@@ -726,7 +767,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       if (updated) {
         applyProjectListSnapshot([updated, ...savedProjects.filter((item) => item.id !== updated.id)]);
       }
-    }, 500);
+      pendingProjectSaveReasonRef.current = null;
+    }, saveReason === 'input' ? 1000 : 180);
 
     return () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
@@ -1082,6 +1124,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   }, [backgroundMusicTracks, basePath, currentCost, currentProjectId, ensureRuntimeStorageReady, generatedData, previewMix, promptStorageSelection, refreshProjects, router]);
 
   const handleNarrationChange = (index: number, narration: string) => {
+    requestProjectSave('input');
     setGeneratedData((prev) => prev.map((item, itemIndex) => itemIndex === index ? {
       ...item,
       narration,
@@ -1090,11 +1133,12 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   };
 
   const handleDurationChange = (index: number, duration: number) => {
+    requestProjectSave('input');
     setGeneratedData((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, targetDuration: Math.min(6, Math.max(3, duration)) } : item));
   };
 
   return (
-    <div className={`mp4-shell ${viewMode === 'gallery' ? 'min-h-0' : 'min-h-screen'} text-slate-900`}>
+    <div className={`mp4-shell ${viewMode === 'gallery' ? 'min-h-0' : 'min-h-screen'} text-slate-900`} onClickCapture={handleProjectInteractionCapture} onChangeCapture={handleProjectInteractionCapture} onInputCapture={handleProjectInteractionCapture}>
       <LoadingOverlay
         open={Boolean(navigationOverlay)}
         title={navigationOverlay?.title || '이동 중'}

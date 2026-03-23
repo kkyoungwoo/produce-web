@@ -77,7 +77,7 @@ ${direction.transitionBeat}
     ].join('\n\n'));
   }
 
-  if (options.contentType === 'news') {
+  if (options.contentType === 'cinematic') {
     return normalizeStoryText([
       `${setting}의 공기가 먼저 화면을 채우고, ${protagonist}은 ${topic}의 이상 징후를 가장 먼저 알아챈다. ${options.mood} 무드가 깔린 오프닝 안에서 관객은 설명보다 표정과 움직임으로 상황의 균열을 읽게 된다. ${direction.visualHook}`, 
       `다음 장면에서는 사소해 보였던 단서들이 빠르게 겹치며 ${conflict}의 실체가 드러난다. ${protagonist}은 멈추지 않고 더 깊은 곳으로 들어가고, 장면의 긴장감은 영화처럼 한 컷씩 눌러 붙는다.`,
@@ -108,7 +108,7 @@ export function buildLocalVisualPrompt(narration: string, sceneNumber: number, c
   const modeLine =
     contentType === 'music_video'
       ? 'Music video storyboard illustration, lyrical, symbolic, cinematic rhythm.'
-      : contentType === 'news'
+      : contentType === 'cinematic'
         ? 'Cinematic movie storyboard illustration, dramatic lighting, emotional tension, immersive composition.'
         : contentType === 'info_delivery'
           ? 'Information explainer storyboard illustration, clean visual hierarchy, credible composition.'

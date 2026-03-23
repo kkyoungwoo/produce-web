@@ -85,7 +85,7 @@ const NARRATIVE_ANGLES: Record<ContentType | 'default', readonly string[]> = {
     'Open with friction already in motion.',
     'Let one human detail reshape the whole beat.',
   ],
-  news: [
+  cinematic: [
     'Treat the material like a cinematic reveal, not a neutral explainer.',
     'Focus on visible stakes before explanation.',
     'Build momentum through discovery and consequence.',

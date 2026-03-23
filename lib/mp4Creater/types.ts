@@ -1,7 +1,21 @@
 // mp4Creater 전용 타입 모음
 // 다른 기능은 건드리지 않고 이 화면에서만 쓰기 쉽게 조금 넓게 정의합니다.
 
-export type ContentType = 'music_video' | 'story' | 'news' | 'info_delivery';
+export type ContentType = 'music_video' | 'story' | 'cinematic' | 'info_delivery';
+export function normalizeContentType(value?: string | null): ContentType {
+  if (value === 'music_video' || value === 'story' || value === 'cinematic' || value === 'info_delivery') return value;
+  if (value === 'news') return 'cinematic';
+  return 'story';
+}
+
+
+export function getContentTypeLabel(value?: string | null): string {
+  const normalized = normalizeContentType(value);
+  if (normalized === 'music_video') return '뮤직비디오';
+  if (normalized === 'cinematic') return '영화';
+  if (normalized === 'info_delivery') return '정보 전달';
+  return '이야기';
+}
 export type AspectRatio = '16:9' | '1:1' | '9:16';
 export type ProjectOutputMode = 'video' | 'image';
 
@@ -220,7 +234,7 @@ export interface CharacterProfile {
   description: string;
   visualStyle: string;
   voiceHint?: string;
-  voiceProvider?: 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen';
+  voiceProvider?: 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen' | 'google';
   voiceId?: string;
   voiceName?: string;
   voicePreviewUrl?: string | null;
@@ -388,16 +402,6 @@ export interface PreviewMixSettings {
   backgroundMusicVolume: number;
 }
 
-export interface ProjectSettings {
-  id: string;
-  name: string;
-  createdAt: number;
-  updatedAt: number;
-  imageModel: string;
-  outputMode: ProjectOutputMode;
-  elevenLabsVoiceId: string;
-  elevenLabsModel: string;
-}
 
 export interface SavedProject {
   id: string;

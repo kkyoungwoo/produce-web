@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Header from '../components/Header';
 import { LoadingOverlay, StudioPageSkeleton } from '../components/LoadingOverlay';
+import { OverlayModal } from '../components/inputSection/ui';
 import { getProjectById, updateProject } from '../services/projectService';
 import { generateImage, getSelectedImageModel, isSampleImageModel } from '../services/imageService';
 import { readProjectNavigationProject, rememberProjectNavigationProject } from '../services/projectNavigationCache';
@@ -24,16 +25,19 @@ function resolveImageSrc(value?: string | null) {
 function getSelectedCharacterIds(project: SavedProject) {
   const draft = project.workflowDraft;
   if (!draft) return [];
-  return draft.selectedCharacterIds.length
-    ? draft.selectedCharacterIds
-    : draft.extractedCharacters.map((item) => item.id);
+  const selectedCharacterIds = Array.isArray(draft.selectedCharacterIds) ? draft.selectedCharacterIds : [];
+  const extractedCharacters = Array.isArray(draft.extractedCharacters) ? draft.extractedCharacters : [];
+  return selectedCharacterIds.length
+    ? selectedCharacterIds
+    : extractedCharacters.map((item) => item.id);
 }
 
 function getSelectedCharacters(project: SavedProject) {
   const draft = project.workflowDraft;
   if (!draft) return [];
+  const extractedCharacters = Array.isArray(draft.extractedCharacters) ? draft.extractedCharacters : [];
   const selectedIds = getSelectedCharacterIds(project);
-  return draft.extractedCharacters.filter((item) => selectedIds.includes(item.id));
+  return extractedCharacters.filter((item) => selectedIds.includes(item.id));
 }
 
 function getCharacterSelectedImage(character: CharacterProfile) {
@@ -55,8 +59,9 @@ function buildReferenceImages(project: SavedProject, leadCharacterId: string | n
   }
 
   const selectedCharacters = getSelectedCharacters(project);
+  const styleImages = Array.isArray(draft.styleImages) ? draft.styleImages : [];
   const lead = selectedCharacters.find((item) => item.id === leadCharacterId) || selectedCharacters[0];
-  const selectedStyle = draft.styleImages.find((item) => item.id === draft.selectedStyleImageId) || draft.styleImages[0];
+  const selectedStyle = styleImages.find((item) => item.id === draft.selectedStyleImageId) || styleImages[0];
 
   return {
     character: [lead, ...selectedCharacters]
@@ -72,6 +77,50 @@ function buildDefaultLeadCharacterId(project: SavedProject) {
   const selectedCharacters = getSelectedCharacters(project);
   const lead = selectedCharacters.find((item) => item.role === 'lead');
   return lead?.id || selectedCharacters[0]?.id || null;
+}
+
+function buildRecommendedThumbnailTitle(project: SavedProject, item: PromptedImageAsset) {
+  const topic = (project.topic || project.name || '프로젝트').trim();
+  const lead = getSelectedCharacters(project)[0]?.name?.trim();
+  const base = item.label?.trim() || topic;
+  return lead ? `${base} | ${lead} 중심 썸네일` : `${base} | 프로젝트 썸네일`;
+}
+
+function buildRecommendedThumbnailDescription(project: SavedProject, item: PromptedImageAsset) {
+  const lead = getSelectedCharacters(project)[0]?.name || '주인공';
+  const draft = project.workflowDraft;
+  const styleImages = Array.isArray(draft?.styleImages) ? draft?.styleImages : [];
+  const selectedStyle = styleImages.find((style) => style.id === draft?.selectedStyleImageId) || styleImages[0];
+  const mood = draft?.selections?.mood?.trim();
+  const direction = (item.note || item.prompt || '').replace(/\s+/g, ' ').trim();
+  return `${lead} 중심 구성의 ${selectedStyle?.groupLabel || selectedStyle?.label || '선택 화풍'} 추천 문구입니다.${mood ? ` 분위기는 ${mood}.` : ''}${direction ? ` 핵심 방향: ${direction.slice(0, 140)}.` : ''}`;
+}
+
+async function copyTextToClipboard(text: string) {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  if (typeof document === 'undefined') throw new Error('clipboard unavailable');
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', 'true');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand('copy');
+  document.body.removeChild(textarea);
+}
+
+function CopyIcon() {
+  return (
+    <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+      <path d="M7 7.5A1.5 1.5 0 0 1 8.5 6h6A1.5 1.5 0 0 1 16 7.5v7A1.5 1.5 0 0 1 14.5 16h-6A1.5 1.5 0 0 1 7 14.5v-7Z" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M4 12.5v-7A1.5 1.5 0 0 1 5.5 4h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
 }
 
 export default function ThumbnailStudioPage() {
@@ -91,8 +140,11 @@ export default function ThumbnailStudioPage() {
   const [history, setHistory] = useState<PromptedImageAsset[]>([]);
   const [selectedThumbnailId, setSelectedThumbnailId] = useState<string | null>(null);
   const [activeThumbnailId, setActiveThumbnailId] = useState<string | null>(null);
+  const [previewThumbnailId, setPreviewThumbnailId] = useState<string | null>(null);
+  const [copyFeedbackMessage, setCopyFeedbackMessage] = useState<string | null>(null);
   const stripRef = useRef<HTMLDivElement | null>(null);
-  const cardRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const copyFeedbackTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!projectId) {
@@ -138,11 +190,43 @@ export default function ThumbnailStudioPage() {
     };
   }, [projectId]);
 
+  useEffect(() => () => {
+    if (copyFeedbackTimerRef.current) {
+      window.clearTimeout(copyFeedbackTimerRef.current);
+      copyFeedbackTimerRef.current = null;
+    }
+  }, []);
 
   const activeThumbnail = useMemo(
     () => history.find((item) => item.id === activeThumbnailId) || null,
     [activeThumbnailId, history]
   );
+
+  const previewThumbnail = useMemo(
+    () => history.find((item) => item.id === previewThumbnailId) || null,
+    [history, previewThumbnailId]
+  );
+
+  const showCopyFeedback = useCallback((message: string) => {
+    setCopyFeedbackMessage(message);
+    if (copyFeedbackTimerRef.current) {
+      window.clearTimeout(copyFeedbackTimerRef.current);
+    }
+    copyFeedbackTimerRef.current = window.setTimeout(() => {
+      setCopyFeedbackMessage(null);
+      copyFeedbackTimerRef.current = null;
+    }, 1000);
+  }, []);
+
+  const handleCopyText = useCallback(async (text: string, label: string) => {
+    try {
+      await copyTextToClipboard(text);
+      showCopyFeedback(`${label} 복사됨`);
+    } catch (error) {
+      console.error('[ThumbnailStudio] copy failed', error);
+      setStatusMessage('복사 중 오류가 발생했습니다. 다시 시도해 주세요.');
+    }
+  }, [showCopyFeedback]);
 
   const scrollStripBy = (direction: 'left' | 'right') => {
     const container = stripRef.current;
@@ -150,6 +234,14 @@ export default function ThumbnailStudioPage() {
     const amount = Math.max(280, Math.floor(container.clientWidth * 0.72));
     container.scrollBy({ left: direction === 'right' ? amount : -amount, behavior: 'smooth' });
   };
+
+  const handleStripWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    const container = stripRef.current;
+    if (!container) return;
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
+    event.preventDefault();
+    container.scrollBy({ left: event.deltaY, behavior: 'auto' });
+  }, []);
 
   const scrollToCard = useCallback((cardId: string) => {
     const node = cardRefs.current[cardId];
@@ -159,7 +251,7 @@ export default function ThumbnailStudioPage() {
     });
   }, []);
 
-  const persistDraftHistory = useCallback(async (nextHistory: PromptedImageAsset[], prompt: string) => {
+  const persistDraftHistory = useCallback(async (nextHistory: PromptedImageAsset[]) => {
     if (!project?.id) return;
     const updated = await updateProject(project.id, {
       thumbnailHistory: nextHistory,
@@ -216,7 +308,7 @@ export default function ThumbnailStudioPage() {
       const nextHistory = [...history, entry];
       setHistory(nextHistory);
       setActiveThumbnailId(entry.id);
-      await persistDraftHistory(nextHistory, prompt);
+      await persistDraftHistory(nextHistory);
       scrollToCard(entry.id);
       setStatusMessage(similarTarget ? '비슷한 결의 새 썸네일 후보가 오른쪽에 추가되었습니다.' : '새 썸네일 후보가 오른쪽에 추가되었습니다.');
     } catch (error) {
@@ -347,7 +439,7 @@ export default function ThumbnailStudioPage() {
                   </div>
                 </div>
 
-                <div ref={stripRef} className="mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2">
+                <div ref={stripRef} onWheel={handleStripWheel} className="mt-5 flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2">
                   {!history.length ? (
                     <div className="flex w-full min-w-[280px] items-center justify-center rounded-[28px] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm leading-6 text-slate-500">
                       왼쪽 프롬프트 입력 아래의 썸네일 만들기 버튼으로 첫 후보를 생성해 주세요.
@@ -356,19 +448,28 @@ export default function ThumbnailStudioPage() {
                   {history.map((item) => {
                     const isActive = item.id === activeThumbnailId;
                     const isFinal = item.id === selectedThumbnailId;
+                    const recommendedTitle = buildRecommendedThumbnailTitle(project, item);
+                    const recommendedDescription = buildRecommendedThumbnailDescription(project, item);
                     return (
-                      <button
+                      <div
                         key={item.id}
                         ref={(node) => {
                           cardRefs.current[item.id] = node;
                         }}
-                        type="button"
                         onClick={() => setActiveThumbnailId(item.id)}
-                        className={`w-[300px] shrink-0 snap-start overflow-hidden rounded-[28px] border bg-white text-left shadow-sm transition ${isActive ? 'border-fuchsia-400 ring-2 ring-fuchsia-200' : 'border-slate-200 hover:-translate-y-0.5 hover:border-fuchsia-200'}`}
+                        className={`w-[320px] shrink-0 snap-start overflow-hidden rounded-[28px] border bg-white text-left shadow-sm transition ${isActive ? 'border-fuchsia-400 ring-2 ring-fuchsia-200' : 'border-slate-200 hover:-translate-y-0.5 hover:border-fuchsia-200'}`}
                       >
-                        <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setActiveThumbnailId(item.id);
+                            setPreviewThumbnailId(item.id);
+                          }}
+                          className="block w-full overflow-hidden border-b border-slate-200 bg-slate-100"
+                        >
                           <img src={resolveImageSrc(item.imageData)} alt={item.label} className="aspect-video w-full object-cover" />
-                        </div>
+                        </button>
                         <div className="space-y-3 p-4">
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0">
@@ -378,6 +479,45 @@ export default function ThumbnailStudioPage() {
                             <span className={`rounded-full px-2 py-1 text-[10px] font-black ${isFinal ? 'bg-emerald-600 text-white' : isActive ? 'bg-fuchsia-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{isFinal ? '대표' : isActive ? '선택 중' : '후보'}</span>
                           </div>
                           <p className="line-clamp-3 text-xs leading-5 text-slate-500">{item.note || item.prompt}</p>
+
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">추천 제목</div>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleCopyText(recommendedTitle, '추천 제목');
+                                }}
+                                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-700 hover:bg-slate-50"
+                                aria-label="추천 제목 복사"
+                              >
+                                <CopyIcon />
+                                복사
+                              </button>
+                            </div>
+                            <div className="mt-2 text-sm font-black leading-6 text-slate-900">{recommendedTitle}</div>
+                          </div>
+
+                          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">추천 설명</div>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleCopyText(recommendedDescription, '추천 설명');
+                                }}
+                                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-700 hover:bg-slate-50"
+                                aria-label="추천 설명 복사"
+                              >
+                                <CopyIcon />
+                                복사
+                              </button>
+                            </div>
+                            <p className="mt-2 text-xs leading-6 text-slate-600">{recommendedDescription}</p>
+                          </div>
+
                           <div className="flex flex-wrap gap-2">
                             <button
                               type="button"
@@ -400,9 +540,20 @@ export default function ThumbnailStudioPage() {
                             >
                               비슷하게 재생성
                             </button>
+                            <button
+                              type="button"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setActiveThumbnailId(item.id);
+                                setPreviewThumbnailId(item.id);
+                              }}
+                              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
+                            >
+                              크게 보기
+                            </button>
                           </div>
                         </div>
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -412,6 +563,79 @@ export default function ThumbnailStudioPage() {
           </div>
         )}
       </main>
+
+      <OverlayModal
+        open={Boolean(previewThumbnail && project)}
+        title={previewThumbnail?.label || '썸네일 크게 보기'}
+        description="클릭한 썸네일을 크게 보면서 제목과 설명 추천 문구까지 함께 검토합니다."
+        onClose={() => setPreviewThumbnailId(null)}
+        dialogClassName="max-w-5xl"
+        bodyClassName="max-h-[76vh] overflow-y-auto"
+        footer={previewThumbnail && project ? (
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                void handleCopyText(buildRecommendedThumbnailTitle(project, previewThumbnail), '추천 제목');
+              }}
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+            >
+              <CopyIcon />
+              제목 복사
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void handleCopyText(buildRecommendedThumbnailDescription(project, previewThumbnail), '추천 설명');
+              }}
+              className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+            >
+              <CopyIcon />
+              설명 복사
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void handleSelectFinalThumbnail(previewThumbnail);
+                setPreviewThumbnailId(null);
+              }}
+              className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white hover:bg-slate-800"
+            >
+              이 썸네일을 대표로 저장
+            </button>
+          </>
+        ) : undefined}
+      >
+        {previewThumbnail && project ? (
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100">
+              <img src={resolveImageSrc(previewThumbnail.imageData)} alt={previewThumbnail.label} className="w-full object-cover" />
+            </div>
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">추천 제목</div>
+                <div className="mt-2 text-lg font-black leading-7 text-slate-900">{buildRecommendedThumbnailTitle(project, previewThumbnail)}</div>
+              </div>
+              <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">추천 설명</div>
+                <p className="mt-2 text-sm leading-7 text-slate-700">{buildRecommendedThumbnailDescription(project, previewThumbnail)}</p>
+              </div>
+            </div>
+            <div className="rounded-[24px] border border-slate-200 bg-white p-4">
+              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">썸네일 생성 메모</div>
+              <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-slate-700">{previewThumbnail.note || previewThumbnail.prompt}</p>
+            </div>
+          </div>
+        ) : null}
+      </OverlayModal>
+
+      {copyFeedbackMessage ? (
+        <div className="pointer-events-none fixed inset-0 z-[130] flex items-center justify-center px-4">
+          <div className="rounded-[24px] bg-slate-950/92 px-6 py-4 text-sm font-black text-white shadow-2xl">
+            {copyFeedbackMessage}
+          </div>
+        </div>
+      ) : null}
 
       <LoadingOverlay
         open={isGenerating || isSavingSelection}

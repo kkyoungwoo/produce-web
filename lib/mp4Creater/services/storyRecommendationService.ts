@@ -22,7 +22,7 @@ const BANKS: Record<ContentType, SelectionBank> = {
     protagonist: ['초보 창작자', '평범한 직장인', '조용한 관찰자', '혼자 사는 주인공'],
     conflict: ['끝내 미루던 선택', '속이고 있던 진실', '잊고 있던 약속', '돌아갈 수 없는 실수'],
   },
-  news: {
+  cinematic: {
     topic: ['비 오는 도시에서 다시 마주친 약속', '사라진 편지를 따라가는 밤의 추적', '막차 직전 서로를 붙잡는 선택', '폐극장에서 시작되는 마지막 리허설'],
     genre: ['시네마틱 드라마', '느와르 로맨스', '서스펜스', '감성 미스터리'],
     mood: ['몰입감 있는', '서늘한', '감성적인', '긴장감 있는'],
@@ -86,7 +86,7 @@ const TOPIC_SENTENCE_PATTERNS: Record<ContentType, string[]> = {
     '{topic} 때문에 숨겨 둔 과거가 드러나는 한밤의 전개',
     '{topic}을 시작점으로 관계가 천천히 뒤집히는 감성 구조',
   ],
-  news: [
+  cinematic: [
     '{topic}을 첫 장면부터 영화처럼 밀어붙이는 구성',
     '{topic} 속 감정선과 비밀을 교차시키는 전개',
     '{topic}이 관계를 바꾸는 결정적 밤으로 설계하기',
@@ -117,7 +117,7 @@ function normalizeTopicSeed(value: string): string {
 
 function getContentLabel(contentType: ContentType) {
   if (contentType === 'music_video') return '뮤직비디오';
-  if (contentType === 'news') return '영화';
+  if (contentType === 'cinematic') return '영화';
   if (contentType === 'info_delivery') return '정보 전달';
   return '이야기';
 }

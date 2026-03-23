@@ -19,13 +19,13 @@ export const PROMPT_STUDIO_BUNDLES: PromptStudioBundleMap = {
     conceptGuide: '뮤직비디오형 영상. 후렴, 반복 훅, 조명 리듬, 퍼포먼스 감정선을 중심에 둔다.',
     stepLayers: STEP_LAYERS.music_video,
   },
-  news: {
+  cinematic: {
     system: '당신은 한국어 영화형 숏폼 대본을 쓰는 시나리오 작가다. 장면의 감정선과 시네마틱한 흐름을 또렷하게 만든다.',
     story: '영화 같은 장면 전환과 감정 누적이 살아 있는 대본을 만든다. 설명보다 장면, 정보보다 인물의 선택과 긴장을 우선한다.',
     recommendations: ['첫 문단부터 영화 오프닝처럼 훅을 만들어줘.', '대사와 행동이 장면으로 보이게 써줘.', '마지막에는 해설 대신 여운이 남는 엔딩으로 정리해줘.'],
     translateRule: '영화형 영상에 맞는 시네마틱 영어 프롬프트로 옮기고, 감정선과 장면 전환이 살아 있게 유지한다.',
     conceptGuide: '영화형 영상. 어두운 공기, 인물의 선택, 의미 있는 소품과 공간의 압력을 함께 보여준다.',
-    stepLayers: STEP_LAYERS.news,
+    stepLayers: STEP_LAYERS.cinematic,
   },
   info_delivery: {
     system: '당신은 한국어 정보 전달형 숏폼 대본을 설계하는 설명형 스크립트 라이터다. 핵심을 빠르게 이해시키는 구조만 반환한다.',

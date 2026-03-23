@@ -173,124 +173,83 @@ export default function Step4Panel({
     <div className="space-y-6">
       {localStage === 'style' && (
         <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">캐릭터 느낌 선택</div>
-              <h2 className="mt-2 text-xl font-black text-slate-900">먼저 캐릭터 느낌을 고르고, 확인 버튼으로 작업 화면을 여세요</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">느낌 카드를 누르면 선택만 바뀌고 바로 다음 화면으로 튀지 않습니다. 확인 버튼을 눌렀을 때만 출연자별 이미지 제작 화면으로 넘어갑니다.</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600">
-                {selectedCharacterStyleId ? '선택 완료' : '느낌 선택 필요'}
-              </div>
-              <button
-                type="button"
-                onClick={moveToWorkspace}
-                disabled={!selectedCharacterStyleId}
-                className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
-              >
-                이 느낌으로 출연자 이미지 만들기
-              </button>
-            </div>
+  <div className="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">캐릭터 느낌 선택</div>
+      <h2 className="mt-2 text-xl font-black text-slate-900">먼저 캐릭터 느낌을 골라주세요</h2>
+      <p className="mt-2 text-sm leading-6 text-slate-600">다음으로 버튼을 누르면 이미지 제작 화면으로 넘어갑니다.</p>
+    </div>
+    <div className="flex flex-wrap items-center gap-2">
+      <div className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600">
+        {selectedCharacterStyleId ? '선택 완료' : '느낌 선택 필요'}
+      </div>
+    </div>
+  </div>
+
+  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+    {characterStyleOptions.map((style) => {
+      const selected = style.id === selectedCharacterStyleId;
+      return (
+        <button
+          key={style.id}
+          type="button"
+          onClick={() => onSelectCharacterStyle(style.id)}
+          className={`overflow-hidden rounded-[24px] border text-left shadow-sm transition ${
+            selected
+              ? 'border-violet-400 ring-2 ring-violet-200'
+              : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'
+          }`}
+        >
+          <div className="relative overflow-hidden border-b border-slate-200 bg-slate-100">
+            {selected ? (
+              <span className="absolute right-2 top-2 z-10 rounded-full bg-violet-600 px-2.5 py-1 text-[10px] font-black text-white shadow-sm">
+                선택됨
+              </span>
+            ) : null}
+
+            <img
+              src={style.sampleImage || buildSampleStylePreview(style.id, style.label, style.description)}
+              alt={`${style.label} 샘플`}
+              className="aspect-[16/10] w-full object-cover"
+              onError={(event) => {
+                event.currentTarget.onerror = null;
+                event.currentTarget.src = buildSampleStylePreview(style.id, style.label, style.description);
+              }}
+            />
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            {characterStyleOptions.map((style) => {
-              const selected = style.id === selectedCharacterStyleId;
-              return (
-                <button
-                  key={style.id}
-                  type="button"
-                  onClick={() => onSelectCharacterStyle(style.id)}
-                  className={`overflow-hidden rounded-[24px] border text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'}`}
-                >
-                  <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
-                    <img src={style.sampleImage || buildSampleStylePreview(style.id, style.label, style.description)} alt={`${style.label} 샘플`} className="aspect-[16/10] w-full object-cover" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = buildSampleStylePreview(style.id, style.label, style.description); }} />
-                  </div>
-                  <div className="p-4">
-                    <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">캐릭터 느낌</div>
-                    <div className="mt-2 text-base font-black text-slate-900">{style.label}</div>
-                    <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">{style.description}</p>
-                    <div className="mt-3 flex items-center justify-between">
-                      <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">공통 적용</span>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${selected ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{selected ? '선택됨' : '먼저 선택'}</span>
-                    </div>
-                  </div>
-                </button>
-              );
-            })}
+          <div className="p-4">
+            <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">
+              캐릭터 느낌
+            </div>
+            <div className="mt-2 text-base font-black text-slate-900">{style.label}</div>
+            <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">{style.description}</p>
           </div>
-        </section>
+        </button>
+      );
+    })}
+  </div>
+</section>
       )}
 
       {localStage === 'workspace' && (
         <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">출연자별 캐릭터 제작</div>
-              <h2 className="mt-2 text-xl font-black text-slate-900">이미지 후보 히스토리에서 출연자마다 대표 이미지 1장씩 직접 선택해 주세요</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">캐릭터 제작</div>
+              <h2 className="mt-2 text-xl font-black text-slate-900">출연자의 대표 이미지를 선택해주세요</h2>
+              <div className="rounded-full bg-white py-1.5 text-xs font-black text-slate-600">
+                대표 이미지 선택 {resolvedCount}/{selectedCharacterIds.length}
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                 현재 느낌은 <span className="font-black text-slate-900">{selectedStyle?.label || '미선택'}</span>입니다.
-                선택된 출연자 {selectedCharacters.length}명 중 {resolvedCount}명이 대표 이미지를 선택했습니다.
               </p>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => onLocalStageChange('style')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
-                느낌 다시 선택
+                느낌 바꾸기
               </button>
               {uploadInput}
-            </div>
-          </div>
-
-          {!!selectedCharacters.length && (
-            <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">선택된 출연자 미리보기</div>
-                  <div className="mt-1 text-sm font-black text-slate-900">Step3에서 고른 출연자만 유지되며, 각 출연자 카드에서 바로 이미지 등록과 대표 이미지 선택을 이어갑니다</div>
-                </div>
-                <div className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600">
-                  대표 이미지 선택 {resolvedCount}/{selectedCharacterIds.length}
-                </div>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-3">
-                {selectedCharacters.map((character) => {
-                  const previewSrc = resolveCharacterPreview(character);
-                  const hasSelectedImage = Boolean(character.selectedImageId);
-                  return (
-                    <div
-                      key={`${character.id}-preview`}
-                      className={`flex items-center gap-3 rounded-2xl border px-3 py-2.5 ${hasSelectedImage ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50'}`}
-                    >
-                      {previewSrc ? (
-                        <img src={previewSrc} alt={`${character.name} 미리보기`} className="h-12 w-12 rounded-xl object-cover" />
-                      ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-200 text-sm font-black text-slate-600">
-                          {getCharacterInitial(character.name)}
-                        </div>
-                      )}
-                      <div>
-                        <div className="text-sm font-black text-slate-900">{character.name}</div>
-                        <div className={`text-[11px] font-black ${hasSelectedImage ? 'text-emerald-700' : 'text-amber-700'}`}>
-                          {hasSelectedImage ? '대표 이미지 선택 완료' : '대표 이미지 선택 필요'}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-5 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Step3 선택 출연자</div>
-                <div className="mt-1 text-sm font-black text-slate-900">Step3에서 고른 출연자만 여기서 이미지 후보를 만들고 선택합니다</div>
-              </div>
-              <div className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-slate-600">
-                대표 이미지 선택 {resolvedCount}/{selectedCharacterIds.length}
-              </div>
             </div>
           </div>
 

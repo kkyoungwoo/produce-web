@@ -70,7 +70,7 @@ export const STYLE_SAMPLE_PRESETS: StyleSamplePreset[] = [
     label: '최고의 행복',
     description: '햇살처럼 따뜻하고 포근한 톤으로 기분 좋은 에너지를 전하는 화면',
     prompt: '밝고 따뜻한 색감, 부드러운 햇살, 환한 표정, 생기 있는 분위기, 깨끗한 화면, 포근한 명암, 희망차고 사랑스러운 연출, 기분 좋은 에너지가 느껴지는 비주얼',
-    imageData: '/mp4Creater/samples/styles/pure_radiant_bliss.png',
+    imageData: '/mp4Creater/samples/styles/radiant_nature_bliss.png',
     accent: '#f59e0b',
   },
   {
@@ -78,7 +78,7 @@ export const STYLE_SAMPLE_PRESETS: StyleSamplePreset[] = [
     label: '몽환',
     description: '보랏빛과 푸른빛이 흐르는 신비로운 공기감, 현실과 환상이 섞인 장면',
     prompt: '은은한 보랏빛과 푸른빛, 부드러운 빛 번짐, 꿈같은 공기감, 느린 감정선, 신비로운 분위기, 살짝 흐릿한 잔상, 감성적인 연출, 현실과 환상이 섞인 듯한 비주얼',
-    imageData: '/mp4Creater/samples/styles/ethereal_dreamscape_haze.png',
+    imageData: '/mp4Creater/samples/styles/ethereal_dreamscape_fog.png',
     accent: '#7c3aed',
   },
   {
@@ -86,7 +86,7 @@ export const STYLE_SAMPLE_PRESETS: StyleSamplePreset[] = [
     label: '청춘의 질주',
     description: '선명한 색감과 빠른 리듬감으로 젊은 에너지가 폭발하는 비주얼',
     prompt: '선명한 색감, 시원한 화면, 역동적인 구도, 빠른 리듬감, 자유롭고 열정적인 분위기, 바람을 가르는 듯한 연출, 젊고 에너지 넘치는 비주얼',
-    imageData: '/mp4Creater/samples/styles/youth_dynamic_sprint.png',
+    imageData: '/mp4Creater/samples/styles/dynamic_road_sprint.png',
     accent: '#0ea5e9',
   },
   {
@@ -94,7 +94,7 @@ export const STYLE_SAMPLE_PRESETS: StyleSamplePreset[] = [
     label: '차가운 진실',
     description: '정돈된 블루톤과 낮은 채도로 냉정하고 세련된 도시 감성을 만드는 화면',
     prompt: '차분한 블루톤, 낮은 채도, 깔끔한 화면, 이성적이고 냉정한 분위기, 정보가 잘 보이는 정돈된 구성, 세련된 조명, 도시적이고 현대적인 비주얼',
-    imageData: '/mp4Creater/samples/styles/cold_rational_truth.png',
+    imageData: '/mp4Creater/samples/styles/cold_rational_architecture.png',
     accent: '#1d4ed8',
   },
   {
@@ -102,7 +102,7 @@ export const STYLE_SAMPLE_PRESETS: StyleSamplePreset[] = [
     label: '비밀의 밤',
     description: '짙은 네이비와 네온 포인트가 만드는 미스터리한 밤의 서스펜스',
     prompt: '짙은 네이비와 네온 포인트, 밤의 공기감, 긴장감 있는 그림자, 미스터리한 분위기, 감춰진 이야기처럼 연출, 세련되고 감각적인 야간 비주얼',
-    imageData: '/mp4Creater/samples/styles/mysterious_neon_night.png',
+    imageData: '/mp4Creater/samples/styles/mysterious_night_cityscape.png',
     accent: '#312e81',
   },
   {
@@ -110,23 +110,15 @@ export const STYLE_SAMPLE_PRESETS: StyleSamplePreset[] = [
     label: '첫사랑의 온도',
     description: '연한 파스텔과 부드러운 빛으로 설렘을 섬세하게 전하는 로맨틱 화면',
     prompt: '연한 파스텔 색감, 부드러운 빛, 수줍고 설레는 분위기, 따뜻한 피부톤, 깨끗하고 사랑스러운 화면, 감정이 섬세하게 전해지는 비주얼',
-    imageData: '/mp4Creater/samples/styles/soft_pastel_first_love.png',
+    imageData: '/mp4Creater/samples/styles/soft_pastel_first_blush.png',
     accent: '#ec4899',
-  },
-  {
-    id: 'style-bold-neon-rebellion',
-    label: '네온 반란',
-    description: '강한 대비와 네온 포인트로 리듬감 있는 트렌디 무드를 만드는 화면',
-    prompt: '강한 대비, 네온 컬러 포인트, 트렌디한 감성, 대담한 조명, 음악과 잘 어울리는 리듬감, 스타일리시한 화면, 강렬하고 개성 있는 비주얼',
-    imageData: '/mp4Creater/samples/styles/bold_neon_rebellion.png',
-    accent: '#db2777',
   },
   {
     id: 'style-still-moment-eternity',
     label: '시간 정지',
     description: '잔잔한 색감과 영화적인 구도로 멈춘 순간의 여운을 길게 남기는 화면',
     prompt: '고요한 분위기, 섬세한 디테일, 잔잔한 색감, 멈춘 순간처럼 정적인 연출, 감정에 집중되는 화면, 영화적인 구도, 여운이 길게 남는 비주얼',
-    imageData: '/mp4Creater/samples/styles/still_moment_eternity.png',
+    imageData: '/mp4Creater/samples/styles/nostalgic_film_fragments.png',
     accent: '#475569',
   },
   {
@@ -134,7 +126,7 @@ export const STYLE_SAMPLE_PRESETS: StyleSamplePreset[] = [
     label: '희망의 새벽',
     description: '차가움과 따뜻함이 함께 번지는 새벽빛으로 회복과 시작을 담는 화면',
     prompt: '새벽빛이 감도는 은은한 색감, 차가움과 따뜻함이 공존하는 분위기, 서서히 밝아지는 조명, 회복과 시작의 감정, 잔잔하지만 힘 있는 비주얼',
-    imageData: '/mp4Creater/samples/styles/dawn_of_resilience.png',
+    imageData: '/mp4Creater/samples/styles/still_moment_dust.png',
     accent: '#0f766e',
   },
   {
@@ -142,7 +134,7 @@ export const STYLE_SAMPLE_PRESETS: StyleSamplePreset[] = [
     label: '기억의 파편',
     description: '필름 질감과 아련한 색감으로 추억의 감정을 서정적으로 끌어내는 화면',
     prompt: '아련한 색감, 필름 같은 질감, 추억을 떠올리게 하는 분위기, 감성적인 빛 번짐, 섬세한 감정 표현, 이야기성이 느껴지는 서정적인 비주얼',
-    imageData: '/mp4Creater/samples/styles/nostalgic_film_fragments.png',
+    imageData: '/mp4Creater/samples/styles/dawn_of_recovery.png',
     accent: '#a16207',
   },
   {
@@ -150,7 +142,7 @@ export const STYLE_SAMPLE_PRESETS: StyleSamplePreset[] = [
     label: '축제의 심장',
     description: '화려한 조명과 생동감으로 음악과 감정이 함께 터지는 축제형 화면',
     prompt: '화려한 색채, 반짝이는 조명, 생동감 넘치는 분위기, 음악과 함께 터지는 감정, 에너지 가득한 화면, 대중적이고 시원한 비주얼',
-    imageData: '/mp4Creater/samples/styles/vibrant_festival_beat.png',
+    imageData: '/mp4Creater/samples/styles/vibrant_festival_lights.png',
     accent: '#f97316',
   },
 ];

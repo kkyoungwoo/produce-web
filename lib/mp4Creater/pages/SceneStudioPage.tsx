@@ -19,9 +19,10 @@ import {
   StudioState,
   SavedProject,
   WorkflowDraft,
+  getContentTypeLabel,
 } from '../types';
 import { DEFAULT_STORAGE_DIR, createDefaultStudioState, fetchStudioState, saveStudioState, getCachedStudioState } from '../services/localFileApi';
-import { ensureWorkflowDraft } from '../services/workflowDraftService';
+import { createSelectedWorkflowDraftForTransport, ensureWorkflowDraft } from '../services/workflowDraftService';
 import { getDefaultPreviewMix, createSampleBackgroundTrack } from '../services/musicService';
 import { generateImage, getSelectedImageModel, isSampleImageModel } from '../services/imageService';
 import { buildThumbnailScene, createSampleThumbnail } from '../services/thumbnailService';
@@ -45,6 +46,14 @@ import SceneStudioResultPanel from '../components/scene-studio/SceneStudioResult
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const MAX_SCENE_DURATION = 6;
 const clampSceneDuration = (value?: number | null) => Math.min(MAX_SCENE_DURATION, Math.max(3, Number((value || 3).toFixed(1))));
+
+function stringifySummaryJson(value: unknown) {
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return JSON.stringify({ error: 'JSON stringify failed' }, null, 2);
+  }
+}
 
 async function withSoftTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | null = null;
@@ -235,6 +244,255 @@ const SceneStudioPage: React.FC = () => {
     { id: 'step5' as const, label: '5단계 화풍', description: '최종 영상용 화풍 카드와 프롬프트' },
     { id: 'step6' as const, label: '6단계 씬 전달', description: '씬 제작 화면으로 넘어온 최종 전달값' },
   ]), []);
+
+  const summaryJsonBySection = useMemo(() => {
+    const selectedCharacters = summaryCharacters.map((character) => {
+      const selectedImage = (character.generatedImages || []).find((item) => item.id === character.selectedImageId) || character.generatedImages?.[0] || null;
+      const resolvedImageData = selectedImage?.imageData || character.imageData || '';
+      return {
+        id: character.id,
+        name: character.name,
+        role: character.role || null,
+        roleLabel: character.roleLabel || null,
+        prompt: character.prompt || character.description || null,
+        selectedImageId: character.selectedImageId || selectedImage?.id || null,
+        selectedImagePrompt: selectedImage?.prompt || null,
+        generatedImageCount: (character.generatedImages || []).length,
+        hasImageData: Boolean(resolvedImageData),
+        selectedImageDataLength: resolvedImageData.length || 0,
+      };
+    });
+
+    const selectedStyle = summarySelectedStyle ? {
+      id: summarySelectedStyle.id,
+      label: summarySelectedStyle.label,
+      groupLabel: summarySelectedStyle.groupLabel || null,
+      prompt: summarySelectedStyle.prompt || null,
+      sourceMode: summarySelectedStyle.sourceMode,
+      hasImageData: Boolean(summarySelectedStyle.imageData),
+      imageDataLength: summarySelectedStyle.imageData?.length || 0,
+    } : null;
+
+    const selectedPromptTemplate = summarySelectedPromptTemplate ? {
+      id: summarySelectedPromptTemplate.id,
+      name: summarySelectedPromptTemplate.name,
+      description: summarySelectedPromptTemplate.description || null,
+      engine: summarySelectedPromptTemplate.engine || null,
+      mode: summarySelectedPromptTemplate.mode || null,
+      prompt: summarySelectedPromptTemplate.prompt || null,
+    } : null;
+
+    const transportDraft = createSelectedWorkflowDraftForTransport(draft);
+    const sceneAssets = generatedData.map((asset, index) => {
+      const rawAudioData = asset.audioData || '';
+      const normalizedAudioPayload = rawAudioData.startsWith('data:') ? (rawAudioData.split(',')[1] || '') : rawAudioData;
+      return {
+        index,
+        sceneNumber: asset.sceneNumber,
+        dialogue: asset.narration || '',
+        dialogueLength: (asset.narration || '').length,
+        imagePrompt: asset.imagePrompt || asset.visualPrompt || '',
+        videoPrompt: asset.videoPrompt || '',
+        selectedVisualType: asset.selectedVisualType || (asset.videoData ? 'video' : 'image'),
+        aspectRatio: asset.aspectRatio || draft.aspectRatio || '16:9',
+        targetDuration: asset.targetDuration || null,
+        audio: {
+          hasAudio: Boolean(asset.audioData),
+          mime: rawAudioData.startsWith('data:audio/wav')
+            ? 'audio/wav'
+            : rawAudioData.startsWith('data:audio/mpeg')
+              ? 'audio/mpeg'
+              : rawAudioData
+                ? 'inline-or-url'
+                : null,
+          payloadLength: normalizedAudioPayload.length,
+          duration: asset.audioDuration || null,
+        },
+        subtitle: {
+          hasSubtitle: Boolean(asset.subtitleData?.fullText),
+          segmentCount: Array.isArray(asset.subtitleData?.segments) ? asset.subtitleData?.segments.length : 0,
+          fullTextLength: asset.subtitleData?.fullText?.length || 0,
+        },
+        image: {
+          hasImage: Boolean(asset.imageData),
+          historyCount: Array.isArray(asset.imageHistory) ? asset.imageHistory.length : 0,
+          sourceMode: asset.sourceMode || null,
+        },
+        video: {
+          hasVideo: Boolean(asset.videoData),
+          historyCount: Array.isArray(asset.videoHistory) ? asset.videoHistory.length : 0,
+          duration: asset.videoDuration || null,
+        },
+        status: asset.status,
+      };
+    });
+
+    const exportSnapshot = {
+      workflowSelection: transportDraft ? {
+        selectedCharacterIds: transportDraft.selectedCharacterIds,
+        selectedCharacterStyleId: transportDraft.selectedCharacterStyleId || null,
+        selectedStyleImageId: transportDraft.selectedStyleImageId || null,
+        promptTemplateId: transportDraft.selectedPromptTemplateId || null,
+      } : null,
+      selectedCharacters: transportDraft?.extractedCharacters?.map((character) => ({
+        id: character.id,
+        name: character.name,
+        selectedImageId: character.selectedImageId || null,
+        generatedImageCount: Array.isArray(character.generatedImages) ? character.generatedImages.length : 0,
+      })) || [],
+      selectedStyles: transportDraft?.styleImages?.map((style) => ({
+        id: style.id,
+        label: style.groupLabel || style.label,
+        sourceMode: style.sourceMode,
+      })) || [],
+      sceneAssets,
+    };
+
+    const step1 = {
+      contentType: draft.contentType,
+      contentTypeLabel: getContentTypeLabel(draft.contentType),
+      aspectRatio: draft.aspectRatio,
+      hasSelectedContentType: Boolean(draft.hasSelectedContentType),
+      hasSelectedAspectRatio: Boolean(draft.hasSelectedAspectRatio),
+      completed: Boolean(draft.completedSteps?.step1),
+    };
+
+    const step2 = {
+      topic: draft.topic || '',
+      selections: {
+        genre: draft.selections?.genre || '',
+        mood: draft.selections?.mood || '',
+        endingTone: draft.selections?.endingTone || '',
+        setting: draft.selections?.setting || '',
+        protagonist: draft.selections?.protagonist || '',
+        conflict: draft.selections?.conflict || '',
+      },
+      customScriptSettings: {
+        expectedDurationMinutes: draft.customScriptSettings?.expectedDurationMinutes || 3,
+        speechStyle: draft.customScriptSettings?.speechStyle || 'default',
+        language: draft.customScriptSettings?.language || 'ko',
+      },
+      completed: Boolean(draft.completedSteps?.step2),
+    };
+
+    const step3 = {
+      selectedPromptTemplate,
+      promptPack: draft.promptPack || null,
+      script: draft.script || '',
+      sceneCount: summarySceneCount,
+      customScriptSettings: {
+        referenceText: draft.customScriptSettings?.referenceText || '',
+        referenceLinks: draft.customScriptSettings?.referenceLinks || [],
+      },
+      constitutionAnalysis: draft.constitutionAnalysis || null,
+      selectedScriptModel: draft.openRouterModel || null,
+      completed: Boolean(draft.completedSteps?.step3),
+    };
+
+    const step4 = {
+      selectedCharacterIds: summaryCharacterIds,
+      selectedCharacterStyleId: draft.selectedCharacterStyleId || null,
+      selectedCharacterStyleLabel: draft.selectedCharacterStyleLabel || null,
+      selectedCharacterStylePrompt: draft.selectedCharacterStylePrompt || null,
+      characters: selectedCharacters,
+      completed: Boolean(draft.completedSteps?.step4),
+    };
+
+    const step5 = {
+      selectedStyleImageId: draft.selectedStyleImageId || null,
+      selectedStyle,
+      styleImages: draft.styleImages.map((style) => ({
+        id: style.id,
+        label: style.label,
+        groupLabel: style.groupLabel || null,
+        prompt: style.prompt || null,
+        sourceMode: style.sourceMode,
+        selected: style.id === draft.selectedStyleImageId,
+        hasImageData: Boolean(style.imageData),
+      })),
+      completed: Boolean(draft.completedSteps?.step5),
+    };
+
+    const step6 = {
+      projectId: currentProjectId,
+      projectNumber: currentProjectSummary?.projectNumber || null,
+      contentType: draft.contentType,
+      contentTypeLabel: getContentTypeLabel(draft.contentType),
+      aspectRatio: draft.aspectRatio,
+      topic: draft.topic || '',
+      script: draft.script || '',
+      sceneCount: summarySceneCount,
+      selectedCharacters,
+      selectedCharacterStyle: {
+        id: draft.selectedCharacterStyleId || null,
+        label: draft.selectedCharacterStyleLabel || null,
+        prompt: draft.selectedCharacterStylePrompt || null,
+      },
+      selectedStyle,
+      referenceImages: {
+        characterCount: summaryCharacters.filter((item) => Boolean(item.imageData)).length,
+        styleCount: summarySelectedStyle?.imageData ? 1 : 0,
+        characterStrength: draft.referenceImages?.characterStrength || 70,
+        styleStrength: draft.referenceImages?.styleStrength || 70,
+      },
+      promptTransfer: {
+        selectedPromptTemplate,
+        promptPack: draft.promptPack || null,
+        scenePrompt: draft.promptPack?.scenePrompt || null,
+      },
+      thumbnailContext: {
+        selectedThumbnailId: currentProjectSummary?.selectedThumbnailId || null,
+        thumbnailTitle: currentProjectSummary?.thumbnailTitle || null,
+        thumbnailPrompt: currentProjectSummary?.thumbnailPrompt || null,
+      },
+      sceneAssets,
+      exportSnapshot,
+      transportDraft,
+    };
+
+    return {
+      step1,
+      step2,
+      step3,
+      step4,
+      step5,
+      step6,
+      all: { step1, step2, step3, step4, step5, step6 },
+    };
+  }, [
+    currentProjectId,
+    currentProjectSummary?.projectNumber,
+    currentProjectSummary?.selectedThumbnailId,
+    currentProjectSummary?.thumbnailPrompt,
+    currentProjectSummary?.thumbnailTitle,
+    draft,
+    generatedData,
+    summaryCharacterIds,
+    summaryCharacters,
+    summarySceneCount,
+    summarySelectedPromptTemplate,
+    summarySelectedStyle,
+  ]);
+
+  const renderSummaryJsonCard = useCallback((title: string, payload: unknown, accent: 'slate' | 'blue' | 'violet' = 'slate') => {
+    const accentClass = accent === 'blue'
+      ? 'border-blue-200 bg-blue-50'
+      : accent === 'violet'
+        ? 'border-violet-200 bg-violet-50'
+        : 'border-slate-200 bg-slate-50';
+    const labelClass = accent === 'blue'
+      ? 'text-blue-700'
+      : accent === 'violet'
+        ? 'text-violet-700'
+        : 'text-slate-500';
+
+    return (
+      <div className={`rounded-[24px] border p-4 ${accentClass}`}>
+        <div className={`text-[11px] font-black uppercase tracking-[0.16em] ${labelClass}`}>{title}</div>
+        <pre className="mt-3 max-h-[420px] overflow-auto rounded-2xl bg-slate-950 p-4 text-[12px] leading-6 text-slate-100">{stringifySummaryJson(payload)}</pre>
+      </div>
+    );
+  }, []);
 
   const resolveSceneTtsOptions = useCallback((): {
     provider: 'qwen3Tts' | 'elevenLabs' | 'heygen';
@@ -1310,11 +1568,12 @@ const SceneStudioPage: React.FC = () => {
       return (
         <div className="space-y-4">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">콘텐츠 유형</div><div className="mt-2 text-sm font-black text-slate-900">{draft.contentType || '미설정'}</div></div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">콘텐츠 유형</div><div className="mt-2 text-sm font-black text-slate-900">{draft.contentType ? getContentTypeLabel(draft.contentType) : '미설정'}</div></div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">화면 비율</div><div className="mt-2 text-sm font-black text-slate-900">{draft.aspectRatio || '16:9'}</div></div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">프로젝트 번호</div><div className="mt-2 text-sm font-black text-slate-900">{currentProjectSummary?.projectNumber ? `#${currentProjectSummary.projectNumber}` : '미지정'}</div></div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">완료 단계</div><div className="mt-2 text-sm font-black text-slate-900">{Object.values(draft.completedSteps || {}).filter(Boolean).length} / 5</div></div>
           </div>
+          {renderSummaryJsonCard('1단계 검토용 JSON', summaryJsonBySection.step1)}
         </div>
       );
     }
@@ -1338,6 +1597,7 @@ const SceneStudioPage: React.FC = () => {
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">말투</div><div className="mt-2 text-sm font-black text-slate-900">{draft.customScriptSettings?.speechStyle || 'default'}</div></div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">언어</div><div className="mt-2 text-sm font-black text-slate-900">{draft.customScriptSettings?.language || 'ko'}</div></div>
           </div>
+          {renderSummaryJsonCard('2단계 검토용 JSON', summaryJsonBySection.step2)}
         </div>
       );
     }
@@ -1368,6 +1628,7 @@ const SceneStudioPage: React.FC = () => {
               ) : null}
             </div>
           ) : null}
+          {renderSummaryJsonCard('3단계 검토용 JSON', summaryJsonBySection.step3, 'blue')}
         </div>
       );
     }
@@ -1385,6 +1646,7 @@ const SceneStudioPage: React.FC = () => {
               return <div key={character.id} className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><div className="text-sm font-black text-slate-900">{character.name}</div><div className="mt-1 text-xs text-slate-500">{character.roleLabel || character.role || '출연자'} · 후보 {(character.generatedImages || []).length}장</div></div><div className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-600">대표 이미지 {selectedImage ? '선택됨' : '없음'}</div></div><div className="mt-3 grid gap-3 md:grid-cols-2"><div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">캐릭터 프롬프트</div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{character.prompt || character.description || '없음'}</div></div><div className="rounded-xl border border-slate-200 bg-slate-50 p-3"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">선택 이미지 프롬프트</div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{selectedImage?.prompt || '선택된 이미지 프롬프트 없음'}</div></div></div></div>;
             }) : <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">저장된 출연자 정보가 없습니다.</div>}
           </div>
+          {renderSummaryJsonCard('4단계 검토용 JSON', summaryJsonBySection.step4)}
         </div>
       );
     }
@@ -1393,6 +1655,7 @@ const SceneStudioPage: React.FC = () => {
         <div className="space-y-4">
           <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4"><div className="text-[11px] font-black uppercase tracking-[0.16em] text-violet-700">선택된 최종 화풍</div><div className="mt-2 text-sm font-black text-slate-900">{summarySelectedStyle?.groupLabel || summarySelectedStyle?.label || '미선택'}</div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{summarySelectedStyle?.prompt || '저장된 화풍 프롬프트가 없습니다.'}</div></div>
           <div className="space-y-3">{draft.styleImages.length ? draft.styleImages.map((style) => <div key={style.id} className="rounded-2xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-center justify-between gap-3"><div className="text-sm font-black text-slate-900">{style.groupLabel || style.label}</div><div className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black text-slate-600">{style.id === draft.selectedStyleImageId ? '현재 선택' : style.sourceMode === 'sample' ? '샘플' : style.sourceMode === 'upload' ? '업로드' : '추천 카드'}</div></div><div className="mt-2 whitespace-pre-wrap break-words text-xs leading-6 text-slate-600">{style.prompt}</div></div>) : <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">저장된 화풍 카드가 없습니다.</div>}</div>
+          {renderSummaryJsonCard('5단계 검토용 JSON', summaryJsonBySection.step5, 'violet')}
         </div>
       );
     }
@@ -1407,13 +1670,15 @@ const SceneStudioPage: React.FC = () => {
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">씬 제작으로 넘기는 핵심 값</div>
           <div className="mt-3 space-y-3 text-sm leading-6 text-slate-700">
-            <div><span className="font-black text-slate-900">기본:</span> {draft.contentType} · {draft.aspectRatio} · 주제 {draft.topic || '미입력'}</div>
+            <div><span className="font-black text-slate-900">기본:</span> {getContentTypeLabel(draft.contentType)} · {draft.aspectRatio} · 주제 {draft.topic || '미입력'}</div>
             <div><span className="font-black text-slate-900">선택 출연자:</span> {summaryCharacters.map((item) => item.name).join(', ') || '없음'}</div>
             <div><span className="font-black text-slate-900">캐릭터 스타일:</span> {draft.selectedCharacterStyleLabel || '미선택'}</div>
             <div><span className="font-black text-slate-900">최종 화풍:</span> {summarySelectedStyle?.groupLabel || summarySelectedStyle?.label || '미선택'}</div>
             <div><span className="font-black text-slate-900">씬 생성 기준 프롬프트:</span> {draft.promptPack?.scenePrompt || '없음'}</div>
           </div>
         </div>
+        {renderSummaryJsonCard('6단계 최종 전달 JSON', summaryJsonBySection.step6, 'blue')}
+        {renderSummaryJsonCard('Step1~6 전체 검토 JSON', summaryJsonBySection.all)}
       </div>
     );
   };

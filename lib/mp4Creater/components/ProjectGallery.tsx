@@ -404,33 +404,45 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
         </div>
 
         <div className="space-y-3 p-3">
-          <div>
-            <div className="text-[11px] text-slate-500">{formatDate(getProjectCreatedAt(project))}</div>
-            <div className="mt-2 flex flex-wrap gap-2 text-[11px]">
-              {project.workflowDraft?.script ? <span className="rounded-full bg-violet-50 px-2.5 py-1 font-bold text-violet-700">대본 포함</span> : null}
-              {totalCost !== undefined ? <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700">{formatKRW(totalCost)}</span> : null}
-            </div>
-          </div>
+  <div>
+    <div className="text-[11px] text-slate-500">
+      {formatDate(getProjectCreatedAt(project))}
+    </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <button
-              type="button"
-              disabled={isInteractionLocked}
-              onClick={() => openProjectScene(project)}
-              className="col-span-2 rounded-[18px] border border-white/70 bg-white/70 px-2 py-2 text-[11px] font-black text-slate-900 shadow-[0_12px_32px_rgba(15,23,42,0.10)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
-            >
-              제작하기
-            </button>
-            <button
-              type="button"
-              disabled={isInteractionLocked}
-              onClick={() => openProjectThumbnailStudio(project)}
-              className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-black text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-            >
-              썸네일 제작
-            </button>
-          </div>
-        </div>
+    <div className="mt-2 flex min-h-[28px] flex-wrap gap-2 text-[11px]">
+      {project.workflowDraft?.script ? (
+        <span className="rounded-full bg-violet-50 px-2.5 py-1 font-bold text-violet-700">
+          대본 포함
+        </span>
+      ) : null}
+
+      {totalCost !== undefined ? (
+        <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700">
+          {formatKRW(totalCost)}
+        </span>
+      ) : null}
+    </div>
+  </div>
+
+  <div className="grid grid-cols-3 gap-2">
+    <button
+      type="button"
+      disabled={isInteractionLocked}
+      onClick={() => openProjectScene(project)}
+      className="col-span-2 rounded-[18px] border border-white/70 bg-white/70 px-2 py-2 text-[11px] font-black text-slate-900 shadow-[0_12px_32px_rgba(15,23,42,0.10)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
+    >
+      제작하기
+    </button>
+    <button
+      type="button"
+      disabled={isInteractionLocked}
+      onClick={() => openProjectThumbnailStudio(project)}
+      className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-black text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+    >
+      썸네일 제작
+    </button>
+  </div>
+</div>
       </article>
     );
   };

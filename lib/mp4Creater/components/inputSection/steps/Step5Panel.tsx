@@ -89,36 +89,12 @@ export default function Step5Panel({
     [selectedStyleImageId, styleItems]
   );
 
-  const handleSelectPreset = (sampleId: string, existingId?: string | null) => {
-    if (existingId) {
-      onSelectStyle(existingId);
-      return;
-    }
+  const handleSelectPreset = (sampleId: string) => {
     onApplyStyleSample(sampleId);
   };
 
   return (
     <div className="space-y-6">
-      <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">최종 영상 화풍</div>
-            <h2 className="mt-2 text-xl font-black text-slate-900">캐릭터 선택처럼 화풍 샘플을 바로 눌러 최종 톤을 고르세요</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">선택한 화풍은 Step6 씬 제작에 그대로 전달됩니다. 샘플 이미지를 아직 넣지 않아도 카드 선택은 바로 동작합니다.</p>
-          </div>
-          <div className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600">
-            총 {STYLE_SAMPLE_PRESETS.length}개 샘플
-          </div>
-        </div>
-
-        {selectedCard && (
-          <div className="mt-4 rounded-[24px] border border-violet-200 bg-violet-50 p-4">
-            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-violet-700">현재 최종 영상에 적용될 화풍</div>
-            <div className="mt-1 text-lg font-black text-slate-900">{selectedCard.groupLabel || selectedCard.label}</div>
-            <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{selectedCard.prompt}</p>
-          </div>
-        )}
-      </section>
 
       <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
@@ -129,39 +105,48 @@ export default function Step5Panel({
           <div className="text-xs text-slate-500">원하는 화풍을 누르면 바로 선택됩니다.</div>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {stylePresetCards.map(({ preset, matched, selected }) => (
-            <button
-              key={preset.id}
-              type="button"
-              onClick={() => handleSelectPreset(preset.id, matched?.id || null)}
-              className={`overflow-hidden rounded-[24px] border text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'}`}
-            >
-              <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
-                <img
-                  src={preset.imageData || buildSamplePreview(preset.label, preset.description)}
-                  alt={`${preset.label} 샘플`}
-                  className="aspect-[16/10] w-full object-cover"
-                  onError={(event) => {
-                    event.currentTarget.onerror = null;
-                    event.currentTarget.src = buildSamplePreview(preset.label, preset.description);
-                  }}
-                />
-              </div>
-              <div className="p-4">
-                <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">최종 영상 화풍</div>
-                <div className="mt-2 text-base font-black text-slate-900">{preset.label}</div>
-                <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">{preset.description}</p>
-                <div className="mt-3 flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">샘플 적용</span>
-                  <span className={`rounded-full px-2 py-1 text-[10px] font-black ${selected ? 'bg-violet-600 text-white' : matched ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                    {selected ? '선택됨' : matched ? '불러옴' : '선택 가능'}
-                  </span>
-                </div>
-              </div>
-            </button>
-          ))}
+        <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
+  {stylePresetCards.map(({ preset, matched, selected }) => (
+    <button
+      key={preset.id}
+      type="button"
+      onClick={() => handleSelectPreset(preset.id)}
+      className={`overflow-hidden rounded-[20px] border text-left shadow-sm transition ${
+        selected
+          ? 'border-violet-400 ring-2 ring-violet-200'
+          : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'
+      }`}
+    >
+      <div className="relative overflow-hidden border-b border-slate-200 bg-slate-100">
+        {selected ? (
+          <span className="absolute right-2 top-2 z-10 rounded-full bg-violet-600 px-2.5 py-1 text-[10px] font-black text-white shadow-sm">
+            선택됨
+          </span>
+        ) : null}
+
+        <img
+          src={preset.imageData || buildSamplePreview(preset.label, preset.description)}
+          alt={`${preset.label} 샘플`}
+          className="aspect-[16/10] w-full object-cover"
+          onError={(event) => {
+            event.currentTarget.onerror = null;
+            event.currentTarget.src = buildSamplePreview(preset.label, preset.description);
+          }}
+        />
+      </div>
+
+      <div className="p-3">
+        <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">
+          최종 영상 화풍
         </div>
+        <div className="mt-2 text-sm font-black text-slate-900">{preset.label}</div>
+        <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-slate-600">
+          {preset.description}
+        </p>
+      </div>
+    </button>
+  ))}
+</div>
       </section>
     </div>
   );
