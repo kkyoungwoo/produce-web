@@ -15,15 +15,15 @@ interface ProviderQuickModalProps {
   onOpenFullSettings?: () => void;
 }
 
-type ProviderField = 'openRouter' | 'elevenLabs' | 'heygen';
+type ProviderField = 'openRouter' | 'elevenLabs';
 
-const fieldOrder: ProviderField[] = ['openRouter', 'elevenLabs', 'heygen'];
+const fieldOrder: ProviderField[] = ['openRouter', 'elevenLabs'];
 
 const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
   open,
   studioState,
   title = 'API 빠른 연결',
-  description = '필요한 API 키만 입력하면 현재 화면에서 바로 실제 생성 흐름을 이어갈 수 있습니다.',
+  description = 'Google AI Studio와 ElevenLabs 키만 입력하면 현재 화면에서 바로 실제 생성 흐름을 이어갈 수 있습니다.',
   focusField = null,
   onClose,
   onSave,
@@ -31,19 +31,16 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
 }) => {
   const [openRouterApiKey, setOpenRouterApiKey] = useState('');
   const [elevenLabsApiKey, setElevenLabsApiKey] = useState('');
-  const [heygenApiKey, setHeygenApiKey] = useState('');
   const [feedback, setFeedback] = useState<Record<string, { tone: 'success' | 'error' | 'info'; message: string } | null>>({});
   const [checking, setChecking] = useState<Record<string, boolean>>({});
   const panelRef = useRef<HTMLDivElement>(null);
   const openRouterInputRef = useRef<HTMLInputElement>(null);
   const elevenLabsInputRef = useRef<HTMLInputElement>(null);
-  const heygenInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
     setOpenRouterApiKey(studioState?.providers?.openRouterApiKey || '');
     setElevenLabsApiKey(studioState?.providers?.elevenLabsApiKey || '');
-    setHeygenApiKey(studioState?.providers?.heygenApiKey || '');
     setFeedback({});
     setChecking({});
   }, [open, studioState]);
@@ -51,9 +48,8 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
   useEffect(() => {
     if (!open) return;
     const timer = window.setTimeout(() => {
-      if (focusField === 'openRouter') openRouterInputRef.current?.focus();
-      if (focusField === 'elevenLabs') elevenLabsInputRef.current?.focus();
-      if (focusField === 'heygen') heygenInputRef.current?.focus();
+      if (focusField === 'openRouter' || focusField === 'fal') openRouterInputRef.current?.focus();
+      if (focusField === 'elevenLabs' || focusField === 'heygen') elevenLabsInputRef.current?.focus();
     }, 60);
     return () => window.clearTimeout(timer);
   }, [open, focusField]);
@@ -62,8 +58,7 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
 
   const getValue = (field: ProviderField) => {
     if (field === 'openRouter') return openRouterApiKey;
-    if (field === 'elevenLabs') return elevenLabsApiKey;
-    return heygenApiKey;
+    return elevenLabsApiKey;
   };
 
   const runCheck = async (field: ProviderField) => {
@@ -91,7 +86,7 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
         ...studioState.providers,
         openRouterApiKey: openRouterApiKey.trim(),
         elevenLabsApiKey: elevenLabsApiKey.trim(),
-        heygenApiKey: heygenApiKey.trim(),
+        falApiKey: openRouterApiKey.trim() || studioState.providers.falApiKey || '',
       },
     });
     onClose();
@@ -129,10 +124,10 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
           </div>
         </div>
 
-        <div className="grid gap-4 p-6 md:grid-cols-3">
-          <label className={`rounded-2xl border p-4 ${focusField === 'openRouter' ? 'border-blue-300 bg-blue-50/70' : 'border-slate-200 bg-slate-50'}`}>
-            <div className="text-sm font-black text-slate-900">OpenRouter</div>
-            <div className="mt-1 text-xs leading-5 text-slate-500">대본 생성, 추천 문장, 프롬프트 보강에 사용합니다.</div>
+        <div className="grid gap-4 p-6 md:grid-cols-2">
+          <label className={`rounded-2xl border p-4 ${focusField === 'openRouter' || focusField === 'fal' ? 'border-blue-300 bg-blue-50/70' : 'border-slate-200 bg-slate-50'}`}>
+            <div className="text-sm font-black text-slate-900">Google AI Studio</div>
+            <div className="mt-1 text-xs leading-5 text-slate-500">대본 생성, 추천 문장, 이미지 생성, 영상 생성에 공통으로 사용합니다.</div>
             <input
               ref={openRouterInputRef}
               type="password"
@@ -142,7 +137,7 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
                 setFeedback((prev) => ({ ...prev, openRouter: null }));
               }}
               className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-400"
-              placeholder="sk-or-v1-..."
+              placeholder="AIza..."
             />
             <button
               type="button"
@@ -155,9 +150,9 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
             {renderFeedback('openRouter')}
           </label>
 
-          <label className={`rounded-2xl border p-4 ${focusField === 'elevenLabs' ? 'border-blue-300 bg-blue-50/70' : 'border-slate-200 bg-slate-50'}`}>
+          <label className={`rounded-2xl border p-4 ${focusField === 'elevenLabs' || focusField === 'heygen' ? 'border-blue-300 bg-blue-50/70' : 'border-slate-200 bg-slate-50'}`}>
             <div className="text-sm font-black text-slate-900">ElevenLabs</div>
-            <div className="mt-1 text-xs leading-5 text-slate-500">음성 생성, 보이스 미리 듣기, 자막 생성에 사용합니다.</div>
+            <div className="mt-1 text-xs leading-5 text-slate-500">음성 생성, 보이스 미리 듣기, 음악 확장 흐름에 사용합니다.</div>
             <input
               ref={elevenLabsInputRef}
               type="password"
@@ -178,31 +173,6 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
               {checking.elevenLabs ? '확인 중...' : '연결 확인'}
             </button>
             {renderFeedback('elevenLabs')}
-          </label>
-
-          <label className={`rounded-2xl border p-4 ${focusField === 'heygen' ? 'border-blue-300 bg-blue-50/70' : 'border-slate-200 bg-slate-50'}`}>
-            <div className="text-sm font-black text-slate-900">HeyGen</div>
-            <div className="mt-1 text-xs leading-5 text-slate-500">Starfish TTS, 보이스 캐스팅, 미리 듣기에 사용합니다.</div>
-            <input
-              ref={heygenInputRef}
-              type="password"
-              value={heygenApiKey}
-              onChange={(e) => {
-                setHeygenApiKey(e.target.value);
-                setFeedback((prev) => ({ ...prev, heygen: null }));
-              }}
-              className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-blue-400"
-              placeholder="X-Api-Key ..."
-            />
-            <button
-              type="button"
-              onClick={() => void runCheck('heygen')}
-              disabled={!heygenApiKey.trim() || checking.heygen}
-              className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
-            >
-              {checking.heygen ? '확인 중...' : '연결 확인'}
-            </button>
-            {renderFeedback('heygen')}
           </label>
         </div>
 

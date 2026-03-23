@@ -1,7 +1,9 @@
 {
-  "/[locale]/mp4Creater/step-3/page": "app/[locale]/mp4Creater/step-3/page.js",
-  "/[locale]/mp4Creater/step-4/page": "app/[locale]/mp4Creater/step-4/page.js",
-  "/[locale]/mp4Creater/step-2/page": "app/[locale]/mp4Creater/step-2/page.js",
-  "/[locale]/mp4Creater/step-6/page": "app/[locale]/mp4Creater/step-6/page.js",
-  "/[locale]/mp4Creater/page": "app/[locale]/mp4Creater/page.js"
+  "/api/local-storage/project/route": "app/api/local-storage/project/route.js",
+  "/api/local-storage/state/route": "app/api/local-storage/state/route.js",
+  "/mp4Creater/step-6/page": "app/mp4Creater/step-6/page.js",
+  "/page": "app/page.js",
+  "/mp4Creater/page": "app/mp4Creater/page.js",
+  "/mp4Creater/step-1/page": "app/mp4Creater/step-1/page.js",
+  "/[locale]/page": "app/[locale]/page.js"
 }

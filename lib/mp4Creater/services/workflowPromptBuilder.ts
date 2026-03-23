@@ -11,6 +11,7 @@ import {
   supportsChannelConstitutionTemplate,
 } from '../prompts/channelConstitutionPrompts';
 import { getPromptRegistry } from './promptRegistryService';
+import { buildPromptStudioStepBlock } from '../prompt-center';
 
 const WORKFLOW_TEMPLATE_IDS = {
   core: 'builtin-core-script',
@@ -165,6 +166,7 @@ function buildConceptOutputGuide(contentType: ContentType) {
   ].join('\n');
 }
 
+
 export function buildWorkflowPromptPack(options: {
   contentType: ContentType;
   topic: string;
@@ -178,6 +180,14 @@ export function buildWorkflowPromptPack(options: {
   const outputGuide = buildConceptOutputGuide(options.contentType);
   const conceptLock = buildConceptLock(options.contentType);
   const paragraphGuide = buildParagraphFlowGuide(options.contentType);
+  const conceptFolderGuide = `[PROMPT FOLDER / CONCEPT]
+${bundle.conceptGuide}`;
+  const scriptFolderGuide = buildPromptStudioStepBlock(options.contentType, 'script');
+  const characterFolderGuide = buildPromptStudioStepBlock(options.contentType, 'character');
+  const styleFolderGuide = buildPromptStudioStepBlock(options.contentType, 'style');
+  const sceneFolderGuide = buildPromptStudioStepBlock(options.contentType, 'scene');
+  const actionFolderGuide = buildPromptStudioStepBlock(options.contentType, 'action');
+
   const storyPrompt = `${bundle.story}
 
 [CONCEPT LOCK]
@@ -185,6 +195,10 @@ ${conceptLock}
 
 [PARAGRAPH FLOW]
 ${paragraphGuide}
+
+${conceptFolderGuide}
+
+${scriptFolderGuide}
 
 ${outputGuide}
 
@@ -201,6 +215,10 @@ ${buildConceptLock('music_video')}
 [PARAGRAPH FLOW]
 ${buildParagraphFlowGuide('music_video')}
 
+${conceptFolderGuide}
+
+${buildPromptStudioStepBlock('music_video', 'script')}
+
 ${buildConceptOutputGuide('music_video')}
 
 [MUSIC VIDEO FLOW]
@@ -215,6 +233,12 @@ ${conceptLock}
 
 [PARAGRAPH FLOW]
 ${paragraphGuide}
+
+${conceptFolderGuide}
+
+${characterFolderGuide}
+
+${styleFolderGuide}
 
 ${outputGuide}
 
@@ -231,6 +255,12 @@ ${conceptLock}
 [PARAGRAPH FLOW]
 ${paragraphGuide}
 
+${conceptFolderGuide}
+
+${sceneFolderGuide}
+
+${styleFolderGuide}
+
 ${outputGuide}
 
 [SCENE PROMPTS]
@@ -246,6 +276,12 @@ ${conceptLock}
 [PARAGRAPH FLOW]
 ${paragraphGuide}
 
+${conceptFolderGuide}
+
+${actionFolderGuide}
+
+${styleFolderGuide}
+
 ${outputGuide}
 
 [SCENE ACTIONS]
@@ -258,19 +294,16 @@ ${conceptLock}
 [PARAGRAPH FLOW]
 ${paragraphGuide}
 
+${conceptFolderGuide}
+
+${scriptFolderGuide}
+
 ${outputGuide}
 
 [RECOMMENDED PHRASES]
 ${bundle.recommendations.join('\n')}`;
 
-  return {
-    storyPrompt,
-    lyricsPrompt,
-    characterPrompt,
-    scenePrompt,
-    actionPrompt,
-    persuasionStoryPrompt,
-  };
+  return { storyPrompt, lyricsPrompt, characterPrompt, scenePrompt, actionPrompt, persuasionStoryPrompt };
 }
 
 export function createBuiltInWorkflowPromptTemplates(

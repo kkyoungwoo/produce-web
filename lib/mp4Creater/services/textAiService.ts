@@ -11,6 +11,7 @@ export async function runTextAi(options: {
 }): Promise<{ text: string; source: 'ai' | 'sample' }> {
   const apiKey =
     (typeof window !== 'undefined' && localStorage.getItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY)) ||
+    process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
     process.env.NEXT_PUBLIC_OPENROUTER_API_KEY ||
     '';
 
@@ -18,7 +19,7 @@ export async function runTextAi(options: {
 
   try {
     const text = await runOpenRouterText({
-      model: options.model || 'openrouter/auto',
+      model: options.model || CONFIG.DEFAULT_SCRIPT_MODEL,
       maxTokens: options.maxTokens || CONFIG.OPENROUTER_DEFAULT_MAX_TOKENS,
       temperature: options.temperature ?? 0.7,
       messages: [

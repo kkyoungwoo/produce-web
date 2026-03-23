@@ -1,15 +1,8 @@
+
 import { redirect } from 'next/navigation';
-import ClientOnlyApp from './ClientOnlyApp';
+import { buildQueryString, type SearchParamsRecord } from './redirect-utils';
 
-export default async function Mp4CreaterPage(props: {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-}) {
+export default async function LegacyLocaleMp4CreaterPage(props: { searchParams?: Promise<SearchParamsRecord>; }) {
   const searchParams = await props.searchParams;
-  const viewParam = searchParams?.view;
-  const view = Array.isArray(viewParam) ? viewParam[0] : viewParam;
-  if (view === 'main') {
-    redirect('?view=gallery');
-  }
-
-  return <ClientOnlyApp />;
+  redirect(`/mp4Creater${buildQueryString(searchParams)}`);
 }

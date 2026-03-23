@@ -948,7 +948,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       aspectRatio: nextDraft.aspectRatio,
       topic: nextDraft.topic,
       activeStage: nextDraft.activeStage,
-      updatedAt: draftPatch.updatedAt,
+      updatedAt: nextDraft.updatedAt,
       selectedCharacterIds: nextDraft.selectedCharacterIds,
       selectedStyleImageId: nextDraft.selectedStyleImageId,
       script: nextDraft.script,
@@ -957,6 +957,12 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       styleImages: nextDraft.styleImages,
       promptTemplates: nextDraft.promptTemplates,
       selectedPromptTemplateId: nextDraft.selectedPromptTemplateId,
+      ttsProvider: nextDraft.ttsProvider,
+      elevenLabsVoiceId: nextDraft.elevenLabsVoiceId,
+      elevenLabsModelId: nextDraft.elevenLabsModelId,
+      heygenVoiceId: nextDraft.heygenVoiceId,
+      qwenVoicePreset: nextDraft.qwenVoicePreset,
+      qwenStylePreset: nextDraft.qwenStylePreset,
     });
 
     if (lastWorkflowDraftSignatureRef.current === draftSignature) return;
@@ -1087,7 +1093,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   };
 
   return (
-    <div className={`${viewMode === 'gallery' ? 'min-h-0' : 'min-h-screen'} bg-slate-50 text-slate-900`}>
+    <div className={`mp4-shell ${viewMode === 'gallery' ? 'min-h-0' : 'min-h-screen'} text-slate-900`}>
       <LoadingOverlay
         open={Boolean(navigationOverlay)}
         title={navigationOverlay?.title || '이동 중'}
@@ -1150,7 +1156,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         <main className="py-8">
           {!storageReady && !shouldAutoConfigureLocalStorage(studioState) && (
             <div className="mx-auto mb-6 max-w-6xl px-4">
-              <div className="rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
+              <div className="mp4-glass-panel rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-xs font-black uppercase tracking-[0.2em] text-amber-700">저장 위치 필요</div>
@@ -1163,7 +1169,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
           )}
           {routeStep && requestedProjectId && currentProjectId !== requestedProjectId ? (
             <div className="mx-auto max-w-[1520px] px-4 sm:px-6 lg:px-8">
-              <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mp4-glass-hero rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
                 <div className="text-[11px] font-black uppercase tracking-[0.22em] text-blue-600">프로젝트 복원 중</div>
                 <div className="mt-2 text-2xl font-black text-slate-900">선택한 Step 데이터를 먼저 정확히 맞추고 있습니다</div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">Step3 출연자 선택, Step4 캐릭터 이미지, Step5 화풍 선택이 요약본으로 덮이지 않도록 프로젝트 상세 JSON 또는 세션 캐시를 먼저 읽은 뒤 화면을 엽니다.</p>

@@ -352,20 +352,20 @@ export default function RouteStepView({ vm }: { vm: any }) {
     : Boolean(routeStepCompleted[currentRouteStep]);
 
   return (
-    <div className="mx-auto my-6 w-full max-w-[1520px] px-4 pb-32 sm:px-6 lg:px-8">
-      <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+    <div className="mp4-editor-shell mx-auto my-6 w-full max-w-[1520px] px-4 pb-32 sm:px-6 lg:px-8">
+      <div className="mp4-stage-card rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
         <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">{currentRouteStep}단계</div>
         <h1 className="mt-2 text-2xl font-black text-slate-900">{STEP_META[currentRouteStep - 1]?.title}</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">{STEP_META[currentRouteStep - 1]?.subtitle}</p>
       </div>
       {notice && (
-        <div className="mt-6 rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm leading-6 text-blue-900 shadow-sm">
+        <div className="mp4-glass-panel mt-6 rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm leading-6 text-blue-900 shadow-sm">
           {notice}
         </div>
       )}
       <div className={`mt-6 min-h-[420px] ${currentRouteStep === 3 ? '' : 'transition-all duration-300'} ${stepShellVisible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}>{renderRouteContent()}</div>
       <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">
-        <div className="pointer-events-auto inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-3 py-3 shadow-xl shadow-slate-200/70 backdrop-blur-md">
+        <div className="mp4-glass-panel pointer-events-auto inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-3 py-3 shadow-xl shadow-slate-200/70 backdrop-blur-md">
           <button
             type="button"
             onClick={() => {

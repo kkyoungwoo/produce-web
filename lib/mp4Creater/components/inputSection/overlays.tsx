@@ -90,7 +90,7 @@ export function SampleGuideModal({
     <OverlayModal
       open={open}
       title="예시는 현재 샘플 데이터로 동작합니다"
-      description="지금은 API 연결이 없어 정해진 예시만 채워집니다. 아래에서 OpenRouter를 바로 등록하거나, 샘플로 즉시 계속 진행할 수 있습니다."
+      description="지금은 API 연결이 없어 정해진 예시만 채워집니다. 아래에서 Google AI Studio를 바로 등록하거나, 샘플로 즉시 계속 진행할 수 있습니다."
       onClose={onClose}
       footer={(
         <>
@@ -100,14 +100,14 @@ export function SampleGuideModal({
             onClick={() => {
               onClose();
               void onOpenApiModal?.({
-                title: '지금 바로 필요한 OpenRouter 키 등록',
+                title: '지금 바로 필요한 Google AI Studio 키 등록',
                 description: '텍스트 생성, 스토리 추천, 캐릭터 / 화풍 추천 품질을 한 번에 올리는 가장 빠른 연결입니다.',
                 focusField: 'openRouter',
               });
             }}
             className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
           >
-            OpenRouter 등록
+            Google AI Studio 등록
           </button>
           <button
             type="button"

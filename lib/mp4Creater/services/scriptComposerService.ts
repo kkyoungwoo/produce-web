@@ -284,7 +284,7 @@ function createNarrativeExpansionFallback(options: ScriptComposerOptions) {
   return normalizeStoryText([options.currentScript?.trim() || '', ...extras.slice(0, paragraphCount)].filter(Boolean).join('\n\n'));
 }
 
-function createExpansionFallback(options: ScriptComposerOptions) {
+function createExpansionFallback(options: ScriptComposerOptions): string {
   const current = normalizeStoryText(options.currentScript || '');
   if (!current) return createFallback({ ...options, generationIntent: 'draft' });
   return options.contentType === 'music_video'
@@ -366,7 +366,7 @@ function applyCustomFallback(baseText: string, options: ScriptComposerOptions) {
   return normalizeStoryText(body.join('\n\n'));
 }
 
-function createFallback(options: ScriptComposerOptions) {
+function createFallback(options: ScriptComposerOptions): string {
   if (options.generationIntent === 'expand') {
     return createExpansionFallback(options);
   }

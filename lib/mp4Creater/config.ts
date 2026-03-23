@@ -8,24 +8,54 @@ export const IMAGE_MODELS = [
     id: 'sample-scene-image',
     name: '샘플 장면 이미지',
     provider: '샘플',
+    tier: 'free',
     pricePerImage: 0,
     description: 'API 키 없이도 흐름을 확인할 수 있는 샘플 이미지',
     speed: '즉시',
+  },
+  {
+    id: 'gemini-2.5-flash-image',
+    name: 'Gemini 2.5 Flash Image',
+    provider: 'Google AI Studio',
+    tier: 'paid',
+    pricePerImage: 0.039,
+    description: '빠른 장면 이미지 생성, 1024px 출력',
+    speed: '빠름',
+  },
+  {
+    id: 'gemini-3.1-flash-image-preview',
+    name: 'Gemini 3.1 Flash Image Preview',
+    provider: 'Google AI Studio',
+    tier: 'paid',
+    pricePerImage: 0.039,
+    description: 'Nano Banana 2 계열, 범용 밸런스가 좋은 이미지 생성',
+    speed: '보통',
+  },
+  {
+    id: 'gemini-3-pro-image-preview',
+    name: 'Gemini 3 Pro Image Preview',
+    provider: 'Google AI Studio',
+    tier: 'paid',
+    pricePerImage: 0.06,
+    description: '정교한 지시와 고품질 자산 제작용 이미지 생성',
+    speed: '보통',
   },
 ] as const;
 
 export type ImageModelId = typeof IMAGE_MODELS[number]['id'];
 
 export const SCRIPT_MODEL_OPTIONS = [
-  { id: 'openrouter/auto', name: 'OpenRouter 자동 선택' },
-  { id: 'openai/gpt-4.1-mini', name: 'GPT-4.1 mini' },
-  { id: 'openai/gpt-4o-mini', name: 'GPT-4o mini' },
-  { id: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' },
+  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash-Lite', tier: 'free' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', tier: 'free' },
+  { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', tier: 'free' },
+  { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash Preview', tier: 'paid' },
+  { id: 'gemini-3.1-pro-preview', name: 'Gemini 3.1 Pro Preview', tier: 'paid' },
 ] as const;
 
 export const VIDEO_MODEL_OPTIONS = [
-  { id: 'sample-sequence-v1', name: '샘플 시퀀스 v1' },
-  { id: 'elevenlabs-mv-auto', name: 'ElevenLabs MV 자동 선택' },
+  { id: 'sample-sequence-v1', name: '샘플 시퀀스 v1', provider: '샘플', tier: 'free' },
+  { id: 'veo-3.1-fast-generate-preview', name: 'Veo 3.1 Fast Preview', provider: 'Google AI Studio', tier: 'paid' },
+  { id: 'veo-3.1-generate-preview', name: 'Veo 3.1 Preview', provider: 'Google AI Studio', tier: 'paid' },
 ] as const;
 
 export const GEMINI_STYLE_CATEGORIES = [
@@ -51,12 +81,18 @@ export const PRICING = {
   USD_TO_KRW: 1450,
   IMAGE: {
     'sample-scene-image': 0,
+    'gemini-2.5-flash-image': 0.039,
+    'gemini-3.1-flash-image-preview': 0.039,
+    'gemini-3-pro-image-preview': 0.06,
   },
   TTS: {
     perCharacter: 0.00003,
   },
   VIDEO: {
     perVideo: 0.15,
+    'sample-sequence-v1': 0,
+    'veo-3.1-fast-generate-preview': 1.2,
+    'veo-3.1-generate-preview': 3.2,
   },
 } as const;
 
@@ -116,6 +152,8 @@ export const CONFIG = {
   DEFAULT_TTS_NARRATOR: 'qwen-default',
   DEFAULT_BGM_MODEL: 'sample-ambient-v1',
   DEFAULT_IMAGE_MODEL: 'sample-scene-image' as ImageModelId,
+  DEFAULT_SCRIPT_MODEL: 'gemini-2.5-flash-lite',
+  DEFAULT_VIDEO_MODEL: 'sample-sequence-v1',
   OPENROUTER_DEFAULT_MAX_TOKENS: 800,
   OPENROUTER_DEFAULT_INPUT_MAX_CHARS: 7000,
   VIDEO_WIDTH: 1280,

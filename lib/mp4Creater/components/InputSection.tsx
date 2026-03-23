@@ -836,6 +836,12 @@ const InputSection: React.FC<InputSectionProps> = ({
     promptPack,
     promptTemplates: syncedPromptTemplates,
     selectedPromptTemplateId,
+    ttsProvider: projectVoiceProvider,
+    elevenLabsVoiceId: studioState?.routing?.elevenLabsVoiceId || workflowDraft?.elevenLabsVoiceId || selectedProjectElevenVoice?.voice_id || null,
+    elevenLabsModelId: studioState?.routing?.elevenLabsModelId || workflowDraft?.elevenLabsModelId || null,
+    heygenVoiceId: studioState?.routing?.heygenVoiceId || workflowDraft?.heygenVoiceId || selectedProjectHeyGenVoice?.voice_id || null,
+    qwenVoicePreset: studioState?.routing?.qwenVoicePreset || workflowDraft?.qwenVoicePreset || 'qwen-default',
+    qwenStylePreset: studioState?.routing?.qwenStylePreset || workflowDraft?.qwenStylePreset || 'balanced',
     customScriptSettings: {
       expectedDurationMinutes: customScriptDurationMinutes,
       speechStyle: customScriptSpeechStyle,
@@ -906,7 +912,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const promptTextAiSetup = (message?: string) => {
     onOpenApiModal?.({
       title: '이 기능은 텍스트 AI 연결이 필요합니다',
-      description: message || 'OpenRouter 키를 연결하면 대본 생성, 항목 추천, 캐릭터 / 화풍 추천이 실제 AI 결과로 바뀝니다.',
+      description: message || 'Google AI Studio 키를 연결하면 대본 생성, 항목 추천, 캐릭터 / 화풍 추천이 실제 AI 결과로 바뀝니다.',
       focusField: 'openRouter',
     });
   };
@@ -944,6 +950,19 @@ const InputSection: React.FC<InputSectionProps> = ({
     promptPack,
     syncedPromptTemplates,
     selectedPromptTemplateId,
+    projectVoiceProvider,
+    studioState?.routing?.elevenLabsVoiceId,
+    studioState?.routing?.elevenLabsModelId,
+    studioState?.routing?.heygenVoiceId,
+    studioState?.routing?.qwenVoicePreset,
+    studioState?.routing?.qwenStylePreset,
+    workflowDraft?.elevenLabsVoiceId,
+    workflowDraft?.elevenLabsModelId,
+    workflowDraft?.heygenVoiceId,
+    workflowDraft?.qwenVoicePreset,
+    workflowDraft?.qwenStylePreset,
+    selectedProjectElevenVoice?.voice_id,
+    selectedProjectHeyGenVoice?.voice_id,
     stepCompleted,
     onSaveWorkflowDraft,
   ]);
@@ -1425,7 +1444,7 @@ const InputSection: React.FC<InputSectionProps> = ({
 
   const refreshField = async (field: keyof StorySelectionState) => {
     if (!connectionSummary.text) {
-      promptTextAiSetup('현재 항목 추천은 샘플 보조 모드로 동작 중입니다. OpenRouter를 연결하면 이 자리에서 실제 AI 추천을 바로 받을 수 있습니다.');
+      promptTextAiSetup('현재 항목 추천은 샘플 보조 모드로 동작 중입니다. Google AI Studio를 연결하면 이 자리에서 실제 AI 추천을 바로 받을 수 있습니다.');
     }
     setLoadingFields((prev) => ({ ...prev, [field]: true }));
     try {
@@ -1564,7 +1583,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       return;
     }
     if (!connectionSummary.text) {
-      promptTextAiSetup('현재 대본 확장은 샘플 보조 모드도 지원합니다. OpenRouter를 연결하면 지금 작성된 대본을 더 자연스럽게 이어서 확장할 수 있습니다.');
+      promptTextAiSetup('현재 대본 확장은 샘플 보조 모드도 지원합니다. Google AI Studio를 연결하면 지금 작성된 대본을 더 자연스럽게 이어서 확장할 수 있습니다.');
     }
     focusPromptTemplate(targetTemplate.id);
     setIsGeneratingScript(true);
@@ -1648,7 +1667,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     const template = templateOverride || selectedPromptTemplate;
     if (!template) return;
     if (!connectionSummary.text) {
-      promptTextAiSetup('현재 대본 생성은 샘플 보조 모드입니다. OpenRouter를 연결하면 이 자리에서 실제 AI 대본 초안을 바로 받을 수 있습니다.');
+      promptTextAiSetup('현재 대본 생성은 샘플 보조 모드입니다. Google AI Studio를 연결하면 이 자리에서 실제 AI 대본 초안을 바로 받을 수 있습니다.');
     }
     focusPromptTemplate(template.id);
     setIsGeneratingScript(true);
@@ -1673,7 +1692,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       setStoryScript(result.text);
       setConstitutionAnalysis(result.analysis || null);
       await hydrateCharactersFromScriptText(result.text, { preserveSelection: true });
-      setNotice(result.source === 'ai' ? `선택한 프롬프트 "${template.name}"로 AI 초안을 만들었습니다.` : 'API 연결이 없어 현재는 정해진 샘플 로직으로 대본을 채웠습니다. OpenRouter를 등록하면 실제 AI 생성으로 전환됩니다.');
+      setNotice(result.source === 'ai' ? `선택한 프롬프트 "${template.name}"로 AI 초안을 만들었습니다.` : 'API 연결이 없어 현재는 정해진 샘플 로직으로 대본을 채웠습니다. Google AI Studio를 등록하면 실제 AI 생성으로 전환됩니다.');
       openStageWithIntent(3, false);
     } finally {
       setIsGeneratingScript(false);
@@ -1694,7 +1713,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     const forceSample = Boolean(options?.forceSample);
     const allowAi = !forceSample && Boolean(studioState?.providers?.openRouterApiKey);
     if (!allowAi && !forceSample) {
-      promptTextAiSetup('캐릭터 추출은 지금 샘플 보조 모드로도 테스트할 수 있습니다. OpenRouter를 연결하면 대본 속 역할을 더 정교하게 추출합니다.');
+      promptTextAiSetup('캐릭터 추출은 지금 샘플 보조 모드로도 테스트할 수 있습니다. Google AI Studio를 연결하면 대본 속 역할을 더 정교하게 추출합니다.');
     }
 
     setIsExtracting(true);
@@ -1761,7 +1780,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           imageData: previousCharacter?.imageData || preservedSelectedImage?.imageData || null,
         };
 
-        if (contentType !== 'music_video' && nextSelectedIds.includes(item.id) && !nextCharacter.voiceProvider) {
+        if (nextSelectedIds.includes(item.id) && !nextCharacter.voiceProvider) {
           Object.assign(nextCharacter, buildCharacterVoicePatch('project-default'));
         }
 
@@ -1785,7 +1804,7 @@ const InputSection: React.FC<InputSectionProps> = ({
 
   const ensureStyleRecommendations = async (mode: 'auto' | 'manual' = 'manual') => {
     if (mode === 'manual' && !connectionSummary.text) {
-      promptTextAiSetup('현재 화풍 추천은 샘플 보조 모드입니다. OpenRouter를 연결하면 화풍 추천이 실제 AI 텍스트 기반으로 더 정교해집니다.');
+      promptTextAiSetup('현재 화풍 추천은 샘플 보조 모드입니다. Google AI Studio를 연결하면 화풍 추천이 실제 AI 텍스트 기반으로 더 정교해집니다.');
     }
     if (!normalizedScript.trim()) {
       setNotice('먼저 3단계에서 대본과 캐릭터 선택을 마쳐 주세요.');
@@ -2214,7 +2233,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     const nextCharacters = extractedCharactersRef.current.map((item) => {
       if (item.id !== characterId) return item;
       if (!directId) return { ...item, ...buildCharacterVoicePatch(provider, '') };
-      const catalogVoice = provider === 'elevenLabs'
+      const catalogVoice: any = provider === 'elevenLabs'
         ? (elevenLabsVoices.find((voice) => voice.voice_id === directId) || null)
         : (heygenVoices.find((voice) => voice.voice_id === directId) || null);
 
@@ -2707,7 +2726,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   }
 
   return (
-    <div className="mx-auto my-6 w-full max-w-[1520px] px-4 sm:px-6 lg:px-8">
+    <div className="mp4-editor-shell mx-auto my-6 w-full max-w-[1520px] px-4 sm:px-6 lg:px-8">
       <MainStepView
         vm={{
           routeStep,

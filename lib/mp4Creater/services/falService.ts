@@ -2,45 +2,43 @@ import { CONFIG } from '../config';
 import { AspectRatio } from '../types';
 import { translatePromptToEnglish } from './promptTranslationService';
 import { createCreativeDirection, hashCreativeSeed } from '../config/creativeVariance';
+import { parseDataUrl } from '../utils/downloadHelpers';
 
 export interface GeneratedVideoResult {
   videoUrl: string;
   sourceMode: 'ai' | 'sample';
 }
 
-interface PixVerseVideoResponse {
-  video: {
-    url: string;
-  };
-  seed?: number;
-}
-
-type FalVideoModelConfig = {
-  endpoint: string;
-  previewResolution: '480p' | '720p';
-  finalResolution: '480p' | '720p' | '1080p';
+type GoogleVideoModelConfig = {
+  resolution: '720p' | '1080p';
+  durationSeconds: 4 | 6 | 8;
 };
 
-const DEFAULT_FAL_VIDEO_MODEL = 'fal-pixverse-v55';
+const DEFAULT_GOOGLE_VIDEO_MODEL = 'veo-3.1-fast-generate-preview';
 
-const FAL_VIDEO_MODEL_CONFIGS: Record<string, FalVideoModelConfig> = {
-  'fal-pixverse-v55': {
-    endpoint: 'https://fal.run/fal-ai/pixverse/v5.5/image-to-video',
-    previewResolution: '480p',
-    finalResolution: '720p',
+const GOOGLE_VIDEO_MODEL_CONFIGS: Record<string, GoogleVideoModelConfig> = {
+  'veo-3.1-fast-generate-preview': {
+    resolution: '720p',
+    durationSeconds: 4,
   },
-  'fal-pixverse-v55-quick': {
-    endpoint: 'https://fal.run/fal-ai/pixverse/v5.5/image-to-video',
-    previewResolution: '480p',
-    finalResolution: '480p',
+  'veo-3.1-generate-preview': {
+    resolution: '720p',
+    durationSeconds: 4,
   },
 };
 
 export function getFalApiKey(): string | null {
-  return process.env.FAL_API_KEY || localStorage.getItem(CONFIG.STORAGE_KEYS.FAL_API_KEY);
+  if (typeof window === 'undefined') return process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.FAL_API_KEY || null;
+  return process.env.NEXT_PUBLIC_GEMINI_API_KEY
+    || localStorage.getItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY)
+    || localStorage.getItem(CONFIG.STORAGE_KEYS.FAL_API_KEY)
+    || process.env.FAL_API_KEY
+    || null;
 }
 
 export function setFalApiKey(key: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY, key);
   localStorage.setItem(CONFIG.STORAGE_KEYS.FAL_API_KEY, key);
 }
 
@@ -150,19 +148,70 @@ async function createSampleVideoFromImage(imageBase64: string, aspectRatio: Aspe
   };
 }
 
+function buildInlineImage(imageBase64: string) {
+  const parsed = parseDataUrl(imageBase64, 'image/png');
+  if (!parsed) return null;
+  let binary = '';
+  for (let i = 0; i < parsed.bytes.length; i += 1) {
+    binary += String.fromCharCode(parsed.bytes[i]);
+  }
+  const base64 = typeof window !== 'undefined' ? btoa(binary) : Buffer.from(parsed.bytes).toString('base64');
+  return {
+    inlineData: {
+      mimeType: parsed.mime || 'image/png',
+      data: base64,
+    },
+  };
+}
+
+async function pollGoogleVideo(operationName: string, apiKey: string): Promise<string | null> {
+  const baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
+
+  for (let attempt = 0; attempt < 18; attempt += 1) {
+    if (attempt > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+    }
+
+    const statusResponse = await fetch(`${baseUrl}/${operationName}`, {
+      headers: {
+        'x-goog-api-key': apiKey,
+      },
+    });
+    if (!statusResponse.ok) return null;
+    const statusJson = await statusResponse.json();
+    if (!statusJson?.done) continue;
+
+    const videoUri = statusJson?.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri
+      || statusJson?.response?.generatedVideos?.[0]?.video?.uri;
+    if (typeof videoUri !== 'string' || !videoUri.trim()) return null;
+
+    const downloadResponse = await fetch(videoUri, {
+      headers: {
+        'x-goog-api-key': apiKey,
+      },
+    });
+    if (!downloadResponse.ok) return null;
+    const blob = await downloadResponse.blob();
+    if (!blob.size) return null;
+    return URL.createObjectURL(blob);
+  }
+
+  return null;
+}
+
 export async function generateVideoFromImage(
   imageBase64: string,
   motionPrompt: string,
   apiKey?: string,
   aspectRatio: AspectRatio = '16:9',
   qualityMode: 'preview' | 'final' = 'preview',
-  videoModel: string = DEFAULT_FAL_VIDEO_MODEL,
+  videoModel: string = DEFAULT_GOOGLE_VIDEO_MODEL,
 ): Promise<GeneratedVideoResult | null> {
   const key = apiKey || getFalApiKey();
-  const modelConfig = FAL_VIDEO_MODEL_CONFIGS[videoModel] || FAL_VIDEO_MODEL_CONFIGS[DEFAULT_FAL_VIDEO_MODEL];
+  const normalizedModel = GOOGLE_VIDEO_MODEL_CONFIGS[videoModel] ? videoModel : DEFAULT_GOOGLE_VIDEO_MODEL;
+  const modelConfig = GOOGLE_VIDEO_MODEL_CONFIGS[normalizedModel];
 
-  if (!key) {
-    console.warn('[FAL] API key is not configured. Falling back to sample video.');
+  if (!key || normalizedModel.startsWith('sample-')) {
     return await createSampleVideoFromImage(imageBase64, aspectRatio);
   }
 
@@ -172,84 +221,43 @@ export async function generateVideoFromImage(
       preserveLineBreaks: true,
       maxChars: 3000,
     });
-    const direction = createCreativeDirection(`${englishMotionPrompt}:${aspectRatio}:${videoModel}`, 0);
-    const imageUrl = await uploadImageToFal(imageBase64, key);
+    const direction = createCreativeDirection(`${englishMotionPrompt}:${aspectRatio}:${normalizedModel}`, 0);
+    const image = buildInlineImage(imageBase64);
+    if (!image) return await createSampleVideoFromImage(imageBase64, aspectRatio);
 
-    if (!imageUrl) {
-      console.error('[FAL] Image upload failed.');
-      return null;
-    }
-
-    console.log(`[FAL] PixVerse v5.5 video generation started: "${englishMotionPrompt.slice(0, 50)}..."`);
-
-    const requestBody = {
-      prompt: `${englishMotionPrompt}
-Fresh motion signature: ${direction.shotType}. ${direction.transitionBeat}` ,
-      image_url: imageUrl,
-      duration: 5,
-      aspect_ratio: aspectRatio,
-      resolution: qualityMode === 'final' ? modelConfig.finalResolution : modelConfig.previewResolution,
-      negative_prompt: 'blurry, low quality, low resolution, pixelated, noisy, grainy, distorted, static',
-    };
-
-    const response = await fetch(modelConfig.endpoint, {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(normalizedModel)}:predictLongRunning`, {
       method: 'POST',
       headers: {
-        Authorization: `Key ${key}`,
+        'x-goog-api-key': key,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(requestBody),
+      body: JSON.stringify({
+        instances: [{
+          prompt: `${englishMotionPrompt}\nFresh motion signature: ${direction.shotType}. ${direction.transitionBeat}`,
+          image,
+        }],
+        parameters: {
+          aspectRatio: aspectRatio,
+          durationSeconds: modelConfig.durationSeconds,
+          resolution: qualityMode === 'final' ? modelConfig.resolution : '720p',
+          numberOfVideos: 1,
+        },
+      }),
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[FAL] API error (${response.status}):`, errorText);
-      throw new Error(`FAL API error: ${response.status} - ${errorText.slice(0, 200)}`);
+      return await createSampleVideoFromImage(imageBase64, aspectRatio);
     }
 
-    const result: PixVerseVideoResponse = await response.json();
-    console.log(`[FAL] Video generation completed: ${result.video.url}`);
-    return { videoUrl: result.video.url, sourceMode: 'ai' };
-  } catch (error: any) {
-    console.error('[FAL] Video generation failed:', error?.message || error);
-    return await createSampleVideoFromImage(imageBase64, aspectRatio);
-  }
-}
+    const operation = await response.json();
+    const operationName = typeof operation?.name === 'string' ? operation.name : '';
+    if (!operationName) return await createSampleVideoFromImage(imageBase64, aspectRatio);
 
-async function uploadImageToFal(imageBase64: string, apiKey: string): Promise<string | null> {
-  try {
-    const normalized = imageBase64.trim();
-    const dataMatch = normalized.match(/^data:(.*?);base64,(.*)$/);
-    const mimeType = dataMatch?.[1] || 'image/png';
-    const rawBase64 = dataMatch?.[2] || normalized;
-    const binaryString = atob(rawBase64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], { type: mimeType });
-
-    const formData = new FormData();
-    formData.append('file', blob, 'image.png');
-
-    const uploadResponse = await fetch('https://fal.run/fal-ai/storage/upload', {
-      method: 'POST',
-      headers: {
-        Authorization: `Key ${apiKey}`,
-      },
-      body: formData,
-    });
-
-    if (!uploadResponse.ok) {
-      console.warn('[FAL] File upload failed, falling back to data URL.');
-      return base64ToDataUrl(imageBase64);
-    }
-
-    const uploadResult = await uploadResponse.json();
-    return uploadResult.url;
+    const videoUrl = await pollGoogleVideo(operationName, key);
+    if (!videoUrl) return await createSampleVideoFromImage(imageBase64, aspectRatio);
+    return { videoUrl, sourceMode: 'ai' };
   } catch {
-    console.warn('[FAL] Image upload failed, falling back to data URL.');
-    return base64ToDataUrl(imageBase64);
+    return await createSampleVideoFromImage(imageBase64, aspectRatio);
   }
 }
 
@@ -277,7 +285,7 @@ export async function batchGenerateVideos(
   assets: Array<{ imageData: string; visualPrompt: string }>,
   apiKey?: string,
   onProgress?: (index: number, total: number) => void,
-  videoModel: string = DEFAULT_FAL_VIDEO_MODEL,
+  videoModel: string = DEFAULT_GOOGLE_VIDEO_MODEL,
 ): Promise<(string | null)[]> {
   const results: (string | null)[] = [];
   const key = apiKey || getFalApiKey() || undefined;

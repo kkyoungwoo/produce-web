@@ -157,6 +157,7 @@ const SceneStudioPage: React.FC = () => {
   const currentCostRef = useRef<CostBreakdown>({ images: 0, tts: 0, videos: 0, total: 0, imageCount: 0, ttsCharacters: 0, videoCount: 0 });
   const autosaveSignatureRef = useRef('');
   const thumbnailToolbarRef = useRef<HTMLDivElement | null>(null);
+  const sceneActionLocksRef = useRef<Set<number>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -249,12 +250,18 @@ const SceneStudioPage: React.FC = () => {
     { id: 'step6' as const, label: '6단계 씬 전달', description: '씬 제작 화면으로 넘어온 최종 전달값' },
   ]), []);
 
-  const resolveSceneTtsOptions = useCallback(() => {
+  const resolveSceneTtsOptions = useCallback((): {
+    provider: 'qwen3Tts' | 'elevenLabs' | 'heygen';
+    apiKey: string;
+    voiceId: string | null;
+    modelId: string;
+    qwenPreset: string;
+  } => {
     const preferredProvider = (draft.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'elevenLabs' | 'heygen';
     const elevenApiKey = studioState?.providers?.elevenLabsApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY) || '';
     const heygenApiKey = studioState?.providers?.heygenApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.HEYGEN_API_KEY) || '';
 
-    const provider = preferredProvider === 'heygen'
+    const provider: 'qwen3Tts' | 'elevenLabs' | 'heygen' = preferredProvider === 'heygen'
       ? (heygenApiKey ? 'heygen' : elevenApiKey ? 'elevenLabs' : 'qwen3Tts')
       : preferredProvider === 'elevenLabs'
         ? (elevenApiKey ? 'elevenLabs' : heygenApiKey ? 'heygen' : 'qwen3Tts')
@@ -311,7 +318,7 @@ const SceneStudioPage: React.FC = () => {
 
   const selectedVideoModel = useMemo(() => {
     const model = studioState?.routing?.videoModel || '';
-    return model.startsWith('fal-') ? model : 'fal-pixverse-v55';
+    return model || CONFIG.DEFAULT_VIDEO_MODEL;
   }, [studioState?.routing?.videoModel]);
 
   const effectiveBackgroundTracks = useMemo(() => {
@@ -357,6 +364,15 @@ const SceneStudioPage: React.FC = () => {
     setGeneratedData([...assetsRef.current]);
   }, []);
 
+  const beginSceneAction = useCallback((index: number) => {
+    if (sceneActionLocksRef.current.has(index)) return false;
+    sceneActionLocksRef.current.add(index);
+    return true;
+  }, []);
+
+  const endSceneAction = useCallback((index: number) => {
+    sceneActionLocksRef.current.delete(index);
+  }, []);
 
   const setSceneProgress = useCallback((index: number, percent: number, label: string) => {
     setSceneProgressMap((prev) => ({
@@ -964,52 +980,61 @@ const SceneStudioPage: React.FC = () => {
   }, [draft.aspectRatio, draft.topic, effectiveBackgroundTracks, isVideoGenerating, openApiModal, previewMix]);
 
   const handleRegenerateImage = async (index: number) => {
-    updateAssetAt(index, { status: 'generating' });
+    if (!assetsRef.current[index] || !beginSceneAction(index)) return;
+    updateAssetAt(index, { status: 'generating', selectedVisualType: 'image' });
     setTaskProgressPercent(12);
     setSceneProgress(index, 18, '이미지 다시 준비');
     setProgressMessage(`씬 ${index + 1} 이미지를 다시 만드는 중...`);
     try {
-      const imageModel = getSelectedImageModel();
-      const usesSampleImageFlow = isSampleImageModel(imageModel);
-      const imageData = await generateImage(assetsRef.current[index], buildReferenceImages(), { qualityMode: 'draft' });
-      if (imageData) {
+      try {
+        const imageModel = getSelectedImageModel();
+        const usesSampleImageFlow = isSampleImageModel(imageModel);
+        const imageData = await generateImage(assetsRef.current[index], buildReferenceImages(), { qualityMode: 'draft' });
+        if (imageData) {
+          updateAssetAt(index, {
+            imageData,
+            imageHistory: appendImageHistory(assetsRef.current[index], imageData, usesSampleImageFlow ? 'sample' : 'ai', usesSampleImageFlow ? '샘플 / 저부하 초안 이미지' : 'AI 재생성 이미지'),
+            sourceMode: usesSampleImageFlow ? 'sample' : 'ai',
+            status: 'completed',
+            selectedVisualType: 'image',
+          });
+          if (!usesSampleImageFlow) {
+            const price = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
+            addCost('image', price, 1);
+          }
+          setSceneProgress(index, 100, usesSampleImageFlow ? '샘플 이미지 다시 준비 완료' : '이미지 다시 생성 완료');
+          setTaskProgressPercent(100);
+          return;
+        }
+      } catch {}
+      const fallbackImage = createInitialSceneAssetsFromDraft(draft)[index]?.imageData || assetsRef.current[index].imageData || null;
+      if (fallbackImage) {
         updateAssetAt(index, {
-          imageData,
-          imageHistory: appendImageHistory(assetsRef.current[index], imageData, usesSampleImageFlow ? 'sample' : 'ai', usesSampleImageFlow ? '샘플 / 저부하 초안 이미지' : 'AI 재생성 이미지'),
-          sourceMode: usesSampleImageFlow ? 'sample' : 'ai',
+          imageData: fallbackImage,
+          imageHistory: appendImageHistory(assetsRef.current[index], fallbackImage, 'sample', '샘플 / 대체 이미지'),
+          sourceMode: 'sample',
           status: 'completed',
+          aspectRatio: assetsRef.current[index].aspectRatio || draft.aspectRatio || '16:9',
           selectedVisualType: 'image',
         });
-        if (!usesSampleImageFlow) {
-          const price = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
-          addCost('image', price, 1);
-        }
-        setSceneProgress(index, 100, usesSampleImageFlow ? '샘플 이미지 다시 준비 완료' : '이미지 다시 생성 완료');
-        setTaskProgressPercent(100);
-        return;
+        setSceneProgress(index, 100, '샘플 이미지로 교체 완료');
       }
-    } catch {}
-    const fallbackImage = createInitialSceneAssetsFromDraft(draft)[index]?.imageData || assetsRef.current[index].imageData || null;
-    if (fallbackImage) {
-      updateAssetAt(index, {
-        imageData: fallbackImage,
-        imageHistory: appendImageHistory(assetsRef.current[index], fallbackImage, 'sample', '샘플 / 대체 이미지'),
-        sourceMode: 'sample',
-        status: 'completed',
-        aspectRatio: assetsRef.current[index].aspectRatio || draft.aspectRatio || '16:9',
-        selectedVisualType: 'image',
-      });
-      setSceneProgress(index, 100, '샘플 이미지로 교체 완료');
+      updateAssetAt(index, { status: 'completed' });
+    } finally {
+      window.setTimeout(() => setTaskProgressPercent(null), 700);
+      endSceneAction(index);
     }
-    window.setTimeout(() => setTaskProgressPercent(null), 700);
   };
 
   const handleRegenerateAudio = async (index: number) => {
+    if (!assetsRef.current[index] || !beginSceneAction(index)) return;
     setTaskProgressPercent(12);
     setSceneProgress(index, 24, '오디오 다시 생성');
+    setProgressMessage(`씬 ${index + 1} 오디오를 다시 만드는 중...`);
     const tts = resolveSceneTtsOptions();
     if (tts.provider !== 'qwen3Tts' && !tts.apiKey) {
       setTaskProgressPercent(null);
+      endSceneAction(index);
       openApiModal({
         title: tts.provider === 'heygen' ? '오디오 생성에는 HeyGen API 키가 필요합니다' : '오디오 생성에는 ElevenLabs API 키가 필요합니다',
         description: '키를 넣고 저장하면 현재 씬의 오디오만 바로 다시 만들 수 있습니다.',
@@ -1019,38 +1044,53 @@ const SceneStudioPage: React.FC = () => {
     }
 
     try {
-      const audio = await generateSceneAudioAsset(assetsRef.current[index].narration);
-      if (audio.audioData) {
-        updateAssetAt(index, {
-          audioData: audio.audioData,
-          subtitleData: audio.subtitleData,
-          audioDuration: audio.estimatedDuration,
-          targetDuration: Math.max(assetsRef.current[index].targetDuration || 0, audio.estimatedDuration || 0, 3),
-        });
-      }
-      setSceneProgress(index, 100, '오디오 다시 생성 완료');
-      setTaskProgressPercent(100);
-    } catch {}
-    window.setTimeout(() => setTaskProgressPercent(null), 700);
+      try {
+        const audio = await generateSceneAudioAsset(assetsRef.current[index].narration);
+        if (audio.audioData) {
+          updateAssetAt(index, {
+            audioData: audio.audioData,
+            subtitleData: audio.subtitleData,
+            audioDuration: audio.estimatedDuration,
+            targetDuration: Math.max(assetsRef.current[index].targetDuration || 0, audio.estimatedDuration || 0, 3),
+          });
+        }
+        setSceneProgress(index, 100, '오디오 다시 생성 완료');
+        setTaskProgressPercent(100);
+      } catch {}
+    } finally {
+      window.setTimeout(() => setTaskProgressPercent(null), 700);
+      endSceneAction(index);
+    }
   };
 
-  const handleGenerateAnimation = async (index: number) => {
+  const handleGenerateAnimation = async (index: number, options?: { sourceImageData?: string | null; sourceImageLabel?: string | null }) => {
     const falKey = studioState?.providers?.falApiKey || getFalApiKey();
-    if (!assetsRef.current[index]?.imageData) return;
-    if (animatingIndices.has(index)) return;
+    const sourceImageData = options?.sourceImageData || assetsRef.current[index]?.imageData || null;
+    if (!sourceImageData) return;
+    if (animatingIndices.has(index) || !beginSceneAction(index)) return;
+
+    let progressPulse: number | null = null;
+    let stagedPercent = 34;
 
     try {
       setAnimatingIndices((prev) => new Set(prev).add(index));
+      updateAssetAt(index, { selectedVisualType: 'video' });
       setTaskProgressPercent(10);
-      setSceneProgress(index, 20, falKey ? '영상 프롬프트 생성' : '샘플 영상 준비');
+      setSceneProgress(index, 16, falKey ? '영상 프롬프트 생성' : '샘플 영상 준비');
+      setProgressMessage(`씬 ${index + 1} ${options?.sourceImageLabel ? `${options.sourceImageLabel} 기준` : '현재 보고 있는 이미지 기준'}으로 영상을 만드는 중...`);
       const motionPrompt = (assetsRef.current[index].videoPrompt || '').trim() || await generateMotionPrompt(assetsRef.current[index].narration, assetsRef.current[index].imagePrompt || assetsRef.current[index].visualPrompt);
+      setSceneProgress(index, 32, falKey ? '영상 렌더링 시작' : '샘플 영상 준비');
+      progressPulse = window.setInterval(() => {
+        stagedPercent = Math.min(92, stagedPercent + (stagedPercent < 72 ? 8 : 3));
+        setSceneProgress(index, stagedPercent, falKey ? '영상 렌더링 중' : '샘플 영상 렌더링 중');
+      }, 420);
       const videoResult = await generateVideoFromImage(
-        assetsRef.current[index].imageData!,
+        sourceImageData,
         motionPrompt,
-        falKey,
+        falKey || undefined,
         assetsRef.current[index].aspectRatio || draft.aspectRatio || '16:9',
         'preview',
-        selectedVideoModel,
+        selectedVideoModel || undefined,
       );
       if (videoResult?.videoUrl) {
         updateAssetAt(index, {
@@ -1066,11 +1106,13 @@ const SceneStudioPage: React.FC = () => {
       setSceneProgress(index, 100, videoResult?.sourceMode === 'sample' ? '샘플 영상 준비 완료' : '영상 변환 완료');
       setTaskProgressPercent(100);
     } finally {
+      if (progressPulse) window.clearInterval(progressPulse);
       setAnimatingIndices((prev) => {
         const next = new Set(prev);
         next.delete(index);
         return next;
       });
+      endSceneAction(index);
       window.setTimeout(() => setTaskProgressPercent(null), 700);
     }
   };
@@ -1097,10 +1139,10 @@ const SceneStudioPage: React.FC = () => {
         const videoResult = await generateVideoFromImage(
           asset.imageData!,
           motionPrompt,
-          falKey,
+          falKey || undefined,
           asset.aspectRatio || draft.aspectRatio || '16:9',
           'preview',
-          selectedVideoModel,
+          selectedVideoModel || undefined,
         );
         if (videoResult?.videoUrl) {
           updateAssetAt(index, {
@@ -1361,7 +1403,7 @@ const SceneStudioPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="mp4-shell min-h-screen text-slate-900">
       <LoadingOverlay open={Boolean(navigationOverlay)} title={navigationOverlay?.title || '이동 중'} description={navigationOverlay?.description} />
       <Header
         projectCount={studioState.projects?.length || 0}
@@ -1385,7 +1427,7 @@ const SceneStudioPage: React.FC = () => {
       <ProviderQuickModal open={showApiModal} studioState={studioState} title={apiModalTitle} description={apiModalDescription} focusField={apiModalFocusField} onClose={handleApiModalClose} onSave={async (partial) => setStudioState(await saveStudioState({ ...studioState, ...partial, updatedAt: Date.now() }))} onOpenFullSettings={() => { setShowApiModal(false); setShowSettings(true); }} />
 
       <main className="mx-auto w-full max-w-[1520px] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mp4-glass-hero rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">{isThumbnailStudioRoute ? '썸네일 제작 화면' : '씬 제작 화면'}</div>
@@ -1434,7 +1476,7 @@ const SceneStudioPage: React.FC = () => {
 
         {step !== GenerationStep.IDLE && progressMessage && !generatedData.length && (
           <div className="my-6 text-center">
-            <div className="inline-flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
+            <div className="mp4-glass-panel inline-flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
               {step === GenerationStep.SCRIPTING || step === GenerationStep.ASSETS ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : <div className={`h-2.5 w-2.5 rounded-full ${step === GenerationStep.ERROR ? 'bg-red-500' : 'bg-emerald-500'}`} />}
               <span className="text-sm font-bold text-slate-700">{progressMessage}</span>
             </div>
@@ -1458,9 +1500,9 @@ const SceneStudioPage: React.FC = () => {
             description: kind === 'audio'
               ? '현재 위치에서 바로 오디오와 자막 생성을 이어가려면 ElevenLabs 키를 연결해 주세요.'
               : kind === 'video'
-                ? '현재 위치에서 바로 영상 변환을 이어가려면 FAL 또는 연결한 영상 공급자 키를 등록해 주세요.'
-                : '현재 위치에서 바로 AI 보조 기능을 쓰려면 OpenRouter 키를 연결해 주세요.',
-            focusField: kind === 'audio' ? 'elevenLabs' : kind === 'video' ? 'fal' : 'openRouter',
+                ? '현재 위치에서 바로 영상 변환을 이어가려면 Google AI Studio 키를 연결해 주세요.'
+                : '현재 위치에서 바로 AI 보조 기능을 쓰려면 Google AI Studio 키를 연결해 주세요.',
+            focusField: kind === 'audio' ? 'elevenLabs' : 'openRouter',
           })}
           isExporting={isVideoGenerating}
           animatingIndices={animatingIndices}
@@ -1491,6 +1533,9 @@ const SceneStudioPage: React.FC = () => {
           onFooterBack={handleGoBackToWorkflow}
           footerBackLabel="이전으로"
           thumbnailToolbarRef={thumbnailToolbarRef}
+          storageDir={studioState.storageDir}
+          projectId={currentProjectId}
+          projectNumber={currentProjectSummary?.projectNumber || null}
         />
       </main>
     </div>

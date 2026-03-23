@@ -25,7 +25,7 @@ export default function Header({ locale }: HeaderProps) {
           <Link href={`/${locale}/db-cleanup`} className="transition-colors hover:text-blue-600">
             {t.nav.dbCleanup}
           </Link>
-          <Link href={`/${locale}/mp4Creater`} className="transition-colors hover:text-blue-600">
+          <Link href="/mp4Creater" className="transition-colors hover:text-blue-600">
             {t.nav.mp4Creater}
           </Link>
         </nav>

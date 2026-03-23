@@ -56,7 +56,7 @@ function resolvePreferredImageSources(value: string): string[] {
   const parsed = parseDataUrl(trimmed, 'image/png');
   if (parsed) {
     try {
-      const blob = new Blob([parsed.bytes], { type: parsed.mime || 'image/png' });
+      const blob = new Blob([Uint8Array.from(parsed.bytes).buffer], { type: parsed.mime || 'image/png' });
       candidates.unshift(URL.createObjectURL(blob));
     } catch {}
   }

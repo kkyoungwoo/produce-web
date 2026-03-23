@@ -11,10 +11,10 @@ import { compactWorkflowDraftForStorage, createDefaultWorkflowDraft } from './wo
 export const DEFAULT_STORAGE_DIR = './local-data/tubegen-studio';
 
 export const DEFAULT_ROUTING: AiRoutingSettings = {
-  scriptModel: 'openrouter/auto',
-  sceneModel: 'openrouter/auto',
-  imagePromptModel: 'openrouter/auto',
-  motionPromptModel: 'openrouter/auto',
+  scriptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
+  sceneModel: CONFIG.DEFAULT_SCRIPT_MODEL,
+  imagePromptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
+  motionPromptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
   openRouterMaxTokens: 800,
   openRouterInputMaxChars: 7000,
   imageProvider: 'sample',
@@ -24,8 +24,8 @@ export const DEFAULT_ROUTING: AiRoutingSettings = {
   ttsNarratorId: 'qwen-default',
   backgroundMusicModel: 'sample-ambient-v1',
   videoProvider: 'sample',
-  videoModel: 'sample-sequence-v1',
-  textModel: 'openrouter/auto',
+  videoModel: CONFIG.DEFAULT_VIDEO_MODEL,
+  textModel: CONFIG.DEFAULT_SCRIPT_MODEL,
   ttsProvider: 'qwen3Tts',
   elevenLabsVoiceId: CONFIG.DEFAULT_VOICE_ID,
   elevenLabsModelId: CONFIG.DEFAULT_ELEVENLABS_MODEL,

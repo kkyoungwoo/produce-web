@@ -200,6 +200,96 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../../app/mp4Creater/character-studio/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/mp4Creater/character-studio">> = Specific
+  const handler = {} as typeof import("../../../app/mp4Creater/character-studio/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/mp4Creater/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/mp4Creater">> = Specific
+  const handler = {} as typeof import("../../../app/mp4Creater/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/mp4Creater/scene-studio/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/mp4Creater/scene-studio">> = Specific
+  const handler = {} as typeof import("../../../app/mp4Creater/scene-studio/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/mp4Creater/step-1/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/mp4Creater/step-1">> = Specific
+  const handler = {} as typeof import("../../../app/mp4Creater/step-1/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/mp4Creater/step-2/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/mp4Creater/step-2">> = Specific
+  const handler = {} as typeof import("../../../app/mp4Creater/step-2/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/mp4Creater/step-3/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/mp4Creater/step-3">> = Specific
+  const handler = {} as typeof import("../../../app/mp4Creater/step-3/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/mp4Creater/step-4/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/mp4Creater/step-4">> = Specific
+  const handler = {} as typeof import("../../../app/mp4Creater/step-4/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/mp4Creater/step-5/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/mp4Creater/step-5">> = Specific
+  const handler = {} as typeof import("../../../app/mp4Creater/step-5/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/mp4Creater/step-6/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/mp4Creater/step-6">> = Specific
+  const handler = {} as typeof import("../../../app/mp4Creater/step-6/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/mp4Creater/thumbnail-studio/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/mp4Creater/thumbnail-studio">> = Specific
+  const handler = {} as typeof import("../../../app/mp4Creater/thumbnail-studio/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../../app/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/">> = Specific
@@ -231,6 +321,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/local-storage/state">> = Specific
   const handler = {} as typeof import("../../../app/api/local-storage/state/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/mp4Creater/davinci-resolve/package/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/davinci-resolve/package">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/davinci-resolve/package/route.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import React from 'react';
 
 interface HeaderProps {
@@ -24,20 +25,20 @@ function NavAction({
   onClick?: () => void;
   href?: string;
 }) {
-  const className = `rounded-xl px-4 py-2 text-sm font-bold transition-colors ${active ? 'bg-blue-600 text-white shadow-sm shadow-blue-100' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`;
+  const className = `mp4-glass-pill inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-black transition-colors ${active ? 'border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-100' : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50'}`;
 
-  if (onClick) {
+  if (href) {
     return (
-      <button type="button" onClick={onClick} className={className}>
+      <Link href={href} onClick={onClick} className={className}>
         {children}
-      </button>
+      </Link>
     );
   }
 
   return (
-    <a href={href} className={className}>
+    <button type="button" onClick={onClick} className={className}>
       {children}
-    </a>
+    </button>
   );
 }
 
@@ -54,8 +55,8 @@ const Header: React.FC<HeaderProps> = ({
   const activeSection = currentSection || viewMode;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/95 backdrop-blur-md">
-      <div className="mx-auto flex max-w-[1520px] flex-col gap-3 px-4 py-3 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-50 border-b border-white/40 bg-white/45 backdrop-blur-xl">
+      <div className="mp4-glass-panel mx-auto flex max-w-[1520px] flex-col gap-3 rounded-b-[28px] px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 shadow-lg shadow-blue-100">
@@ -77,13 +78,13 @@ const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <NavAction active={activeSection === 'gallery'} onClick={onGoGallery} href={`${basePath}?view=gallery`}>
+            <NavAction active={activeSection === 'gallery' || activeSection === 'main'} onClick={onGoGallery} href={`${basePath}?view=gallery`}>
               프로젝트 {projectCount > 0 ? `(${projectCount})` : ''}
             </NavAction>
             <button
               type="button"
               onClick={onOpenSettings}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
+              className="mp4-glass-pill rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-black text-slate-900 shadow-sm transition-colors hover:bg-white"
             >
               설정
             </button>

@@ -7,14 +7,15 @@ import {
   BGM_MODEL_OPTIONS,
   CONFIG,
   ELEVENLABS_MODELS,
+  IMAGE_MODELS,
   QWEN_TTS_PRESET_OPTIONS,
   SCRIPT_MODEL_OPTIONS,
+  VIDEO_MODEL_OPTIONS,
 } from '../config';
 import { validateProviderConnection } from '../services/providerValidationService';
 import { createTtsPreview } from '../services/ttsService';
 import { createSampleBackgroundTrack } from '../services/musicService';
 import { fetchElevenLabsVoices } from '../services/elevenLabsService';
-import { fetchHeyGenVoices } from '../services/heygenService';
 
 interface SettingsDrawerProps {
   open: boolean;
@@ -23,28 +24,15 @@ interface SettingsDrawerProps {
   onSave: (nextState: Partial<StudioState>) => void | Promise<void>;
 }
 
-type RoutingModelField = 'scriptModel' | 'sceneModel' | 'imagePromptModel' | 'motionPromptModel';
-
-type OpenRouterModelItem = {
-  id: string;
-  name: string;
-};
-
-const OPENROUTER_FALLBACK_MODELS: OpenRouterModelItem[] = [
-  { id: 'openrouter/auto', name: 'OpenRouter 자동 선택' },
-  { id: 'openai/gpt-4.1-mini', name: 'GPT-4.1 mini' },
-  { id: 'openai/gpt-4o-mini', name: 'GPT-4o mini' },
-  { id: 'anthropic/claude-3.7-sonnet', name: 'Claude 3.7 Sonnet' },
-];
-
-const STEP6_VIDEO_MODEL_OPTIONS = [
-  { id: 'fal-pixverse-v55', name: 'FAL PixVerse v5.5 (표준)' },
-  { id: 'fal-pixverse-v55-quick', name: 'FAL PixVerse v5.5 (빠른)' },
-] as const;
-
 const cardClass = 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm';
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400';
 const isElevenLabsBgmModel = (modelId?: string | null) => (modelId || '').startsWith('elevenlabs');
+const isPaidScriptModel = (modelId?: string | null) => SCRIPT_MODEL_OPTIONS.find((item) => item.id === modelId)?.tier === 'paid';
+const isPaidImageModel = (modelId?: string | null) => IMAGE_MODELS.find((item) => item.id === modelId)?.tier === 'paid';
+const isPaidVideoModel = (modelId?: string | null) => VIDEO_MODEL_OPTIONS.find((item) => item.id === modelId)?.tier === 'paid';
+const freeScriptModel = SCRIPT_MODEL_OPTIONS.find((item) => item.tier !== 'paid')?.id || CONFIG.DEFAULT_SCRIPT_MODEL;
+const freeImageModel = IMAGE_MODELS.find((item) => item.tier !== 'paid')?.id || CONFIG.DEFAULT_IMAGE_MODEL;
+const freeVideoModel = VIDEO_MODEL_OPTIONS.find((item) => item.tier !== 'paid')?.id || CONFIG.DEFAULT_VIDEO_MODEL;
 
 const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onClose, onSave }) => {
   const [storageDir, setStorageDir] = useState('');
@@ -52,31 +40,27 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const [providerValues, setProviderValues] = useState({
     openRouterApiKey: '',
     elevenLabsApiKey: '',
-    heygenApiKey: '',
-    falApiKey: '',
   });
   const [showSecrets, setShowSecrets] = useState({
     openRouterApiKey: false,
     elevenLabsApiKey: false,
-    heygenApiKey: false,
-    falApiKey: false,
   });
   const [routing, setRouting] = useState<StudioState['routing']>({
-    scriptModel: 'openrouter/auto',
-    sceneModel: 'openrouter/auto',
-    imagePromptModel: 'openrouter/auto',
-    motionPromptModel: 'openrouter/auto',
+    scriptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
+    sceneModel: CONFIG.DEFAULT_SCRIPT_MODEL,
+    imagePromptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
+    motionPromptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
     openRouterMaxTokens: CONFIG.OPENROUTER_DEFAULT_MAX_TOKENS,
     openRouterInputMaxChars: CONFIG.OPENROUTER_DEFAULT_INPUT_MAX_CHARS,
     imageProvider: 'sample',
-    imageModel: 'sample-scene-image',
+    imageModel: CONFIG.DEFAULT_IMAGE_MODEL,
     audioProvider: 'qwen3Tts',
     audioModel: 'eleven_multilingual_v2',
     ttsNarratorId: 'qwen-default',
     backgroundMusicModel: 'sample-ambient-v1',
     videoProvider: 'sample',
-    videoModel: 'sample-sequence-v1',
-    textModel: 'openrouter/auto',
+    videoModel: CONFIG.DEFAULT_VIDEO_MODEL,
+    textModel: CONFIG.DEFAULT_SCRIPT_MODEL,
     ttsProvider: 'qwen3Tts',
     elevenLabsVoiceId: CONFIG.DEFAULT_VOICE_ID,
     elevenLabsModelId: CONFIG.DEFAULT_ELEVENLABS_MODEL,
@@ -90,16 +74,12 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   });
   const [providerFeedback, setProviderFeedback] = useState<Record<string, { tone: 'success' | 'error' | 'info'; message: string } | null>>({});
   const [isCheckingProviders, setIsCheckingProviders] = useState<Record<string, boolean>>({});
-  const [openRouterModels, setOpenRouterModels] = useState<OpenRouterModelItem[]>(OPENROUTER_FALLBACK_MODELS);
-  const [openRouterQuery, setOpenRouterQuery] = useState('');
-  const [openRouterTarget, setOpenRouterTarget] = useState<RoutingModelField>('scriptModel');
   const [isVoicePreviewing, setIsVoicePreviewing] = useState(false);
   const [voicePreviewMessage, setVoicePreviewMessage] = useState('');
   const [isBgmPreviewing, setIsBgmPreviewing] = useState(false);
   const [bgmPreviewMessage, setBgmPreviewMessage] = useState('');
   const [isPaidMode, setIsPaidMode] = useState(false);
   const [elevenLabsVoices, setElevenLabsVoices] = useState<Array<{ voice_id: string; name: string; preview_url?: string; labels?: { accent?: string; gender?: string; description?: string } }>>([]);
-  const [heygenVoices, setHeygenVoices] = useState<Array<{ voice_id: string; name: string; language?: string; gender?: string; preview_audio_url?: string; preview_audio?: string }>>([]);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   const previewAudioRef = React.useRef<HTMLAudioElement | null>(null);
   const bgmAudioRef = React.useRef<HTMLAudioElement | null>(null);
@@ -107,45 +87,62 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const voicePreviewKeyRef = React.useRef('');
   const bgmPreviewKeyRef = React.useRef('');
 
+  const visibleScriptModels = useMemo(
+    () => SCRIPT_MODEL_OPTIONS.filter((item) => isPaidMode || item.tier !== 'paid'),
+    [isPaidMode],
+  );
+  const visibleImageModels = useMemo(
+    () => IMAGE_MODELS.filter((item) => isPaidMode || item.tier !== 'paid'),
+    [isPaidMode],
+  );
+  const visibleVideoModels = useMemo(
+    () => VIDEO_MODEL_OPTIONS.filter((item) => isPaidMode || item.tier !== 'paid'),
+    [isPaidMode],
+  );
+
   useEffect(() => {
     if (!open || !studioState) return;
     setStorageDir(studioState.storageDir || '');
     setProviderValues({
       openRouterApiKey: studioState.providers.openRouterApiKey || '',
       elevenLabsApiKey: studioState.providers.elevenLabsApiKey || '',
-      heygenApiKey: studioState.providers.heygenApiKey || '',
-      falApiKey: studioState.providers.falApiKey || '',
     });
-    setRouting((prev) => ({ ...prev, ...studioState.routing }));
+    setRouting((prev) => ({
+      ...prev,
+      ...studioState.routing,
+      scriptModel: studioState.routing?.scriptModel || studioState.routing?.textModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+      textModel: studioState.routing?.textModel || studioState.routing?.scriptModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+      sceneModel: studioState.routing?.sceneModel || studioState.routing?.textModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+      imagePromptModel: studioState.routing?.imagePromptModel || studioState.routing?.sceneModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+      motionPromptModel: studioState.routing?.motionPromptModel || studioState.routing?.sceneModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+      imageModel: studioState.routing?.imageModel || CONFIG.DEFAULT_IMAGE_MODEL,
+      videoModel: studioState.routing?.videoModel || CONFIG.DEFAULT_VIDEO_MODEL,
+      ttsProvider: studioState.routing?.ttsProvider === 'elevenLabs' ? 'elevenLabs' : 'qwen3Tts',
+      audioProvider: studioState.routing?.audioProvider === 'elevenLabs' ? 'elevenLabs' : 'qwen3Tts',
+      backgroundMusicProvider: studioState.routing?.backgroundMusicProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
+      musicVideoProvider: studioState.routing?.musicVideoProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
+      musicVideoMode: studioState.routing?.musicVideoMode || 'sample',
+    }));
     setPickedFolderLabel('');
-    setOpenRouterQuery('');
-    setOpenRouterTarget('scriptModel');
     setVoicePreviewMessage('');
     setIsVoicePreviewing(false);
     setBgmPreviewMessage('');
     setIsBgmPreviewing(false);
     setIsPaidMode(Boolean(
-      studioState.routing?.ttsProvider === 'elevenLabs' ||
-      studioState.routing?.ttsProvider === 'heygen' ||
-      studioState.routing?.backgroundMusicProvider === 'elevenLabs' ||
-      studioState.routing?.videoProvider === 'elevenLabs'
+      studioState.routing?.ttsProvider === 'elevenLabs'
+      || studioState.routing?.backgroundMusicProvider === 'elevenLabs'
+      || isPaidScriptModel(studioState.routing?.scriptModel || studioState.routing?.textModel)
+      || isPaidScriptModel(studioState.routing?.sceneModel)
+      || isPaidImageModel(studioState.routing?.imageModel)
+      || isPaidVideoModel(studioState.routing?.videoModel)
     ));
     setProviderFeedback({});
     setIsCheckingProviders({});
-    setOpenRouterModels(OPENROUTER_FALLBACK_MODELS);
     setShowSecrets({
       openRouterApiKey: false,
       elevenLabsApiKey: false,
-      heygenApiKey: false,
-      falApiKey: false,
     });
   }, [open, studioState]);
-
-  const filteredModels = useMemo(() => {
-    const query = openRouterQuery.trim().toLowerCase();
-    if (!query) return openRouterModels;
-    return openRouterModels.filter((item) => item.id.toLowerCase().includes(query) || item.name.toLowerCase().includes(query));
-  }, [openRouterModels, openRouterQuery]);
 
   useEffect(() => {
     if (!open) return;
@@ -154,17 +151,12 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     const loadVoices = async () => {
       setIsLoadingVoices(true);
       try {
-        const [eleven, heygen] = await Promise.all([
-          fetchElevenLabsVoices(providerValues.elevenLabsApiKey.trim() || undefined),
-          fetchHeyGenVoices(providerValues.heygenApiKey.trim() || undefined),
-        ]);
+        const eleven = await fetchElevenLabsVoices(providerValues.elevenLabsApiKey.trim() || undefined);
         if (cancelled) return;
         setElevenLabsVoices(eleven);
-        setHeygenVoices(heygen);
         setRouting((prev) => ({
           ...prev,
           elevenLabsVoiceId: prev.elevenLabsVoiceId || eleven[0]?.voice_id || CONFIG.DEFAULT_VOICE_ID,
-          heygenVoiceId: prev.heygenVoiceId || heygen[0]?.voice_id || null,
         }));
       } finally {
         if (!cancelled) setIsLoadingVoices(false);
@@ -175,16 +167,11 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     return () => {
       cancelled = true;
     };
-  }, [open, providerValues.elevenLabsApiKey, providerValues.heygenApiKey]);
+  }, [open, providerValues.elevenLabsApiKey]);
 
   const selectedElevenVoice = useMemo(
     () => elevenLabsVoices.find((item) => item.voice_id === (routing.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID)) || elevenLabsVoices[0] || null,
     [elevenLabsVoices, routing.elevenLabsVoiceId],
-  );
-
-  const selectedHeyGenVoice = useMemo(
-    () => heygenVoices.find((item) => item.voice_id === (routing.heygenVoiceId || '')) || heygenVoices[0] || null,
-    [heygenVoices, routing.heygenVoiceId],
   );
 
   const stopVoicePreview = useCallback(() => {
@@ -212,13 +199,12 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   }, []);
 
   const playVoicePreview = useCallback(async () => {
-    const provider = routing.ttsProvider || 'qwen3Tts';
+    const provider = routing.ttsProvider === 'elevenLabs' ? 'elevenLabs' : 'qwen3Tts';
     const voicePreviewKey = [
       provider,
       routing.qwenVoicePreset || 'qwen-default',
       routing.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID,
       routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
-      routing.heygenVoiceId || '',
     ].join('|');
 
     if (isVoicePreviewing && voicePreviewKeyRef.current === voicePreviewKey) {
@@ -232,15 +218,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setVoicePreviewMessage('선택한 모델로 미리 듣기를 준비 중입니다.');
 
     const elevenLabsApiKey = providerValues.elevenLabsApiKey.trim();
-    const heygenApiKey = providerValues.heygenApiKey.trim();
     if (provider === 'elevenLabs' && !elevenLabsApiKey) {
       setIsVoicePreviewing(false);
       setVoicePreviewMessage('ElevenLabs API가 연결되지 않았습니다. 먼저 API 연결 확인을 해주세요.');
-      return;
-    }
-    if (provider === 'heygen' && !heygenApiKey) {
-      setIsVoicePreviewing(false);
-      setVoicePreviewMessage('HeyGen API가 연결되지 않았습니다. 먼저 API 연결 확인을 해주세요.');
       return;
     }
 
@@ -285,17 +265,13 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
         title: '설정 미리 듣기',
         text: '안녕하세요 반갑습니다. 지금 선택한 기본 목소리를 확인합니다.',
         mode: 'voice-preview',
-        apiKey: provider === 'elevenLabs' ? elevenLabsApiKey : provider === 'heygen' ? heygenApiKey : undefined,
-        voiceId:
-          provider === 'heygen'
-            ? (routing.heygenVoiceId || selectedHeyGenVoice?.voice_id || null)
-            : (routing.elevenLabsVoiceId || selectedElevenVoice?.voice_id || CONFIG.DEFAULT_VOICE_ID),
+        apiKey: elevenLabsApiKey,
+        voiceId: routing.elevenLabsVoiceId || selectedElevenVoice?.voice_id || CONFIG.DEFAULT_VOICE_ID,
         modelId: routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
         qwenPreset: routing.qwenVoicePreset || 'qwen-default',
       });
 
-      const mimeType = asset.provider === 'elevenLabs' || asset.provider === 'heygen' ? 'audio/mpeg' : 'audio/wav';
-      const audio = new Audio(`data:${mimeType};base64,${asset.audioData}`);
+      const audio = new Audio(`data:audio/mpeg;base64,${asset.audioData}`);
       previewAudioRef.current = audio;
       audio.onended = () => {
         setIsVoicePreviewing(false);
@@ -306,11 +282,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
         setVoicePreviewMessage('음성 미리 듣기에 실패했습니다.');
       };
       await audio.play();
-      setVoicePreviewMessage(
-        provider === 'elevenLabs'
-          ? `ElevenLabs (${selectedElevenVoice?.name || asset.voiceId || '기본 보이스'}) 미리 듣기 중입니다.`
-          : `HeyGen (${selectedHeyGenVoice?.name || asset.voiceId || '기본 보이스'}) 미리 듣기 중입니다.`
-      );
+      setVoicePreviewMessage(`ElevenLabs (${selectedElevenVoice?.name || asset.voiceId || '기본 보이스'}) 미리 듣기 중입니다.`);
     } catch {
       setIsVoicePreviewing(false);
       setVoicePreviewMessage('음성 미리 듣기에 실패했습니다. API 연결 상태를 확인해 주세요.');
@@ -318,10 +290,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   }, [
     isVoicePreviewing,
     providerValues.elevenLabsApiKey,
-    providerValues.heygenApiKey,
     routing,
     selectedElevenVoice,
-    selectedHeyGenVoice,
     stopVoicePreview,
   ]);
 
@@ -393,7 +363,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       setIsBgmPreviewing(false);
       setBgmPreviewMessage('배경 음악 미리 듣기에 실패했습니다.');
     }
-  }, [isBgmPreviewing, providerValues.elevenLabsApiKey, routing.backgroundMusicModel, stopBgmPreview]);
+  }, [isBgmPreviewing, providerValues.elevenLabsApiKey, routing.backgroundMusicModel, routing.backgroundMusicProvider, stopBgmPreview]);
 
   useEffect(() => {
     if (!open) {
@@ -406,10 +376,18 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     if (isPaidMode) return;
     setRouting((prev) => ({
       ...prev,
+      scriptModel: isPaidScriptModel(prev.scriptModel) ? freeScriptModel : prev.scriptModel,
+      textModel: isPaidScriptModel(prev.textModel) ? freeScriptModel : (prev.textModel || freeScriptModel),
+      sceneModel: isPaidScriptModel(prev.sceneModel) ? freeScriptModel : (prev.sceneModel || freeScriptModel),
+      imagePromptModel: isPaidScriptModel(prev.imagePromptModel) ? freeScriptModel : (prev.imagePromptModel || freeScriptModel),
+      motionPromptModel: isPaidScriptModel(prev.motionPromptModel) ? freeScriptModel : (prev.motionPromptModel || freeScriptModel),
+      imageModel: isPaidImageModel(prev.imageModel) ? freeImageModel : (prev.imageModel || freeImageModel),
+      imageProvider: 'sample',
       ttsProvider: 'qwen3Tts',
       audioProvider: 'qwen3Tts',
       backgroundMusicProvider: 'sample',
       videoProvider: 'sample',
+      videoModel: isPaidVideoModel(prev.videoModel) ? freeVideoModel : (prev.videoModel || freeVideoModel),
       musicVideoProvider: 'sample',
       musicVideoMode: 'sample',
       backgroundMusicModel: prev.backgroundMusicModel.startsWith('elevenlabs') ? 'sample-ambient-v1' : prev.backgroundMusicModel,
@@ -417,38 +395,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   }, [isPaidMode]);
 
   const handleTogglePaidMode = useCallback(() => {
-    setIsPaidMode((prev) => {
-      const next = !prev;
-      setRouting((current) => {
-        if (next) {
-          const preferredTtsProvider = providerValues.heygenApiKey.trim()
-            ? 'heygen'
-            : 'elevenLabs';
-          return {
-            ...current,
-            ttsProvider: preferredTtsProvider,
-            audioProvider: preferredTtsProvider,
-            scriptModel: current.scriptModel === 'openrouter/auto' ? 'openai/gpt-4.1-mini' : current.scriptModel,
-            textModel: current.textModel === 'openrouter/auto' ? 'openai/gpt-4.1-mini' : current.textModel,
-            backgroundMusicProvider: isElevenLabsBgmModel(current.backgroundMusicModel) ? 'elevenLabs' : 'sample',
-            videoProvider: 'elevenLabs',
-            musicVideoProvider: 'elevenLabs',
-          };
-        }
-        return {
-          ...current,
-          ttsProvider: 'qwen3Tts',
-          audioProvider: 'qwen3Tts',
-          scriptModel: 'openrouter/auto',
-          textModel: 'openrouter/auto',
-          backgroundMusicProvider: 'sample',
-          videoProvider: 'sample',
-          musicVideoProvider: 'sample',
-        };
-      });
-      return next;
-    });
-  }, [providerValues.heygenApiKey]);
+    setIsPaidMode((prev) => !prev);
+  }, []);
 
   const handleFolderPick = async () => {
     const picked = await pickFolderPath(storageDir);
@@ -457,9 +405,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setPickedFolderLabel(picked.selectedLabel);
   };
 
-  const runProviderCheck = useCallback(async (field: 'openRouterApiKey' | 'elevenLabsApiKey' | 'heygenApiKey' | 'falApiKey') => {
+  const runProviderCheck = useCallback(async (field: 'openRouterApiKey' | 'elevenLabsApiKey') => {
     const value = providerValues[field]?.trim() || '';
-    const kind = field === 'openRouterApiKey' ? 'openRouter' : field === 'elevenLabsApiKey' ? 'elevenLabs' : field === 'heygenApiKey' ? 'heygen' : 'fal';
+    const kind = field === 'openRouterApiKey' ? 'openRouter' : 'elevenLabs';
     setIsCheckingProviders((prev) => ({ ...prev, [field]: true }));
     try {
       const result = await validateProviderConnection(kind, value);
@@ -472,22 +420,34 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
 
   const handleSave = async () => {
     if (!studioState) return;
-    const hasElevenLabsKey = Boolean(providerValues.elevenLabsApiKey.trim());
-    const hasHeyGenKey = Boolean(providerValues.heygenApiKey.trim());
-    const hasFalKey = Boolean(providerValues.falApiKey.trim());
-    const wantsElevenTts = isPaidMode && routing.ttsProvider === 'elevenLabs' && hasElevenLabsKey;
-    const wantsHeyGenTts = isPaidMode && routing.ttsProvider === 'heygen' && hasHeyGenKey;
-    const wantsElevenBgm = isPaidMode && routing.backgroundMusicProvider === 'elevenLabs' && hasElevenLabsKey;
-    const wantsElevenVideo = hasFalKey || (isPaidMode && routing.videoProvider === 'elevenLabs' && hasElevenLabsKey);
-    const wantsElevenMusicVideo = isPaidMode && routing.musicVideoProvider === 'elevenLabs' && hasElevenLabsKey;
+    const googleApiKey = providerValues.openRouterApiKey.trim();
+    const elevenLabsApiKey = providerValues.elevenLabsApiKey.trim();
+    const nextScriptModel = !isPaidMode && isPaidScriptModel(routing.scriptModel) ? freeScriptModel : (routing.scriptModel || freeScriptModel);
+    const nextPromptModel = !isPaidMode && isPaidScriptModel(routing.sceneModel) ? freeScriptModel : (routing.sceneModel || nextScriptModel);
+    const nextImageModel = !isPaidMode && isPaidImageModel(routing.imageModel) ? freeImageModel : (routing.imageModel || freeImageModel);
+    const nextVideoModel = !isPaidMode && isPaidVideoModel(routing.videoModel) ? freeVideoModel : (routing.videoModel || freeVideoModel);
+    const wantsElevenTts = isPaidMode && routing.ttsProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
+    const wantsElevenBgm = isPaidMode && routing.backgroundMusicProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
+    const wantsPaidImage = isPaidMode && nextImageModel !== freeImageModel && Boolean(googleApiKey);
+    const wantsPaidVideo = isPaidMode && nextVideoModel !== freeVideoModel && Boolean(googleApiKey);
+
     const normalizedRouting = {
       ...routing,
-      ttsProvider: wantsElevenTts ? 'elevenLabs' : wantsHeyGenTts ? 'heygen' : 'qwen3Tts',
-      audioProvider: wantsElevenTts ? 'elevenLabs' : wantsHeyGenTts ? 'heygen' : 'qwen3Tts',
+      scriptModel: nextScriptModel,
+      textModel: nextScriptModel,
+      sceneModel: nextPromptModel,
+      imagePromptModel: routing.imagePromptModel || nextPromptModel,
+      motionPromptModel: routing.motionPromptModel || nextPromptModel,
+      imageModel: nextImageModel,
+      imageProvider: wantsPaidImage ? 'openrouter' : 'sample',
+      ttsProvider: wantsElevenTts ? 'elevenLabs' : 'qwen3Tts',
+      audioProvider: wantsElevenTts ? 'elevenLabs' : 'qwen3Tts',
       backgroundMusicProvider: wantsElevenBgm ? 'elevenLabs' : 'sample',
-      videoProvider: wantsElevenVideo ? 'elevenLabs' : 'sample',
-      musicVideoProvider: wantsElevenMusicVideo ? 'elevenLabs' : 'sample',
-      musicVideoMode: wantsElevenMusicVideo ? 'auto' : 'sample',
+      videoProvider: wantsPaidVideo ? 'elevenLabs' : 'sample',
+      videoModel: nextVideoModel,
+      musicVideoProvider: wantsPaidVideo ? 'elevenLabs' : 'sample',
+      musicVideoMode: wantsPaidVideo ? 'auto' : 'sample',
+      backgroundMusicModel: wantsElevenBgm ? routing.backgroundMusicModel : (isElevenLabsBgmModel(routing.backgroundMusicModel) ? 'sample-ambient-v1' : routing.backgroundMusicModel),
     } as StudioState['routing'];
 
     await onSave({
@@ -495,10 +455,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       isStorageConfigured: Boolean(storageDir.trim()),
       providers: {
         ...studioState.providers,
-        openRouterApiKey: providerValues.openRouterApiKey.trim(),
-        elevenLabsApiKey: providerValues.elevenLabsApiKey.trim(),
-        heygenApiKey: providerValues.heygenApiKey.trim(),
-        falApiKey: providerValues.falApiKey.trim(),
+        openRouterApiKey: googleApiKey,
+        elevenLabsApiKey,
+        falApiKey: googleApiKey || studioState.providers.falApiKey || '',
       },
       routing: {
         ...studioState.routing,
@@ -509,10 +468,6 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   };
 
   if (!open || !studioState) return null;
-
-  const advancedApiLocked = !isPaidMode;
-  const openRouterModelOptions = filteredModels.length ? filteredModels : openRouterModels;
-  const promptModelValue = routing.sceneModel || routing.imagePromptModel || routing.motionPromptModel || 'openrouter/auto';
 
   return (
     <div
@@ -525,8 +480,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
         <div className="flex items-start justify-between gap-4">
           <div>
             <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">제작 설정</div>
-            <h2 className="mt-1 text-2xl font-black text-slate-900">OpenRouter / ElevenLabs / HeyGen / qwen3-tts 연결 설정</h2>
-            <p className="mt-2 text-xs leading-5 text-slate-600">API 연결과 기본 생성 방식을 현재 프로젝트 기준으로 관리합니다.</p>
+            <h2 className="mt-1 text-2xl font-black text-slate-900">Google AI Studio / ElevenLabs 연결 설정</h2>
+            <p className="mt-2 text-xs leading-5 text-slate-600">mp4Creater 안에서만 텍스트, 이미지, 영상, 음성 생성의 기본 연결과 샘플 모드를 관리합니다.</p>
           </div>
           <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">닫기</button>
         </div>
@@ -548,19 +503,20 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">API 연결</h3>
-                <p className="mt-1 text-xs text-slate-600">텍스트(OpenRouter), 음성(ElevenLabs/HeyGen), 영상(FAL.AI/HeyGen) 연동 키를 연결합니다.</p>
+                <p className="mt-1 text-xs text-slate-600">Google AI Studio는 텍스트, 이미지, 영상 생성에 사용하고 ElevenLabs는 음성과 음악 샘플 고도화에 사용합니다.</p>
               </div>
             </div>
-            <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-black text-slate-900">OpenRouter API 키</div>
+                <div className="text-xs font-black text-slate-900">Google AI Studio API 키</div>
+                <div className="mt-1 text-[11px] text-slate-500">Gemini 텍스트/이미지와 Veo 영상 생성 연결에 공통 사용합니다.</div>
                 <div className="mt-3 flex items-center gap-2">
                   <input
                     type={showSecrets.openRouterApiKey ? 'text' : 'password'}
                     value={providerValues.openRouterApiKey}
                     onChange={(e) => setProviderValues((prev) => ({ ...prev, openRouterApiKey: e.target.value }))}
                     className={inputClass}
-                    placeholder="sk-or-v1-..."
+                    placeholder="AIza..."
                   />
                   <button
                     type="button"
@@ -579,8 +535,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 <button type="button" onClick={() => void runProviderCheck('openRouterApiKey')} disabled={!providerValues.openRouterApiKey.trim() || isCheckingProviders.openRouterApiKey} className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400">{isCheckingProviders.openRouterApiKey ? '확인 중...' : '연결 확인'}</button>
                 {providerFeedback.openRouterApiKey?.message ? <p className="mt-2 text-xs text-slate-500">{providerFeedback.openRouterApiKey.message}</p> : null}
               </div>
+
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-black text-slate-900">ElevenLabs API 키</div>
+                <div className="mt-1 text-[11px] text-slate-500">유료 모드에서 음성 생성과 음악 확장 품질 확인에 사용합니다.</div>
                 <div className="mt-3 flex items-center gap-2">
                   <input
                     type={showSecrets.elevenLabsApiKey ? 'text' : 'password'}
@@ -606,64 +564,6 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 <button type="button" onClick={() => void runProviderCheck('elevenLabsApiKey')} disabled={!providerValues.elevenLabsApiKey.trim() || isCheckingProviders.elevenLabsApiKey} className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400">{isCheckingProviders.elevenLabsApiKey ? '확인 중...' : '연결 확인'}</button>
                 {providerFeedback.elevenLabsApiKey?.message ? <p className="mt-2 text-xs text-slate-500">{providerFeedback.elevenLabsApiKey.message}</p> : null}
               </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-black text-slate-900">HeyGen API 키</div>
-                <div className="mt-1 text-[11px] text-slate-500">Starfish TTS, 보이스 목록, 미리 듣기와 HeyGen 기반 영상 제작 연동에 사용합니다.</div>
-                <div className="mt-3 flex items-center gap-2">
-                  <input
-                    type={showSecrets.heygenApiKey ? 'text' : 'password'}
-                    value={providerValues.heygenApiKey}
-                    onChange={(e) => setProviderValues((prev) => ({ ...prev, heygenApiKey: e.target.value }))}
-                    className={inputClass}
-                    placeholder="X-Api-Key ..."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSecrets((prev) => ({ ...prev, heygenApiKey: !prev.heygenApiKey }))}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
-                    aria-label={showSecrets.heygenApiKey ? 'API 키 숨기기' : 'API 키 보기'}
-                    title={showSecrets.heygenApiKey ? '숨기기' : '보기'}
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                      <path d="M1 12c2.8-4.5 6.5-7 11-7s8.2 2.5 11 7c-2.8 4.5-6.5 7-11 7s-8.2-2.5-11-7z" />
-                      <circle cx="12" cy="12" r="3" />
-                      {showSecrets.heygenApiKey ? <path d="M3 3l18 18" /> : null}
-                    </svg>
-                  </button>
-                </div>
-                <button type="button" onClick={() => void runProviderCheck('heygenApiKey')} disabled={!providerValues.heygenApiKey.trim() || isCheckingProviders.heygenApiKey} className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400">{isCheckingProviders.heygenApiKey ? '확인 중...' : '연결 확인'}</button>
-                {providerFeedback.heygenApiKey?.message ? <p className="mt-2 text-xs text-slate-500">{providerFeedback.heygenApiKey.message}</p> : null}
-                <p className="mt-2 text-xs text-slate-500">등록 후 설정 기본 음성과 Step3 출연자별 보이스 선택, HeyGen 연동 영상 제작 설정에 함께 사용됩니다.</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-black text-slate-900">FAL.AI API 키</div>
-                <div className="mt-1 text-[11px] text-slate-500">Step6 씬 영상 생성에 사용합니다.</div>
-                <div className="mt-3 flex items-center gap-2">
-                  <input
-                    type={showSecrets.falApiKey ? 'text' : 'password'}
-                    value={providerValues.falApiKey}
-                    onChange={(e) => setProviderValues((prev) => ({ ...prev, falApiKey: e.target.value }))}
-                    className={inputClass}
-                    placeholder="fal_key_..."
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSecrets((prev) => ({ ...prev, falApiKey: !prev.falApiKey }))}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
-                    aria-label={showSecrets.falApiKey ? 'API 키 숨기기' : 'API 키 보기'}
-                    title={showSecrets.falApiKey ? '숨기기' : '보기'}
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                      <path d="M1 12c2.8-4.5 6.5-7 11-7s8.2 2.5 11 7c-2.8 4.5-6.5 7-11 7s-8.2-2.5-11-7z" />
-                      <circle cx="12" cy="12" r="3" />
-                      {showSecrets.falApiKey ? <path d="M3 3l18 18" /> : null}
-                    </svg>
-                  </button>
-                </div>
-                <button type="button" onClick={() => void runProviderCheck('falApiKey')} disabled={!providerValues.falApiKey.trim() || isCheckingProviders.falApiKey} className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400">{isCheckingProviders.falApiKey ? '확인 중...' : '연결 확인'}</button>
-                {providerFeedback.falApiKey?.message ? <p className="mt-2 text-xs text-slate-500">{providerFeedback.falApiKey.message}</p> : null}
-                <p className="mt-2 text-xs text-slate-500">키를 저장하면 Step6에서 선택한 영상 모델로 생성을 실행합니다.</p>
-              </div>
             </div>
           </section>
 
@@ -671,7 +571,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">기본 API 선택</h3>
-                <p className="mt-1 text-xs text-slate-600">🆓 무료 모드는 샘플/기본 TTS로 진행되고, 유료 모드에서는 API 모델을 선택할 수 있습니다.</p>
+                <p className="mt-1 text-xs text-slate-600">무료 모드는 샘플과 무료 모델만 보이고, 유료 모드를 켜면 무료 모델과 유료 모델을 함께 선택할 수 있습니다.</p>
               </div>
               <button
                 type="button"
@@ -681,15 +581,15 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 {isPaidMode ? '유료모드 끄기' : '유료모드 켜기'}
               </button>
             </div>
+
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-black text-slate-900">음성</div>
                 <label className="mt-2 block">
                   <div className="mb-1 text-xs font-bold text-slate-700">음성 공급자</div>
-                  <select value={routing.ttsProvider || 'qwen3Tts'} onChange={(e) => setRouting((prev) => ({ ...prev, ttsProvider: e.target.value as 'qwen3Tts' | 'elevenLabs' | 'heygen', audioProvider: e.target.value as 'qwen3Tts' | 'elevenLabs' | 'heygen' }))} className={inputClass}>
+                  <select value={routing.ttsProvider === 'elevenLabs' && isPaidMode ? 'elevenLabs' : 'qwen3Tts'} onChange={(e) => setRouting((prev) => ({ ...prev, ttsProvider: e.target.value as 'qwen3Tts' | 'elevenLabs', audioProvider: e.target.value as 'qwen3Tts' | 'elevenLabs' }))} className={inputClass}>
                     <option value="qwen3Tts">🆓 qwen3-tts</option>
                     {isPaidMode ? <option value="elevenLabs">ElevenLabs</option> : null}
-                    {isPaidMode ? <option value="heygen">HeyGen Starfish</option> : null}
                   </select>
                 </label>
                 <label className="mt-2 block">
@@ -714,20 +614,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                     </label>
                   </>
                 ) : null}
-                {routing.ttsProvider === 'heygen' ? (
-                  <label className="mt-2 block">
-                    <div className="mb-1 text-xs font-bold text-slate-700">HeyGen 보이스</div>
-                    <select value={routing.heygenVoiceId || selectedHeyGenVoice?.voice_id || ''} onChange={(e) => setRouting((prev) => ({ ...prev, heygenVoiceId: e.target.value }))} className={inputClass}>
-                      {heygenVoices.map((item) => <option key={item.voice_id} value={item.voice_id}>{item.name}{item.language ? ` · ${item.language}` : ''}</option>)}
-                    </select>
-                  </label>
-                ) : null}
                 <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
-                  {routing.ttsProvider === 'qwen3Tts'
-                    ? `현재 기본 보이스: ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'}`
-                    : routing.ttsProvider === 'elevenLabs'
-                      ? `현재 기본 보이스: ${selectedElevenVoice?.name || 'ElevenLabs 기본 보이스'}${selectedElevenVoice?.labels?.gender ? ` · ${selectedElevenVoice.labels.gender}` : ''}`
-                      : `현재 기본 보이스: ${selectedHeyGenVoice?.name || 'HeyGen 기본 보이스'}${selectedHeyGenVoice?.language ? ` · ${selectedHeyGenVoice.language}` : ''}`}
+                  {routing.ttsProvider === 'elevenLabs'
+                    ? `현재 기본 보이스: ${selectedElevenVoice?.name || 'ElevenLabs 기본 보이스'}${selectedElevenVoice?.labels?.gender ? ` · ${selectedElevenVoice.labels.gender}` : ''}`
+                    : `현재 기본 보이스: ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'}`}
                 </div>
                 <button type="button" onClick={() => void playVoicePreview()} className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
                   {isVoicePreviewing ? '음성 정지' : '음성 재생'}
@@ -736,11 +626,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 {routing.ttsProvider === 'elevenLabs' && !providerValues.elevenLabsApiKey.trim() ? (
                   <p className="mt-2 text-xs text-amber-600">선택한 음성 모델은 API 연결이 필요합니다. API 등록 후 다시 시도해 주세요.</p>
                 ) : null}
-                {routing.ttsProvider === 'heygen' && !providerValues.heygenApiKey.trim() ? (
-                  <p className="mt-2 text-xs text-amber-600">선택한 HeyGen 보이스는 API 연결이 필요합니다. API 등록 후 다시 시도해 주세요.</p>
-                ) : null}
                 {isLoadingVoices ? <p className="mt-2 text-xs text-slate-500">보이스 목록을 불러오는 중입니다.</p> : null}
               </div>
+
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-black text-slate-900">배경 음악</div>
                 <label className="mt-2 block">
@@ -778,77 +666,78 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
           <section className={cardClass}>
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-base font-black text-slate-900">고급 API 선택</h3>
-                <p className="mt-1 text-xs text-slate-600">유료모드에서 OpenRouter 모델(대본/프롬프트)과 Step6 영상 생성 모델(FAL)을 세부 선택합니다.</p>
+                <h3 className="text-base font-black text-slate-900">텍스트 · 이미지 · 영상 모델</h3>
+                <p className="mt-1 text-xs text-slate-600">Google AI Studio 모델은 무료/유료를 구분해 드롭다운으로 제공합니다. 무료 API가 없는 항목은 샘플 모델로 최종 출력까지 테스트할 수 있습니다.</p>
               </div>
-              <span className={`rounded-full px-3 py-1 text-[11px] font-black ${advancedApiLocked ? 'bg-slate-100 text-slate-500' : 'bg-blue-50 text-blue-700'}`}>
-                {advancedApiLocked ? '유료모드 필요' : '활성화됨'}
+              <span className={`rounded-full px-3 py-1 text-[11px] font-black ${isPaidMode ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                {isPaidMode ? '무료 + 유료 표시' : '무료만 표시'}
               </span>
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-black text-slate-900">OpenRouter 모델 검색</div>
-                <input
-                  value={openRouterQuery}
-                  onChange={(e) => setOpenRouterQuery(e.target.value)}
-                  disabled={advancedApiLocked}
-                  placeholder="모델 ID 또는 이름 검색"
-                  className={`${inputClass} mt-2 disabled:bg-slate-100 disabled:text-slate-400`}
-                />
-
-                <label className="mt-3 block">
-                  <div className="mb-1 text-xs font-bold text-slate-700">대본 생성 모델</div>
+                <div className="text-xs font-black text-slate-900">텍스트 생성 모델</div>
+                <label className="mt-2 block">
+                  <div className="mb-1 text-xs font-bold text-slate-700">대본 생성</div>
                   <select
-                    value={routing.scriptModel || routing.textModel || 'openrouter/auto'}
+                    value={visibleScriptModels.some((item) => item.id === (routing.scriptModel || routing.textModel)) ? (routing.scriptModel || routing.textModel || freeScriptModel) : freeScriptModel}
                     onChange={(e) => setRouting((prev) => ({ ...prev, scriptModel: e.target.value, textModel: e.target.value }))}
-                    disabled={advancedApiLocked}
-                    className={`${inputClass} disabled:bg-slate-100 disabled:text-slate-400`}
+                    className={inputClass}
                   >
-                    {openRouterModelOptions.map((item) => <option key={`script-${item.id}`} value={item.id}>{item.name}</option>)}
+                    {visibleScriptModels.map((item) => <option key={`script-${item.id}`} value={item.id}>{item.tier === 'paid' ? `💳 ${item.name}` : `🆓 ${item.name}`}</option>)}
                   </select>
                 </label>
-
                 <label className="mt-2 block">
-                  <div className="mb-1 text-xs font-bold text-slate-700">프롬프트 생성 모델</div>
+                  <div className="mb-1 text-xs font-bold text-slate-700">프롬프트 생성</div>
                   <select
-                    value={promptModelValue}
+                    value={visibleScriptModels.some((item) => item.id === (routing.sceneModel || routing.imagePromptModel || routing.motionPromptModel)) ? (routing.sceneModel || routing.imagePromptModel || routing.motionPromptModel || freeScriptModel) : freeScriptModel}
                     onChange={(e) => setRouting((prev) => ({
                       ...prev,
                       sceneModel: e.target.value,
                       imagePromptModel: e.target.value,
                       motionPromptModel: e.target.value,
                     }))}
-                    disabled={advancedApiLocked}
-                    className={`${inputClass} disabled:bg-slate-100 disabled:text-slate-400`}
+                    className={inputClass}
                   >
-                    {openRouterModelOptions.map((item) => <option key={`prompt-${item.id}`} value={item.id}>{item.name}</option>)}
+                    {visibleScriptModels.map((item) => <option key={`prompt-${item.id}`} value={item.id}>{item.tier === 'paid' ? `💳 ${item.name}` : `🆓 ${item.name}`}</option>)}
                   </select>
                 </label>
-
-                <p className="mt-2 text-xs text-slate-500">OpenRouter 키가 연결되어야 실제 모델 호출이 적용됩니다.</p>
+                {!providerValues.openRouterApiKey.trim() ? (
+                  <p className="mt-2 text-xs text-amber-600">Google AI Studio 키가 없어도 샘플/무료 흐름 점검은 가능하지만, 실제 호출은 키를 저장해야 적용됩니다.</p>
+                ) : (
+                  <p className="mt-2 text-xs text-slate-500">저장 후 현재 프로젝트에서 선택 모델이 바로 반영됩니다.</p>
+                )}
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-black text-slate-900">Step6 영상 생성 모델</div>
+                <div className="text-xs font-black text-slate-900">이미지 · 영상 생성 모델</div>
+                <label className="mt-2 block">
+                  <div className="mb-1 text-xs font-bold text-slate-700">이미지 모델</div>
+                  <select
+                    value={visibleImageModels.some((item) => item.id === routing.imageModel) ? (routing.imageModel || freeImageModel) : freeImageModel}
+                    onChange={(e) => setRouting((prev) => ({
+                      ...prev,
+                      imageModel: e.target.value,
+                      imageProvider: e.target.value === freeImageModel ? 'sample' : 'openrouter',
+                    }))}
+                    className={inputClass}
+                  >
+                    {visibleImageModels.map((item) => <option key={item.id} value={item.id}>{item.tier === 'paid' ? `💳 ${item.name}` : `🆓 ${item.name}`}</option>)}
+                  </select>
+                </label>
                 <label className="mt-2 block">
                   <div className="mb-1 text-xs font-bold text-slate-700">영상 모델</div>
                   <select
-                    value={routing.videoModel || 'fal-pixverse-v55'}
-                    onChange={(e) => setRouting((prev) => ({ ...prev, videoModel: e.target.value, videoProvider: 'elevenLabs' }))}
-                    disabled={advancedApiLocked}
-                    className={`${inputClass} disabled:bg-slate-100 disabled:text-slate-400`}
+                    value={visibleVideoModels.some((item) => item.id === routing.videoModel) ? (routing.videoModel || freeVideoModel) : freeVideoModel}
+                    onChange={(e) => setRouting((prev) => ({ ...prev, videoModel: e.target.value, videoProvider: e.target.value === freeVideoModel ? 'sample' : 'elevenLabs' }))}
+                    className={inputClass}
                   >
-                    {STEP6_VIDEO_MODEL_OPTIONS.map((item) => (
-                      <option key={item.id} value={item.id}>{item.name}</option>
-                    ))}
+                    {visibleVideoModels.map((item) => <option key={item.id} value={item.id}>{item.tier === 'paid' ? `💳 ${item.name}` : `🆓 ${item.name}`}</option>)}
                   </select>
                 </label>
-                {!providerValues.falApiKey.trim() ? (
-                  <p className="mt-2 text-xs text-amber-600">영상 생성에는 FAL.AI API 키가 필요합니다. 위에서 키를 등록해 주세요.</p>
-                ) : (
-                  <p className="mt-2 text-xs text-slate-500">선택 모델은 Step6의 씬 영상 생성/전체 씬 영상 생성에 즉시 반영됩니다.</p>
-                )}
+                <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
+                  무료 API가 없는 항목은 샘플 모델로도 화면 흐름, 씬 생성, 최종 출력 테스트가 되도록 유지됩니다.
+                </div>
               </div>
             </div>
           </section>

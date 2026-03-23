@@ -1,5 +1,8 @@
-import ClientOnlyApp from '../ClientOnlyApp';
 
-export default function Mp4CreaterStep1Page() {
-  return <ClientOnlyApp routeStep={1} />;
+import { redirect } from 'next/navigation';
+import { buildQueryString, type SearchParamsRecord } from '../redirect-utils';
+
+export default async function LegacyRedirectPage(props: { searchParams?: Promise<SearchParamsRecord>; }) {
+  const searchParams = await props.searchParams;
+  redirect(`/mp4Creater/step-1${buildQueryString(searchParams)}`);
 }

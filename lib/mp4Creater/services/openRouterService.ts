@@ -48,7 +48,7 @@ function trimMessagesByBudget(messages: OpenRouterMessage[], inputMaxChars: numb
   let remaining = inputMaxChars;
 
   for (const message of reversed) {
-    const content = `${message.content || ""}`;
+    const content = `${message.content || ''}`;
     if (!content.trim()) continue;
 
     const trimmed = content.length > remaining ? content.slice(content.length - remaining) : content;
@@ -62,53 +62,76 @@ function trimMessagesByBudget(messages: OpenRouterMessage[], inputMaxChars: numb
   return kept.reverse();
 }
 
-function buildOpenRouterError(status: number, text: string) {
-  if (status === 401 || status === 403) {
-    return 'The OpenRouter API key is invalid. Please enter it again.';
-  }
+function normalizeGoogleTextModel(model?: string | null) {
+  const trimmed = `${model || ''}`.trim();
+  if (!trimmed || trimmed === 'openrouter/auto') return CONFIG.DEFAULT_SCRIPT_MODEL;
+  return trimmed;
+}
 
-  if (status === 402 || status === 429) {
-    return 'The OpenRouter balance or request quota is not available. Recharge it or enter another key.';
-  }
+function buildGeminiError(status: number, text: string) {
+  if (status === 400) return 'Google AI Studio 요청 형식이 올바르지 않습니다. 모델이나 입력을 다시 확인해 주세요.';
+  if (status === 401 || status === 403) return 'Google AI Studio API 키가 올바르지 않거나 접근 권한이 없습니다.';
+  if (status === 402 || status === 429) return 'Google AI Studio 요청 한도 또는 결제 제한에 걸렸습니다. 무료/유료 사용량을 확인해 주세요.';
+  return `Google AI Studio 요청이 실패했습니다: ${status}${text ? ` - ${text.slice(0, 200)}` : ''}`;
+}
 
-  return `OpenRouter request failed: ${status}${text ? ` - ${text.slice(0, 200)}` : ""}`;
+function extractTextFromGeminiResponse(json: any): string {
+  const candidates = Array.isArray(json?.candidates) ? json.candidates : [];
+  for (const candidate of candidates) {
+    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
+    const joined = parts
+      .map((part: any) => (typeof part?.text === 'string' ? part.text : ''))
+      .filter(Boolean)
+      .join('\n');
+    if (joined.trim()) return joined.trim();
+  }
+  return '';
 }
 
 export async function runOpenRouterText(request: OpenRouterRequest): Promise<string> {
   const apiKey =
     localStorage.getItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY) ||
+    process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
     process.env.NEXT_PUBLIC_OPENROUTER_API_KEY ||
     '';
 
   if (!apiKey) {
-    throw new Error('The OpenRouter API key is not configured.');
+    throw new Error('The Google AI Studio API key is not configured.');
   }
 
   const { maxTokens, inputMaxChars } = resolveTokenLimits(request);
   const messages = trimMessagesByBudget(request.messages, inputMaxChars);
+  const systemText = messages.filter((item) => item.role === 'system').map((item) => item.content.trim()).filter(Boolean).join('\n\n');
+  const conversationMessages = messages.filter((item) => item.role !== 'system');
+  const contents = conversationMessages.length
+    ? conversationMessages.map((message) => ({
+        role: message.role === 'assistant' ? 'model' : 'user',
+        parts: [{ text: message.content }],
+      }))
+    : [{ role: 'user', parts: [{ text: 'Respond to the latest instruction.' }] }];
 
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(normalizeGoogleTextModel(request.model))}:generateContent`, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      'x-goog-api-key': apiKey,
       'Content-Type': 'application/json',
-      'HTTP-Referer': typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
-      'X-Title': 'TubeGen Studio',
     },
     body: JSON.stringify({
-      model: request.model,
-      messages,
-      temperature: request.temperature ?? 0.7,
-      max_tokens: maxTokens,
-      ...(request.responseFormat ? { response_format: request.responseFormat } : {}),
+      ...(systemText ? { systemInstruction: { parts: [{ text: systemText }] } } : {}),
+      contents,
+      generationConfig: {
+        temperature: request.temperature ?? 0.7,
+        maxOutputTokens: maxTokens,
+        ...(request.responseFormat ? { responseMimeType: 'application/json' } : {}),
+      },
     }),
   });
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(buildOpenRouterError(response.status, text));
+    throw new Error(buildGeminiError(response.status, text));
   }
 
   const json = await response.json();
-  return json?.choices?.[0]?.message?.content ?? '';
+  return extractTextFromGeminiResponse(json);
 }

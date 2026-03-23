@@ -105,7 +105,6 @@ export default function Step4Panel({
 }: Step4PanelProps) {
   const stripRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const previousImageCountRef = useRef<Record<string, number>>({});
-  const autoSeededCharacterIdsRef = useRef<string[]>([]);
 
   const selectedStyle = useMemo(
     () => characterStyleOptions.find((item) => item.id === selectedCharacterStyleId) || null,
@@ -150,27 +149,7 @@ export default function Step4Panel({
     });
   }, [localStage, selectedCharacters, onSelectCharacterImage]);
 
-  useEffect(() => {
-    if (localStage !== 'workspace') return;
 
-    selectedCharacters.forEach((character) => {
-      const images = character.generatedImages || [];
-      const isGenerating = characterLoadingProgress[character.id] !== undefined;
-      if (images.length || isGenerating || autoSeededCharacterIdsRef.current.includes(character.id)) return;
-      autoSeededCharacterIdsRef.current = [...autoSeededCharacterIdsRef.current, character.id];
-      onCreateVariants(character, { sourceLabel: 'auto-seed', note: 'Create the first candidate automatically when Step4 workspace opens.' });
-    });
-  }, [localStage, selectedCharacters, characterLoadingProgress, onCreateVariants]);
-
-  useEffect(() => {
-    autoSeededCharacterIdsRef.current = autoSeededCharacterIdsRef.current.filter((characterId) => {
-      const character = selectedCharacters.find((item) => item.id === characterId);
-      if (!character) return false;
-      const hasImages = Boolean((character.generatedImages || []).length);
-      const isGenerating = characterLoadingProgress[character.id] !== undefined;
-      return !hasImages && !isGenerating;
-    });
-  }, [selectedCharacters, characterLoadingProgress]);
 
   const scrollStripBy = (characterId: string, direction: 'left' | 'right') => {
     const container = stripRefs.current[characterId];

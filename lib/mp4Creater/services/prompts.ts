@@ -5,6 +5,7 @@
 import { AspectRatio, ContentType } from '../types';
 import { getAspectRatioPrompt } from '../utils/aspectRatio';
 import { buildScriptPromptByContentType } from './promptProfiles';
+import { buildPromptStudioStepBlock, getPromptStudioBundle } from '../prompt-center';
 
 export const VAR_BASE_CHAR = `Simple 2D stick figure. Circle head, dot eyes, line mouth, thin line body/arms/legs. Black outline only.`;
 
@@ -82,5 +83,7 @@ export const getScriptGenerationPrompt = (
   contentType: ContentType = 'story'
 ) => {
   const content = sourceContext || topic;
-  return buildScriptPromptByContentType(contentType, topic, content);
+  const basePrompt = buildScriptPromptByContentType(contentType, topic, content);
+  const promptStudio = getPromptStudioBundle(contentType);
+  return `${basePrompt}\n\n[PROMPT FOLDER / CONCEPT]\n${promptStudio.conceptGuide}\n\n${buildPromptStudioStepBlock(contentType, 'scene')}\n\n${buildPromptStudioStepBlock(contentType, 'style')}\n\n${buildPromptStudioStepBlock(contentType, 'action')}`;
 };

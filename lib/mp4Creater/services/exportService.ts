@@ -217,8 +217,12 @@ function createStoredZip(entries: ZipEntryInput[]): Blob {
   writeUint32(endView, 16, offset);
   writeUint16(endView, 20, 0);
 
-  const allParts = [...localChunks, centralDirectory, endRecord];
+  const allParts = [...localChunks.map(toBlobPart), toBlobPart(centralDirectory), toBlobPart(endRecord)];
   return new Blob(allParts, { type: 'application/zip' });
+}
+
+function toBlobPart(value: Uint8Array): ArrayBuffer {
+  return Uint8Array.from(value).buffer;
 }
 
 function bytesFromText(value: string): Uint8Array {

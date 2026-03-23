@@ -341,7 +341,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
     return (
       <article
         key={project.id}
-        className={`group relative overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm transition-all ${isDeleting ? 'pointer-events-none scale-95 opacity-50' : 'hover:-translate-y-0.5 hover:shadow-lg'}`}
+        className={`mp4-glass-panel group relative overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm transition-all ${isDeleting ? 'pointer-events-none scale-95 opacity-50' : 'hover:-translate-y-0.5 hover:shadow-lg'}`}
       >
         <div className="relative h-[132px] overflow-hidden border-b border-slate-200" style={{ background: cardBackground }}>
           {thumbSrc ? (
@@ -444,7 +444,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
         className="hidden"
       />
 
-      <div className="mb-5 flex flex-col gap-3 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mp4-glass-hero mb-5 flex flex-col gap-3 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">보관함</div>
@@ -500,7 +500,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           type="button"
           disabled={isInteractionLocked}
           onClick={openCreateProject}
-          className={`flex min-h-[238px] items-center justify-center rounded-[24px] border border-dashed p-6 text-left shadow-sm transition-all ${isInteractionLocked ? 'cursor-wait border-slate-300 bg-slate-200/90 text-slate-500' : 'border-blue-300 bg-gradient-to-br from-blue-50 via-white to-cyan-50 hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-lg'}`}
+          className={`mp4-glass-panel flex min-h-[238px] items-center justify-center rounded-[24px] border border-dashed p-6 text-left shadow-sm transition-all ${isInteractionLocked ? 'cursor-wait border-slate-300 bg-slate-200/90 text-slate-500' : 'border-blue-300 bg-gradient-to-br from-blue-50 via-white to-cyan-50 hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-lg'}`}
         >
           <div className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black ${isInteractionLocked ? 'bg-slate-500 text-white' : 'bg-blue-600 text-white'}`}>
             제작하기 <span aria-hidden="true">→</span>
@@ -534,7 +534,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
             if (event.target === event.currentTarget) setNameModal(null);
           }}
         >
-          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+          <div className="mp4-glass-panel w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
             <h3 className="text-base font-black text-slate-900">
               {nameModal.mode === 'create' ? '프로젝트 이름을 적어주세요' : '프로젝트 이름 수정'}
             </h3>

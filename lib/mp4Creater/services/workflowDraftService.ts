@@ -1,3 +1,4 @@
+import { CONFIG } from '../config';
 import {
   ContentType,
   DEFAULT_ASPECT_RATIO,
@@ -90,10 +91,10 @@ export function createDefaultWorkflowDraft(contentType: ContentType = 'story', o
       language: 'ko',
       referenceText: '',
       referenceLinks: [],
-      scriptModel: 'openrouter/auto',
+      scriptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
     },
     constitutionAnalysis: null,
-    openRouterModel: 'openrouter/auto',
+    openRouterModel: CONFIG.DEFAULT_SCRIPT_MODEL,
     ttsProvider: 'qwen3Tts',
     elevenLabsVoiceId: null,
     elevenLabsModelId: null,
@@ -251,14 +252,14 @@ export function ensureWorkflowDraft(studioState?: StudioState | null): WorkflowD
       language: existing.customScriptSettings?.language || 'ko',
       referenceText: existing.customScriptSettings?.referenceText || '',
       referenceLinks: Array.isArray(existing.customScriptSettings?.referenceLinks) ? existing.customScriptSettings?.referenceLinks : [],
-      scriptModel: existing.customScriptSettings?.scriptModel || existing.openRouterModel || 'openrouter/auto',
+      scriptModel: existing.customScriptSettings?.scriptModel || existing.openRouterModel || CONFIG.DEFAULT_SCRIPT_MODEL,
     },
     constitutionAnalysis: existing.constitutionAnalysis || null,
     selectedPromptTemplateId:
       promptTemplates.some((item) => item.id === existing.selectedPromptTemplateId)
         ? existing.selectedPromptTemplateId
         : getDefaultWorkflowPromptTemplateId(contentType),
-    openRouterModel: existing.openRouterModel || existing.selectedPromptTemplateId || 'openrouter/auto',
+    openRouterModel: existing.openRouterModel || existing.selectedPromptTemplateId || CONFIG.DEFAULT_SCRIPT_MODEL,
     ttsProvider: existing.ttsProvider || 'qwen3Tts',
     heygenVoiceId: existing.heygenVoiceId || null,
     qwenVoicePreset: existing.qwenVoicePreset || 'qwen-default',

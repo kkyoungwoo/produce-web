@@ -18,11 +18,10 @@ function buildFailureMessage(status: number, providerName: string) {
   return `${providerName} API 연결이 확인되지 않았습니다. 다시 시도해 주세요.`;
 }
 
-async function validateOpenRouter(apiKey: string): Promise<ProviderValidationResult> {
-  const response = await fetch('https://openrouter.ai/api/v1/models', {
+async function validateGoogleAiStudio(apiKey: string): Promise<ProviderValidationResult> {
+  const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
     headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
     },
   });
 
@@ -30,14 +29,14 @@ async function validateOpenRouter(apiKey: string): Promise<ProviderValidationRes
     return {
       ok: false,
       tone: 'error',
-      message: buildFailureMessage(response.status, 'OpenRouter'),
+      message: buildFailureMessage(response.status, 'Google AI Studio'),
     };
   }
 
   return {
     ok: true,
     tone: 'success',
-    message: 'OpenRouter API 연결이 확인되었습니다.',
+    message: 'Google AI Studio API 연결이 확인되었습니다.',
   };
 }
 
@@ -63,81 +62,6 @@ async function validateElevenLabs(apiKey: string): Promise<ProviderValidationRes
   };
 }
 
-
-async function validateHeyGen(apiKey: string): Promise<ProviderValidationResult> {
-  const response = await fetch('/api/mp4Creater/heygen/voices', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      apiKey,
-      limit: 5,
-    }),
-  });
-
-  if (!response.ok) {
-    return {
-      ok: false,
-      tone: 'error',
-      message: buildFailureMessage(response.status, 'HeyGen'),
-    };
-  }
-
-  return {
-    ok: true,
-    tone: 'success',
-    message: 'HeyGen API 연결이 확인되었습니다.',
-  };
-}
-
-async function validateFal(apiKey: string): Promise<ProviderValidationResult> {
-  const response = await fetch('https://fal.run/fal-ai/pixverse/v5.5/image-to-video', {
-    method: 'POST',
-    headers: {
-      Authorization: `Key ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      prompt: 'connection-test',
-      image_url: 'https://example.com/invalid.png',
-      duration: 5,
-      aspect_ratio: '16:9',
-      resolution: '480p',
-    }),
-  });
-
-  if (response.status === 401 || response.status === 403) {
-    return {
-      ok: false,
-      tone: 'error',
-      message: buildFailureMessage(response.status, 'FAL'),
-    };
-  }
-
-  if (response.status === 402 || response.status === 429) {
-    return {
-      ok: false,
-      tone: 'error',
-      message: buildFailureMessage(response.status, 'FAL'),
-    };
-  }
-
-  if (response.ok || response.status === 400 || response.status === 422) {
-    return {
-      ok: true,
-      tone: 'success',
-      message: 'FAL API 연결 응답을 확인했습니다.',
-    };
-  }
-
-  return {
-    ok: false,
-    tone: 'error',
-    message: buildFailureMessage(response.status, 'FAL'),
-  };
-}
-
 export async function validateProviderConnection(
   kind: ProviderValidationKind,
   apiKey: string
@@ -152,10 +76,8 @@ export async function validateProviderConnection(
   }
 
   try {
-    if (kind === 'openRouter') return await validateOpenRouter(trimmed);
     if (kind === 'elevenLabs') return await validateElevenLabs(trimmed);
-    if (kind === 'heygen') return await validateHeyGen(trimmed);
-    return await validateFal(trimmed);
+    return await validateGoogleAiStudio(trimmed);
   } catch {
     return {
       ok: false,

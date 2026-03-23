@@ -34,8 +34,8 @@ export function LoadingOverlay({
     : null;
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/30 px-4 backdrop-blur-[2px]">
-      <div className="w-full max-w-md rounded-[32px] border border-slate-200 bg-white p-6 shadow-2xl">
+    <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/22 px-4 backdrop-blur-[6px]">
+      <div className="mp4-glass-panel w-full max-w-md rounded-[32px] border border-slate-200 bg-white p-6 shadow-2xl">
         <div className="flex items-center gap-3">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600/10">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
@@ -83,15 +83,15 @@ export function StudioPageSkeleton({
   const safeProgress = Math.max(0, Math.min(100, Math.round(progressPercent || 0)));
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <div className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 px-4 py-4 backdrop-blur-md sm:px-6 lg:px-8">
+    <div className="mp4-shell min-h-screen text-slate-900">
+      <div className="sticky top-0 z-20 border-b border-white/40 bg-white/45 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
         <div className="mx-auto max-w-[1520px] animate-pulse">
           <div className="h-8 w-64 rounded-full bg-slate-200" />
           <div className="mt-4 h-3 w-80 rounded-full bg-slate-200" />
         </div>
       </div>
       <main className="mx-auto max-w-[1520px] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="mp4-glass-hero rounded-[30px] border border-slate-200 bg-white p-6 shadow-sm">
           <div className="text-[11px] font-black uppercase tracking-[0.22em] text-blue-600">준비 중</div>
           <h1 className="mt-2 text-3xl font-black text-slate-900">{title}</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>
