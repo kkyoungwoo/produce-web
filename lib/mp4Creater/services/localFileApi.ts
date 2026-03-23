@@ -358,12 +358,15 @@ function buildLeanStatePayload(partial: Partial<StudioState>, cachedState?: Stud
     characters: Array.isArray(partial.characters) ? partial.characters : base.characters,
     routing: partial.routing ? { ...(base.routing || DEFAULT_ROUTING), ...partial.routing } : base.routing,
     providers: partial.providers ? { ...(base.providers || {}), ...partial.providers } : base.providers,
-    workflowDraft: Object.prototype.hasOwnProperty.call(partial, 'workflowDraft') ? compactWorkflowDraftForStorage(partial.workflowDraft as any) ?? null : base.workflowDraft,
     agentProfile: partial.agentProfile || base.agentProfile,
     preferredPromptProfile: partial.preferredPromptProfile || base.preferredPromptProfile,
     providerRegistry: Array.isArray(partial.providerRegistry) ? partial.providerRegistry : base.providerRegistry,
     lastContentType: partial.lastContentType || base.lastContentType || 'story',
   };
+
+  if (Object.prototype.hasOwnProperty.call(partial, 'workflowDraft')) {
+    payload.workflowDraft = compactWorkflowDraftForStorage(partial.workflowDraft as any) ?? null;
+  }
 
   const nextProjectIndex = Array.isArray((partial as any).projectIndex)
     ? (partial as any).projectIndex.map(summarizeProjectForIndex)

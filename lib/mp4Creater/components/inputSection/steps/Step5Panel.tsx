@@ -75,31 +75,30 @@ function buildSamplePreview(label: string, subtitle: string) {
 export default function Step5Panel({
   styleGroups,
   selectedStyleImageId,
-  isExtracting,
-  onEnsureStyleRecommendations,
   onSelectStyle,
 }: Step5PanelProps) {
+  const visibleStyleGroups = useMemo(() => styleGroups.slice(0, 2), [styleGroups]);
   const flattenedCards = useMemo(
-    () => styleGroups.map((group) => group.items.find((item) => item.id === selectedStyleImageId) || group.items[0]).filter(Boolean) as PromptedImageAsset[],
-    [selectedStyleImageId, styleGroups]
+    () => visibleStyleGroups.map((group) => group.items.find((item) => item.id === selectedStyleImageId) || group.items[0]).filter(Boolean) as PromptedImageAsset[],
+    [selectedStyleImageId, visibleStyleGroups]
   );
-  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(styleGroups[0]?.id || null);
+  const [expandedGroupId, setExpandedGroupId] = useState<string | null>(visibleStyleGroups[0]?.id || null);
 
   useEffect(() => {
-    const selectedGroup = styleGroups.find((group) => group.items.some((item) => item.id === selectedStyleImageId));
+    const selectedGroup = visibleStyleGroups.find((group) => group.items.some((item) => item.id === selectedStyleImageId));
     if (selectedGroup?.id) {
       if (selectedGroup.id !== expandedGroupId) {
         setExpandedGroupId(selectedGroup.id);
       }
       return;
     }
-    const fallbackGroupId = styleGroups[0]?.id || null;
-    if (!styleGroups.some((group) => group.id === expandedGroupId) && fallbackGroupId !== expandedGroupId) {
+    const fallbackGroupId = visibleStyleGroups[0]?.id || null;
+    if (!visibleStyleGroups.some((group) => group.id === expandedGroupId) && fallbackGroupId !== expandedGroupId) {
       setExpandedGroupId(fallbackGroupId);
     }
-  }, [expandedGroupId, selectedStyleImageId, styleGroups]);
+  }, [expandedGroupId, selectedStyleImageId, visibleStyleGroups]);
 
-  const selectedGroup = styleGroups.find((group) => group.items.some((item) => item.id === selectedStyleImageId)) || styleGroups.find((group) => group.id === expandedGroupId) || styleGroups[0] || null;
+  const selectedGroup = visibleStyleGroups.find((group) => group.items.some((item) => item.id === selectedStyleImageId)) || visibleStyleGroups.find((group) => group.id === expandedGroupId) || visibleStyleGroups[0] || null;
   const selectedCard = selectedGroup?.items.find((item) => item.id === selectedStyleImageId) || selectedGroup?.items[0] || null;
 
   return (
@@ -109,12 +108,7 @@ export default function Step5Panel({
           <div>
             <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">최종 영상 화풍</div>
             <h2 className="mt-2 text-xl font-black text-slate-900">배경과 장면 전체 톤을 정하는 Step5 화풍</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">여기서 고른 화풍은 최종 영상 장면 전체의 비주얼 톤앤매너에만 적용됩니다.</p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={onEnsureStyleRecommendations} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500">
-              {isExtracting ? '화풍 준비 중...' : '화풍 샘플 더 불러오기'}
-            </button>
+            <p className="mt-2 text-sm leading-6 text-slate-600">여기서는 제공된 샘플 화풍 2개만 비교해서 고를 수 있습니다. 선택한 화풍은 최종 영상 장면 전체의 톤앤매너에만 적용됩니다.</p>
           </div>
         </div>
 
@@ -133,7 +127,7 @@ export default function Step5Panel({
             <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">한눈에 비교</div>
             <h3 className="mt-2 text-lg font-black text-slate-900">화풍 카드 선택</h3>
           </div>
-          <div className="text-xs text-slate-500">작게 보고 빠르게 고를 수 있게 카드 높이를 줄였습니다.</div>
+          <div className="text-xs text-slate-500">항상 2개 카드만 보여 줍니다.</div>
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
@@ -152,7 +146,7 @@ export default function Step5Panel({
                 className={`overflow-hidden rounded-[20px] border text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-violet-200'}`}
               >
                 <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
-                  <img src={buildSamplePreview(groupLabel, '최종 영상 장면용 화풍 카드')} alt={`${groupLabel} 샘플`} className="aspect-[16/9] w-full object-cover" />
+                  <img src={card.imageData || buildSamplePreview(groupLabel, '최종 영상 장면용 화풍 카드')} alt={`${groupLabel} 샘플`} className="aspect-[16/9] w-full object-cover" />
                 </div>
                 <div className="p-3">
                   <div className="flex items-start justify-between gap-2">
@@ -170,7 +164,7 @@ export default function Step5Panel({
 
         {!flattenedCards.length && (
           <div className="mt-4 rounded-[24px] border border-dashed border-slate-300 bg-white p-8 text-center text-sm leading-6 text-slate-500">
-            아직 준비된 화풍 카드가 없습니다. 화풍 샘플 더 불러오기를 누르면 최종 영상용 화풍 카드가 한 번에 채워집니다.
+            아직 선택 가능한 화풍 카드가 준비되지 않았습니다. Step5에서는 제공된 샘플 카드만 선택할 수 있습니다.
           </div>
         )}
       </section>

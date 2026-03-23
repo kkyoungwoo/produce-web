@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StepId } from '../types';
 import { STEP_META } from '../constants';
 import { OverlayModal } from '../ui';
@@ -132,6 +132,8 @@ export default function RouteStepView({ vm }: { vm: any }) {
 
   const currentRouteStep = (routeStep || 1) as 1 | 2 | 3 | 4 | 5;
   const [stepShellVisible, setStepShellVisible] = useState(false);
+  const [step4LocalStage, setStep4LocalStage] = useState<'style' | 'workspace'>(selectedCharacterStyleId ? 'workspace' : 'style');
+  const previousRouteStepRef = useRef(currentRouteStep);
 
   useEffect(() => {
     if (currentRouteStep === 3) {
@@ -142,6 +144,19 @@ export default function RouteStepView({ vm }: { vm: any }) {
     const frame = window.requestAnimationFrame(() => setStepShellVisible(true));
     return () => window.cancelAnimationFrame(frame);
   }, [currentRouteStep]);
+
+  useEffect(() => {
+    const previousRouteStep = previousRouteStepRef.current;
+    previousRouteStepRef.current = currentRouteStep;
+    if (currentRouteStep !== 4 || previousRouteStep === 4) return;
+    setStep4LocalStage(selectedCharacterStyleId ? 'workspace' : 'style');
+  }, [currentRouteStep, selectedCharacterStyleId]);
+
+  useEffect(() => {
+    if (currentRouteStep !== 4) return;
+    if (selectedCharacterStyleId || step4LocalStage !== 'workspace') return;
+    setStep4LocalStage('style');
+  }, [currentRouteStep, selectedCharacterStyleId, step4LocalStage]);
 
   if (!routeStep) return null;
 
@@ -272,9 +287,11 @@ export default function RouteStepView({ vm }: { vm: any }) {
           selectedCharacterIds={normalizedSelectedCharacterIds}
           selectedCharacterStyleId={selectedCharacterStyleId}
           characterStyleOptions={characterStyleOptions}
+          localStage={step4LocalStage}
           isExtracting={isExtracting}
           characterLoadingProgress={characterLoadingProgress}
           onHydrateCharacters={() => { void hydrateCharactersForScript({ preserveSelection: true }); }}
+          onLocalStageChange={setStep4LocalStage}
           onSelectCharacterStyle={vm.setSelectedCharacterStyleId}
           onUploadCharacterImage={handleCharacterUploadForId}
           onUploadNewCharacterImage={openCharacterUploadPicker}
@@ -311,6 +328,14 @@ export default function RouteStepView({ vm }: { vm: any }) {
       return;
     }
     if (!nextRouteStep) return;
+    if (currentRouteStep === 4 && step4LocalStage === 'style') {
+      if (!selectedCharacterStyleId) return;
+      setStep4LocalStage('workspace');
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+      return;
+    }
     if (currentRouteStep === 3) {
       window.requestAnimationFrame(() => {
         void completeStage(currentRouteStep, nextRouteStep as StepId);
@@ -322,6 +347,8 @@ export default function RouteStepView({ vm }: { vm: any }) {
 
   const canMoveNext = currentRouteStep === 1
     ? Boolean(hasSelectedContentType && hasSelectedAspectRatio)
+    : currentRouteStep === 4 && step4LocalStage === 'style'
+      ? Boolean(selectedCharacterStyleId)
     : Boolean(routeStepCompleted[currentRouteStep]);
 
   return (
@@ -342,6 +369,13 @@ export default function RouteStepView({ vm }: { vm: any }) {
           <button
             type="button"
             onClick={() => {
+              if (currentRouteStep === 4 && step4LocalStage === 'workspace') {
+                setStep4LocalStage('style');
+                window.requestAnimationFrame(() => {
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                });
+                return;
+              }
               if (previousRouteStep) {
                 void moveRouteStep(previousRouteStep);
                 return;

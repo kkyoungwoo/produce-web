@@ -1,20 +1,10 @@
-[00:00:02.316] Server  LOG     ✓ Ready in 2.1s
-[00:00:05.573] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:04:53.126] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:04:54.615] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
-[00:04:55.259] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:04:58.243] Browser WARN    [Project] project detail sync failed. IndexedDB backup is still safe. {}
-[00:04:59.612] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:05:00.280] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
-[00:05:13.006] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:05:14.034] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
-[00:05:23.746] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:05:24.718] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
-[00:14:02.497] Server  ERROR   ⨯ SyntaxError: Unexpected end of JSON input
-[00:14:03.273] Browser WARN    [mp4Creater] saveStudioState failed, keeping local cache only {}
-[00:24:20.486] Server  WARN    [local-storage/project] readStoredState failed in POST, using fallback current state Error: EBUSY: resource busy or locked, unlink 'C:\Users\gorhr\.tubegen-studio\projects\project_1774175998515_jzvhuf.json'
-[00:24:25.976] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:24:25.976] Browser ERROR   uncaughtError: Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+[00:00:02.259] Server  LOG     ✓ Ready in 2s
+[00:00:30.458] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:08:39.268] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:27:46.768] Server  ERROR   ⨯ Failed to generate static paths for /[locale]/mp4Creater/step-5:
+[00:27:46.783] Server  ERROR   SyntaxError: Unexpected end of JSON input
+[00:41:39.999] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:41:40.139] Browser ERROR   uncaughtError: Error: Hydration failed because the server rendered text didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
 
 - A server/client branch `if (typeof window !== 'undefined')`.
 - Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
@@ -65,5 +55,5 @@ https://react.dev/link/hydration-mismatch
                   ...
         ...
 
-[00:25:06.901] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:25:12.029] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:41:43.563] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:49:05.073] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

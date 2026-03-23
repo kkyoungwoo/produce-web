@@ -6,9 +6,9 @@ mp4Creater v3: 첫 진입/신규 생성 안정화 + Step 3 → Step 4 출연자 
 ## 현재 우선순위
 1. `/mp4Creater` 첫 진입과 새 프로젝트 생성 직후 blank screen이 다시 생기지 않게 유지한다.
 2. 새 프로젝트 생성 시 저장 지연이 있어도 `step-1?projectId=...`가 즉시 열리도록 optimistic project + navigation cache + project API fallback 흐름을 유지한다.
-3. Step 3에서 고른 출연자 id가 Step 4에서 그대로 유지되도록 한다.
+3. Step 3에서 고른 출연자 id와 출연자별 TTS 선택값이 Step 4 이동 전까지 유지되도록 한다.
 4. Step 4에서는 선택된 출연자만 표시하고, 각 출연자별 대표 이미지 선택 흐름이 자동으로 시작되게 유지한다.
-5. 문서와 테스트 규칙을 현재 코드 흐름에 맞춰 정리하고, 더 이상 사용하지 않는 폴더형 저장 구조 설명은 제거한다.
+5. 문서와 테스트 규칙을 현재 코드 흐름에 맞춰 정리하고, Step 3 출연자 + TTS 규칙과 더 이상 사용하지 않는 폴더형 저장 구조 설명을 함께 최신화한다.
 
 ## 최신 반영 기준 (v3)
 
@@ -21,6 +21,7 @@ mp4Creater v3: 첫 진입/신규 생성 안정화 + Step 3 → Step 4 출연자 
 
 ### Step 3 → Step 4 출연자 handoff
 - Step 4 이동 직전에는 현재 `selectedCharacterIds`를 우선 보존한다.
+- 선택된 출연자 카드의 TTS API / 보이스 선택값은 Step 3 완료 조건과 함께 유지되어야 한다.
 - 현재 추출 목록에 선택된 출연자가 없을 때만 `hydrateCharactersForScript({ preserveSelection: true })`를 다시 시도한다.
 - `completeStage(3, 4)`에서 생성하는 navigation draft는 보존된 선택값을 그대로 `selectedCharacterIds`에 넣어 저장한다.
 

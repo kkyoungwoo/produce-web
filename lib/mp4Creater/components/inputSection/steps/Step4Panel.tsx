@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { CharacterProfile } from '../../../types';
 
 interface CharacterStyleOption {
@@ -8,6 +8,7 @@ interface CharacterStyleOption {
   prompt: string;
   accentFrom: string;
   accentTo: string;
+  sampleImage?: string;
 }
 
 const SAMPLE_STYLE_PALETTE: Record<string, { from: string; to: string; badge: string }> = {
@@ -70,9 +71,11 @@ interface Step4PanelProps {
   selectedCharacterIds: string[];
   selectedCharacterStyleId: string | null;
   characterStyleOptions: CharacterStyleOption[];
+  localStage: 'style' | 'workspace';
   isExtracting: boolean;
   characterLoadingProgress: Record<string, number>;
   onHydrateCharacters: (forceSample?: boolean) => void;
+  onLocalStageChange: (stage: 'style' | 'workspace') => void;
   onSelectCharacterStyle: (styleId: string) => void;
   onUploadCharacterImage: (characterId: string) => void;
   onUploadNewCharacterImage: () => void;
@@ -88,9 +91,11 @@ export default function Step4Panel({
   selectedCharacterIds,
   selectedCharacterStyleId,
   characterStyleOptions,
+  localStage,
   isExtracting,
   characterLoadingProgress,
   onHydrateCharacters,
+  onLocalStageChange,
   onSelectCharacterStyle,
   onUploadCharacterImage,
   onUploadNewCharacterImage,
@@ -98,10 +103,9 @@ export default function Step4Panel({
   onCreateVariants,
   uploadInput,
 }: Step4PanelProps) {
-  const [localStage, setLocalStage] = useState<'style' | 'workspace'>(selectedCharacterStyleId ? 'workspace' : 'style');
   const stripRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const previousImageCountRef = useRef<Record<string, number>>({});
-  const autoStartedCharacterIdsRef = useRef<Record<string, boolean>>({});
+  const autoSeededCharacterIdsRef = useRef<string[]>([]);
 
   const selectedStyle = useMemo(
     () => characterStyleOptions.find((item) => item.id === selectedCharacterStyleId) || null,
@@ -117,8 +121,10 @@ export default function Step4Panel({
   );
 
   useEffect(() => {
-    setLocalStage(selectedCharacterStyleId ? 'workspace' : 'style');
-  }, [selectedCharacterStyleId]);
+    if (!selectedCharacterStyleId && localStage !== 'style') {
+      onLocalStageChange('style');
+    }
+  }, [selectedCharacterStyleId, localStage, onLocalStageChange]);
 
   useEffect(() => {
     selectedCharacters.forEach((character) => {
@@ -141,17 +147,30 @@ export default function Step4Panel({
       if (!character.selectedImageId && images[0]?.id) {
         onSelectCharacterImage(character.id, images[0].id);
       }
-
-      if (images.length || characterLoadingProgress[character.id] !== undefined || autoStartedCharacterIdsRef.current[character.id]) {
-        return;
-      }
-
-      autoStartedCharacterIdsRef.current[character.id] = true;
-      onCreateVariants(character, {
-        note: `Generate the first reference image for ${character.name} using the saved shared character style.`,
-      });
     });
-  }, [localStage, selectedCharacters, characterLoadingProgress, onCreateVariants, onSelectCharacterImage]);
+  }, [localStage, selectedCharacters, onSelectCharacterImage]);
+
+  useEffect(() => {
+    if (localStage !== 'workspace') return;
+
+    selectedCharacters.forEach((character) => {
+      const images = character.generatedImages || [];
+      const isGenerating = characterLoadingProgress[character.id] !== undefined;
+      if (images.length || isGenerating || autoSeededCharacterIdsRef.current.includes(character.id)) return;
+      autoSeededCharacterIdsRef.current = [...autoSeededCharacterIdsRef.current, character.id];
+      onCreateVariants(character, { sourceLabel: 'auto-seed', note: 'Create the first candidate automatically when Step4 workspace opens.' });
+    });
+  }, [localStage, selectedCharacters, characterLoadingProgress, onCreateVariants]);
+
+  useEffect(() => {
+    autoSeededCharacterIdsRef.current = autoSeededCharacterIdsRef.current.filter((characterId) => {
+      const character = selectedCharacters.find((item) => item.id === characterId);
+      if (!character) return false;
+      const hasImages = Boolean((character.generatedImages || []).length);
+      const isGenerating = characterLoadingProgress[character.id] !== undefined;
+      return !hasImages && !isGenerating;
+    });
+  }, [selectedCharacters, characterLoadingProgress]);
 
   const scrollStripBy = (characterId: string, direction: 'left' | 'right') => {
     const container = stripRefs.current[characterId];
@@ -160,9 +179,9 @@ export default function Step4Panel({
     container.scrollBy({ left: direction === 'right' ? amount : -amount, behavior: 'smooth' });
   };
 
-  const moveToWorkspace = (styleId: string) => {
-    onSelectCharacterStyle(styleId);
-    setLocalStage('workspace');
+  const moveToWorkspace = () => {
+    if (!selectedCharacterStyleId) return;
+    onLocalStageChange('workspace');
     window.requestAnimationFrame(() => {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     });
@@ -175,8 +194,21 @@ export default function Step4Panel({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">캐릭터 느낌 선택</div>
-              <h2 className="mt-2 text-xl font-black text-slate-900">먼저 캐릭터 느낌을 고르면 Step4 작업 화면이 열립니다</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">여기서 고른 느낌은 출연자별 캐릭터 생성의 공통 기준이 됩니다. 선택 후에는 출연자마다 후보 이미지를 만들고, 직접 1장씩 선택해야 다음 단계로 넘어갈 수 있습니다.</p>
+              <h2 className="mt-2 text-xl font-black text-slate-900">먼저 캐릭터 느낌을 고르고, 확인 버튼으로 작업 화면을 여세요</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">느낌 카드를 누르면 선택만 바뀌고 바로 다음 화면으로 튀지 않습니다. 확인 버튼을 눌렀을 때만 출연자별 이미지 제작 화면으로 넘어갑니다.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-black text-slate-600">
+                {selectedCharacterStyleId ? '선택 완료' : '느낌 선택 필요'}
+              </div>
+              <button
+                type="button"
+                onClick={moveToWorkspace}
+                disabled={!selectedCharacterStyleId}
+                className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
+              >
+                이 느낌으로 출연자 이미지 만들기
+              </button>
             </div>
           </div>
 
@@ -187,11 +219,11 @@ export default function Step4Panel({
                 <button
                   key={style.id}
                   type="button"
-                  onClick={() => moveToWorkspace(style.id)}
+                  onClick={() => onSelectCharacterStyle(style.id)}
                   className={`overflow-hidden rounded-[24px] border text-left shadow-sm transition ${selected ? 'border-violet-400 ring-2 ring-violet-200' : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'}`}
                 >
                   <div className="overflow-hidden border-b border-slate-200 bg-slate-100">
-                    <img src={buildSampleStylePreview(style.id, style.label, style.description)} alt={`${style.label} 샘플`} className="aspect-[16/10] w-full object-cover" />
+                    <img src={style.sampleImage || buildSampleStylePreview(style.id, style.label, style.description)} alt={`${style.label} 샘플`} className="aspect-[16/10] w-full object-cover" />
                   </div>
                   <div className="p-4">
                     <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">캐릭터 느낌</div>
@@ -199,7 +231,7 @@ export default function Step4Panel({
                     <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-600">{style.description}</p>
                     <div className="mt-3 flex items-center justify-between">
                       <span className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">공통 적용</span>
-                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${selected ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{selected ? '선택됨' : '선택하기'}</span>
+                      <span className={`rounded-full px-2 py-1 text-[10px] font-black ${selected ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-500'}`}>{selected ? '선택됨' : '먼저 선택'}</span>
                     </div>
                   </div>
                 </button>
@@ -221,7 +253,7 @@ export default function Step4Panel({
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <button type="button" onClick={() => setLocalStage('style')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
+              <button type="button" onClick={() => onLocalStageChange('style')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">
                 느낌 다시 선택
               </button>
               {uploadInput}

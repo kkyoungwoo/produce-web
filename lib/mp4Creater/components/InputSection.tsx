@@ -231,6 +231,27 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [voicePreviewMessage, setVoicePreviewMessage] = useState('');
   const characterVoiceAudioRef = useRef<HTMLAudioElement | null>(null);
   const characterVoiceUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const extractedCharactersRef = useRef<CharacterProfile[]>(initial.extractedCharacters || []);
+  const selectedCharacterIdsRef = useRef<string[]>(initial.selectedCharacterIds || []);
+
+  useEffect(() => {
+    extractedCharactersRef.current = extractedCharacters;
+  }, [extractedCharacters]);
+
+  useEffect(() => {
+    selectedCharacterIdsRef.current = selectedCharacterIds;
+  }, [selectedCharacterIds]);
+
+  const replaceExtractedCharacters = (nextCharacters: CharacterProfile[], options?: { persistDraft?: boolean }) => {
+    extractedCharactersRef.current = nextCharacters;
+    setExtractedCharacters(nextCharacters);
+    if (options?.persistDraft && onSaveWorkflowDraft) {
+      onSaveWorkflowDraft({
+        extractedCharacters: nextCharacters,
+        selectedCharacterIds: selectedCharacterIdsRef.current,
+      });
+    }
+  };
 
   const openStageWithIntent = (nextStage: StepId, shouldScroll = true) => {
     shouldAutoScrollSectionRef.current = shouldScroll;
@@ -291,9 +312,13 @@ const InputSection: React.FC<InputSectionProps> = ({
     setSetting(nextSelections.setting || FIELD_OPTIONS_BY_TYPE[nextType].setting[0]);
     setProtagonist(nextSelections.protagonist || FIELD_OPTIONS_BY_TYPE[nextType].protagonist[0]);
     setConflict(nextSelections.conflict || FIELD_OPTIONS_BY_TYPE[nextType].conflict[0]);
-    setExtractedCharacters(workflowDraft?.extractedCharacters || []);
+    const nextHydratedCharacters = workflowDraft?.extractedCharacters || [];
+    const nextHydratedSelectedCharacterIds = workflowDraft?.selectedCharacterIds || [];
+    extractedCharactersRef.current = nextHydratedCharacters;
+    selectedCharacterIdsRef.current = nextHydratedSelectedCharacterIds;
+    setExtractedCharacters(nextHydratedCharacters);
     setStyleImages(workflowDraft?.styleImages || []);
-    setSelectedCharacterIds(workflowDraft?.selectedCharacterIds || []);
+    setSelectedCharacterIds(nextHydratedSelectedCharacterIds);
     setSelectedCharacterStyleId(workflowDraft?.selectedCharacterStyleId || null);
     setSelectedStyleImageId(workflowDraft?.selectedStyleImageId || null);
     setActiveStage(nextStage);
@@ -1380,6 +1405,9 @@ const InputSection: React.FC<InputSectionProps> = ({
     const validCharacterIds = new Set(extractedCharacters.map((item) => item.id));
     setSelectedCharacterIds((prev) => {
       const next = prev.filter((id) => validCharacterIds.has(id));
+      if (next.length !== prev.length) {
+        selectedCharacterIdsRef.current = next;
+      }
       return next.length === prev.length ? prev : next;
     });
   }, [extractedCharacters]);
@@ -1739,6 +1767,8 @@ const InputSection: React.FC<InputSectionProps> = ({
 
         return nextCharacter;
       });
+      extractedCharactersRef.current = normalizedCharacters;
+      selectedCharacterIdsRef.current = nextSelectedIds;
       setExtractedCharacters(normalizedCharacters);
       setSelectedCharacterIds(nextSelectedIds);
       setCharacterCarouselIndices({});
@@ -1765,30 +1795,30 @@ const InputSection: React.FC<InputSectionProps> = ({
 
     setIsExtracting(true);
     try {
-      const usedLabels: string[] = Array.from(new Set(styleImages.map((item) => item.groupLabel || item.label).filter(Boolean) as string[]));
-      const recommendationCount = mode === 'auto' && !styleImages.length ? 10 : 8;
-      const nextStyleCards = buildStyleRecommendations(
+      const recommendationCount = 2;
+      const resolvedCards = buildStyleRecommendations(
         normalizedScript,
         contentType,
-        usedLabels,
+        [],
         recommendationCount,
         aspectRatio
       );
-      const fallbackCards = buildStyleRecommendations(normalizedScript, contentType, [], recommendationCount, aspectRatio);
-      const resolvedCards = nextStyleCards.length ? nextStyleCards : fallbackCards;
-      const nextStyles = mode === 'auto' && !styleImages.length ? resolvedCards : [...styleImages, ...resolvedCards];
-      const nextSelectedStyleId = selectedStyleImageId || nextStyles[0]?.id || null;
+      const previousSelectedCard = styleImages.find((item) => item.id === selectedStyleImageId) || null;
+      const matchedSelectedCard = previousSelectedCard
+        ? resolvedCards.find((item) => (item.groupLabel || item.label) === (previousSelectedCard.groupLabel || previousSelectedCard.label)) || null
+        : null;
+      const nextSelectedStyleId = matchedSelectedCard?.id || resolvedCards[0]?.id || null;
 
-      if (nextStyles.length) {
-        setStyleImages(nextStyles);
-        setSelectedStyleImageId(nextSelectedStyleId || nextStyles[0].id);
+      if (resolvedCards.length) {
+        setStyleImages(resolvedCards);
+        setSelectedStyleImageId(nextSelectedStyleId || resolvedCards[0].id);
         setStyleCarouselIndices({});
       }
 
       setNotice(
         studioState?.providers?.openRouterApiKey
-          ? (mode === 'auto' ? '5단계용 최종 화풍 카드 10개 내외를 먼저 채웠습니다. 여기서 비교하며 고를 수 있습니다.' : '선택한 대본 기준으로 최종 화풍 카드를 추가했습니다.')
-          : (mode === 'auto' ? 'API 연결이 없어도 5단계용 샘플 화풍 카드를 먼저 채웠습니다.' : 'AI 연결이 없어 샘플 화풍 카드를 추가했습니다. OpenRouter를 연결하면 실제 추천 기반으로 계속 늘릴 수 있습니다.')
+          ? (mode === 'auto' ? '5단계 최종 화풍 카드를 2개만 정리해 바로 비교할 수 있게 맞췄습니다.' : '최종 화풍 카드 2개를 현재 대본 기준으로 다시 정리했습니다.')
+          : (mode === 'auto' ? 'API 연결이 없어도 5단계용 샘플 화풍 카드 2개를 먼저 채웠습니다.' : 'AI 연결이 없어 샘플 화풍 카드 2개를 다시 정리했습니다.')
       );
     } finally {
       setIsExtracting(false);
@@ -2159,56 +2189,58 @@ const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const handleCharacterVoiceChange = (characterId: string, voiceHint: string | null) => {
-    setExtractedCharacters((prev) =>
-      prev.map((item) => (item.id === characterId ? { ...item, voiceHint: voiceHint || undefined } : item))
-    );
+    const nextCharacters = extractedCharactersRef.current.map((item) => (
+      item.id === characterId ? { ...item, voiceHint: voiceHint || undefined } : item
+    ));
+    replaceExtractedCharacters(nextCharacters, { persistDraft: true });
   };
 
   const handleCharacterVoiceProviderChange = (characterId: string, provider: 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen') => {
-    setExtractedCharacters((prev) =>
-      prev.map((item) => (item.id === characterId ? { ...item, ...buildCharacterVoicePatch(provider) } : item))
-    );
+    const nextCharacters = extractedCharactersRef.current.map((item) => (
+      item.id === characterId ? { ...item, ...buildCharacterVoicePatch(provider) } : item
+    ));
+    replaceExtractedCharacters(nextCharacters, { persistDraft: true });
   };
 
   const handleCharacterVoiceChoiceChange = (characterId: string, provider: 'qwen3Tts' | 'elevenLabs' | 'heygen', value: string) => {
-    setExtractedCharacters((prev) =>
-      prev.map((item) => (item.id === characterId ? { ...item, ...buildCharacterVoicePatch(provider, value) } : item))
-    );
+    const nextCharacters = extractedCharactersRef.current.map((item) => (
+      item.id === characterId ? { ...item, ...buildCharacterVoicePatch(provider, value) } : item
+    ));
+    replaceExtractedCharacters(nextCharacters, { persistDraft: true });
   };
 
   const handleCharacterVoiceDirectInputChange = (characterId: string, provider: 'elevenLabs' | 'heygen', value: string) => {
     const directId = value.trim();
-    setExtractedCharacters((prev) =>
-      prev.map((item) => {
-        if (item.id !== characterId) return item;
-        if (!directId) return { ...item, ...buildCharacterVoicePatch(provider, '') };
-        const catalogVoice = provider === 'elevenLabs'
-          ? (elevenLabsVoices.find((voice) => voice.voice_id === directId) || null)
-          : (heygenVoices.find((voice) => voice.voice_id === directId) || null);
+    const nextCharacters = extractedCharactersRef.current.map((item) => {
+      if (item.id !== characterId) return item;
+      if (!directId) return { ...item, ...buildCharacterVoicePatch(provider, '') };
+      const catalogVoice = provider === 'elevenLabs'
+        ? (elevenLabsVoices.find((voice) => voice.voice_id === directId) || null)
+        : (heygenVoices.find((voice) => voice.voice_id === directId) || null);
 
-        if (provider === 'elevenLabs') {
-          return {
-            ...item,
-            voiceProvider: 'elevenLabs' as const,
-            voiceHint: directId,
-            voiceId: directId,
-            voiceName: catalogVoice?.name || `ElevenLabs 직접 입력 (${directId})`,
-            voicePreviewUrl: catalogVoice?.preview_url || null,
-            voiceLocale: item.voiceLocale || null,
-          };
-        }
-
+      if (provider === 'elevenLabs') {
         return {
           ...item,
-          voiceProvider: 'heygen' as const,
+          voiceProvider: 'elevenLabs' as const,
           voiceHint: directId,
           voiceId: directId,
-          voiceName: catalogVoice?.name || `HeyGen 직접 입력 (${directId})`,
-          voicePreviewUrl: catalogVoice?.preview_audio_url || catalogVoice?.preview_audio || null,
-          voiceLocale: catalogVoice?.language || item.voiceLocale || null,
+          voiceName: catalogVoice?.name || `ElevenLabs 직접 입력 (${directId})`,
+          voicePreviewUrl: catalogVoice?.preview_url || null,
+          voiceLocale: item.voiceLocale || null,
         };
-      })
-    );
+      }
+
+      return {
+        ...item,
+        voiceProvider: 'heygen' as const,
+        voiceHint: directId,
+        voiceId: directId,
+        voiceName: catalogVoice?.name || `HeyGen 직접 입력 (${directId})`,
+        voicePreviewUrl: catalogVoice?.preview_audio_url || catalogVoice?.preview_audio || null,
+        voiceLocale: catalogVoice?.language || item.voiceLocale || null,
+      };
+    });
+    replaceExtractedCharacters(nextCharacters, { persistDraft: true });
   };
 
   const handlePreviewCharacterVoice = async (characterId: string) => {

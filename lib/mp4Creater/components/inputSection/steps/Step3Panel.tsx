@@ -240,9 +240,9 @@ export default function Step3Panel({
         >
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">출연자 선택</div>
-              <h2 className="mt-2 text-xl font-black text-slate-900">Step4로 넘길 출연자만 가볍게 고르세요</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">카드를 누르면 선택, 다시 누르면 해제됩니다. 출연자는 여기서 직접 추가하거나 삭제할 수 있습니다.</p>
+              <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">출연자 선택 + TTS</div>
+              <h2 className="mt-2 text-xl font-black text-slate-900">Step4로 넘길 출연자를 고르고, 선택한 카드에서 TTS까지 바로 정해 주세요</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">카드를 누르면 선택, 다시 누르면 해제됩니다. 선택된 출연자 카드 아래에서 TTS API와 보이스를 바로 고를 수 있습니다.</p>
             </div>
             <div className="flex flex-wrap items-center justify-end gap-2 text-[11px] font-black">
               <button

@@ -424,8 +424,20 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     projectName?: string,
     navigateToStep1?: boolean
   ) => {
-    if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
+    if (workflowDraftSaveTimerRef.current) {
+      window.clearTimeout(workflowDraftSaveTimerRef.current);
+      workflowDraftSaveTimerRef.current = null;
+    }
+    if (autosaveTimerRef.current) {
+      window.clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+    if (projectDraftSyncTimerRef.current) {
+      window.clearTimeout(projectDraftSyncTimerRef.current);
+      projectDraftSyncTimerRef.current = null;
+    }
     pendingWorkflowDraftRef.current = null;
+    lastWorkflowDraftSignatureRef.current = '';
 
     const shouldUseOverlay = false;
     try {
@@ -490,12 +502,13 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
             }
           : {}),
       })
-        .then((nextState) => {
-          setStudioState(nextState);
-        })
         .catch((error) => {
           console.warn('[mp4Creater] initial studio state save failed', error);
+          return pendingStateForSave;
         });
+
+      const committedState = await saveStatePromise;
+      setStudioState(committedState);
 
       if (navigateToStep1 && optimisticProject) {
         let project: SavedProject | null = null;
@@ -541,7 +554,6 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         setCurrentTopic(project.topic || topic);
         rememberProjectNavigationProject(project);
         applyProjectListSnapshot([project, ...savedProjects.filter((item) => item.id !== project.id && item.id !== optimisticProject.id)]);
-        await saveStatePromise;
         setNavigationOverlay(null);
         try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
         router.push(`${basePath}/step-1?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
@@ -569,7 +581,6 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       }
       if (!project) throw lastError || new Error('project_create_failed');
 
-      void saveStatePromise;
       setCurrentProjectId(project.id);
       rememberProjectNavigationProject(project);
       applyProjectListSnapshot([project, ...savedProjects.filter((item) => item.id !== project.id)]);

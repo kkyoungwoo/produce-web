@@ -417,13 +417,17 @@ export default function Step2Panel({
         <p className="mt-3 text-xs text-slate-500">
           입력한 텍스트를 기준으로 한 문장 주제를 최대 8개 추천합니다. AI가 연결되어 있으면 AI 추천을, 연결되지 않았으면 샘플 추천을 보여줍니다.
         </p>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5 text-[11px] font-bold text-slate-500">
+          <span className="inline-block h-2 w-2 rounded-full bg-slate-400" aria-hidden="true" />
+          기본 추천 문구
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
           {visibleRecommendations.map((item) => (
             <button
               key={item}
               type="button"
               onClick={() => onSelectTopicRecommendation(item)}
-              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-bold leading-5 text-slate-600 hover:bg-slate-50"
+              className="rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-bold leading-5 text-slate-700 transition hover:bg-slate-200"
             >
               {item}
             </button>

@@ -8,6 +8,7 @@ import {
 import { getAspectRatioPrompt } from '../utils/aspectRatio';
 import { runOpenRouterText } from './openRouterService';
 import { buildVariantSuffix, createCreativeDirection } from '../config/creativeVariance';
+import { STYLE_SAMPLE_PRESETS } from '../samples/presetCatalog';
 
 const BASE_STYLE_TEXT = `Stylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.`;
 
@@ -252,43 +253,36 @@ export function buildStyleRecommendations(
   aspectRatio: AspectRatio = '16:9'
 ): PromptedImageAsset[] {
   const seed = hashCode(script || contentType);
-  const palettes = [
-    ['시네마틱', '#0f172a'],
-    ['느와르 / 범죄 스릴러', '#1e293b'],
-    ['K-드라마', '#fb7185'],
-    ['SF 퓨처리스틱', '#06b6d4'],
-    ['호러 / 공포', '#334155'],
-    ['뷰티 / 코스메틱', '#f472b6'],
-    ['라이프스타일', '#16a34a'],
-    ['디즈니 / 픽사 3D', '#f59e0b'],
-    ['지브리', '#22c55e'],
-    ['스파이더버스', '#7c3aed'],
-    ['K-웹툰', '#2563eb'],
-    ['로판', '#ec4899'],
-    ['치비 / SD', '#f97316'],
-    ['러프 펜슬 스케치', '#64748b'],
-    ['수채화', '#38bdf8'],
-    ['빈티지 필름', '#a16207'],
-    ['감성 일러스트', '#8b5cf6'],
-    ['하이패션 에디토리얼', '#be185d'],
-  ] as const;
-
-  const filtered = palettes.filter(([label]) => !excludeLabels.includes(label));
-  const fallbackPool = filtered.length ? filtered : palettes;
+  const presets = STYLE_SAMPLE_PRESETS.map((item) => ({ ...item }));
+  const filtered = presets.filter((item) => !excludeLabels.includes(item.label));
+  const fallbackPool = filtered.length ? filtered : presets;
   const picked = fallbackPool.slice(0, Math.max(1, limit));
 
-  return picked.map(([label, accent], index) => {
-    const direction = createCreativeDirection(`${label}:${script}:${contentType}`, index, contentType);
-    const prompt = `${label}. Create a cohesive full-scene visual style for the final video. Keep background direction, composition rhythm, lighting logic, color palette, texture density, and rendering finish consistent across scenes, but make this recommendation feel newly authored. ${getAspectRatioPrompt(aspectRatio)}. Variation seed ${seed + index + excludeLabels.length}. ${direction.shotType}. ${direction.paletteDirection}. Story context: ${(script || contentType).slice(0, 220)}.`;
-    return buildPromptPreviewCard({
-      label,
-      subtitle: contentType === 'info_delivery' ? '최종 영상용 정보형 화풍' : '최종 영상용 비주얼 화풍',
-      prompt,
-      accent,
-      kind: 'style',
-      sourceMode: 'ai',
-      groupLabel: label,
-    });
+  return picked.map((preset, index) => {
+    const direction = createCreativeDirection(`${preset.label}:${script}:${contentType}`, index, contentType);
+    const prompt = [
+      preset.prompt,
+      'Create a cohesive full-scene visual style for the final video.',
+      'Keep background direction, composition rhythm, lighting logic, color palette, texture density, and rendering finish consistent across scenes, but make this recommendation feel newly authored.',
+      getAspectRatioPrompt(aspectRatio),
+      `Variation seed ${seed + index + excludeLabels.length}.`,
+      direction.shotType,
+      direction.paletteDirection,
+      `Story context: ${(script || contentType).slice(0, 220)}.`,
+    ].filter(Boolean).join(' ');
+
+    return {
+      ...buildPromptPreviewCard({
+        label: preset.label,
+        subtitle: contentType === 'info_delivery' ? '최종 영상용 정보형 화풍' : '최종 영상용 비주얼 화풍',
+        prompt,
+        accent: preset.accent || '#8b5cf6',
+        kind: 'style',
+        sourceMode: 'ai',
+        groupLabel: preset.label,
+      }),
+      imageData: preset.imageData,
+    };
   });
 }
 
