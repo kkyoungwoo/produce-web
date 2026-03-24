@@ -7,6 +7,7 @@ import {
   ScriptLanguageOption,
   WorkflowPromptTemplateEngine,
 } from '../../../types';
+import { CHATTERBOX_TTS_PRESET_OPTIONS, NO_AI_SCRIPT_MODEL_ID } from '../../../config';
 
 interface Step3PanelProps {
   contentType: ContentType;
@@ -30,7 +31,7 @@ interface Step3PanelProps {
   selectedCharacterIds: string[];
   isHydratingCharacters: boolean;
   isLoadingVoiceCatalogs: boolean;
-  projectVoiceProvider: 'qwen3Tts' | 'elevenLabs' | 'google' | 'heygen';
+  projectVoiceProvider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
   projectVoiceSummary: string;
   elevenLabsVoices: Array<{
     voice_id: string;
@@ -66,16 +67,16 @@ interface Step3PanelProps {
   onCharacterRemove: (characterId: string) => void;
   onCharacterVoiceProviderChange: (
     characterId: string,
-    provider: 'qwen3Tts' | 'elevenLabs' | 'google'
+    provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs'
   ) => void;
   onCharacterVoiceChoiceChange: (
     characterId: string,
-    provider: 'qwen3Tts' | 'elevenLabs' | 'google',
+    provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs',
     value: string
   ) => void;
   onCharacterVoiceDirectInputChange: (
     characterId: string,
-    provider: 'elevenLabs' | 'google',
+    provider: 'elevenLabs',
     value: string
   ) => void;
   onPreviewCharacterVoice: (characterId: string) => void;
@@ -95,6 +96,8 @@ const QWEN_VOICE_OPTIONS = [
   { id: 'qwen-default', name: 'qwen3-tts 기본 보이스' },
   { id: 'qwen-soft', name: 'qwen3-tts 부드러운 보이스' },
 ];
+
+const CHATTERBOX_VOICE_OPTIONS = CHATTERBOX_TTS_PRESET_OPTIONS;
 
 const SCRIPT_CHARACTER_RANGE_BY_TYPE: Record<ContentType, { min: number; max: number }> = {
   music_video: { min: 130, max: 250 },
@@ -555,7 +558,7 @@ export default function Step3Panel({
               {scriptModelOptions.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
-                  {item.id === 'sample-script' ? ' · 무료' : ' · 유료'}
+                  {item.id === NO_AI_SCRIPT_MODEL_ID ? ' · 무료 샘플' : ' · AI'}
                 </option>
               ))}
             </select>
@@ -767,9 +770,9 @@ export default function Step3Panel({
             >
               {extractedCharacters.map((character, index) => {
                 const rawVoiceProvider = character.voiceProvider;
-                const voiceProvider: 'qwen3Tts' | 'elevenLabs' | 'google' =
+                const voiceProvider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' =
                   rawVoiceProvider === 'elevenLabs' ||
-                  rawVoiceProvider === 'google' ||
+                  rawVoiceProvider === 'chatterbox' ||
                   rawVoiceProvider === 'qwen3Tts'
                     ? rawVoiceProvider
                     : 'qwen3Tts';
@@ -785,7 +788,10 @@ export default function Step3Panel({
                     ? currentVoiceId || elevenLabsVoices[0]?.voice_id || ''
                     : elevenLabsVoices[0]?.voice_id || '';
 
-                const googleVoiceId = voiceProvider === 'google' ? currentVoiceId : '';
+                const chatterboxVoiceId =
+                  voiceProvider === 'chatterbox'
+                    ? currentVoiceId || CHATTERBOX_VOICE_OPTIONS[0]?.id || 'chatterbox-clear'
+                    : CHATTERBOX_VOICE_OPTIONS[0]?.id || 'chatterbox-clear';
                 const selected = selectedCharacterIds.includes(character.id);
                 return (
                   <div
@@ -881,12 +887,12 @@ export default function Step3Panel({
                               }}
                             />
                             <SelectablePill
-                              active={voiceProvider === 'google'}
-                              label="Google"
+                              active={voiceProvider === 'chatterbox'}
+                              label="Chatterbox"
                               onClick={(event) => {
                                 event.preventDefault();
                                 event.stopPropagation();
-                                onCharacterVoiceProviderChange(character.id, 'google');
+                                onCharacterVoiceProviderChange(character.id, 'chatterbox');
                               }}
                             />
                           </div>
@@ -943,21 +949,26 @@ export default function Step3Panel({
                                   )}
                                 </select>
                               ) : (
-                                <input
-                                  value={googleVoiceId}
+                                <select
+                                  value={chatterboxVoiceId}
                                   onClick={stopCardToggle}
                                   onKeyDown={stopCardToggle}
                                   onPointerDown={stopCardToggle}
                                   onChange={(e) =>
-                                    onCharacterVoiceDirectInputChange(
+                                    onCharacterVoiceChoiceChange(
                                       character.id,
-                                      'google',
+                                      'chatterbox',
                                       e.target.value
                                     )
                                   }
-                                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-violet-400"
-                                  placeholder="Google voice name 입력"
-                                />
+                                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
+                                >
+                                  {CHATTERBOX_VOICE_OPTIONS.map((item) => (
+                                    <option key={item.id} value={item.id}>
+                                      {item.name}
+                                    </option>
+                                  ))}
+                                </select>
                               )}
                             </div>
 

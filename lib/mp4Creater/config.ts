@@ -121,6 +121,13 @@ export const QWEN_TTS_PRESET_OPTIONS = [
   { id: 'qwen-soft', name: 'qwen3-tts 부드러운 보이스' },
 ] as const;
 
+export const CHATTERBOX_TTS_PRESET_OPTIONS = [
+  { id: 'chatterbox-clear', name: 'Chatterbox 클리어' },
+  { id: 'chatterbox-warm', name: 'Chatterbox 웜' },
+] as const;
+
+export const NO_AI_SCRIPT_MODEL_ID = 'no-ai-model';
+
 export const TTS_NARRATOR_OPTIONS = [
   ...QWEN_TTS_PRESET_OPTIONS,
   { id: 'rachel', name: 'Rachel 보이스 (ElevenLabs)' },

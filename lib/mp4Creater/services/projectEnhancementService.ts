@@ -74,7 +74,7 @@ export function inferGenerationMode(studioState?: StudioState | null): Generatio
     routing && (
       routing.imageProvider !== 'sample'
       || routing.videoProvider !== 'sample'
-      || routing.audioProvider !== 'qwen3Tts'
+      || (routing.audioProvider !== 'qwen3Tts' && routing.audioProvider !== 'chatterbox')
       || routing.backgroundMusicProvider === 'elevenLabs'
     )
   );

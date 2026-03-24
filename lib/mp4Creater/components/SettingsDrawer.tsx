@@ -5,6 +5,7 @@ import { StudioState } from '../types';
 import { pickFolderPath } from '../services/folderPicker';
 import {
   BGM_MODEL_OPTIONS,
+  CHATTERBOX_TTS_PRESET_OPTIONS,
   CONFIG,
   ELEVENLABS_MODELS,
   IMAGE_MODELS,
@@ -102,7 +103,11 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     elevenLabsVoiceId: CONFIG.DEFAULT_VOICE_ID,
     elevenLabsModelId: CONFIG.DEFAULT_ELEVENLABS_MODEL,
     heygenVoiceId: null,
+    chatterboxVoicePreset: 'chatterbox-clear',
     qwenVoicePreset: 'qwen-default',
+    voiceReferenceAudioData: null,
+    voiceReferenceMimeType: null,
+    voiceReferenceName: null,
     qwenStylePreset: 'balanced',
     backgroundMusicProvider: 'sample',
     backgroundMusicStyle: 'ambient',
@@ -113,6 +118,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const [isCheckingProviders, setIsCheckingProviders] = useState<Record<string, boolean>>({});
   const [isVoicePreviewing, setIsVoicePreviewing] = useState(false);
   const [voicePreviewMessage, setVoicePreviewMessage] = useState('');
+  const [isRecordingVoiceSample, setIsRecordingVoiceSample] = useState(false);
   const [isBgmPreviewing, setIsBgmPreviewing] = useState(false);
   const [bgmPreviewMessage, setBgmPreviewMessage] = useState('');
   const [isPaidMode, setIsPaidMode] = useState(false);
@@ -121,6 +127,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const previewUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const voiceRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceRecorderStreamRef = useRef<MediaStream | null>(null);
+  const voiceRecorderChunksRef = useRef<Blob[]>([]);
   const voicePreviewKeyRef = useRef('');
   const bgmPreviewKeyRef = useRef('');
   const youtubePopupRef = useRef<Window | null>(null);
@@ -156,15 +165,20 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       motionPromptModel: studioState.routing?.motionPromptModel || studioState.routing?.sceneModel || CONFIG.DEFAULT_SCRIPT_MODEL,
       imageModel: studioState.routing?.imageModel || CONFIG.DEFAULT_IMAGE_MODEL,
       videoModel: studioState.routing?.videoModel || CONFIG.DEFAULT_VIDEO_MODEL,
-      ttsProvider: studioState.routing?.ttsProvider === 'elevenLabs' ? 'elevenLabs' : 'qwen3Tts',
-      audioProvider: studioState.routing?.audioProvider === 'elevenLabs' ? 'elevenLabs' : 'qwen3Tts',
+      ttsProvider: studioState.routing?.ttsProvider === 'elevenLabs' ? 'elevenLabs' : studioState.routing?.ttsProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
+      audioProvider: studioState.routing?.audioProvider === 'elevenLabs' ? 'elevenLabs' : studioState.routing?.audioProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
       backgroundMusicProvider: studioState.routing?.backgroundMusicProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
       musicVideoProvider: studioState.routing?.musicVideoProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
       musicVideoMode: studioState.routing?.musicVideoMode || 'sample',
+      chatterboxVoicePreset: studioState.routing?.chatterboxVoicePreset || 'chatterbox-clear',
+      voiceReferenceAudioData: studioState.routing?.voiceReferenceAudioData || null,
+      voiceReferenceMimeType: studioState.routing?.voiceReferenceMimeType || null,
+      voiceReferenceName: studioState.routing?.voiceReferenceName || null,
     }));
     setPickedFolderLabel('');
     setVoicePreviewMessage('');
     setIsVoicePreviewing(false);
+    setIsRecordingVoiceSample(false);
     setBgmPreviewMessage('');
     setIsBgmPreviewing(false);
     setIsPaidMode(Boolean(
@@ -275,6 +289,34 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     [elevenLabsVoices, routing.elevenLabsVoiceId],
   );
 
+  const selectedChatterboxVoice = useMemo(
+    () => CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.chatterboxVoicePreset || 'chatterbox-clear')) || CHATTERBOX_TTS_PRESET_OPTIONS[0],
+    [routing.chatterboxVoicePreset],
+  );
+
+  const recordedVoiceSampleUrl = useMemo(() => {
+    if (!routing.voiceReferenceAudioData || !routing.voiceReferenceMimeType) return '';
+    return `data:${routing.voiceReferenceMimeType};base64,${routing.voiceReferenceAudioData}`;
+  }, [routing.voiceReferenceAudioData, routing.voiceReferenceMimeType]);
+
+  const stopVoiceRecorderStream = useCallback(() => {
+    voiceRecorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+    voiceRecorderStreamRef.current = null;
+    voiceRecorderRef.current = null;
+    voiceRecorderChunksRef.current = [];
+    setIsRecordingVoiceSample(false);
+  }, []);
+
+  const clearRecordedVoiceSample = useCallback(() => {
+    setRouting((prev) => ({
+      ...prev,
+      voiceReferenceAudioData: null,
+      voiceReferenceMimeType: null,
+      voiceReferenceName: null,
+    }));
+  }, []);
+
+
   const stopVoicePreview = useCallback(() => {
     if (previewAudioRef.current) {
       previewAudioRef.current.pause();
@@ -300,12 +342,18 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   }, []);
 
   const playVoicePreview = useCallback(async () => {
-    const provider = routing.ttsProvider === 'elevenLabs' ? 'elevenLabs' : 'qwen3Tts';
+    const provider = routing.ttsProvider === 'elevenLabs'
+      ? 'elevenLabs'
+      : routing.ttsProvider === 'chatterbox'
+        ? 'chatterbox'
+        : 'qwen3Tts';
     const voicePreviewKey = [
       provider,
       routing.qwenVoicePreset || 'qwen-default',
+      routing.chatterboxVoicePreset || 'chatterbox-clear',
       routing.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID,
       routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+      routing.voiceReferenceName || '',
     ].join('|');
 
     if (isVoicePreviewing && voicePreviewKeyRef.current === voicePreviewKey) {
@@ -326,10 +374,26 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     }
 
     try {
-      if (provider === 'qwen3Tts') {
+      if (provider === 'chatterbox' && recordedVoiceSampleUrl) {
+        const audio = new Audio(recordedVoiceSampleUrl);
+        previewAudioRef.current = audio;
+        audio.onended = () => {
+          setIsVoicePreviewing(false);
+          setVoicePreviewMessage('저장된 목소리 샘플 미리 듣기가 끝났습니다.');
+        };
+        audio.onerror = () => {
+          setIsVoicePreviewing(false);
+          setVoicePreviewMessage('저장된 목소리 샘플 재생에 실패했습니다.');
+        };
+        await audio.play();
+        setVoicePreviewMessage(`저장된 목소리 샘플 (${routing.voiceReferenceName || 'recorded-voice.webm'}) 재생 중입니다.`);
+        return;
+      }
+
+      if (provider === 'qwen3Tts' || provider === 'chatterbox') {
         if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
           setIsVoicePreviewing(false);
-          setVoicePreviewMessage('이 브라우저에서는 qwen3-tts 미리 듣기를 지원하지 않습니다.');
+          setVoicePreviewMessage(provider === 'chatterbox' ? '이 브라우저에서는 Chatterbox 무료 미리 듣기를 지원하지 않습니다.' : '이 브라우저에서는 qwen3-tts 미리 듣기를 지원하지 않습니다.');
           return;
         }
 
@@ -340,24 +404,32 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
         const allVoices = synth.getVoices();
         const koreanVoices = allVoices.filter((voice) => (voice.lang || '').toLowerCase().startsWith('ko'));
         const selectedVoice =
-          routing.qwenVoicePreset === 'qwen-soft'
-            ? koreanVoices.find((voice) => /female|yuna|soyoung|sunhi|sora/i.test(voice.name)) || koreanVoices[0]
-            : koreanVoices.find((voice) => /male|minho|inho|jiyoung|hyun/i.test(voice.name)) || koreanVoices[0];
+          provider === 'chatterbox'
+            ? ((routing.chatterboxVoicePreset || 'chatterbox-clear') === 'chatterbox-warm'
+                ? koreanVoices.find((voice) => /female|yuna|soyoung|sunhi|sora/i.test(voice.name)) || koreanVoices[0]
+                : koreanVoices.find((voice) => /male|minho|inho|jiyoung|hyun/i.test(voice.name)) || koreanVoices[0])
+            : ((routing.qwenVoicePreset || 'qwen-default') === 'qwen-soft'
+                ? koreanVoices.find((voice) => /female|yuna|soyoung|sunhi|sora/i.test(voice.name)) || koreanVoices[0]
+                : koreanVoices.find((voice) => /male|minho|inho|jiyoung|hyun/i.test(voice.name)) || koreanVoices[0]);
 
         if (selectedVoice) utterance.voice = selectedVoice;
         utterance.onend = () => {
           setIsVoicePreviewing(false);
-          setVoicePreviewMessage(`qwen3-tts (${routing.qwenVoicePreset || 'qwen-default'}) 미리 듣기가 끝났습니다.`);
+          setVoicePreviewMessage(provider === 'chatterbox'
+            ? `Chatterbox (${selectedChatterboxVoice?.name || '기본 프리셋'}) 미리 듣기가 끝났습니다.`
+            : `qwen3-tts (${routing.qwenVoicePreset || 'qwen-default'}) 미리 듣기가 끝났습니다.`);
           previewUtteranceRef.current = null;
         };
         utterance.onerror = () => {
           setIsVoicePreviewing(false);
-          setVoicePreviewMessage('qwen3-tts 미리 듣기에 실패했습니다.');
+          setVoicePreviewMessage(provider === 'chatterbox' ? 'Chatterbox 무료 미리 듣기에 실패했습니다.' : 'qwen3-tts 미리 듣기에 실패했습니다.');
           previewUtteranceRef.current = null;
         };
         previewUtteranceRef.current = utterance;
         synth.speak(utterance);
-        setVoicePreviewMessage(`qwen3-tts (${routing.qwenVoicePreset || 'qwen-default'}) 미리 듣기 중입니다.`);
+        setVoicePreviewMessage(provider === 'chatterbox'
+          ? `Chatterbox (${selectedChatterboxVoice?.name || '기본 프리셋'}) 무료 미리 듣기 중입니다.`
+          : `qwen3-tts (${routing.qwenVoicePreset || 'qwen-default'}) 미리 듣기 중입니다.`);
         return;
       }
 
@@ -391,10 +463,91 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   }, [
     isVoicePreviewing,
     providerValues.elevenLabsApiKey,
+    recordedVoiceSampleUrl,
     routing,
+    selectedChatterboxVoice,
     selectedElevenVoice,
     stopVoicePreview,
   ]);
+
+
+  const handleToggleVoiceSampleRecording = useCallback(async () => {
+    if (isRecordingVoiceSample && voiceRecorderRef.current) {
+      voiceRecorderRef.current.stop();
+      return;
+    }
+
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      setVoicePreviewMessage('이 브라우저에서는 마이크 녹음을 지원하지 않습니다.');
+      return;
+    }
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const preferredMimeTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'];
+      const mimeType = preferredMimeTypes.find((item) => typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported(item)) || '';
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+
+      voiceRecorderStreamRef.current = stream;
+      voiceRecorderRef.current = recorder;
+      voiceRecorderChunksRef.current = [];
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          voiceRecorderChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = () => {
+        const blob = new Blob(voiceRecorderChunksRef.current, { type: recorder.mimeType || mimeType || 'audio/webm' });
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = typeof reader.result === 'string' ? reader.result : '';
+          const base64 = result.includes(',') ? result.split(',')[1] || '' : '';
+          setRouting((prev) => ({
+            ...prev,
+            voiceReferenceAudioData: base64 || null,
+            voiceReferenceMimeType: blob.type || recorder.mimeType || mimeType || 'audio/webm',
+            voiceReferenceName: `voice-reference.${(blob.type || recorder.mimeType || mimeType || 'audio/webm').includes('mp4') ? 'm4a' : 'webm'}`,
+          }));
+          setVoicePreviewMessage(base64 ? '녹음한 목소리 샘플을 저장했습니다. Chatterbox 기본 목소리로 바로 사용할 수 있습니다.' : '녹음 저장에 실패했습니다. 다시 시도해 주세요.');
+          stopVoiceRecorderStream();
+        };
+        reader.readAsDataURL(blob);
+      };
+
+      recorder.start();
+      setIsRecordingVoiceSample(true);
+      setVoicePreviewMessage('녹음 중입니다. 짧게 읽은 뒤 다시 버튼을 눌러 저장하세요.');
+    } catch {
+      stopVoiceRecorderStream();
+      setVoicePreviewMessage('마이크 권한을 확인한 뒤 다시 시도해 주세요.');
+    }
+  }, [isRecordingVoiceSample, stopVoiceRecorderStream]);
+
+  const playRecordedVoiceSample = useCallback(async () => {
+    if (!recordedVoiceSampleUrl) {
+      setVoicePreviewMessage('저장된 목소리 샘플이 없습니다. 먼저 녹음해 주세요.');
+      return;
+    }
+    stopVoicePreview();
+    setIsVoicePreviewing(true);
+    const audio = new Audio(recordedVoiceSampleUrl);
+    previewAudioRef.current = audio;
+    audio.onended = () => {
+      setIsVoicePreviewing(false);
+      setVoicePreviewMessage('저장된 목소리 샘플 재생이 끝났습니다.');
+    };
+    audio.onerror = () => {
+      setIsVoicePreviewing(false);
+      setVoicePreviewMessage('저장된 목소리 샘플 재생에 실패했습니다.');
+    };
+    await audio.play().catch(() => {
+      setIsVoicePreviewing(false);
+      setVoicePreviewMessage('저장된 목소리 샘플 재생에 실패했습니다.');
+    });
+    setVoicePreviewMessage(`저장된 목소리 샘플 (${routing.voiceReferenceName || 'recorded-voice.webm'}) 재생 중입니다.`);
+  }, [recordedVoiceSampleUrl, routing.voiceReferenceName, stopVoicePreview]);
 
   const playBgmPreview = useCallback(async () => {
     const bgmPreviewKey = [
@@ -470,8 +623,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     if (!open) {
       stopVoicePreview();
       stopBgmPreview();
+      stopVoiceRecorderStream();
     }
-  }, [open, stopVoicePreview, stopBgmPreview]);
+  }, [open, stopVoicePreview, stopBgmPreview, stopVoiceRecorderStream]);
 
   useEffect(() => {
     if (isPaidMode) return;
@@ -484,8 +638,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       motionPromptModel: prev.motionPromptModel || prev.sceneModel || freeScriptModel,
       imageModel: prev.imageModel || freeImageModel,
       imageProvider: 'sample',
-      ttsProvider: 'qwen3Tts',
-      audioProvider: 'qwen3Tts',
+      ttsProvider: prev.ttsProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
+      audioProvider: prev.audioProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
       backgroundMusicProvider: 'sample',
       videoProvider: 'sample',
       videoModel: prev.videoModel || freeVideoModel,
@@ -525,6 +679,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const closeDrawerCleanly = useCallback(() => {
     stopVoicePreview();
     stopBgmPreview();
+    stopVoiceRecorderStream();
     if (typeof document !== 'undefined') {
       const active = document.activeElement as HTMLElement | null;
       active?.blur?.();
@@ -536,7 +691,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       return;
     }
     onClose();
-  }, [onClose, stopBgmPreview, stopVoicePreview]);
+  }, [onClose, stopBgmPreview, stopVoicePreview, stopVoiceRecorderStream]);
 
   const persistYoutubeConfigFromInputs = useCallback(async (options?: { requireClientIdWithSecret?: boolean }) => {
     const googleClientId = youtubeOAuthValues.googleClientId.trim();
@@ -861,6 +1016,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     const nextImageModel = routing.imageModel || freeImageModel;
     const nextVideoModel = routing.videoModel || freeVideoModel;
     const wantsElevenTts = isPaidMode && routing.ttsProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
+    const wantsChatterboxTts = routing.ttsProvider === 'chatterbox';
     const wantsElevenBgm = isPaidMode && routing.backgroundMusicProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
     const wantsPaidImage = isPaidMode && nextImageModel !== freeImageModel && Boolean(googleApiKey);
     const wantsPaidVideo = isPaidMode && nextVideoModel !== freeVideoModel && Boolean(googleApiKey);
@@ -874,8 +1030,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       motionPromptModel: routing.motionPromptModel || nextPromptModel,
       imageModel: nextImageModel,
       imageProvider: wantsPaidImage ? 'openrouter' : 'sample',
-      ttsProvider: wantsElevenTts ? 'elevenLabs' : 'qwen3Tts',
-      audioProvider: wantsElevenTts ? 'elevenLabs' : 'qwen3Tts',
+      ttsProvider: wantsElevenTts ? 'elevenLabs' : wantsChatterboxTts ? 'chatterbox' : 'qwen3Tts',
+      audioProvider: wantsElevenTts ? 'elevenLabs' : wantsChatterboxTts ? 'chatterbox' : 'qwen3Tts',
       backgroundMusicProvider: wantsElevenBgm ? 'elevenLabs' : 'sample',
       videoProvider: wantsPaidVideo ? 'elevenLabs' : 'sample',
       videoModel: nextVideoModel,
@@ -1155,17 +1311,52 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 <div className="text-xs font-black text-slate-900">음성</div>
                 <label className="mt-2 block">
                   <div className="mb-1 text-xs font-bold text-slate-700">음성 공급자</div>
-                  <select value={routing.ttsProvider === 'elevenLabs' && isPaidMode ? 'elevenLabs' : 'qwen3Tts'} onChange={(e) => setRouting((prev) => ({ ...prev, ttsProvider: e.target.value as 'qwen3Tts' | 'elevenLabs', audioProvider: e.target.value as 'qwen3Tts' | 'elevenLabs' }))} className={inputClass}>
+                  <select value={routing.ttsProvider === 'elevenLabs' && isPaidMode ? 'elevenLabs' : routing.ttsProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts'} onChange={(e) => setRouting((prev) => ({ ...prev, ttsProvider: e.target.value as 'qwen3Tts' | 'chatterbox' | 'elevenLabs', audioProvider: e.target.value as 'qwen3Tts' | 'chatterbox' | 'elevenLabs' }))} className={inputClass}>
                     <option value="qwen3Tts">🆓 qwen3-tts</option>
+                    <option value="chatterbox">🆓 Chatterbox</option>
                     <option value="elevenLabs">💳 ElevenLabs</option>
                   </select>
                 </label>
-                <label className="mt-2 block">
-                  <div className="mb-1 text-xs font-bold text-slate-700">qwen3-tts 보이스 프리셋</div>
-                  <select value={routing.qwenVoicePreset || 'qwen-default'} onChange={(e) => setRouting((prev) => ({ ...prev, qwenVoicePreset: e.target.value, ttsNarratorId: e.target.value }))} className={inputClass}>
-                    {QWEN_TTS_PRESET_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                  </select>
-                </label>
+                {routing.ttsProvider === 'qwen3Tts' ? (
+                  <label className="mt-2 block">
+                    <div className="mb-1 text-xs font-bold text-slate-700">qwen3-tts 보이스 프리셋</div>
+                    <select value={routing.qwenVoicePreset || 'qwen-default'} onChange={(e) => setRouting((prev) => ({ ...prev, qwenVoicePreset: e.target.value, ttsNarratorId: e.target.value }))} className={inputClass}>
+                      {QWEN_TTS_PRESET_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    </select>
+                  </label>
+                ) : null}
+                {routing.ttsProvider === 'chatterbox' ? (
+                  <>
+                    <label className="mt-2 block">
+                      <div className="mb-1 text-xs font-bold text-slate-700">Chatterbox 프리셋</div>
+                      <select value={routing.chatterboxVoicePreset || 'chatterbox-clear'} onChange={(e) => setRouting((prev) => ({ ...prev, chatterboxVoicePreset: e.target.value, ttsNarratorId: e.target.value }))} className={inputClass}>
+                        {CHATTERBOX_TTS_PRESET_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                      </select>
+                    </label>
+                    <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <div className="text-xs font-black text-slate-900">목소리 샘플 녹음</div>
+                          <p className="mt-1 text-[11px] leading-5 text-slate-500">10초 안팎으로 또렷하게 읽은 샘플을 저장해 두면 무료 기본 목소리 확인용으로 바로 재생할 수 있습니다.</p>
+                        </div>
+                        <button type="button" onClick={() => void handleToggleVoiceSampleRecording()} className={`rounded-xl px-3 py-2 text-xs font-black ${isRecordingVoiceSample ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
+                          {isRecordingVoiceSample ? '녹음 저장' : '목소리 녹음 시작'}
+                        </button>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button type="button" onClick={() => void playRecordedVoiceSample()} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400">
+                          저장된 샘플 듣기
+                        </button>
+                        <button type="button" onClick={clearRecordedVoiceSample} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:border-slate-200 disabled:text-slate-400">
+                          샘플 삭제
+                        </button>
+                      </div>
+                      <div className="mt-2 text-[11px] leading-5 text-slate-500">
+                        {recordedVoiceSampleUrl ? `저장된 파일: ${routing.voiceReferenceName || 'recorded-voice.webm'}` : '아직 저장된 목소리 샘플이 없습니다.'}
+                      </div>
+                    </div>
+                  </>
+                ) : null}
                 {routing.ttsProvider === 'elevenLabs' ? (
                   <>
                     <label className="mt-2 block">
@@ -1185,7 +1376,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
                   {routing.ttsProvider === 'elevenLabs'
                     ? `현재 기본 보이스: ${selectedElevenVoice?.name || 'ElevenLabs 기본 보이스'}${selectedElevenVoice?.labels?.gender ? ` · ${selectedElevenVoice.labels.gender}` : ''}`
-                    : `현재 기본 보이스: ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'}`}
+                    : routing.ttsProvider === 'chatterbox'
+                      ? `현재 기본 보이스: ${selectedChatterboxVoice?.name || 'Chatterbox 클리어'}${routing.voiceReferenceName ? ` · 녹음 샘플 ${routing.voiceReferenceName}` : ''}`
+                      : `현재 기본 보이스: ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'}`}
                 </div>
                 <button type="button" onClick={() => void playVoicePreview()} className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
                   {isVoicePreviewing ? '음성 정지' : '음성 재생'}
@@ -1193,6 +1386,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 {voicePreviewMessage ? <p className="mt-2 text-xs text-slate-500">{voicePreviewMessage}</p> : null}
                 {routing.ttsProvider === 'elevenLabs' && !providerValues.elevenLabsApiKey.trim() ? (
                   <p className="mt-2 text-xs text-amber-600">선택한 음성 모델은 API 연결이 필요합니다. API 등록 후 다시 시도해 주세요.</p>
+                ) : routing.ttsProvider === 'chatterbox' ? (
+                  <p className="mt-2 text-xs text-emerald-600">Chatterbox는 무료 기본 모드로 저장됩니다. 녹음한 샘플은 설정에 함께 저장됩니다.</p>
                 ) : null}
                 {isLoadingVoices ? <p className="mt-2 text-xs text-slate-500">보이스 목록을 불러오는 중입니다.</p> : null}
               </div>

@@ -198,7 +198,7 @@ export interface BackgroundMusicTrack {
   volume: number;
   sourceMode: 'ai' | 'sample';
   createdAt: number;
-  provider?: 'elevenLabs' | 'qwen3Tts' | 'heygen' | 'sample';
+  provider?: 'elevenLabs' | 'qwen3Tts' | 'chatterbox' | 'heygen' | 'sample';
   mode?: 'preview' | 'final';
   stylePreset?: string;
 }
@@ -209,7 +209,7 @@ export interface AudioPreviewAsset {
   text: string;
   audioData: string | null;
   duration?: number | null;
-  provider: 'elevenLabs' | 'qwen3Tts' | 'heygen' | 'sample';
+  provider: 'elevenLabs' | 'qwen3Tts' | 'chatterbox' | 'heygen' | 'sample';
   mode: 'voice-preview' | 'script-preview' | 'final-output';
   sourceMode: 'ai' | 'sample';
   voiceId?: string | null;
@@ -234,7 +234,7 @@ export interface CharacterProfile {
   description: string;
   visualStyle: string;
   voiceHint?: string;
-  voiceProvider?: 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen' | 'google';
+  voiceProvider?: 'project-default' | 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
   voiceId?: string;
   voiceName?: string;
   voicePreviewUrl?: string | null;
@@ -368,11 +368,15 @@ export interface WorkflowDraft {
   customScriptSettings?: CustomScriptSettings;
   constitutionAnalysis?: ConstitutionAnalysisSummary | null;
   openRouterModel?: string;
-  ttsProvider?: 'qwen3Tts' | 'elevenLabs' | 'heygen';
+  ttsProvider?: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
   elevenLabsVoiceId?: string | null;
   elevenLabsModelId?: string | null;
   heygenVoiceId?: string | null;
   qwenVoicePreset?: string | null;
+  chatterboxVoicePreset?: string | null;
+  voiceReferenceAudioData?: string | null;
+  voiceReferenceMimeType?: string | null;
+  voiceReferenceName?: string | null;
   qwenStylePreset?: string | null;
   voicePreviewAsset?: AudioPreviewAsset | null;
   scriptPreviewAsset?: AudioPreviewAsset | null;
@@ -433,7 +437,7 @@ export interface TtsFileItem {
   id: string;
   sceneNumber: number;
   paragraphId?: string | null;
-  provider: 'qwen3Tts' | 'elevenLabs' | 'heygen' | 'sample';
+  provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen' | 'sample';
   voiceId?: string | null;
   modelId?: string | null;
   duration: number;
@@ -572,18 +576,22 @@ export interface AiRoutingSettings {
   openRouterInputMaxChars?: number;
   imageProvider: 'sample' | 'openrouter' | 'custom';
   imageModel: string;
-  audioProvider: 'elevenLabs' | 'qwen3Tts' | 'heygen' | 'sample';
+  audioProvider: 'elevenLabs' | 'qwen3Tts' | 'chatterbox' | 'heygen' | 'sample';
   audioModel: string;
   ttsNarratorId: string;
   backgroundMusicModel: string;
   videoProvider: 'elevenLabs' | 'sample';
   videoModel: string;
   textModel?: string;
-  ttsProvider?: 'qwen3Tts' | 'elevenLabs' | 'heygen';
+  ttsProvider?: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
   elevenLabsVoiceId?: string | null;
   elevenLabsModelId?: string | null;
   heygenVoiceId?: string | null;
   qwenVoicePreset?: string | null;
+  chatterboxVoicePreset?: string | null;
+  voiceReferenceAudioData?: string | null;
+  voiceReferenceMimeType?: string | null;
+  voiceReferenceName?: string | null;
   qwenStylePreset?: string | null;
   backgroundMusicProvider?: 'elevenLabs' | 'sample';
   backgroundMusicStyle?: string;

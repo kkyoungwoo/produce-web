@@ -6,7 +6,7 @@ import { generateAudioWithHeyGen } from './heygenService';
 let activeRequestId = 0;
 
 export async function generateTtsAudio(options: {
-  provider: 'qwen3Tts' | 'elevenLabs' | 'heygen';
+  provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
   text: string;
   apiKey?: string;
   voiceId?: string | null;
@@ -35,7 +35,7 @@ export async function generateTtsAudio(options: {
   const asset = await createQwenTtsAsset({
     title: 'qwen3-tts',
     text: options.text,
-    preset: options.qwenPreset,
+    preset: options.provider === 'chatterbox' ? (options.qwenPreset || 'chatterbox-clear') : options.qwenPreset,
     mode: 'voice-preview',
   });
 
@@ -45,12 +45,12 @@ export async function generateTtsAudio(options: {
     estimatedDuration: asset.duration,
     sourceMode: asset.sourceMode,
     voiceId: asset.voiceId || options.qwenPreset || null,
-    modelId: asset.modelId || 'qwen3-tts',
+    modelId: asset.modelId || (options.provider === 'chatterbox' ? 'chatterbox-local' : 'qwen3-tts'),
   };
 }
 
 export async function createTtsPreview(options: {
-  provider: 'qwen3Tts' | 'elevenLabs' | 'heygen';
+  provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
   title: string;
   text: string;
   mode: AudioPreviewAsset['mode'];
@@ -89,7 +89,13 @@ export async function createTtsPreview(options: {
         modelId:
           result.modelId ||
           options.modelId ||
-          (options.provider === 'heygen' ? 'starfish' : options.provider === 'qwen3Tts' ? 'qwen3-tts' : null),
+          (options.provider === 'heygen'
+            ? 'starfish'
+            : options.provider === 'chatterbox'
+              ? 'chatterbox-local'
+              : options.provider === 'qwen3Tts'
+                ? 'qwen3-tts'
+                : null),
         createdAt: Date.now(),
       },
     };

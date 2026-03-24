@@ -12,6 +12,7 @@ import { buildSelectableStoryDraft, formatStoryTextForEditor, normalizeStoryText
 import { runTextAi } from './textAiService';
 import { getPromptRegistry } from './promptRegistryService';
 import { buildCreativeDirectionBlock, createCreativeDirection } from '../config/creativeVariance';
+import { NO_AI_SCRIPT_MODEL_ID } from '../config';
 
 interface ScriptComposerOptions {
   contentType: ContentType;
@@ -166,6 +167,73 @@ function buildLengthPaddingParagraphs(options: ScriptComposerOptions) {
     `${conflict}은 더는 뒤로 미뤄지지 않고, ${mood} 기류 속에서도 ${pickSample(pushes, random)}.`,
     `${direction.visualHook} 같은 인상이 짧게 남고, 끝에는 ${endingTone} 감정이 또렷하게 걸린다.`
   ].join(' ')));
+}
+
+
+function createNoAiModelSampleScript(options: ScriptComposerOptions) {
+  const topic = options.topic || '이번 이야기';
+  const protagonist = options.selections.protagonist || '주인공';
+  const setting = options.selections.setting || '익숙한 공간';
+  const conflict = options.selections.conflict || '아직 정리되지 않은 문제';
+  const mood = options.selections.mood || '몰입감 있는';
+  const endingTone = options.selections.endingTone || '잔잔한 여운';
+  const minutes = Math.max(1, Math.min(12, Math.round(options.customSettings?.expectedDurationMinutes || 1)));
+  const paragraphCount = Math.max(3, Math.min(10, Math.round(minutes * 1.4)));
+  const random = createSeededRandom([
+    'no-ai-model',
+    options.contentType,
+    topic,
+    protagonist,
+    setting,
+    conflict,
+    mood,
+    endingTone,
+    options.generationNonce || `${Date.now()}`,
+  ].join('::'));
+
+  const openers = ['문득', '어느 순간', '조용히', '낯설게도', '천천히'];
+  const visuals = ['빛이 번지고', '공기가 흔들리고', '작은 소음이 지나가고', '장면의 결이 바뀌고', '시선이 잠깐 멈추고'];
+  const feelings = ['마음이 먼저 반응한다', '이야기가 스스로 방향을 잡는다', '한 문장이 다음 장면을 불러온다', '말보다 분위기가 먼저 살아난다', '평범한 흐름이 갑자기 특별해진다'];
+  const endings = ['조금 더 앞으로 간다', '결국 다음 선택을 남긴다', '짧지만 선명한 여운을 만든다', '마지막 줄까지 온도를 유지한다', '작은 결심 하나를 남긴다'];
+  const infoHooks = ['핵심을 먼저 짚고', '비교 포인트를 나누고', '실제 사례를 붙이고', '보기 쉬운 기준부터 세우고', '복잡한 표현을 덜어 내고'];
+  const lyricHooks = ['리듬은 느리게 시작되고', '후렴은 더 가까이 들어오고', '감정은 낮게 번지다가', '멈춘 심장이 다시 뛰듯', '숨겨 둔 한마디가 결국'];
+
+  const paragraphs = Array.from({ length: paragraphCount }, (_, index) => {
+    if (options.contentType === 'info_delivery') {
+      return formatStoryTextForEditor([
+        `${pickSample(infoHooks, random)} ${topic}를 이해하는 가장 쉬운 길을 연다.`,
+        `${setting} 기준으로 보면 ${conflict}이 왜 중요한지 훨씬 선명해지고, ${mood} 톤으로 정리하면 처음 보는 사람도 흐름을 따라오기 쉬워진다.`,
+        `${index === paragraphCount - 1 ? endingTone : pickSample(endings, random)} 흐름으로 핵심 한 줄을 또렷하게 남긴다.`
+      ].join(' '));
+    }
+
+    if (options.contentType === 'music_video') {
+      return formatStoryTextForEditor([
+        `${pickSample(lyricHooks, random)} ${topic}의 이름을 다시 부른다.`,
+        `${protagonist}의 밤은 ${setting} 위를 스치고, ${conflict}은 후렴처럼 맴돌다가 결국 목소리 안으로 스며든다.`,
+        `${mood} 떨림은 작게 시작해도 마지막에는 ${endingTone} 파장으로 남는다.`
+      ].join(' '));
+    }
+
+    if (options.contentType === 'cinematic') {
+      return formatStoryTextForEditor([
+        `${pickSample(openers, random)} ${protagonist}은 ${setting}에서 ${topic}의 진짜 얼굴을 마주한다.`,
+        `${pickSample(visuals, random)} ${conflict}은 설명보다 표정과 침묵으로 먼저 드러나고, ${mood} 흐름은 장면 전체의 밀도를 끌어올린다.`,
+        `${index === paragraphCount - 1 ? endingTone : pickSample(endings, random)} 컷 감각으로 마무리된다.`
+      ].join(' '));
+    }
+
+    return formatStoryTextForEditor([
+      `${pickSample(openers, random)} ${protagonist}은 ${setting}에서 ${topic}의 시작을 받아들인다.`,
+      `${pickSample(visuals, random)} ${conflict}은 조금씩 가까워지고, ${mood} 공기 속에서 ${pickSample(feelings, random)}.`,
+      `${index === paragraphCount - 1 ? endingTone : pickSample(endings, random)} 문장으로 다음 문단을 자연스럽게 이어 준다.`
+    ].join(' '));
+  });
+
+  return fitScriptToCharacterRange(
+    ensureParagraphVideoScript(normalizeStoryText(paragraphs.join('\n\n')), options),
+    options,
+  );
 }
 
 function trimScriptToMax(text: string, max: number) {
@@ -933,10 +1001,25 @@ function createEmergencySampleScript(options: ScriptComposerOptions) {
 }
 
 export function buildSampleScriptDraft(options: ScriptComposerOptions): string {
+  const selectedModel = options.customSettings?.scriptModel || options.model || '';
+  if (selectedModel === NO_AI_SCRIPT_MODEL_ID) {
+    return createNoAiModelSampleScript(options);
+  }
   return createEmergencySampleScript(options);
 }
 
 export async function composeScriptDraft(options: ScriptComposerOptions): Promise<ScriptComposerResult> {
+  const selectedModel = options.customSettings?.scriptModel || options.model || '';
+  if (selectedModel === NO_AI_SCRIPT_MODEL_ID) {
+    return {
+      text: buildSampleScriptDraft(options),
+      source: 'sample',
+      analysis: options.template.engine === 'channel_constitution_v32'
+        ? buildConstitutionFallbackAnalysis(options, 'sample')
+        : null,
+    };
+  }
+
   const fallback = createEmergencySampleScript(options);
   const fallbackAnalysis = options.template.engine === 'channel_constitution_v32'
     ? buildConstitutionFallbackAnalysis(options, 'sample')

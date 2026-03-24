@@ -17,7 +17,7 @@ import {
   ScriptLanguageOption,
   ScriptSpeechStyle,
 } from '../types';
-import { CONFIG, IMAGE_MODELS, QWEN_TTS_PRESET_OPTIONS, SCRIPT_MODEL_OPTIONS } from '../config';
+import { CHATTERBOX_TTS_PRESET_OPTIONS, CONFIG, IMAGE_MODELS, NO_AI_SCRIPT_MODEL_ID, QWEN_TTS_PRESET_OPTIONS, SCRIPT_MODEL_OPTIONS } from '../config';
 import { WORKFLOW_CHARACTER_STYLE_OPTIONS, getCharacterSamplePreset, getStyleSamplePreset } from '../samples/presetCatalog';
 import {
   buildSelectableStoryDraft,
@@ -147,7 +147,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     language: 'ko' as ScriptLanguageOption,
     referenceText: '',
     referenceLinks: [] as ReferenceLinkDraft[],
-    scriptModel: initial.openRouterModel || SCRIPT_MODEL_OPTIONS[0].id,
+    scriptModel: initial.openRouterModel || NO_AI_SCRIPT_MODEL_ID,
   };
 
   const [activeStage, setActiveStage] = useState<StepId>(initialStage);
@@ -221,7 +221,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [pendingReferenceLinkUrl, setPendingReferenceLinkUrl] = useState('');
   const [showReferenceLinkInput, setShowReferenceLinkInput] = useState(false);
   const [isAddingReferenceLink, setIsAddingReferenceLink] = useState(false);
-  const [selectedScriptGenerationModel, setSelectedScriptGenerationModel] = useState(initialCustomScriptSettings.scriptModel || SCRIPT_MODEL_OPTIONS[0].id);
+  const [selectedScriptGenerationModel, setSelectedScriptGenerationModel] = useState(initialCustomScriptSettings.scriptModel || NO_AI_SCRIPT_MODEL_ID);
   const [constitutionAnalysis, setConstitutionAnalysis] = useState<ConstitutionAnalysisSummary | null>(initial.constitutionAnalysis || null);
   // 샘플 안내 모달과 프롬프트 수정 모달은 흐름을 끊지 않게 이 컴포넌트에서 직접 제어합니다.
   const [sampleGuideOpen, setSampleGuideOpen] = useState(false);
@@ -382,7 +382,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setReferenceLinks(Array.isArray(workflowDraft?.customScriptSettings?.referenceLinks) ? workflowDraft.customScriptSettings.referenceLinks : []);
     setPendingReferenceLinkUrl('');
     setShowReferenceLinkInput(false);
-    setSelectedScriptGenerationModel(workflowDraft?.customScriptSettings?.scriptModel || workflowDraft?.openRouterModel || SCRIPT_MODEL_OPTIONS[0].id);
+    setSelectedScriptGenerationModel(workflowDraft?.customScriptSettings?.scriptModel || NO_AI_SCRIPT_MODEL_ID);
     setConstitutionAnalysis(workflowDraft?.constitutionAnalysis || null);
   }, [workflowHydrationKey, workflowDraft, studioState?.lastContentType]);
 
@@ -490,7 +490,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     () => styleImages.find((item) => item.id === selectedStyleImageId) || styleImages[0] || null,
     [styleImages, selectedStyleImageId]
   );
-  const projectVoiceProvider = (workflowDraft?.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'elevenLabs' | 'heygen';
+  const projectVoiceProvider = (workflowDraft?.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
   const selectedProjectElevenVoice = useMemo(
     () => elevenLabsVoices.find((item) => item.voice_id === (workflowDraft?.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID)) || elevenLabsVoices[0] || null,
     [elevenLabsVoices, studioState?.routing?.elevenLabsVoiceId, workflowDraft?.elevenLabsVoiceId]
@@ -506,8 +506,11 @@ const InputSection: React.FC<InputSectionProps> = ({
     if (projectVoiceProvider === 'heygen') {
       return `기본값 · HeyGen / ${selectedProjectHeyGenVoice?.name || '기본 보이스'}`;
     }
+    if (projectVoiceProvider === 'chatterbox') {
+      return `기본값 · Chatterbox / ${CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === (workflowDraft?.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear'))?.name || 'Chatterbox 클리어'}`;
+    }
     return `기본값 · qwen3-tts / ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'}`;
-  }, [projectVoiceProvider, selectedProjectElevenVoice, selectedProjectHeyGenVoice, studioState?.routing?.qwenVoicePreset, workflowDraft?.qwenVoicePreset]);
+  }, [projectVoiceProvider, selectedProjectElevenVoice, selectedProjectHeyGenVoice, studioState?.routing?.chatterboxVoicePreset, studioState?.routing?.qwenVoicePreset, workflowDraft?.chatterboxVoicePreset, workflowDraft?.qwenVoicePreset]);
   const stopCharacterVoicePreview = () => {
     if (characterVoiceAudioRef.current) {
       characterVoiceAudioRef.current.pause();
@@ -521,11 +524,16 @@ const InputSection: React.FC<InputSectionProps> = ({
     setVoicePreviewCharacterId(null);
   };
   const resolveCharacterVoiceSelection = (character: CharacterProfile) => {
-    const provider = (character.voiceProvider || 'project-default') as 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen';
+    const provider = (character.voiceProvider || 'project-default') as 'project-default' | 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
     if (provider === 'qwen3Tts') {
       const qwenId = character.voiceId || character.voiceHint || workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default';
       const qwenVoice = QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === qwenId) || QWEN_TTS_PRESET_OPTIONS[0];
       return { provider, voiceId: qwenVoice.id, voiceName: qwenVoice.name, previewUrl: null as string | null, locale: 'ko-KR' };
+    }
+    if (provider === 'chatterbox') {
+      const chatterboxId = character.voiceId || character.voiceHint || workflowDraft?.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear';
+      const chatterboxVoice = CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === chatterboxId) || CHATTERBOX_TTS_PRESET_OPTIONS[0];
+      return { provider, voiceId: chatterboxVoice.id, voiceName: chatterboxVoice.name, previewUrl: null as string | null, locale: 'ko-KR' };
     }
     if (provider === 'elevenLabs') {
       const voiceId = character.voiceId || character.voiceHint || workflowDraft?.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID;
@@ -543,6 +551,11 @@ const InputSection: React.FC<InputSectionProps> = ({
     if (projectVoiceProvider === 'heygen') {
       return { provider, voiceId: selectedProjectHeyGenVoice?.voice_id || workflowDraft?.heygenVoiceId || studioState?.routing?.heygenVoiceId || null, voiceName: selectedProjectHeyGenVoice?.name || 'HeyGen 기본 보이스', previewUrl: selectedProjectHeyGenVoice?.preview_audio_url || selectedProjectHeyGenVoice?.preview_audio || null, locale: selectedProjectHeyGenVoice?.language || null };
     }
+    if (projectVoiceProvider === 'chatterbox') {
+      const chatterboxId = workflowDraft?.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear';
+      const chatterboxVoice = CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === chatterboxId) || CHATTERBOX_TTS_PRESET_OPTIONS[0];
+      return { provider, voiceId: chatterboxVoice.id, voiceName: chatterboxVoice.name, previewUrl: null as string | null, locale: 'ko-KR' };
+    }
     const qwenId = workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default';
     const qwenVoice = QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === qwenId) || QWEN_TTS_PRESET_OPTIONS[0];
     return { provider, voiceId: qwenVoice.id, voiceName: qwenVoice.name, previewUrl: null as string | null, locale: 'ko-KR' };
@@ -552,9 +565,10 @@ const InputSection: React.FC<InputSectionProps> = ({
     if (resolved.provider === 'project-default') return projectVoiceSummary;
     if (resolved.provider === 'elevenLabs') return `직접 지정 · ElevenLabs / ${resolved.voiceName}`;
     if (resolved.provider === 'heygen') return `직접 지정 · HeyGen / ${resolved.voiceName}`;
+    if (resolved.provider === 'chatterbox') return `직접 지정 · Chatterbox / ${resolved.voiceName}`;
     return `직접 지정 · qwen3-tts / ${resolved.voiceName}`;
   };
-  const buildCharacterVoicePatch = (provider: 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen', value?: string | null) => {
+  const buildCharacterVoicePatch = (provider: 'project-default' | 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen', value?: string | null) => {
     if (provider === 'project-default') {
       return {
         voiceProvider: 'project-default' as const,
@@ -569,6 +583,17 @@ const InputSection: React.FC<InputSectionProps> = ({
       const preset = QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (value || 'qwen-default')) || QWEN_TTS_PRESET_OPTIONS[0];
       return {
         voiceProvider: 'qwen3Tts' as const,
+        voiceHint: preset.id,
+        voiceId: preset.id,
+        voiceName: preset.name,
+        voicePreviewUrl: null,
+        voiceLocale: 'ko-KR',
+      };
+    }
+    if (provider === 'chatterbox') {
+      const preset = CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === (value || 'chatterbox-clear')) || CHATTERBOX_TTS_PRESET_OPTIONS[0];
+      return {
+        voiceProvider: 'chatterbox' as const,
         voiceHint: preset.id,
         voiceId: preset.id,
         voiceName: preset.name,
@@ -602,7 +627,10 @@ const InputSection: React.FC<InputSectionProps> = ({
     if (!selectedCharacterStyle) return trimmed;
     return [`[COMMON CHARACTER STYLE] ${selectedCharacterStyle.label}`, selectedCharacterStyle.prompt, trimmed].filter(Boolean).join('\n\n');
   };
-  const customScriptModelOptions = useMemo(() => SCRIPT_MODEL_OPTIONS.map((item) => ({ id: item.id, name: item.name })), []);
+  const customScriptModelOptions = useMemo(
+    () => ([{ id: NO_AI_SCRIPT_MODEL_ID, name: 'AI 모델 없음' }, ...SCRIPT_MODEL_OPTIONS.map((item) => ({ id: item.id, name: item.name }))]),
+    []
+  );
   const combinedReferenceText = useMemo(() => {
     const linkNotes = referenceLinks
       .filter((item) => item.status === 'ready')
@@ -738,6 +766,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       if (!provider) return false;
       if (provider === 'project-default') return true;
       if (provider === 'qwen3Tts') return Boolean(character.voiceId || character.voiceHint || 'qwen-default');
+      if (provider === 'chatterbox') return Boolean(character.voiceId || character.voiceHint || studioState?.routing?.chatterboxVoicePreset || workflowDraft?.chatterboxVoicePreset || 'chatterbox-clear');
       if (provider === 'elevenLabs') {
         return Boolean(
           character.voiceId
@@ -761,8 +790,10 @@ const InputSection: React.FC<InputSectionProps> = ({
     selectedCharacters,
     selectedProjectElevenVoice?.voice_id,
     selectedProjectHeyGenVoice?.voice_id,
+    studioState?.routing?.chatterboxVoicePreset,
     studioState?.routing?.elevenLabsVoiceId,
     studioState?.routing?.heygenVoiceId,
+    workflowDraft?.chatterboxVoicePreset,
     workflowDraft?.elevenLabsVoiceId,
     workflowDraft?.heygenVoiceId,
     isMuteScriptMode,
@@ -884,6 +915,10 @@ const InputSection: React.FC<InputSectionProps> = ({
     elevenLabsModelId: workflowDraft?.elevenLabsModelId || studioState?.routing?.elevenLabsModelId || null,
     heygenVoiceId: workflowDraft?.heygenVoiceId || studioState?.routing?.heygenVoiceId || selectedProjectHeyGenVoice?.voice_id || null,
     qwenVoicePreset: workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default',
+    chatterboxVoicePreset: workflowDraft?.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear',
+    voiceReferenceAudioData: workflowDraft?.voiceReferenceAudioData || studioState?.routing?.voiceReferenceAudioData || null,
+    voiceReferenceMimeType: workflowDraft?.voiceReferenceMimeType || studioState?.routing?.voiceReferenceMimeType || null,
+    voiceReferenceName: workflowDraft?.voiceReferenceName || studioState?.routing?.voiceReferenceName || null,
     qwenStylePreset: workflowDraft?.qwenStylePreset || studioState?.routing?.qwenStylePreset || 'balanced',
     customScriptSettings: {
       expectedDurationMinutes: customScriptDurationMinutes,
@@ -1773,9 +1808,12 @@ const InputSection: React.FC<InputSectionProps> = ({
       updatedAt: Date.now(),
     };
     if (isMuteScriptMode) return;
-    const hasTextApiConnection = connectionSummary.text;
+    const isNoAiScriptMode = selectedScriptGenerationModel === NO_AI_SCRIPT_MODEL_ID;
+    const hasTextApiConnection = connectionSummary.text && !isNoAiScriptMode;
     if (!hasTextApiConnection) {
-      promptTextAiSetup('현재 대본 생성은 샘플 보조 모드입니다. Google AI Studio를 연결하면 이 자리에서 실제 AI 대본 초안을 바로 받을 수 있습니다.');
+      promptTextAiSetup(isNoAiScriptMode
+        ? '현재 AI 모델 없음 모드가 선택되어 있어 샘플 대본을 바로 만듭니다. 실제 AI 대본을 쓰려면 모델을 바꿔 주세요.'
+        : '현재 대본 생성은 샘플 보조 모드입니다. Google AI Studio를 연결하면 이 자리에서 실제 AI 대본 초안을 바로 받을 수 있습니다.');
     }
     if (template.id !== 'sample-script-fallback-template') {
       focusPromptTemplate(template.id);
@@ -1817,7 +1855,9 @@ const InputSection: React.FC<InputSectionProps> = ({
     if (!hasTextApiConnection) {
       setIsGeneratingScript(true);
       try {
-        await applySampleFallback('AI 연결이 없어 Step 3 샘플 대본을 바로 채웠습니다. 설정을 연결하면 같은 버튼에서 실제 AI 대본으로 바뀝니다.');
+        await applySampleFallback(isNoAiScriptMode
+          ? 'AI 모델 없음이 선택되어 Step 3 샘플 대본을 바로 채웠습니다. 모델을 바꾸면 실제 AI 생성으로 전환됩니다.'
+          : 'AI 연결이 없어 Step 3 샘플 대본을 바로 채웠습니다. 설정을 연결하면 같은 버튼에서 실제 AI 대본으로 바뀝니다.');
       } finally {
         setIsGeneratingScript(false);
       }
@@ -2438,14 +2478,14 @@ const InputSection: React.FC<InputSectionProps> = ({
     replaceExtractedCharacters(nextCharacters, { persistDraft: true });
   };
 
-  const handleCharacterVoiceProviderChange = (characterId: string, provider: 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen') => {
+  const handleCharacterVoiceProviderChange = (characterId: string, provider: 'project-default' | 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen') => {
     const nextCharacters = extractedCharactersRef.current.map((item) => (
       item.id === characterId ? { ...item, ...buildCharacterVoicePatch(provider) } : item
     ));
     replaceExtractedCharacters(nextCharacters, { persistDraft: true });
   };
 
-  const handleCharacterVoiceChoiceChange = (characterId: string, provider: 'qwen3Tts' | 'elevenLabs' | 'heygen', value: string) => {
+  const handleCharacterVoiceChoiceChange = (characterId: string, provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen', value: string) => {
     const nextCharacters = extractedCharactersRef.current.map((item) => (
       item.id === characterId ? { ...item, ...buildCharacterVoicePatch(provider, value) } : item
     ));
@@ -2504,7 +2544,7 @@ const InputSection: React.FC<InputSectionProps> = ({
 
     try {
       const previewUrl = resolved.previewUrl || character.voicePreviewUrl || null;
-      if (effectiveProvider !== 'qwen3Tts' && previewUrl) {
+      if (effectiveProvider !== 'qwen3Tts' && effectiveProvider !== 'chatterbox' && previewUrl) {
         const audio = new Audio(previewUrl);
         characterVoiceAudioRef.current = audio;
         audio.onended = () => {
@@ -2520,10 +2560,25 @@ const InputSection: React.FC<InputSectionProps> = ({
         return;
       }
 
-      if (effectiveProvider === 'qwen3Tts') {
+      if (effectiveProvider === 'qwen3Tts' || effectiveProvider === 'chatterbox') {
+        if (effectiveProvider === 'chatterbox' && studioState?.routing?.voiceReferenceAudioData && studioState?.routing?.voiceReferenceMimeType) {
+          const audio = new Audio(`data:${studioState.routing.voiceReferenceMimeType};base64,${studioState.routing.voiceReferenceAudioData}`);
+          characterVoiceAudioRef.current = audio;
+          audio.onended = () => {
+            setVoicePreviewCharacterId(null);
+            setVoicePreviewMessage(`${character.name} · ${resolved.voiceName} 샘플 재생이 끝났습니다.`);
+          };
+          audio.onerror = () => {
+            setVoicePreviewCharacterId(null);
+            setVoicePreviewMessage('저장된 녹음 샘플 재생에 실패했습니다. 다시 녹음해 주세요.');
+          };
+          await audio.play();
+          setVoicePreviewMessage(`${character.name} · ${resolved.voiceName} 저장 샘플을 재생 중입니다.`);
+          return;
+        }
         if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
           setVoicePreviewCharacterId(null);
-          setVoicePreviewMessage('이 브라우저에서는 qwen3-tts 미리 듣기를 지원하지 않습니다.');
+          setVoicePreviewMessage(effectiveProvider === 'chatterbox' ? '이 브라우저에서는 Chatterbox 무료 미리 듣기를 지원하지 않습니다.' : '이 브라우저에서는 qwen3-tts 미리 듣기를 지원하지 않습니다.');
           return;
         }
         const synth = window.speechSynthesis;
@@ -2531,7 +2586,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         utterance.lang = 'ko-KR';
         const koreanVoices = synth.getVoices().filter((voice) => (voice.lang || '').toLowerCase().startsWith('ko'));
         const selectedVoice =
-          resolved.voiceId === 'qwen-soft'
+          resolved.voiceId === 'qwen-soft' || resolved.voiceId === 'chatterbox-warm'
             ? koreanVoices.find((voice) => /female|yuna|soyoung|sunhi|sora/i.test(voice.name)) || koreanVoices[0]
             : koreanVoices.find((voice) => /male|minho|inho|hyun|jiyoung/i.test(voice.name)) || koreanVoices[0];
         if (selectedVoice) utterance.voice = selectedVoice;
@@ -2578,7 +2633,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         qwenPreset: resolved.voiceId || studioState?.routing?.qwenVoicePreset || 'qwen-default',
         locale: resolved.locale || undefined,
       });
-      const mimeType = asset.provider === 'qwen3Tts' ? 'audio/wav' : 'audio/mpeg';
+      const mimeType = asset.provider === 'qwen3Tts' || asset.provider === 'chatterbox' ? 'audio/wav' : 'audio/mpeg';
       const audio = new Audio(`data:${mimeType};base64,${asset.audioData}`);
       characterVoiceAudioRef.current = audio;
       audio.onended = () => {

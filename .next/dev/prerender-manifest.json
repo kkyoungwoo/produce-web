@@ -1,11 +1,1 @@
-{
-  "version": 4,
-  "routes": {},
-  "dynamicRoutes": {},
-  "notFoundRoutes": [],
-  "preview": {
-    "previewModeId": "bd02d376182469ee293d2fefe5a11c5c",
-    "previewModeSigningKey": "1f4f0b2109ab899c6c458d0176f09bf2aeef73b75b0efc63f721e761ef289340",
-    "previewModeEncryptionKey": "c69c8639c803221d5232f3c8f2566d9bfa9061ec9c0c972225f024272752489c"
-  }
-}
+{"version":4,"routes":{"/ko":{}},"dynamicRoutes":{"/[locale]":{"dataRoute":null,"dataRouteRegex":null,"fallback":null,"fallbackRevalidate":false,"fallbackSourceRoute":"/[locale]","routeRegex":"^\\/([^/]+?)(?:\\/)?$","allowHeader":[]}},"notFoundRoutes":[],"preview":{"previewModeId":"314e4f2138d715b34e9a3763433be314","previewModeSigningKey":"2abba9ce81ef6825c19608cddd5bdd292a8488287dfab4773a0f0c3b16d1b4c0","previewModeEncryptionKey":"07cd5824b6dedcb26da96184d1a57d27193e300d6357376f53257b1f9cfd86f9"}}

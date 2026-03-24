@@ -567,17 +567,19 @@ const SceneStudioPage: React.FC = () => {
   }, []);
 
   const resolveSceneTtsOptions = useCallback((): {
-    provider: 'qwen3Tts' | 'elevenLabs' | 'heygen';
+    provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
     apiKey: string;
     voiceId: string | null;
     modelId: string;
     qwenPreset: string;
   } => {
-    const preferredProvider = (draft.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'elevenLabs' | 'heygen';
+    const preferredProvider = (draft.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
     const elevenApiKey = studioState?.providers?.elevenLabsApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY) || '';
     const heygenApiKey = studioState?.providers?.heygenApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.HEYGEN_API_KEY) || '';
 
-    const provider: 'qwen3Tts' | 'elevenLabs' | 'heygen' = preferredProvider === 'heygen'
+    const provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen' = preferredProvider === 'chatterbox'
+      ? 'chatterbox'
+      : preferredProvider === 'heygen'
       ? (heygenApiKey ? 'heygen' : elevenApiKey ? 'elevenLabs' : 'qwen3Tts')
       : preferredProvider === 'elevenLabs'
         ? (elevenApiKey ? 'elevenLabs' : heygenApiKey ? 'heygen' : 'qwen3Tts')
@@ -594,13 +596,17 @@ const SceneStudioPage: React.FC = () => {
       apiKey,
       voiceId: provider === 'elevenLabs'
         ? (draft.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID)
+        : provider === 'chatterbox'
+          ? (draft.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear')
         : provider === 'heygen'
           ? (draft.heygenVoiceId || studioState?.routing?.heygenVoiceId || null)
           : (draft.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default'),
       modelId: draft.elevenLabsModelId || studioState?.routing?.elevenLabsModelId || studioState?.routing?.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
-      qwenPreset: draft.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default',
+      qwenPreset: provider === 'chatterbox'
+        ? (draft.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear')
+        : (draft.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default'),
     };
-  }, [draft.elevenLabsModelId, draft.elevenLabsVoiceId, draft.heygenVoiceId, draft.qwenVoicePreset, draft.ttsProvider, studioState?.providers?.elevenLabsApiKey, studioState?.providers?.heygenApiKey, studioState?.routing?.audioModel, studioState?.routing?.elevenLabsModelId, studioState?.routing?.elevenLabsVoiceId, studioState?.routing?.heygenVoiceId, studioState?.routing?.qwenVoicePreset, studioState?.routing?.ttsProvider]);
+  }, [draft.chatterboxVoicePreset, draft.elevenLabsModelId, draft.elevenLabsVoiceId, draft.heygenVoiceId, draft.qwenVoicePreset, draft.ttsProvider, studioState?.providers?.elevenLabsApiKey, studioState?.providers?.heygenApiKey, studioState?.routing?.audioModel, studioState?.routing?.chatterboxVoicePreset, studioState?.routing?.elevenLabsModelId, studioState?.routing?.elevenLabsVoiceId, studioState?.routing?.heygenVoiceId, studioState?.routing?.qwenVoicePreset, studioState?.routing?.ttsProvider]);
 
   const generateSceneAudioAsset = useCallback(async (text: string) => {
     const tts = resolveSceneTtsOptions();

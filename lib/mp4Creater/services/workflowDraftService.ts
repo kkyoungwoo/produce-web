@@ -1,4 +1,4 @@
-import { CONFIG } from '../config';
+import { CONFIG, NO_AI_SCRIPT_MODEL_ID } from '../config';
 import {
   ContentType,
   normalizeContentType,
@@ -93,7 +93,7 @@ export function createDefaultWorkflowDraft(contentType: ContentType = 'story', o
       language: 'ko',
       referenceText: '',
       referenceLinks: [],
-      scriptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
+      scriptModel: NO_AI_SCRIPT_MODEL_ID,
     },
     constitutionAnalysis: null,
     openRouterModel: CONFIG.DEFAULT_SCRIPT_MODEL,
@@ -102,6 +102,10 @@ export function createDefaultWorkflowDraft(contentType: ContentType = 'story', o
     elevenLabsModelId: null,
     heygenVoiceId: null,
     qwenVoicePreset: 'qwen-default',
+    chatterboxVoicePreset: 'chatterbox-clear',
+    voiceReferenceAudioData: null,
+    voiceReferenceMimeType: null,
+    voiceReferenceName: null,
     qwenStylePreset: 'balanced',
     voicePreviewAsset: null,
     scriptPreviewAsset: null,
@@ -256,7 +260,7 @@ export function ensureWorkflowDraft(studioState?: StudioState | null): WorkflowD
       language: existing.customScriptSettings?.language || 'ko',
       referenceText: existing.customScriptSettings?.referenceText || '',
       referenceLinks: Array.isArray(existing.customScriptSettings?.referenceLinks) ? existing.customScriptSettings?.referenceLinks : [],
-      scriptModel: existing.customScriptSettings?.scriptModel || existing.openRouterModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+      scriptModel: existing.customScriptSettings?.scriptModel || NO_AI_SCRIPT_MODEL_ID,
     },
     constitutionAnalysis: existing.constitutionAnalysis || null,
     selectedPromptTemplateId:
@@ -267,6 +271,10 @@ export function ensureWorkflowDraft(studioState?: StudioState | null): WorkflowD
     ttsProvider: existing.ttsProvider || 'qwen3Tts',
     heygenVoiceId: existing.heygenVoiceId || null,
     qwenVoicePreset: existing.qwenVoicePreset || 'qwen-default',
+    chatterboxVoicePreset: existing.chatterboxVoicePreset || 'chatterbox-clear',
+    voiceReferenceAudioData: existing.voiceReferenceAudioData || null,
+    voiceReferenceMimeType: existing.voiceReferenceMimeType || null,
+    voiceReferenceName: existing.voiceReferenceName || null,
     qwenStylePreset: existing.qwenStylePreset || 'balanced',
     sampleMode: {
       text: existing.sampleMode?.text ?? true,

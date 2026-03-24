@@ -121,7 +121,7 @@ function normalizeAudioPreview(item: any): AudioPreviewAsset | null {
     text: typeof item.text === 'string' ? item.text : '',
     audioData: typeof item.audioData === 'string' ? item.audioData : null,
     duration: typeof item.duration === 'number' ? item.duration : null,
-    provider: item.provider === 'elevenLabs' ? 'elevenLabs' : item.provider === 'qwen3Tts' ? 'qwen3Tts' : item.provider === 'heygen' ? 'heygen' : 'sample',
+    provider: item.provider === 'elevenLabs' ? 'elevenLabs' : item.provider === 'qwen3Tts' ? 'qwen3Tts' : item.provider === 'chatterbox' ? 'chatterbox' : item.provider === 'heygen' ? 'heygen' : 'sample',
     mode: item.mode === 'script-preview' || item.mode === 'final-output' ? item.mode : 'voice-preview',
     sourceMode: item.sourceMode === 'ai' ? 'ai' : 'sample',
     voiceId: typeof item.voiceId === 'string' ? item.voiceId : null,
