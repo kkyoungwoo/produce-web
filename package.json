@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "framer-motion": "^12.38.0",
+    "hangul-js": "^0.2.6",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",

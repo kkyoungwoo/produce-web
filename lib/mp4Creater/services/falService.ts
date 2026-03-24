@@ -3,6 +3,7 @@ import { AspectRatio } from '../types';
 import { translatePromptToEnglish } from './promptTranslationService';
 import { createCreativeDirection, hashCreativeSeed } from '../config/creativeVariance';
 import { parseDataUrl } from '../utils/downloadHelpers';
+import { getPrimaryFreeVideoForPrompt } from './freeMediaService';
 
 export interface GeneratedVideoResult {
   videoUrl: string;
@@ -59,7 +60,11 @@ function resolveSampleCanvasSize(aspectRatio: AspectRatio = '16:9') {
   return { width: 960, height: 540 };
 }
 
-async function createSampleVideoFromImage(imageBase64: string, aspectRatio: AspectRatio = '16:9'): Promise<GeneratedVideoResult | null> {
+async function createSampleVideoFromImage(imageBase64: string, aspectRatio: AspectRatio = '16:9', motionPrompt?: string): Promise<GeneratedVideoResult | null> {
+  const freeVideoUrl = motionPrompt ? await getPrimaryFreeVideoForPrompt(motionPrompt).catch(() => null) : null;
+  if (freeVideoUrl) {
+    return { videoUrl: freeVideoUrl, sourceMode: 'sample' };
+  }
   if (typeof window === 'undefined' || typeof document === 'undefined' || typeof MediaRecorder === 'undefined') {
     return null;
   }
@@ -212,7 +217,7 @@ export async function generateVideoFromImage(
   const modelConfig = GOOGLE_VIDEO_MODEL_CONFIGS[normalizedModel];
 
   if (!key || normalizedModel.startsWith('sample-')) {
-    return await createSampleVideoFromImage(imageBase64, aspectRatio);
+    return await createSampleVideoFromImage(imageBase64, aspectRatio, motionPrompt);
   }
 
   try {
@@ -223,7 +228,7 @@ export async function generateVideoFromImage(
     });
     const direction = createCreativeDirection(`${englishMotionPrompt}:${aspectRatio}:${normalizedModel}`, 0);
     const image = buildInlineImage(imageBase64);
-    if (!image) return await createSampleVideoFromImage(imageBase64, aspectRatio);
+    if (!image) return await createSampleVideoFromImage(imageBase64, aspectRatio, motionPrompt);
 
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(normalizedModel)}:predictLongRunning`, {
       method: 'POST',
@@ -246,18 +251,18 @@ export async function generateVideoFromImage(
     });
 
     if (!response.ok) {
-      return await createSampleVideoFromImage(imageBase64, aspectRatio);
+      return await createSampleVideoFromImage(imageBase64, aspectRatio, motionPrompt);
     }
 
     const operation = await response.json();
     const operationName = typeof operation?.name === 'string' ? operation.name : '';
-    if (!operationName) return await createSampleVideoFromImage(imageBase64, aspectRatio);
+    if (!operationName) return await createSampleVideoFromImage(imageBase64, aspectRatio, motionPrompt);
 
     const videoUrl = await pollGoogleVideo(operationName, key);
-    if (!videoUrl) return await createSampleVideoFromImage(imageBase64, aspectRatio);
+    if (!videoUrl) return await createSampleVideoFromImage(imageBase64, aspectRatio, motionPrompt);
     return { videoUrl, sourceMode: 'ai' };
   } catch {
-    return await createSampleVideoFromImage(imageBase64, aspectRatio);
+    return await createSampleVideoFromImage(imageBase64, aspectRatio, motionPrompt);
   }
 }
 

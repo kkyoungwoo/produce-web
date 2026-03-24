@@ -31,13 +31,13 @@ function normalizeProjectContentTypes(project: any): SavedProject {
 
 function normalizeStudioStateContentTypes(state: StudioState | null | undefined): StudioState {
   if (!state) return createDefaultStudioState();
-  return {
+  return sanitizeRoutingForAvailableProviders({
     ...state,
     workflowDraft: state.workflowDraft ? normalizeWorkflowDraftContentType(state.workflowDraft) : null,
     projects: Array.isArray(state.projects) ? state.projects.map(normalizeProjectContentTypes) : [],
     projectIndex: Array.isArray((state as any).projectIndex) ? (state as any).projectIndex.map(normalizeProjectContentTypes) : [],
     lastContentType: normalizeContentType(state.lastContentType || state.workflowDraft?.contentType || 'story'),
-  };
+  });
 }
 
 export const DEFAULT_ROUTING: AiRoutingSettings = {
@@ -122,7 +122,12 @@ export const createDefaultStudioState = (): StudioState => ({
   selectedCharacterId: null,
   characters: [],
   routing: { ...DEFAULT_ROUTING },
-  providers: {},
+  providers: {
+    openRouterApiKey: '',
+    elevenLabsApiKey: '',
+    heygenApiKey: '',
+    falApiKey: '',
+  },
   projects: [],
   projectIndex: [],
   workflowDraft: createDefaultWorkflowDraft('story'),
@@ -136,6 +141,40 @@ export const createDefaultStudioState = (): StudioState => ({
   providerRegistry: createDefaultRegistry(),
   lastContentType: 'story',
 });
+
+function sanitizeRoutingForAvailableProviders(state: StudioState): StudioState {
+  const providers = state.providers || {};
+  const routing = { ...DEFAULT_ROUTING, ...(state.routing || {}) };
+  const hasGoogleStyleKey = Boolean((providers.openRouterApiKey || providers.falApiKey || '').trim());
+  const hasElevenLabsKey = Boolean((providers.elevenLabsApiKey || '').trim());
+  const hasHeygenKey = Boolean((providers.heygenApiKey || '').trim());
+
+  if (!hasGoogleStyleKey) {
+    routing.imageProvider = 'sample';
+    routing.videoProvider = 'sample';
+    routing.musicVideoProvider = 'sample';
+    routing.musicVideoMode = 'sample';
+    routing.imageModel = routing.imageModel || CONFIG.DEFAULT_IMAGE_MODEL;
+    routing.videoModel = routing.videoModel || CONFIG.DEFAULT_VIDEO_MODEL;
+  }
+
+  if (!hasElevenLabsKey) {
+    if (routing.audioProvider === 'elevenLabs') routing.audioProvider = 'qwen3Tts';
+    if (routing.ttsProvider === 'elevenLabs') routing.ttsProvider = 'qwen3Tts';
+    if (routing.backgroundMusicProvider === 'elevenLabs') routing.backgroundMusicProvider = 'sample';
+    if ((routing.backgroundMusicModel || '').startsWith('elevenlabs')) routing.backgroundMusicModel = 'sample-ambient-v1';
+  }
+
+  if (!hasHeygenKey) {
+    if (routing.audioProvider === 'heygen') routing.audioProvider = 'qwen3Tts';
+    if (routing.ttsProvider === 'heygen') routing.ttsProvider = 'qwen3Tts';
+  }
+
+  return {
+    ...state,
+    routing,
+  };
+}
 
 async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -202,6 +241,9 @@ export function summarizeProjectForIndex(project: any): SavedProject {
     lastSavedAt: typeof project?.lastSavedAt === 'number' ? project.lastSavedAt : Date.now(),
     settings: project?.settings || {
       imageModel: CONFIG.DEFAULT_IMAGE_MODEL,
+      videoModel: CONFIG.DEFAULT_VIDEO_MODEL,
+      scriptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
+      sceneModel: CONFIG.DEFAULT_SCRIPT_MODEL,
       outputMode: 'video',
       elevenLabsModel: CONFIG.DEFAULT_ELEVENLABS_MODEL,
     },
@@ -226,6 +268,12 @@ export function summarizeProjectForIndex(project: any): SavedProject {
       selectedStyleImageId: project.workflowDraft.selectedStyleImageId,
       selectedCharacterIds: project.workflowDraft.selectedCharacterIds || [],
     } as any : null,
+    youtubeUploadStatus: project?.youtubeUploadStatus || 'idle',
+    youtubeUploadedAt: typeof project?.youtubeUploadedAt === 'number' ? project.youtubeUploadedAt : null,
+    youtubeVideoId: typeof project?.youtubeVideoId === 'string' ? project.youtubeVideoId : null,
+    youtubeChannelTitle: typeof project?.youtubeChannelTitle === 'string' ? project.youtubeChannelTitle : null,
+    youtubeTitle: typeof project?.youtubeTitle === 'string' ? project.youtubeTitle : null,
+    isShortsEligible: typeof project?.isShortsEligible === 'boolean' ? project.isShortsEligible : false,
   };
 }
 

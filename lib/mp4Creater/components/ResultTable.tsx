@@ -26,6 +26,7 @@ interface ResultTableProps {
   onVideoPromptChange?: (index: number, prompt: string) => void;
   onSelectedVisualTypeChange?: (index: number, mode: 'image' | 'video') => void;
   onDurationChange?: (index: number, duration: number) => void;
+  onAddParagraphScene?: () => void;
   onOpenSettings?: () => void;
   onRequestProviderSetup?: (kind: 'text' | 'audio' | 'video') => void;
   isExporting?: boolean;
@@ -235,6 +236,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   onVideoPromptChange,
   onSelectedVisualTypeChange,
   onDurationChange,
+  onAddParagraphScene,
   onOpenSettings,
   onRequestProviderSetup,
   isExporting,
@@ -734,7 +736,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
             </div>
           </div>
 
-          <div className="grid gap-2 lg:grid-cols-3">
+          <div className="grid gap-2 lg:grid-cols-4">
             <button type="button" onClick={() => setPreviewOpen(true)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white hover:bg-slate-800">미리보기</button>
             {onGenerateAllImages && (
               <button type="button" onClick={() => void onGenerateAllImages?.()} disabled={isGenerating} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isGenerating ? '이미지 생성 중...' : '전체 이미지 생성'}</button>
@@ -891,7 +893,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
               }}
               className={`overflow-hidden rounded-[24px] border bg-white shadow-sm transition-all duration-300 ${activeSceneIndex === index ? 'border-blue-300 ring-2 ring-blue-100' : 'border-slate-200'}`}
             >
-              <div className="flex flex-col xl:grid xl:h-[300px] xl:grid-cols-[232px_minmax(0,1fr)_186px]">
+              <div className="flex flex-col gap-3 xl:grid xl:grid-cols-[232px_minmax(0,1fr)_186px] xl:gap-0">
                 <div className="border-b border-slate-200 bg-slate-50 p-3 xl:border-b-0 xl:border-r">
                   <div className="mb-3 flex items-center justify-between gap-2">
                     <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-black text-white">씬 {row.sceneNumber}</span>
@@ -945,15 +947,11 @@ const ResultTable: React.FC<ResultTableProps> = ({
                         )}
                       </div>
                     )}
-                    {visualEntries.length > 1 && !isSceneWorking && (hasPrevVisualEntry || hasNextVisualEntry) && (
+                    {visualEntries.length > 0 && !isSceneWorking && (
                       <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-between gap-2 opacity-100 transition-opacity duration-200">
-                        {hasPrevVisualEntry ? (
-                          <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, -1)} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white">←</button>
-                        ) : <span className="h-8 w-8" aria-hidden="true" />}
-                        <div className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-black text-slate-700 shadow-sm">{visualEntryIndex + 1}/{visualEntries.length}</div>
-                        {hasNextVisualEntry ? (
-                          <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, 1)} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white">→</button>
-                        ) : <span className="h-8 w-8" aria-hidden="true" />}
+                        <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, -1)} disabled={!hasPrevVisualEntry} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white disabled:cursor-not-allowed disabled:opacity-45">←</button>
+                        <div className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-black text-slate-700 shadow-sm">{visualEntries.length ? `${visualEntryIndex + 1}/${visualEntries.length}` : '0/0'}</div>
+                        <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, 1)} disabled={!hasNextVisualEntry} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white disabled:cursor-not-allowed disabled:opacity-45">→</button>
                       </div>
                     )}
                   </div>
@@ -962,13 +960,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
                       <div className="flex items-center justify-between gap-2 px-1 pb-2 text-[11px] font-bold text-slate-600">
                         <span>{activeHistoryKind === 'video' ? '영상 히스토리' : '이미지 히스토리'} · 오른쪽으로 누적</span>
                         <div className="flex items-center gap-2">
-                          {hasPrevVisualEntry ? (
-                            <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, -1)} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-700 hover:bg-slate-100">←</button>
-                          ) : null}
+                          <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, -1)} disabled={!hasPrevVisualEntry} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45">←</button>
                           <span>{visualEntry?.label || `생성본 ${visualEntryIndex + 1}`}</span>
-                          {hasNextVisualEntry ? (
-                            <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, 1)} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-700 hover:bg-slate-100">→</button>
-                          ) : null}
+                          <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, 1)} disabled={!hasNextVisualEntry} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45">→</button>
                         </div>
                       </div>
                       <div
@@ -1034,7 +1028,11 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   </div>
                 </div>
 
-                <div className="min-w-0 p-3 xl:grid xl:h-[300px] xl:grid-rows-[auto_98px_auto] xl:gap-2 xl:overflow-hidden">
+                <div className="min-w-0 p-3 space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">문단 내용 / 프롬프트</div>
+                    <div className="text-[11px] text-slate-400">한 카드 안에서 바로 수정</div>
+                  </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {(['narration', 'image', 'video'] as SceneEditorMode[]).map((mode) => {
                       const selected = editorMode === mode;
@@ -1059,7 +1057,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     placeholder={editorMeta.placeholder}
                     disabled={isSceneWorking}
                     onChange={(e) => handleSceneEditorChange(row, index, editorMode, e.target.value)}
-                    className="min-h-[96px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400 xl:h-[98px]"
+                    className="min-h-[120px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400"
                   />
 
                   <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -1106,8 +1104,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200 bg-slate-50 p-3 xl:border-l xl:border-t-0 xl:overflow-hidden">
-                  <div className="grid h-full auto-rows-fr grid-cols-2 gap-2 xl:grid-cols-1">
+                <div className="border-t border-slate-200 bg-slate-50 p-3 xl:border-l xl:border-t-0">
+                  <div className="space-y-3">
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">생성 버튼</div>
+                    <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
                     {onRegenerateImage && (
                       <button type="button" disabled={isSceneWorking} onClick={() => { void runSceneAction(`image-${index}`, async () => { await Promise.resolve(onRegenerateImage?.(index)); }); }} className="rounded-2xl bg-blue-600 px-3 py-2.5 text-[13px] font-black leading-tight text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">
                         {row.imageData ? '이미지 다시 생성' : '이미지 생성'}
@@ -1125,9 +1125,26 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 </div>
               </div>
             </div>
+          </div>
           );
         })}
       </div>
+
+      {onAddParagraphScene && (
+        <div className="mt-4">
+          <button
+            type="button"
+            onClick={() => void onAddParagraphScene?.()}
+            className="flex w-full items-center justify-center gap-3 rounded-[24px] border border-dashed border-blue-300 bg-blue-50 px-5 py-5 text-center transition hover:bg-blue-100"
+          >
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-2xl font-black text-white">+</span>
+            <span className="text-left">
+              <span className="block text-sm font-black text-slate-900">문단 추가</span>
+              <span className="block text-xs leading-5 text-slate-500">현재 생성된 문단들 맨 아래에 새 씬 카드를 추가합니다.</span>
+            </span>
+          </button>
+        </div>
+      )}
     </div>
 
       {mediaViewer && (

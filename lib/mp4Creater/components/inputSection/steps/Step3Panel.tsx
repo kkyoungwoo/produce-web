@@ -4,11 +4,14 @@ import {
   ConstitutionAnalysisSummary,
   ContentType,
   ReferenceLinkDraft,
+  ScriptLanguageOption,
   WorkflowPromptTemplateEngine,
 } from '../../../types';
 
 interface Step3PanelProps {
   contentType: ContentType;
+  customScriptLanguage: ScriptLanguageOption;
+  expectedDurationMinutes: number;
   isGeneratingScript: boolean;
   sceneCount: number;
   storyScript: string;
@@ -92,6 +95,25 @@ const QWEN_VOICE_OPTIONS = [
   { id: 'qwen-default', name: 'qwen3-tts 기본 보이스' },
   { id: 'qwen-soft', name: 'qwen3-tts 부드러운 보이스' },
 ];
+
+const SCRIPT_CHARACTER_RANGE_BY_TYPE: Record<ContentType, { min: number; max: number }> = {
+  music_video: { min: 130, max: 250 },
+  story: { min: 210, max: 390 },
+  cinematic: { min: 110, max: 210 },
+  info_delivery: { min: 390, max: 720 },
+};
+
+function formatRecommendedCharacterRange(contentType: ContentType, minutes: number) {
+  const safeMinutes = Math.max(1, Number.isFinite(minutes) ? Math.round(minutes) : 1);
+  const range = SCRIPT_CHARACTER_RANGE_BY_TYPE[contentType] || SCRIPT_CHARACTER_RANGE_BY_TYPE.story;
+  const min = safeMinutes * range.min;
+  const max = safeMinutes * range.max;
+  return {
+    min,
+    max,
+    target: Math.round((min + max) / 2),
+  };
+}
 
 function SelectablePill({
   active,
@@ -288,8 +310,8 @@ function CharacterRail({
       onMouseEnter={revealArrowsTemporarily}
       onFocusCapture={revealArrowsTemporarily}
     >
-      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-white to-transparent" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-white to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 bg-gradient-to-r from-white to-transparent" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 z-10 bg-gradient-to-l from-white to-transparent" />
 
       <ScrollArrow
         direction="left"
@@ -395,6 +417,9 @@ function CharacterRail({
 }
 
 export default function Step3Panel({
+  contentType,
+  customScriptLanguage,
+  expectedDurationMinutes,
   isGeneratingScript,
   sceneCount,
   storyScript,
@@ -436,7 +461,17 @@ export default function Step3Panel({
   const prevCharacterCountRef = useRef(extractedCharacters.length);
 
   const selectedCount = selectedCharacterIds.length;
+  const isMuteScriptMode = customScriptLanguage === 'mute';
   const scriptCharacterCount = Array.from(storyScript || '').length;
+  const recommendedCharacterRange = useMemo(
+    () => formatRecommendedCharacterRange(contentType, expectedDurationMinutes),
+    [contentType, expectedDurationMinutes]
+  );
+  const isScriptCharacterCountInRecommendedRange =
+    scriptCharacterCount >= recommendedCharacterRange.min &&
+    scriptCharacterCount <= recommendedCharacterRange.max;
+  const hasStoryScript = Boolean((storyScript || '').trim());
+  const isPreparingCharacters = !isMuteScriptMode && hasStoryScript && (isGeneratingScript || isHydratingCharacters);
 
   const canSubmitManualCharacter =
     manualCharacterName.trim().length > 0 &&
@@ -536,10 +571,10 @@ export default function Step3Panel({
             <button
               type="button"
               onClick={onGenerateScript}
-              disabled={isGeneratingScript}
+              disabled={isGeneratingScript || isMuteScriptMode}
               className="shrink-0 rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500"
             >
-              {isGeneratingScript ? '대본 생성 중...' : '대본 생성'}
+              {isMuteScriptMode ? '무음 모드' : isGeneratingScript ? '대본 생성 중...' : '대본 생성'}
             </button>
           </div>
         </div>
@@ -556,14 +591,7 @@ export default function Step3Panel({
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
-              {sceneCount}문단
-            </span>
-            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
-              {scriptCharacterCount}자
-            </span>
-
-            {isScriptModified ? (
+                        {!isMuteScriptMode && isScriptModified ? (
               <>
                 <button
                   type="button"
@@ -587,25 +615,62 @@ export default function Step3Panel({
                 </button>
               </>
             ) : null}
+            {isMuteScriptMode ? (
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                무음 콘텐츠
+              </span>
+            ) : (
+              <>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                  {sceneCount}문단
+                </span>
+                <span
+                  className={`rounded-full px-3 py-1 text-xs font-black ${
+                    isScriptCharacterCountInRecommendedRange
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-amber-100 text-amber-700'
+                  }`}
+                >
+                  {scriptCharacterCount}자
+                </span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">
+                  추천 {recommendedCharacterRange.min}~{recommendedCharacterRange.max}자 · 목표 약 {recommendedCharacterRange.target}자
+                </span>
+              </>
+            )}
           </div>
         </div>
 
-        <textarea
-          value={storyScript}
-          onChange={(e) => onStoryScriptChange(e.target.value)}
-          className={`min-h-[420px] w-full rounded-3xl border px-5 py-5 text-sm leading-7 text-slate-900 outline-none transition ${
-            isScriptModified
-              ? 'border-blue-300 bg-white focus:border-blue-400'
-              : 'border-slate-200 bg-slate-50 focus:border-slate-300'
-          }`}
-          placeholder="여기에 최종 대본을 입력하거나 생성해 주세요."
-        />
+        <div className="mb-3 rounded-[18px] border border-violet-200 bg-violet-50 px-4 py-3 text-xs leading-6 text-violet-800">
+          {isMuteScriptMode
+            ? '무음 콘텐츠는 대본 대신 화면 흐름과 출연자 선택으로 진행합니다. 아래에서 출연자만 추가하거나 선택하면 다음 단계로 넘어갈 수 있습니다.'
+            : '생성 대본은 장면 설명이 아닌 TTS 낭독용 목소리 본문만 나오도록 맞춰집니다. 추천 글자수의 중간값에 가깝게 맞추고, 한 줄을 한 문단으로 계산하며 연속 엔터는 자동으로 한 줄만 유지됩니다.'}
+        </div>
 
-        {isScriptModified ? (
-          <div className="mt-3 rounded-[18px] border border-blue-200 bg-blue-50 px-4 py-3 text-xs leading-6 text-blue-800">
-            최종 대본이 수정되었습니다. 수정하기를 누르면 이 내용을 기준으로 출연자가 다시 업데이트됩니다.
+        {isMuteScriptMode ? (
+          <div className="flex h-[90px] w-full items-center justify-center rounded-3xl border border-slate-200 bg-slate-50 px-5 text-center text-sm font-black text-slate-500">
+            무음 콘텐츠는 대본을 작성할 수 없습니다
           </div>
-        ) : null}
+        ) : (
+          <>
+            <textarea
+              value={storyScript}
+              onChange={(e) => onStoryScriptChange(e.target.value)}
+              className={`min-h-[420px] w-full rounded-3xl border px-5 py-5 text-sm leading-7 text-slate-900 outline-none transition ${
+                isScriptModified
+                  ? 'border-blue-300 bg-white focus:border-blue-400'
+                  : 'border-slate-200 bg-slate-50 focus:border-slate-300'
+              }`}
+              placeholder="여기에 최종 대본을 입력하거나 생성해 주세요."
+            />
+
+            {isScriptModified ? (
+              <div className="mt-3 rounded-[18px] border border-blue-200 bg-blue-50 px-4 py-3 text-xs leading-6 text-blue-800">
+                최종 대본이 수정되었습니다. 수정하기를 누르면 이 내용을 기준으로 출연자가 다시 업데이트됩니다.
+              </div>
+            ) : null}
+          </>
+        )}
       </section>
 
       <section
@@ -651,17 +716,45 @@ export default function Step3Panel({
 
         {extractedCharacters.length > 0 && !selectedCount ? (
           <div className="mt-4 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-800">
-            출연자를 1명 이상 선택해야 다음 단계로 넘어갈 수 있습니다.
+            {isMuteScriptMode
+              ? '무음 콘텐츠는 출연자를 1명 이상 추가하거나 선택해야 다음 단계로 넘어갈 수 있습니다.'
+              : '출연자를 1명 이상 선택해야 다음 단계로 넘어갈 수 있습니다.'}
           </div>
         ) : <div className="mt-4 rounded-[20px] border border-amber-200 bg-amber-50 px-4 py-3 text-xs leading-6 text-amber-800">
             다음 스텝으로 넘어갈 수 있습니다
           </div>
           }
 
-        {!extractedCharacters.length && !showInlineAddCharacterCard ? (
+        {isPreparingCharacters && !extractedCharacters.length && !showInlineAddCharacterCard ? (
+          <div className="mt-4 rounded-[24px] border border-violet-200 bg-violet-50 px-5 py-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.22em] text-violet-600">출연자 준비 중</div>
+                <div className="mt-2 text-base font-black text-slate-900">대본을 읽고 출연자 카드를 불러오는 중입니다</div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  대본 길이나 내용이 바뀌면 출연자 정리도 함께 다시 맞춥니다. 응답이 늦을 때는 이 영역에서 계속 준비 상태를 안내합니다.
+                </p>
+              </div>
+              <div className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-violet-700 shadow-sm">
+                {isGeneratingScript ? '대본 생성 중' : '출연자 분석 중'}
+              </div>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {[0, 1, 2].map((item) => (
+                <div key={item} className="animate-pulse rounded-[18px] border border-violet-100 bg-white/90 p-4">
+                  <div className="h-4 w-24 rounded-full bg-violet-100" />
+                  <div className="mt-3 h-3 w-full rounded-full bg-slate-100" />
+                  <div className="mt-2 h-3 w-4/5 rounded-full bg-slate-100" />
+                  <div className="mt-5 h-10 rounded-2xl bg-slate-100" />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : !extractedCharacters.length && !showInlineAddCharacterCard ? (
           <div className="mt-4 rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-center text-sm leading-6 text-slate-500">
-            대본이 준비되면 출연자를 자동으로 불러옵니다. 지금은 출연자 추가 버튼으로 먼저 직접
-            등록할 수 있습니다.
+            {isMuteScriptMode
+              ? '무음 모드에서는 대본 없이도 출연자를 직접 추가해 바로 다음 단계로 이어갈 수 있습니다.'
+              : '대본이 준비되면 출연자를 자동으로 불러옵니다. 지금은 출연자 추가 버튼으로 먼저 직접 등록할 수 있습니다.'}
           </div>
         ) : null}
 
@@ -975,7 +1068,7 @@ export default function Step3Panel({
 
         {isHydratingCharacters ? (
           <p className="mt-4 text-xs leading-6 text-violet-600">
-            대본 변경을 기준으로 출연자를 다시 정리하고 있습니다.
+            대본 변경을 기준으로 출연자를 다시 정리하고 있습니다. 로딩이 길어져도 이 단계에서 계속 결과를 기다릴 수 있습니다.
           </p>
         ) : null}
       </section>

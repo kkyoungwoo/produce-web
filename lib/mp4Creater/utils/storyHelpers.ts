@@ -20,27 +20,164 @@ export function normalizeStoryText(text: string): string {
     .join('\n\n');
 }
 
+export function normalizeStoryEditorInput(text: string): string {
+  return text
+    .replace(/\r/g, '')
+    .split(/\n+/)
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+export function splitStorySentences(text: string): string[] {
+  const normalized = text
+    .replace(/\r/g, ' ')
+    .replace(/\n+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!normalized) return [];
+
+  const sentences = normalized
+    .split(/(?<=[.!?。！？])\s+|(?<=다\.)\s+|(?<=요\.)\s+|(?<=함\.)\s+/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+
+  return sentences.length ? sentences : [normalized];
+}
+
+export function formatStoryTextForEditor(text: string): string {
+  const normalized = normalizeStoryText(text);
+  if (!normalized) return '';
+
+  const lines = normalized
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => splitStorySentences(line));
+
+  return lines
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
+const MIN_SCENE_DURATION_SECONDS = 2;
+const MAX_SCENE_DURATION_SECONDS = 6;
+const TARGET_SCENE_DURATION_SECONDS = 5;
+
+function splitParagraphIntoSentences(paragraph: string): string[] {
+  const sentences = splitStorySentences(paragraph);
+  return sentences.length ? sentences : [paragraph.trim()];
+}
+
+function normalizeSceneChunks(chunks: string[]): string[] {
+  const result: string[] = [];
+
+  for (const chunk of chunks.map((item) => item.trim()).filter(Boolean)) {
+    if (!result.length) {
+      result.push(chunk);
+      continue;
+    }
+
+    const estimated = estimateClipDuration(chunk);
+    if (estimated < MIN_SCENE_DURATION_SECONDS + 0.2) {
+      const previous = result[result.length - 1];
+      const merged = `${previous} ${chunk}`.trim();
+      if (estimateClipDuration(merged) <= MAX_SCENE_DURATION_SECONDS) {
+        result[result.length - 1] = merged;
+        continue;
+      }
+    }
+
+    result.push(chunk);
+  }
+
+  return result;
+}
+
+function paragraphToSceneChunks(paragraph: string): string[] {
+  const safeParagraph = paragraph.trim();
+  if (!safeParagraph) return [];
+
+  if (estimateClipDuration(safeParagraph) <= MAX_SCENE_DURATION_SECONDS) {
+    return [safeParagraph];
+  }
+
+  const sentences = splitParagraphIntoSentences(safeParagraph);
+  const chunks: string[] = [];
+  let current = '';
+
+  for (const sentence of sentences) {
+    const merged = current ? `${current} ${sentence}`.trim() : sentence;
+    if (!current) {
+      current = sentence;
+      continue;
+    }
+
+    if (estimateClipDuration(merged) <= MAX_SCENE_DURATION_SECONDS) {
+      current = merged;
+      continue;
+    }
+
+    chunks.push(current.trim());
+    current = sentence;
+  }
+
+  if (current.trim()) chunks.push(current.trim());
+
+  const normalizedChunks = normalizeSceneChunks(chunks);
+  if (normalizedChunks.length > 0) return normalizedChunks;
+
+  const words = safeParagraph.split(/\s+/).filter(Boolean);
+  if (!words.length) return [safeParagraph];
+
+  const fallbackChunks: string[] = [];
+  let bucket: string[] = [];
+  for (const word of words) {
+    const merged = [...bucket, word].join(' ');
+    if (bucket.length && estimateClipDuration(merged) > TARGET_SCENE_DURATION_SECONDS) {
+      fallbackChunks.push(bucket.join(' '));
+      bucket = [word];
+      continue;
+    }
+    bucket.push(word);
+  }
+  if (bucket.length) fallbackChunks.push(bucket.join(' '));
+  return normalizeSceneChunks(fallbackChunks);
+}
+
 export function splitStoryIntoParagraphScenes(text: string): string[] {
   const normalized = normalizeStoryText(text);
   if (!normalized) return [];
+
+  const explicitParagraphLines = normalizeStoryEditorInput(normalized)
+    .split(/\n+/)
+    .map((paragraph) => paragraph.trim())
+    .filter(Boolean);
+
+  if (explicitParagraphLines.length >= 2) {
+    return explicitParagraphLines;
+  }
 
   const paragraphs = normalized
     .split(/\n{2,}/)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
 
-  if (paragraphs.length > 0) return paragraphs;
+  const source = paragraphs.length
+    ? paragraphs
+    : splitStorySentences(normalized);
 
-  return normalized
-    .split(/(?<=[.!?。！？])\s+/)
-    .map((sentence) => sentence.trim())
-    .filter(Boolean);
+  return source.flatMap((paragraph) => paragraphToSceneChunks(paragraph));
 }
-
 export function estimateClipDuration(text: string): number {
-  const length = text.trim().length;
-  const seconds = 2.8 + length / 18;
-  return Math.min(6, Math.max(3, Number(seconds.toFixed(1))));
+  const normalized = text.trim();
+  if (!normalized) return TARGET_SCENE_DURATION_SECONDS;
+  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
+  const charCount = normalized.replace(/\s+/g, '').length;
+  const seconds = Math.max(charCount / 8.2, wordCount / 2.2, 1.8);
+  return Math.min(MAX_SCENE_DURATION_SECONDS, Math.max(MIN_SCENE_DURATION_SECONDS, Number(seconds.toFixed(1))));
 }
 
 export function buildSelectableStoryDraft(options: StoryDraftOptions): string {
@@ -52,34 +189,17 @@ export function buildSelectableStoryDraft(options: StoryDraftOptions): string {
 
   if (options.contentType === 'music_video') {
     return normalizeStoryText([
-      `[Intro]
-${setting} 위로 젖은 불빛이 내려와
-${topic}의 첫 문장이 입술 끝에 맴돌아`,
-      `[Verse 1]
-${protagonist}의 걸음마다 ${options.mood} 밤이 번지고
-말하지 못한 ${conflict}만 박자처럼 남아
-${direction.narrativeAngle}
-같은 거리를 걸어도 오늘은 다르게 울려`,
-      `[Chorus]
-나는 너를 다시 불러, 후렴처럼 크게 불러
-사라진 줄 알았던 장면을 다시 살려
-끝난 줄 알았던 이 밤도 아직 노래가 돼
-${options.endingTone} 기분까지 안고 끝까지 갈래`,
-      `[Verse 2]
-젖은 창문 너머로 뒤늦은 진심이 번지고
-숨겨 둔 표정들이 한 줄씩 멜로디가 돼
-돌아설 수 있었던 순간도 천천히 지나가고
-이제는 미뤄 둔 마음까지 전부 따라와`,
-      `[Outro]
-마지막 불빛 아래서도 나는 멈추지 않아
-${direction.transitionBeat}
-남겨 둔 한마디까지 오늘의 노래로 안아`,
+      `[Intro]\n${setting} 위로 젖은 불빛이 내려와\n${topic}의 첫 문장이 입술 끝에 맴돌아`,
+      `[Verse 1]\n${protagonist}의 걸음마다 ${options.mood} 밤이 번지고\n말하지 못한 ${conflict}만 박자처럼 남아\n${direction.narrativeAngle}\n같은 거리를 걸어도 오늘은 다르게 울려`,
+      `[Chorus]\n나는 너를 다시 불러, 후렴처럼 크게 불러\n사라진 줄 알았던 장면을 다시 살려\n끝난 줄 알았던 이 밤도 아직 노래가 돼\n${options.endingTone} 기분까지 안고 끝까지 갈래`,
+      `[Verse 2]\n젖은 창문 너머로 뒤늦은 진심이 번지고\n숨겨 둔 표정들이 한 줄씩 멜로디가 돼\n돌아설 수 있었던 순간도 천천히 지나가고\n이제는 미뤄 둔 마음까지 전부 따라와`,
+      `[Outro]\n마지막 불빛 아래서도 나는 멈추지 않아\n${direction.transitionBeat}\n남겨 둔 한마디까지 오늘의 노래로 안아`,
     ].join('\n\n'));
   }
 
   if (options.contentType === 'cinematic') {
     return normalizeStoryText([
-      `${setting}의 공기가 먼저 화면을 채우고, ${protagonist}은 ${topic}의 이상 징후를 가장 먼저 알아챈다. ${options.mood} 무드가 깔린 오프닝 안에서 관객은 설명보다 표정과 움직임으로 상황의 균열을 읽게 된다. ${direction.visualHook}`, 
+      `${setting}의 공기가 먼저 화면을 채우고, ${protagonist}은 ${topic}의 이상 징후를 가장 먼저 알아챈다. ${options.mood} 무드가 깔린 오프닝 안에서 관객은 설명보다 표정과 움직임으로 상황의 균열을 읽게 된다. ${direction.visualHook}`,
       `다음 장면에서는 사소해 보였던 단서들이 빠르게 겹치며 ${conflict}의 실체가 드러난다. ${protagonist}은 멈추지 않고 더 깊은 곳으로 들어가고, 장면의 긴장감은 영화처럼 한 컷씩 눌러 붙는다.`,
       `중반부에는 인물의 선택과 시선이 부딪히며 갈등이 정면으로 폭발한다. 말보다 공간의 온도, 조명, 소품이 먼저 의미를 만들고, ${topic}는 하나의 사건이 아니라 인물을 바꾸는 장면으로 보이기 시작한다.`,
       `엔딩은 ${options.endingTone} 결로 남긴다. 모든 설명을 닫아 버리기보다 마지막 표정과 여운을 남겨, 다음 컷이 자동으로 떠오르는 시네마틱 마감으로 정리한다.`,
@@ -90,15 +210,15 @@ ${direction.transitionBeat}
     return normalizeStoryText([
       `먼저 ${topic}가 왜 지금 중요한지부터 짚는다. ${setting}에서 바로 마주칠 수 있는 상황을 예로 열고, 이번 영상에서 무엇을 이해하게 될지 ${options.mood} 톤으로 선명하게 예고한다.`,
       `이어서 핵심 구조를 한 단계씩 풀어 준다. ${protagonist} 시점에서 가장 먼저 확인해야 할 포인트를 짚고, ${conflict}이 실제로 어떤 문제를 만드는지 짧은 예시와 함께 설명한다.`,
-      `중간 문단에서는 자주 헷갈리는 지점을 비교해 정리한다. 무엇을 먼저 보고 무엇을 나중에 판단해야 하는지, 실수하기 쉬운 흐름과 더 나은 선택을 나란히 보여 주며 이해를 돕는다. ${direction.subtitleTone}`, 
+      `중간 문단에서는 자주 헷갈리는 지점을 비교해 정리한다. 무엇을 먼저 보고 무엇을 나중에 판단해야 하는지, 실수하기 쉬운 흐름과 더 나은 선택을 나란히 보여 주며 이해를 돕는다. ${direction.subtitleTone}`,
       `마지막은 ${options.endingTone} 톤으로 요약한다. 지금 기억해야 할 한 줄과 바로 해 볼 다음 행동을 남겨, 시청자가 영상을 보고 곧바로 적용할 수 있게 마무리한다.`,
     ].join('\n\n'));
   }
 
   return normalizeStoryText([
-    `${setting}에서 ${protagonist}은 ${topic}의 조짐을 처음 마주한다. ${options.mood} 톤으로 시작하지만, 화면 어딘가에는 이미 ${conflict}의 그림자가 놓여 있다. ${direction.visualHook}`, 
+    `${setting}에서 ${protagonist}은 ${topic}의 조짐을 처음 마주한다. ${options.mood} 톤으로 시작하지만, 화면 어딘가에는 이미 ${conflict}의 그림자가 놓여 있다. ${direction.visualHook}`,
     `처음엔 사소해 보였던 단서가 점점 커지면서 ${protagonist}의 일상은 흔들리기 시작한다. ${options.genre} 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.`,
-    `결정적인 순간, ${protagonist}은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 ${conflict}가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다. ${direction.narrativeAngle}`, 
+    `결정적인 순간, ${protagonist}은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 ${conflict}가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다. ${direction.narrativeAngle}`,
     `마지막 장면은 ${options.endingTone} 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, ${protagonist}은 이전과는 다른 표정으로 앞으로 걸어간다.`,
   ].join('\n\n'));
 }

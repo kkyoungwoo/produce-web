@@ -88,7 +88,7 @@ export function createDefaultWorkflowDraft(contentType: ContentType = 'story', o
     selectedPromptTemplateId: getDefaultWorkflowPromptTemplateId(normalizedContentType),
     promptAdditions: [],
     customScriptSettings: {
-      expectedDurationMinutes: 3,
+      expectedDurationMinutes: 1,
       speechStyle: 'default',
       language: 'ko',
       referenceText: '',
@@ -128,12 +128,12 @@ export function createDefaultWorkflowDraft(contentType: ContentType = 'story', o
 }
 
 
-function compactPromptTemplatesForStorage(templates?: WorkflowPromptTemplate[]): WorkflowPromptTemplate[] {
+function compactPromptTemplatesForStorage(templates?: WorkflowPromptTemplate[], selectedTemplateId?: string | null): WorkflowPromptTemplate[] {
   if (!Array.isArray(templates)) return [];
   return templates
     .filter((template): template is WorkflowPromptTemplate => Boolean(template?.id))
     .map((template) => {
-      const shouldKeepPromptBody = !template.builtIn || Boolean(template.isCustomized);
+      const shouldKeepPromptBody = !template.builtIn || Boolean(template.isCustomized) || template.id === selectedTemplateId;
       if (shouldKeepPromptBody) return { ...template };
       return {
         ...template,
@@ -150,14 +150,14 @@ export function compactWorkflowDraftForStorage(draft?: WorkflowDraft | null): Wo
     ...draft,
     contentType,
     promptPack: {
-      storyPrompt: '',
-      lyricsPrompt: '',
-      characterPrompt: '',
-      scenePrompt: '',
-      actionPrompt: '',
-      persuasionStoryPrompt: '',
+      storyPrompt: draft.promptPack?.storyPrompt || '',
+      lyricsPrompt: draft.promptPack?.lyricsPrompt || '',
+      characterPrompt: draft.promptPack?.characterPrompt || '',
+      scenePrompt: draft.promptPack?.scenePrompt || '',
+      actionPrompt: draft.promptPack?.actionPrompt || '',
+      persuasionStoryPrompt: draft.promptPack?.persuasionStoryPrompt || '',
     },
-    promptTemplates: compactPromptTemplatesForStorage(draft.promptTemplates),
+    promptTemplates: compactPromptTemplatesForStorage(draft.promptTemplates, draft.selectedPromptTemplateId),
   };
 }
 
@@ -251,7 +251,7 @@ export function ensureWorkflowDraft(studioState?: StudioState | null): WorkflowD
     promptTemplates,
     promptAdditions: Array.isArray(existing.promptAdditions) ? existing.promptAdditions.filter((item) => typeof item === 'string' && item.trim()) : [],
     customScriptSettings: {
-      expectedDurationMinutes: Math.max(1, Math.min(30, Number(existing.customScriptSettings?.expectedDurationMinutes || 3))),
+      expectedDurationMinutes: Math.max(1, Math.min(30, Number(existing.customScriptSettings?.expectedDurationMinutes || 1))),
       speechStyle: existing.customScriptSettings?.speechStyle || 'default',
       language: existing.customScriptSettings?.language || 'ko',
       referenceText: existing.customScriptSettings?.referenceText || '',

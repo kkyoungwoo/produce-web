@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, type Transition } from 'framer-motion';
 import { SavedProject } from '../types';
 import { formatKRW } from '../config';
 import { rememberProjectNavigationProject } from '../services/projectNavigationCache';
@@ -22,6 +22,7 @@ interface ProjectGalleryProps {
 }
 
 const HANGUL_NAME_REGEX = /[ㄱ-ㅎㅏ-ㅣ가-힣]/;
+const HEADER_HEIGHT = 77.08;
 
 const getProjectNameLimit = (value: string) => (HANGUL_NAME_REGEX.test(value) ? 30 : 50);
 const clampProjectName = (value: string) => value.slice(0, getProjectNameLimit(value));
@@ -120,16 +121,14 @@ const resolveLastWorkedStep = (project: SavedProject): 1 | 2 | 3 | 4 | 5 | 6 => 
   return 1;
 };
 
-const getGalleryFrameWidthClass = (cardCount: number) => {
-  if (cardCount <= 1) return 'max-w-[270px]';
-  if (cardCount === 2) return 'max-w-[550px]';
-  if (cardCount === 3) return 'max-w-[830px]';
-  if (cardCount === 4) return 'max-w-[1110px]';
-  return 'max-w-7xl';
-};
+const itemTransition: Transition = { duration: 0.3 };
 
-const itemTransition = { duration: 0.22 };
-const groupTransition = { duration: 0.28 };
+const galleryLayoutTransition: Transition = {
+  type: 'spring',
+  stiffness: 110,
+  damping: 20,
+  mass: 0.9,
+};
 
 const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   projects,
@@ -151,6 +150,8 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   const [deletingProjectIds, setDeletingProjectIds] = useState<Record<string, boolean>>({});
   const [duplicatingProjectId, setDuplicatingProjectId] = useState<string | null>(null);
   const [selectedProjectIds, setSelectedProjectIds] = useState<string[]>([]);
+
+  const galleryMinHeight = `calc(100dvh - ${HEADER_HEIGHT}px)`;
 
   const sortedProjects = useMemo(
     () => [...projects].sort((a, b) => getProjectCreatedAt(b) - getProjectCreatedAt(a)),
@@ -184,7 +185,12 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   }, [isLoading, sortedProjects.length]);
 
   const shouldCenterWholeBox = totalDisplayCardCount <= 4;
-  const galleryFrameWidthClass = getGalleryFrameWidthClass(totalDisplayCardCount);
+
+  const galleryShellClass = shouldCenterWholeBox
+    ? 'justify-center py-10 lg:py-12'
+    : 'justify-start pt-12 pb-10 lg:pt-16 lg:pb-12';
+
+  const galleryContentOffsetY = shouldCenterWholeBox ? 0 : 150;
 
   const formatDate = (timestamp: number) => {
     if (!timestamp) return '-';
@@ -386,12 +392,12 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
     return (
       <motion.article
         key={project.id}
-        layout
-        initial={{ opacity: 0, y: 8, scale: 0.988 }}
+        layout="position"
+        initial={{ opacity: 0, y: 6, scale: 0.985 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, y: -6, scale: 0.988 }}
+        exit={{ opacity: 0, y: -4, scale: 0.985 }}
         transition={itemTransition}
-        className={`group relative overflow-hidden rounded-[24px] border border-white/70 bg-white/65 shadow-[0_16px_40px_rgba(120,170,220,0.16)] backdrop-blur-xl ${
+        className={`group relative flex-none aspect-square w-full max-w-[265px] overflow-hidden rounded-[24px] border border-white/70 bg-white/65 shadow-[0_16px_40px_rgba(120,170,220,0.16)] backdrop-blur-xl lg:h-[265px] lg:w-[265px] lg:max-w-[265px] ${
           isDeleting ? 'pointer-events-none' : ''
         }`}
       >
@@ -400,7 +406,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
         <div className="pointer-events-none absolute inset-0 rounded-[24px] ring-1 ring-inset ring-sky-100/80" />
 
         <div
-          className="relative h-[132px] overflow-hidden border-b border-sky-100/80"
+          className="relative h-[122px] overflow-hidden border-b border-sky-100/80 sm:h-[124px]"
           style={{ background: cardBackground }}
         >
           {thumbSrc ? (
@@ -426,7 +432,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
               aria-label={`${project.name} 선택`}
             />
             {typeof project.projectNumber === 'number' ? (
-              <span className="rounded-full bg-sky-50 px-2.5 py-1 font-bold text-sky-700">
+              <span className="rounded-full bg-sky-50 px-2 font-bold text-sky-700">
                 #{project.projectNumber}
               </span>
             ) : null}
@@ -479,13 +485,13 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           </div>
         </div>
 
-        <div className="space-y-3 p-3">
+        <div className="flex h-[calc(100%-122px)] flex-col justify-between p-3 sm:h-[calc(100%-124px)]">
           <div>
             <div className="text-[11px] text-slate-500">
               {formatDate(getProjectCreatedAt(project))}
             </div>
 
-            <div className="mt-2 flex min-h-[28px] flex-wrap gap-2 text-[11px]">
+            <div className="mt-2 flex min-h-[28px] flex-wrap gap-1.5 text-[10px] sm:text-[11px]">
               {project.workflowDraft?.script ? (
                 <span className="rounded-full border border-sky-100 bg-sky-50/90 px-2.5 py-1 font-bold text-sky-700">
                   대본 포함
@@ -500,7 +506,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="mt-3 grid grid-cols-3 gap-2">
             <motion.button
               type="button"
               whileHover={{ y: -1 }}
@@ -518,7 +524,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
               whileTap={{ scale: 0.99 }}
               disabled={isInteractionLocked}
               onClick={() => openProjectThumbnailStudio(project)}
-              className="rounded-xl border border-sky-100 bg-white/80 px-2 py-2 text-[11px] font-black text-slate-700 shadow-sm backdrop-blur-md transition-all duration-300 hover:bg-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+              className="rounded-xl border border-sky-100 bg-white/80 px-2 py-2 text-[10px] font-black text-slate-700 shadow-sm backdrop-blur-md transition-all duration-300 hover:bg-white sm:text-[11px] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
             >
               썸네일 제작
             </motion.button>
@@ -530,8 +536,9 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
   return (
     <div
-      className="relative min-h-screen overflow-hidden"
+      className="relative overflow-hidden"
       style={{
+        minHeight: galleryMinHeight,
         background:
           'linear-gradient(180deg, #f8fcff 0%, #f2f8ff 40%, #edf6ff 100%)',
       }}
@@ -563,20 +570,20 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
       <motion.section
         layout
-        transition={groupTransition}
-        className={`relative z-10 mx-auto flex min-h-screen w-full flex-col px-4 py-8 ${
-          shouldCenterWholeBox ? 'justify-center' : 'justify-start'
-        }`}
+        transition={galleryLayoutTransition}
+        className={`relative z-10 mx-auto flex w-full flex-col px-4 ${galleryShellClass}`}
+        style={{ minHeight: galleryMinHeight }}
       >
         <motion.div
           layout
-          transition={groupTransition}
-          className={`mx-auto w-full ${galleryFrameWidthClass}`}
+          animate={{ y: galleryContentOffsetY }}
+          transition={galleryLayoutTransition}
+          className="mx-auto w-full max-w-[1200px]"
         >
           <motion.div
-            layout
-            transition={groupTransition}
-            className="mb-5 overflow-hidden rounded-[28px] border border-white/80 bg-white/70 p-5 shadow-[0_18px_44px_rgba(150,190,225,0.16)] backdrop-blur-2xl"
+            layout="position"
+            transition={galleryLayoutTransition}
+            className="mb-5 w-full overflow-hidden rounded-[28px] border border-white/80 bg-white/70 p-5 shadow-[0_18px_44px_rgba(150,190,225,0.16)] backdrop-blur-2xl lg:mx-auto lg:w-[1000px] lg:max-w-[1000px]"
           >
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>
@@ -587,7 +594,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                   저장된 프로젝트
                 </h2>
                 <p className="mt-2 text-sm text-slate-500">
-                  프로젝트 데이터는 번호별 폴더가 아니라 단일 JSON 저장소 기준으로 관리되어 복사, 삭제, 가져오기가 더 빠르게 동작합니다.
+                  제작하기 버튼을 눌러 프로젝트를 시작해보세요!
                 </p>
               </div>
 
@@ -638,19 +645,19 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
           <motion.div
             layout
-            transition={groupTransition}
-            className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4"
+            transition={galleryLayoutTransition}
+            className="mx-auto flex w-full max-w-[1124px] flex-wrap justify-center gap-3 sm:gap-4"
           >
             <motion.button
-              layout
-              initial={{ opacity: 0, y: 8, scale: 0.988 }}
+              layout="position"
+              initial={{ opacity: 0, y: 6, scale: 0.985 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.988 }}
+              exit={{ opacity: 0, y: -4, scale: 0.985 }}
               transition={itemTransition}
               type="button"
               disabled={isInteractionLocked}
               onClick={openCreateProject}
-              className={`group relative flex min-h-[238px] items-center justify-center overflow-hidden rounded-[24px] border border-dashed p-6 text-left shadow-[0_16px_40px_rgba(120,170,220,0.16)] backdrop-blur-xl transition-all duration-300 ${
+              className={`group relative flex-none aspect-square w-full max-w-[265px] items-center justify-center overflow-hidden rounded-[24px] border border-dashed p-6 text-left shadow-[0_16px_40px_rgba(120,170,220,0.16)] backdrop-blur-xl transition-all duration-300 lg:flex lg:h-[265px] lg:w-[265px] lg:max-w-[265px] ${
                 isInteractionLocked
                   ? 'cursor-wait border-slate-200 bg-white/50 text-slate-400'
                   : 'border-sky-200 bg-white/70 hover:bg-white/85'
@@ -662,21 +669,21 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                 whileHover={{ y: -1 }}
                 className="relative inline-flex items-center gap-2 rounded-2xl border border-sky-100 bg-white/90 px-4 py-3 text-sm font-black text-sky-700 shadow-sm backdrop-blur-md"
               >
-                제작하기 <span aria-hidden="true">→</span>
+                동영상 제작하기
               </motion.div>
             </motion.button>
 
-            <AnimatePresence initial={false}>
+            <AnimatePresence initial={false} mode="popLayout">
               {isLoading && !sortedProjects.length ? (
                 Array.from({ length: 3 }).map((_, index) => (
                   <motion.div
                     key={`skeleton-${index}`}
-                    layout
-                    initial={{ opacity: 0, y: 8, scale: 0.988 }}
+                    layout="position"
+                    initial={{ opacity: 0, y: 6, scale: 0.985 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -6, scale: 0.988 }}
-                    transition={{ duration: 0.18 + index * 0.04 }}
-                    className="min-h-[238px] overflow-hidden rounded-[24px] border border-white/80 bg-white/70 p-4 shadow-[0_16px_40px_rgba(120,170,220,0.14)] backdrop-blur-xl"
+                    exit={{ opacity: 0, y: -4, scale: 0.985 }}
+                    transition={{ duration: 0.2 + index * 0.04 }}
+                    className="flex-none aspect-square w-full max-w-[265px] overflow-hidden rounded-[24px] border border-white/80 bg-white/70 p-4 shadow-[0_16px_40px_rgba(120,170,220,0.14)] backdrop-blur-xl lg:h-[265px] lg:w-[265px] lg:max-w-[265px]"
                   >
                     <div className="h-[132px] animate-pulse rounded-2xl bg-sky-50" />
                     <div className="mt-4 h-4 w-2/3 animate-pulse rounded bg-sky-50" />
@@ -688,14 +695,15 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
               {!isLoading && !sortedProjects.length ? (
                 <motion.div
-                  layout
-                  initial={{ opacity: 0, y: 8, scale: 0.988 }}
+                  key="empty-card"
+                  layout="position"
+                  initial={{ opacity: 0, y: 6, scale: 0.985 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -6, scale: 0.988 }}
+                  exit={{ opacity: 0, y: -4, scale: 0.985 }}
                   transition={itemTransition}
-                  className="flex min-h-[238px] items-center justify-center rounded-[24px] border border-white/80 bg-white/70 p-6 text-center text-sm leading-6 text-slate-500 shadow-[0_16px_40px_rgba(120,170,220,0.14)] backdrop-blur-xl sm:col-span-1 xl:col-span-3"
+                  className="flex flex-none aspect-square w-full max-w-[256px] items-center justify-center rounded-[24px] border border-white/80 bg-white/70 p-6 text-center text-sm leading-6 text-slate-500 shadow-[0_16px_40px_rgba(120,170,220,0.14)] backdrop-blur-xl lg:h-[265px]"
                 >
-                  아직 저장된 프로젝트가 없습니다. 왼쪽 카드에서 새 프로젝트를 시작하거나 JSON 파일을 가져오세요.
+                  아직 저장된 프로젝트가 없습니다.
                 </motion.div>
               ) : null}
 

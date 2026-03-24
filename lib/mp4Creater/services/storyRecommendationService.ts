@@ -1,4 +1,4 @@
-import { ContentType, StorySelectionState } from '../types';
+import { ContentType, ScriptLanguageOption, StorySelectionState } from '../types';
 import { runOpenRouterText } from './openRouterService';
 
 type SelectionBank = { topic: string[] } & Record<keyof StorySelectionState, string[]>;
@@ -213,6 +213,7 @@ export async function recommendTopicFromInput(options: {
   inputText: string;
   model?: string;
   allowAi?: boolean;
+  scriptLanguage?: ScriptLanguageOption;
 }): Promise<string> {
   const seedText = normalizeTopicSeed(options.inputText);
   const fallbackBase = seedText || getTopicSuggestion(options.contentType, '');
@@ -235,7 +236,9 @@ export async function recommendTopicFromInput(options: {
           role: 'user',
           content: `콘텐츠 유형: ${contentLabel}
 사용자 입력: ${seedText || '자동 추천'}
-이 입력을 바탕으로 바로 사용할 수 있는 새 주제 한 줄만 추천해줘.`,
+무음 모드 여부: ${options.scriptLanguage === 'mute' ? '예' : '아니오'}
+이 입력을 바탕으로 바로 사용할 수 있는 새 주제 한 줄만 추천해줘.
+입력이 길면 정보 밀도에 맞춰 조금 더 구체적으로 쓰고, 무음 모드면 화면 전개와 장면 흐름이 떠오르도록 제안해줘.`,
         },
       ],
     });
@@ -253,6 +256,7 @@ export async function recommendTopicCandidatesFromInput(options: {
   count?: number;
   model?: string;
   allowAi?: boolean;
+  scriptLanguage?: ScriptLanguageOption;
 }): Promise<string[]> {
   const count = Math.max(1, options.count || 5);
   const seedText = normalizeTopicSeed(options.inputText);
@@ -275,17 +279,21 @@ export async function recommendTopicCandidatesFromInput(options: {
       messages: [
         {
           role: 'system',
-          content: '한국어 영상 제작 주제 추천 도우미다. JSON만 반환한다. key는 topics, value는 문장형 주제 배열이다. 기존 입력을 그대로 복붙하지 말고 비슷한 새 문장으로 변형해라.',
+          content: '한국어 영상 제작 주제 추천 도우미다. JSON만 반환한다. key는 topics, value는 한국어 한 줄 주제 배열이다. 각 항목은 줄바꿈 없는 한 줄 문장으로 작성한다. 입력이 짧으면 간결하게, 입력이 길거나 정보가 많으면 그 밀도에 맞춰 조금 더 길고 구체적인 한 줄 문장으로 확장한다. 기존 입력을 그대로 복붙하지 말고 새 관점으로 변형하며, 서로 결이 겹치지 않게 다양하게 제안한다.',
         },
         {
           role: 'user',
           content: `콘텐츠 유형: ${contentLabel}
 사용자 입력: ${seedText || '자동 추천'}
+무음 모드 여부: ${options.scriptLanguage === 'mute' ? '예' : '아니오'}
 조건:
 1) 주제 문장을 ${count}개 추천
-2) 서로 의미가 겹치지 않게
-3) 바로 입력창에 넣어 사용할 수 있게
-4) 설명문 없이 주제 문장만`,
+2) 각 항목은 줄바꿈 없는 한 줄 문장으로 작성
+3) 입력이 짧으면 간결하게, 입력이 길면 그에 맞춰 더 디테일한 한 줄로 확장
+4) 서로 의미와 전개 방향이 겹치지 않게 다양하게
+5) 바로 입력창에 넣어 영상 스토리의 출발점으로 쓸 수 있게
+6) 무음 모드면 대사보다 장면 흐름, 감정선, 시각적 전개가 잘 떠오르도록 작성
+7) 설명문 없이 주제 문장만`,
         },
       ],
     });

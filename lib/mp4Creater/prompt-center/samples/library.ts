@@ -145,5 +145,13 @@ export const STYLE_SAMPLE_PRESETS: StyleSamplePreset[] = [
     imageData: '/mp4Creater/samples/styles/vibrant_festival_lights.png',
     accent: '#f97316',
   },
+  {
+    id: 'style-minimal-purity',
+    label: '여백의 미',
+    description: '단순한 색상의 스튜디오 배경으로 피사체에 집중하게 만드는 깔끔하고 정돈된 비주얼',
+    prompt: '미니멀리즘 스타일, 단색의 매트한 배경, 깔끔하고 정돈된 구도, 부드럽고 균일한 조명, 피사체의 본질에 집중, 현대적이고 세련된 비주얼',
+    imageData: '/mp4Creater/samples/styles/minimal_purity_void.png',
+    accent: '#e2e8f0',
+  },
 ];
 

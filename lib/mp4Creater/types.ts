@@ -397,6 +397,96 @@ export interface WorkflowDraft {
   updatedAt: number;
 }
 
+
+export type GenerationMode = 'free' | 'premium';
+export type SceneSourceType = 'ai' | 'free-media' | 'sample' | 'mixed';
+export type EncodingMode = 'browser' | 'ffmpeg';
+export type SubtitleSizePreset = 'small' | 'medium' | 'large';
+export type SubtitlePositionPreset = 'top' | 'middle' | 'bottom';
+export type SubtitleSegmentMode = 'paragraph' | 'sentence';
+export type YoutubeUploadStatus = 'idle' | 'ready' | 'uploading' | 'uploaded' | 'error';
+
+export interface ScriptParagraphPlan {
+  id: string;
+  index: number;
+  text: string;
+  estimatedSeconds: number;
+  startAt?: number;
+  endAt?: number;
+}
+
+export interface ScenePlanItem {
+  id: string;
+  sceneNumber: number;
+  paragraphId?: string | null;
+  narration: string;
+  imagePrompt?: string;
+  videoPrompt?: string;
+  motionPrompt?: string;
+  estimatedSeconds: number;
+  targetDuration: number;
+  sceneSourceType?: SceneSourceType;
+  sourceAssetUrl?: string | null;
+}
+
+export interface TtsFileItem {
+  id: string;
+  sceneNumber: number;
+  paragraphId?: string | null;
+  provider: 'qwen3Tts' | 'elevenLabs' | 'heygen' | 'sample';
+  voiceId?: string | null;
+  modelId?: string | null;
+  duration: number;
+  audioData?: string | null;
+}
+
+export interface SubtitlePresetState {
+  size: SubtitleSizePreset;
+  position: SubtitlePositionPreset;
+  fontFamily: string;
+  background: boolean;
+  backgroundOpacity: number;
+  segmentation: SubtitleSegmentMode;
+}
+
+export interface YoutubeConnectedAccountInfo {
+  email?: string | null;
+  channelId?: string | null;
+  channelTitle?: string | null;
+}
+
+export interface YoutubeMetaDraft {
+  title: string;
+  description: string;
+  tags: string[];
+  privacyStatus: 'private' | 'unlisted' | 'public';
+  isShortsEligible: boolean;
+}
+
+export interface FreeMediaItem {
+  id: string;
+  type: 'image' | 'video';
+  title: string;
+  provider: 'pexels' | 'sample';
+  dataUrl?: string | null;
+  previewUrl?: string | null;
+  videoUrl?: string | null;
+  sourceUrl?: string | null;
+  width?: number | null;
+  height?: number | null;
+  duration?: number | null;
+}
+
+export interface ProjectPromptRecord {
+  scriptPrompt?: string | null;
+  scenePrompt?: string | null;
+  imagePrompt?: string | null;
+  videoPrompt?: string | null;
+  motionPrompt?: string | null;
+  thumbnailPrompt?: string | null;
+  youtubeMetaPrompt?: string | null;
+}
+
 export interface PreviewMixSettings {
   narrationVolume: number;
   backgroundMusicVolume: number;
@@ -414,6 +504,9 @@ export interface SavedProject {
   lastSavedAt?: number;
   settings: {
     imageModel: string;
+    videoModel?: string;
+    scriptModel?: string;
+    sceneModel?: string;
     outputMode: ProjectOutputMode;
     elevenLabsModel: string;
     fluxStyle?: string;
@@ -435,6 +528,30 @@ export interface SavedProject {
   finalBackgroundMusic?: BackgroundMusicTrack | null;
   musicVideoPreview?: VideoPreviewAsset | null;
   finalMusicVideo?: VideoPreviewAsset | null;
+  script?: string | null;
+  scriptParagraphs?: ScriptParagraphPlan[];
+  sceneList?: ScenePlanItem[];
+  sceneDuration?: number | null;
+  ttsFiles?: TtsFileItem[];
+  ttsDuration?: number | null;
+  generationMode?: GenerationMode;
+  sceneSourceType?: SceneSourceType;
+  encodingMode?: EncodingMode;
+  subtitlePreset?: SubtitlePresetState | null;
+  subtitlePosition?: SubtitlePositionPreset | null;
+  subtitleBackgroundOpacity?: number | null;
+  prompts?: ProjectPromptRecord | null;
+  youtubeConnectedAccount?: YoutubeConnectedAccountInfo | null;
+  youtubeChannelTitle?: string | null;
+  youtubeUploadStatus?: YoutubeUploadStatus;
+  youtubeUploadedAt?: number | null;
+  youtubeVideoId?: string | null;
+  youtubePrivacyStatus?: 'private' | 'unlisted' | 'public' | null;
+  youtubeTitle?: string | null;
+  youtubeDescription?: string | null;
+  youtubeTags?: string[];
+  isShortsEligible?: boolean;
+  uploadErrorMessage?: string | null;
 }
 
 export type AiTaskKind =

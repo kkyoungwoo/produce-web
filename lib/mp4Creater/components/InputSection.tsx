@@ -21,6 +21,8 @@ import { CONFIG, IMAGE_MODELS, QWEN_TTS_PRESET_OPTIONS, SCRIPT_MODEL_OPTIONS } f
 import { WORKFLOW_CHARACTER_STYLE_OPTIONS, getCharacterSamplePreset, getStyleSamplePreset } from '../samples/presetCatalog';
 import {
   buildSelectableStoryDraft,
+  formatStoryTextForEditor,
+  normalizeStoryEditorInput,
   normalizeStoryText,
   splitStoryIntoParagraphScenes,
 } from '../utils/storyHelpers';
@@ -45,7 +47,7 @@ import {
   createStyleCardFromPrompt,
   extractCharactersFromScript,
 } from '../services/characterStudioService';
-import { composeScriptDraft } from '../services/scriptComposerService';
+import { buildSampleScriptDraft, composeScriptDraft } from '../services/scriptComposerService';
 import { createTtsPreview } from '../services/ttsService';
 import { fetchElevenLabsVoices } from '../services/elevenLabsService';
 import { fetchHeyGenVoices } from '../services/heygenService';
@@ -59,7 +61,7 @@ import {
   normalizeStage,
   STEP_META,
 } from './inputSection/constants';
-import { SummaryChip } from './inputSection/ui';
+import { OverlayModal, SummaryChip } from './inputSection/ui';
 import { arePromptTemplatesEqual } from './inputSection/helpers';
 import { StepId } from './inputSection/types';
 import {
@@ -79,17 +81,7 @@ const SCRIPT_DURATION_PRESETS = [1, 3, 5, 8, 10, 15, 20, 25, 30] as const;
 const CHARACTER_GENERATION_FAILSAFE_MS = 120000;
 
 function normalizeScriptDurationPreset(value: number) {
-  const safe = Number.isFinite(value) ? Math.max(1, Math.min(30, Math.round(value))) : 3;
-  let nearest: number = SCRIPT_DURATION_PRESETS[0];
-  let distance: number = Math.abs(safe - nearest);
-  for (const preset of SCRIPT_DURATION_PRESETS) {
-    const nextDistance = Math.abs(safe - preset);
-    if (nextDistance < distance) {
-      nearest = preset;
-      distance = nextDistance;
-    }
-  }
-  return nearest;
+  return Number.isFinite(value) ? Math.max(1, Math.min(30, Math.round(value))) : 1;
 }
 
 interface InputSectionProps {
@@ -150,7 +142,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const initialHasSelectedAspectRatio = Boolean(initial.hasSelectedAspectRatio ?? initial.completedSteps?.step1 ?? (initialStage > 1));
   const step1SelectionRef = useRef({ contentType: initialHasSelectedContentType, aspectRatio: initialHasSelectedAspectRatio });
   const initialCustomScriptSettings = initial.customScriptSettings || {
-    expectedDurationMinutes: 3,
+    expectedDurationMinutes: 1,
     speechStyle: 'default' as ScriptSpeechStyle,
     language: 'ko' as ScriptLanguageOption,
     referenceText: '',
@@ -173,6 +165,14 @@ const InputSection: React.FC<InputSectionProps> = ({
     };
   }, [hasSelectedContentType, hasSelectedAspectRatio]);
   const [storyScript, setStoryScript] = useState(initial.script || '');
+
+  const applyGeneratedStoryScript = (value: string) => {
+    setStoryScript(formatStoryTextForEditor(value));
+  };
+
+  const handleStoryScriptInputChange = (value: string) => {
+    setStoryScript(normalizeStoryEditorInput(value));
+  };
   const [genre, setGenre] = useState(initialSelections.genre || FIELD_OPTIONS_BY_TYPE[initialContentType].genre[0]);
   const [mood, setMood] = useState(initialSelections.mood || FIELD_OPTIONS_BY_TYPE[initialContentType].mood[0]);
   const [endingTone, setEndingTone] = useState(initialSelections.endingTone || FIELD_OPTIONS_BY_TYPE[initialContentType].endingTone[0]);
@@ -212,7 +212,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [step3PanelMode, setStep3PanelMode] = useState<'balanced' | 'character-focus' | 'script-focus'>('balanced');
   const [newStyleName, setNewStyleName] = useState('');
   const [newStylePrompt, setNewStylePrompt] = useState('');
-  const [customScriptDurationMinutes, setCustomScriptDurationMinutes] = useState<number>(normalizeScriptDurationPreset(Number(initialCustomScriptSettings.expectedDurationMinutes || 3)));
+  const [customScriptDurationMinutes, setCustomScriptDurationMinutes] = useState<number>(normalizeScriptDurationPreset(Number(initialCustomScriptSettings.expectedDurationMinutes || 1)));
   const [customScriptSpeechStyle, setCustomScriptSpeechStyle] = useState<ScriptSpeechStyle>(initialCustomScriptSettings.speechStyle || 'default');
   const [customScriptLanguage, setCustomScriptLanguage] = useState<ScriptLanguageOption>(initialCustomScriptSettings.language || 'ko');
   const [customScriptReferenceText, setCustomScriptReferenceText] = useState(initialCustomScriptSettings.referenceText || '');
@@ -225,6 +225,8 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [constitutionAnalysis, setConstitutionAnalysis] = useState<ConstitutionAnalysisSummary | null>(initial.constitutionAnalysis || null);
   // 샘플 안내 모달과 프롬프트 수정 모달은 흐름을 끊지 않게 이 컴포넌트에서 직접 제어합니다.
   const [sampleGuideOpen, setSampleGuideOpen] = useState(false);
+  const [scriptGenerationConfirmOpen, setScriptGenerationConfirmOpen] = useState(false);
+  const [pendingCharacterDeleteId, setPendingCharacterDeleteId] = useState<string | null>(null);
   const [promptEditorForm, setPromptEditorForm] = useState({ name: '', description: '', prompt: '' });
   const [elevenLabsVoices, setElevenLabsVoices] = useState<Array<{ voice_id: string; name: string; preview_url?: string; labels?: { accent?: string; gender?: string; description?: string } }>>([]);
   const [heygenVoices, setHeygenVoices] = useState<Array<{ voice_id: string; name: string; language?: string; gender?: string; preview_audio_url?: string; preview_audio?: string }>>([]);
@@ -339,7 +341,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       : (shouldPreserveStep1Selection ? step1SelectionRef.current.aspectRatio : step1Selected);
     setHasSelectedContentType(Boolean(nextHasSelectedContentType));
     setHasSelectedAspectRatio(Boolean(nextHasSelectedAspectRatio));
-    setStoryScript(workflowDraft?.script || '');
+    applyGeneratedStoryScript(workflowDraft?.script || '');
     setGenre(nextSelections.genre || FIELD_OPTIONS_BY_TYPE[nextType].genre[0]);
     setMood(nextSelections.mood || FIELD_OPTIONS_BY_TYPE[nextType].mood[0]);
     setEndingTone(nextSelections.endingTone || FIELD_OPTIONS_BY_TYPE[nextType].endingTone[0]);
@@ -373,7 +375,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setNewCharacterPrompt('');
     setNewStyleName('');
     setNewStylePrompt('');
-    setCustomScriptDurationMinutes(normalizeScriptDurationPreset(Number(workflowDraft?.customScriptSettings?.expectedDurationMinutes || 3)));
+    setCustomScriptDurationMinutes(normalizeScriptDurationPreset(Number(workflowDraft?.customScriptSettings?.expectedDurationMinutes || 1)));
     setCustomScriptSpeechStyle(workflowDraft?.customScriptSettings?.speechStyle || 'default');
     setCustomScriptLanguage(workflowDraft?.customScriptSettings?.language || 'ko');
     setCustomScriptReferenceText(workflowDraft?.customScriptSettings?.referenceText || '');
@@ -488,13 +490,13 @@ const InputSection: React.FC<InputSectionProps> = ({
     () => styleImages.find((item) => item.id === selectedStyleImageId) || styleImages[0] || null,
     [styleImages, selectedStyleImageId]
   );
-  const projectVoiceProvider = (studioState?.routing?.ttsProvider || workflowDraft?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'elevenLabs' | 'heygen';
+  const projectVoiceProvider = (workflowDraft?.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'elevenLabs' | 'heygen';
   const selectedProjectElevenVoice = useMemo(
-    () => elevenLabsVoices.find((item) => item.voice_id === (studioState?.routing?.elevenLabsVoiceId || workflowDraft?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID)) || elevenLabsVoices[0] || null,
+    () => elevenLabsVoices.find((item) => item.voice_id === (workflowDraft?.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID)) || elevenLabsVoices[0] || null,
     [elevenLabsVoices, studioState?.routing?.elevenLabsVoiceId, workflowDraft?.elevenLabsVoiceId]
   );
   const selectedProjectHeyGenVoice = useMemo(
-    () => heygenVoices.find((item) => item.voice_id === (studioState?.routing?.heygenVoiceId || workflowDraft?.heygenVoiceId || '')) || heygenVoices[0] || null,
+    () => heygenVoices.find((item) => item.voice_id === (workflowDraft?.heygenVoiceId || studioState?.routing?.heygenVoiceId || '')) || heygenVoices[0] || null,
     [heygenVoices, studioState?.routing?.heygenVoiceId, workflowDraft?.heygenVoiceId]
   );
   const projectVoiceSummary = useMemo(() => {
@@ -504,7 +506,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     if (projectVoiceProvider === 'heygen') {
       return `기본값 · HeyGen / ${selectedProjectHeyGenVoice?.name || '기본 보이스'}`;
     }
-    return `기본값 · qwen3-tts / ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (studioState?.routing?.qwenVoicePreset || workflowDraft?.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'}`;
+    return `기본값 · qwen3-tts / ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'}`;
   }, [projectVoiceProvider, selectedProjectElevenVoice, selectedProjectHeyGenVoice, studioState?.routing?.qwenVoicePreset, workflowDraft?.qwenVoicePreset]);
   const stopCharacterVoicePreview = () => {
     if (characterVoiceAudioRef.current) {
@@ -521,27 +523,27 @@ const InputSection: React.FC<InputSectionProps> = ({
   const resolveCharacterVoiceSelection = (character: CharacterProfile) => {
     const provider = (character.voiceProvider || 'project-default') as 'project-default' | 'qwen3Tts' | 'elevenLabs' | 'heygen';
     if (provider === 'qwen3Tts') {
-      const qwenId = character.voiceId || character.voiceHint || studioState?.routing?.qwenVoicePreset || workflowDraft?.qwenVoicePreset || 'qwen-default';
+      const qwenId = character.voiceId || character.voiceHint || workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default';
       const qwenVoice = QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === qwenId) || QWEN_TTS_PRESET_OPTIONS[0];
       return { provider, voiceId: qwenVoice.id, voiceName: qwenVoice.name, previewUrl: null as string | null, locale: 'ko-KR' };
     }
     if (provider === 'elevenLabs') {
-      const voiceId = character.voiceId || character.voiceHint || studioState?.routing?.elevenLabsVoiceId || workflowDraft?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID;
+      const voiceId = character.voiceId || character.voiceHint || workflowDraft?.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID;
       const voice = elevenLabsVoices.find((item) => item.voice_id === voiceId) || selectedProjectElevenVoice;
       return { provider, voiceId: voice?.voice_id || voiceId, voiceName: voice?.name || character.voiceName || 'ElevenLabs 기본 보이스', previewUrl: voice?.preview_url || character.voicePreviewUrl || null, locale: character.voiceLocale || null };
     }
     if (provider === 'heygen') {
-      const voiceId = character.voiceId || character.voiceHint || studioState?.routing?.heygenVoiceId || workflowDraft?.heygenVoiceId || selectedProjectHeyGenVoice?.voice_id || null;
+      const voiceId = character.voiceId || character.voiceHint || workflowDraft?.heygenVoiceId || studioState?.routing?.heygenVoiceId || selectedProjectHeyGenVoice?.voice_id || null;
       const voice = heygenVoices.find((item) => item.voice_id === voiceId) || selectedProjectHeyGenVoice;
       return { provider, voiceId: voice?.voice_id || voiceId, voiceName: voice?.name || character.voiceName || 'HeyGen 기본 보이스', previewUrl: voice?.preview_audio_url || voice?.preview_audio || character.voicePreviewUrl || null, locale: voice?.language || character.voiceLocale || null };
     }
     if (projectVoiceProvider === 'elevenLabs') {
-      return { provider, voiceId: selectedProjectElevenVoice?.voice_id || studioState?.routing?.elevenLabsVoiceId || workflowDraft?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID, voiceName: selectedProjectElevenVoice?.name || 'ElevenLabs 기본 보이스', previewUrl: selectedProjectElevenVoice?.preview_url || null, locale: null as string | null };
+      return { provider, voiceId: selectedProjectElevenVoice?.voice_id || workflowDraft?.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID, voiceName: selectedProjectElevenVoice?.name || 'ElevenLabs 기본 보이스', previewUrl: selectedProjectElevenVoice?.preview_url || null, locale: null as string | null };
     }
     if (projectVoiceProvider === 'heygen') {
-      return { provider, voiceId: selectedProjectHeyGenVoice?.voice_id || studioState?.routing?.heygenVoiceId || workflowDraft?.heygenVoiceId || null, voiceName: selectedProjectHeyGenVoice?.name || 'HeyGen 기본 보이스', previewUrl: selectedProjectHeyGenVoice?.preview_audio_url || selectedProjectHeyGenVoice?.preview_audio || null, locale: selectedProjectHeyGenVoice?.language || null };
+      return { provider, voiceId: selectedProjectHeyGenVoice?.voice_id || workflowDraft?.heygenVoiceId || studioState?.routing?.heygenVoiceId || null, voiceName: selectedProjectHeyGenVoice?.name || 'HeyGen 기본 보이스', previewUrl: selectedProjectHeyGenVoice?.preview_audio_url || selectedProjectHeyGenVoice?.preview_audio || null, locale: selectedProjectHeyGenVoice?.language || null };
     }
-    const qwenId = studioState?.routing?.qwenVoicePreset || workflowDraft?.qwenVoicePreset || 'qwen-default';
+    const qwenId = workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default';
     const qwenVoice = QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === qwenId) || QWEN_TTS_PRESET_OPTIONS[0];
     return { provider, voiceId: qwenVoice.id, voiceName: qwenVoice.name, previewUrl: null as string | null, locale: 'ko-KR' };
   };
@@ -727,8 +729,9 @@ const InputSection: React.FC<InputSectionProps> = ({
   }, [openStage, workflowDraft?.id]);
 
   const selectedCharactersReady = selectedCharacters.every((character) => Boolean(character.selectedImageId));
+  const isMuteScriptMode = customScriptLanguage === 'mute';
   const selectedCharactersHaveVoiceSelection = useMemo(() => {
-    if (contentType === 'music_video') return true;
+    if (contentType === 'music_video' || isMuteScriptMode) return true;
     if (!selectedCharacters.length) return false;
     return selectedCharacters.every((character) => {
       const provider = character.voiceProvider;
@@ -762,24 +765,29 @@ const InputSection: React.FC<InputSectionProps> = ({
     studioState?.routing?.heygenVoiceId,
     workflowDraft?.elevenLabsVoiceId,
     workflowDraft?.heygenVoiceId,
+    isMuteScriptMode,
   ]);
 
   const stepCompleted = useMemo(
     () => ({
       1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
       2: Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()),
-      3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
+      3: isMuteScriptMode
+        ? Boolean(selectedCharacterIds.length)
+        : Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
       4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
       5: Boolean(selectedStyleImageId || styleImages[0]?.id),
     }),
-    [hasSelectedContentType, hasSelectedAspectRatio, topic, genre, mood, endingTone, setting, protagonist, conflict, normalizedScript, selectedPromptTemplateId, selectedCharacterIds, selectedCharactersHaveVoiceSelection, selectedCharacters.length, selectedCharacterStyleId, selectedCharactersReady, selectedStyleImageId, styleImages]
+    [hasSelectedContentType, hasSelectedAspectRatio, topic, genre, mood, endingTone, setting, protagonist, conflict, normalizedScript, selectedPromptTemplateId, selectedCharacterIds, selectedCharactersHaveVoiceSelection, selectedCharacters.length, selectedCharacterStyleId, selectedCharactersReady, selectedStyleImageId, styleImages, isMuteScriptMode]
   );
 
   const routeStepCompleted = useMemo(
     () => ({
       1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
       2: Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()),
-      3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
+      3: isMuteScriptMode
+        ? Boolean(selectedCharacterIds.length)
+        : Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
       4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
       5: Boolean(selectedStyleImageId || styleImages[0]?.id),
     }),
@@ -802,6 +810,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       selectedCharactersReady,
       selectedStyleImageId,
       styleImages,
+      isMuteScriptMode,
     ]
   );
 
@@ -871,11 +880,11 @@ const InputSection: React.FC<InputSectionProps> = ({
     promptTemplates: syncedPromptTemplates,
     selectedPromptTemplateId,
     ttsProvider: projectVoiceProvider,
-    elevenLabsVoiceId: studioState?.routing?.elevenLabsVoiceId || workflowDraft?.elevenLabsVoiceId || selectedProjectElevenVoice?.voice_id || null,
-    elevenLabsModelId: studioState?.routing?.elevenLabsModelId || workflowDraft?.elevenLabsModelId || null,
-    heygenVoiceId: studioState?.routing?.heygenVoiceId || workflowDraft?.heygenVoiceId || selectedProjectHeyGenVoice?.voice_id || null,
-    qwenVoicePreset: studioState?.routing?.qwenVoicePreset || workflowDraft?.qwenVoicePreset || 'qwen-default',
-    qwenStylePreset: studioState?.routing?.qwenStylePreset || workflowDraft?.qwenStylePreset || 'balanced',
+    elevenLabsVoiceId: workflowDraft?.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || selectedProjectElevenVoice?.voice_id || null,
+    elevenLabsModelId: workflowDraft?.elevenLabsModelId || studioState?.routing?.elevenLabsModelId || null,
+    heygenVoiceId: workflowDraft?.heygenVoiceId || studioState?.routing?.heygenVoiceId || selectedProjectHeyGenVoice?.voice_id || null,
+    qwenVoicePreset: workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default',
+    qwenStylePreset: workflowDraft?.qwenStylePreset || studioState?.routing?.qwenStylePreset || 'balanced',
     customScriptSettings: {
       expectedDurationMinutes: customScriptDurationMinutes,
       speechStyle: customScriptSpeechStyle,
@@ -932,6 +941,8 @@ const InputSection: React.FC<InputSectionProps> = ({
     }, 120);
   });
 
+  const createGenerationNonce = () => `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
   const connectionSummary = {
     text: Boolean(studioState?.providers?.openRouterApiKey),
     audio: Boolean(studioState?.providers?.elevenLabsApiKey),
@@ -948,6 +959,11 @@ const InputSection: React.FC<InputSectionProps> = ({
   const requestWorkflowDraftSave = (reason: 'input' | 'action' = 'action') => {
     pendingDraftSaveReasonRef.current = reason;
     pendingDraftSaveTokenRef.current += 1;
+  };
+
+  const handleCustomScriptDurationChange = (value: number) => {
+    setCustomScriptDurationMinutes(normalizeScriptDurationPreset(value));
+    requestWorkflowDraftSave('action');
   };
 
   const handleInteractionCapture = (event: React.SyntheticEvent<HTMLElement>) => {
@@ -1282,6 +1298,13 @@ const InputSection: React.FC<InputSectionProps> = ({
     const completionMap = routeStep ? routeStepCompleted : stepCompleted;
 
     if (!completionMap[stage]) {
+      if (stage === 3 && isMuteScriptMode && !selectedCharacterIds.length) {
+        setStep3CastSelectionHighlightTick((prev) => prev + 1);
+        setNotice('무음 콘텐츠는 대본 없이 진행할 수 있습니다. 아래에서 출연자를 1명 이상 추가하거나 선택해 주세요.');
+        openOnly(3);
+        scrollToStep3CastSelection();
+        return false;
+      }
       if (stage === 3 && normalizedScript.trim() && !selectedCharacterIds.length) {
         setStep3CastSelectionHighlightTick((prev) => prev + 1);
         setNotice('대본은 준비되었습니다. 아래 출연자 선택에서 Step4로 넘길 출연자를 1명 이상 골라 주세요. 선택 위치까지 바로 내려갑니다.');
@@ -1289,7 +1312,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         scrollToStep3CastSelection();
         return false;
       }
-      if (stage === 3 && normalizedScript.trim() && selectedCharacterIds.length && !selectedCharactersHaveVoiceSelection) {
+      if (stage === 3 && !isMuteScriptMode && normalizedScript.trim() && selectedCharacterIds.length && !selectedCharactersHaveVoiceSelection) {
         setStep3CastSelectionHighlightTick((prev) => prev + 1);
         setNotice('선택한 출연자의 TTS 설정을 먼저 골라 주세요. 출연자 카드 위치까지 바로 이동합니다.');
         openOnly(3);
@@ -1359,7 +1382,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       setSetting('비 오는 옥상');
       setProtagonist('무대를 떠난 보컬');
       setConflict('전하지 못한 마음');
-      setStoryScript(
+      applyGeneratedStoryScript(
         normalizeStoryText(`
 [Intro]
 젖은 옥상 끝에 서서 밤의 숨을 세어
@@ -1401,7 +1424,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       setSetting('비 내리는 도시 골목');
       setProtagonist('과거를 숨긴 주인공');
       setConflict('되돌릴 수 없는 선택의 대가');
-      setStoryScript(
+      applyGeneratedStoryScript(
         normalizeStoryText(`비가 천천히 내려앉는 도시 골목에서 주인공은 오래전 끝난 줄 알았던 약속의 흔적을 다시 발견한다. 익숙한 장소인데도 오늘 밤만큼은 모든 것이 낯설게 보인다.
 
 희미한 네온 아래로 스쳐 가는 사람들 사이에서 그는 자신이 외면해 온 이름을 다시 듣게 되고, 사라졌던 관계가 아직 끝나지 않았다는 사실을 깨닫는다.
@@ -1423,7 +1446,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       setSetting('설명형 보드');
       setProtagonist('설명자');
       setConflict('데이터와 체감의 차이');
-      setStoryScript(
+      applyGeneratedStoryScript(
         normalizeStoryText(`오늘의 핵심 이슈는 도시 재개발 계획과 생활권 변화가 어떻게 연결되는지 이해하는 것이다. 첫 장면에서 전체 흐름을 짧게 짚고 시작한다.
 
 이어지는 장면에서는 사업 일정과 예산, 주민 반응이 순서대로 정리되며 왜 이 사안이 빠르게 주목받는지 설명한다.
@@ -1444,7 +1467,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setSetting('새벽의 편의점');
     setProtagonist('초보 창작자');
     setConflict('잊고 있던 약속');
-    setStoryScript(
+    applyGeneratedStoryScript(
       normalizeStoryText(`새벽의 편의점 앞, 주인공은 하루를 끝낸 표정으로 서 있지만 사실 오늘만큼은 그냥 지나칠 수 없는 밤이라는 것을 알고 있다.\n\n계산대 옆 작은 메모 하나가 눈에 들어오고, 그는 오래전에 미뤄 둔 약속이 아직 끝나지 않았다는 사실을 떠올린다.\n\n평소라면 고개를 돌렸겠지만, 이번에는 발걸음을 멈춘 채 스스로가 도망치던 이유를 처음으로 인정한다.\n\n문이 닫히기 직전, 그는 메시지를 보내고 아주 작은 선택 하나가 앞으로의 시간을 바꾸기 시작한다.\n\n마지막 장면에서 주인공은 혼자가 아니게 된 표정으로 골목을 걸어가며, 같은 밤이 전과 다른 공기로 보이기 시작한다.`)
     );
     setNotice('스토리 샘플을 채웠습니다. 이제 프롬프트를 고르고 바로 대본을 다듬을 수 있습니다.');
@@ -1460,9 +1483,10 @@ const InputSection: React.FC<InputSectionProps> = ({
       const recommended = await recommendTopicCandidatesFromInput({
         contentType,
         inputText: topic,
-        count: 8,
+        count: 5,
         model: studioState?.routing?.scriptModel,
         allowAi: connectionSummary.text,
+        scriptLanguage: customScriptLanguage,
       });
       setTopicRecommendations(recommended);
       setNotice(connectionSummary.text ? '입력한 텍스트를 기준으로 추천 주제 목록을 갱신했습니다. 원하는 항목을 클릭해 적용하세요.' : '샘플 추천 주제 목록을 갱신했습니다. 원하는 항목을 클릭해 적용하세요.');
@@ -1540,7 +1564,7 @@ const InputSection: React.FC<InputSectionProps> = ({
 
   const createDraftFromSelections = () => {
     const draft = buildSelectableStoryDraft({ contentType, topic, ...selections });
-    setStoryScript(draft);
+    applyGeneratedStoryScript(draft);
     setNotice(contentType === 'music_video' ? '선택값으로 가사형 샘플을 만들었습니다.' : '선택값으로 대본 초안을 만들었습니다.');
     openStageWithIntent(3, false);
   };
@@ -1624,35 +1648,28 @@ const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const handleGenerateScriptClick = () => {
-    const targetTemplate = selectedPromptTemplate || syncedPromptTemplates[0];
-    if (!targetTemplate) return;
-    if (!connectionSummary.text) {
-      const sampleDraft = composeScriptDraft({
-        contentType,
-        topic,
-        selections,
-        template: targetTemplate,
-        currentScript: normalizedScript,
-        model: selectedScriptGenerationModel,
-        conversationMode: targetTemplate.mode === 'dialogue',
-        customSettings: {
-          expectedDurationMinutes: customScriptDurationMinutes,
-          speechStyle: customScriptSpeechStyle,
-          language: customScriptLanguage,
-          referenceText: combinedReferenceText,
-          referenceLinks,
-          scriptModel: selectedScriptGenerationModel,
-        },
-      });
-      void sampleDraft.then(async (result) => {
-        setStoryScript(result.text);
-        setConstitutionAnalysis(result.analysis || null);
-        await hydrateCharactersFromScriptText(result.text, { preserveSelection: false });
-        setNotice(contentType === 'music_video' ? '뮤직비디오 프롬프트를 반영한 가사형 대본을 생성했습니다.' : '선택한 프롬프트를 반영한 대본을 생성했습니다.');
-      });
+    if (isMuteScriptMode) {
+      setNotice('무음 콘텐츠는 대본을 작성할 수 없습니다. 아래에서 출연자를 추가하거나 선택해 다음 단계로 진행해 주세요.');
+      openOnly(3);
+      scrollToStep3CastSelection();
       return;
     }
-    void generateScriptByPrompt(targetTemplate.mode === 'dialogue', targetTemplate);
+
+    const targetTemplate = selectedPromptTemplate || syncedPromptTemplates[0];
+    const hasExistingScript = Boolean(normalizedScript.trim());
+
+    if (!connectionSummary.text && !hasExistingScript) {
+      void generateScriptByPrompt(targetTemplate?.mode === 'dialogue', targetTemplate);
+      return;
+    }
+
+    setScriptGenerationConfirmOpen(true);
+  };
+
+  const confirmGenerateScriptOverwrite = () => {
+    const targetTemplate = selectedPromptTemplate || syncedPromptTemplates[0];
+    setScriptGenerationConfirmOpen(false);
+    void generateScriptByPrompt(targetTemplate?.mode === 'dialogue', targetTemplate);
   };
 
 
@@ -1680,6 +1697,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         conversationMode: targetTemplate.mode === 'dialogue',
         generationIntent: 'expand',
         expandByChars: chars,
+        generationNonce: createGenerationNonce(),
         customSettings: {
           expectedDurationMinutes: customScriptDurationMinutes,
           speechStyle: customScriptSpeechStyle,
@@ -1689,7 +1707,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           scriptModel: selectedScriptGenerationModel,
         },
       });
-      setStoryScript(result.text);
+      applyGeneratedStoryScript(result.text);
       setConstitutionAnalysis(result.analysis || null);
       await hydrateCharactersFromScriptText(result.text, { preserveSelection: false });
       setNotice(result.source === 'ai'
@@ -1746,12 +1764,66 @@ const InputSection: React.FC<InputSectionProps> = ({
   }, [promptPreviewId, syncedPromptTemplates]);
 
   const generateScriptByPrompt = async (conversationMode = false, templateOverride?: WorkflowPromptTemplate) => {
-    const template = templateOverride || selectedPromptTemplate;
-    if (!template) return;
-    if (!connectionSummary.text) {
+    const template = templateOverride || selectedPromptTemplate || syncedPromptTemplates[0] || {
+      id: 'sample-script-fallback-template',
+      name: '기본 샘플 프롬프트',
+      description: 'API 미연결 상태에서도 Step 3 샘플 대본을 즉시 만들기 위한 내부 기본 프롬프트입니다.',
+      prompt: '현재 선택된 콘텐츠 유형, 주제, 분위기, 예상 길이에 맞춰 바로 읽을 수 있는 영상용 샘플 대본을 작성한다.',
+      mode: 'narration' as const,
+      updatedAt: Date.now(),
+    };
+    if (isMuteScriptMode) return;
+    const hasTextApiConnection = connectionSummary.text;
+    if (!hasTextApiConnection) {
       promptTextAiSetup('현재 대본 생성은 샘플 보조 모드입니다. Google AI Studio를 연결하면 이 자리에서 실제 AI 대본 초안을 바로 받을 수 있습니다.');
     }
-    focusPromptTemplate(template.id);
+    if (template.id !== 'sample-script-fallback-template') {
+      focusPromptTemplate(template.id);
+    }
+    const generationSettings = {
+      expectedDurationMinutes: customScriptDurationMinutes,
+      speechStyle: customScriptSpeechStyle,
+      language: customScriptLanguage,
+      referenceText: combinedReferenceText,
+      referenceLinks,
+      scriptModel: selectedScriptGenerationModel,
+    };
+    const sampleDraft = buildSampleScriptDraft({
+      contentType,
+      topic,
+      selections,
+      template,
+      currentScript: '',
+      model: selectedScriptGenerationModel,
+      conversationMode,
+      generationNonce: createGenerationNonce(),
+      customSettings: generationSettings,
+    });
+
+    applyGeneratedStoryScript(sampleDraft);
+    setConstitutionAnalysis(null);
+    openStageWithIntent(3, false);
+
+    const applySampleFallback = async (message: string) => {
+      applyGeneratedStoryScript(sampleDraft);
+      setConstitutionAnalysis(null);
+      try {
+        await hydrateCharactersFromScriptText(sampleDraft, { preserveSelection: false, forceSample: true });
+      } catch {}
+      setNotice(message);
+      openStageWithIntent(3, false);
+    };
+
+    if (!hasTextApiConnection) {
+      setIsGeneratingScript(true);
+      try {
+        await applySampleFallback('AI 연결이 없어 Step 3 샘플 대본을 바로 채웠습니다. 설정을 연결하면 같은 버튼에서 실제 AI 대본으로 바뀝니다.');
+      } finally {
+        setIsGeneratingScript(false);
+      }
+      return;
+    }
+
     setIsGeneratingScript(true);
     try {
       const result = await composeScriptDraft({
@@ -1759,23 +1831,20 @@ const InputSection: React.FC<InputSectionProps> = ({
         topic,
         selections,
         template,
-        currentScript: normalizedScript,
+        currentScript: '',
         model: selectedScriptGenerationModel,
         conversationMode,
-        customSettings: {
-          expectedDurationMinutes: customScriptDurationMinutes,
-          speechStyle: customScriptSpeechStyle,
-          language: customScriptLanguage,
-          referenceText: combinedReferenceText,
-          referenceLinks,
-          scriptModel: selectedScriptGenerationModel,
-        },
+        generationNonce: createGenerationNonce(),
+        customSettings: generationSettings,
       });
-      setStoryScript(result.text);
+      const nextScript = (result.text || '').trim() ? result.text : sampleDraft;
+      applyGeneratedStoryScript(nextScript);
       setConstitutionAnalysis(result.analysis || null);
-      await hydrateCharactersFromScriptText(result.text, { preserveSelection: false });
-      setNotice(result.source === 'ai' ? `선택한 프롬프트 "${template.name}"로 AI 초안을 만들었습니다.` : 'API 연결이 없어 현재는 정해진 샘플 로직으로 대본을 채웠습니다. Google AI Studio를 등록하면 실제 AI 생성으로 전환됩니다.');
+      await hydrateCharactersFromScriptText(nextScript, { preserveSelection: false, forceSample: result.source !== 'ai' });
+      setNotice(result.source === 'ai' ? `선택한 프롬프트 "${template.name}"로 AI 초안을 만들었습니다.` : 'AI 연결 상태를 확인할 수 없어 Step 3 샘플 대본으로 안전하게 채웠습니다. 설정을 다시 연결하면 실제 AI 생성으로 전환됩니다.');
       openStageWithIntent(3, false);
+    } catch {
+      await applySampleFallback('AI 연결 호출이 실패해도 Step 3 샘플 대본은 바로 나오도록 보정했습니다. 지금은 샘플 대본으로 채워졌습니다.');
     } finally {
       setIsGeneratingScript(false);
     }
@@ -2008,7 +2077,18 @@ const InputSection: React.FC<InputSectionProps> = ({
       return next;
     });
     setExpandedCharacterEditorId((prev) => prev === characterId ? null : prev);
+    setPendingCharacterDeleteId((prev) => (prev === characterId ? null : prev));
     setNotice('출연자 카드 1개를 제거했습니다. 선택 목록과 참조 이미지도 함께 정리했습니다.');
+  };
+
+  const requestCharacterRemoval = (characterId: string) => {
+    setPendingCharacterDeleteId(characterId);
+  };
+
+  const confirmCharacterRemoval = () => {
+    if (!pendingCharacterDeleteId) return;
+    removeCharacter(pendingCharacterDeleteId);
+    setPendingCharacterDeleteId(null);
   };
 
   const toggleCharacterSelection = (characterId: string) => {
@@ -2760,7 +2840,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           setHasSelectedContentType,
           setContentType,
           setTopic,
-          setStoryScript,
+          setStoryScript: handleStoryScriptInputChange,
           setGenre,
           setMood,
           setEndingTone,
@@ -2830,7 +2910,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           constitutionAnalysis,
           selectedPromptTemplateName: selectedPromptTemplate?.name || '',
           selectedPromptTemplateEngine: selectedPromptTemplate?.engine || 'default',
-          setCustomScriptDurationMinutes,
+          setCustomScriptDurationMinutes: handleCustomScriptDurationChange,
           setCustomScriptSpeechStyle,
           setCustomScriptLanguage,
           setCustomScriptReferenceText,
@@ -2860,7 +2940,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           setNewCharacterPrompt,
           createNewCharacterByPrompt,
           createNewCharacterFromForm,
-          removeCharacter,
+          removeCharacter: requestCharacterRemoval,
           previousRouteStep,
           moveRouteStep,
           goBackFromStep1,
@@ -2901,7 +2981,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           setHasSelectedContentType,
           setContentType,
           setTopic,
-          setStoryScript,
+          setStoryScript: handleStoryScriptInputChange,
           setGenre,
           setMood,
           setEndingTone,
@@ -3059,6 +3139,82 @@ const InputSection: React.FC<InputSectionProps> = ({
         onSave={savePromptEditor}
         onPromptChange={(value) => setPromptEditorForm((prev) => ({ ...prev, prompt: value }))}
       />
+
+      <OverlayModal
+        open={scriptGenerationConfirmOpen}
+        title="대본을 새로 생성할까요?"
+        description="대본을 생성하면 현재 작성된 대본은 새 결과로 교체됩니다. 영상 길이와 현재 설정을 기준으로 새 대본을 다시 만듭니다."
+        onClose={() => setScriptGenerationConfirmOpen(false)}
+        footer={(
+          <>
+            <button
+              type="button"
+              onClick={() => setScriptGenerationConfirmOpen(false)}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={confirmGenerateScriptOverwrite}
+              disabled={isGeneratingScript}
+              className="rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {isGeneratingScript ? '생성 중...' : '확인하고 생성'}
+            </button>
+          </>
+        )}
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-[24px] border border-violet-200 bg-violet-50 p-4">
+            <div className="text-sm font-black text-violet-900">새로 생성되는 기준</div>
+            <p className="mt-2 text-sm leading-6 text-violet-800">
+              예상 길이 {customScriptDurationMinutes}분, {selectedPromptTemplate?.name || '현재 프롬프트'}, {selectedScriptGenerationModel} 기준으로
+              글자수 범위에 맞는 새 대본을 만듭니다.
+            </p>
+          </div>
+          <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4">
+            <div className="text-sm font-black text-amber-900">현재 대본 교체 안내</div>
+            <p className="mt-2 text-sm leading-6 text-amber-800">
+              확인을 누르면 지금 작성된 내용은 유지되지 않고 새 대본으로 덮어써집니다. 생성 결과는 항상 새로운 느낌으로 다시 만듭니다.
+            </p>
+          </div>
+        </div>
+      </OverlayModal>
+
+      <OverlayModal
+        open={Boolean(pendingCharacterDeleteId)}
+        title="출연자를 삭제할까요?"
+        description="삭제하면 선택 상태와 연결된 참조 정보도 함께 정리됩니다."
+        onClose={() => setPendingCharacterDeleteId(null)}
+        footer={(
+          <>
+            <button
+              type="button"
+              onClick={() => setPendingCharacterDeleteId(null)}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={confirmCharacterRemoval}
+              className="rounded-2xl bg-rose-600 px-5 py-3 text-sm font-black text-white hover:bg-rose-500"
+            >
+              삭제 확인
+            </button>
+          </>
+        )}
+      >
+        <div className="rounded-[24px] border border-rose-200 bg-rose-50 p-4">
+          <div className="text-sm font-black text-rose-900">
+            {extractedCharacters.find((item) => item.id === pendingCharacterDeleteId)?.name || '선택한 출연자'}
+          </div>
+          <p className="mt-2 text-sm leading-6 text-rose-800">
+            한 번 삭제하면 현재 Step3 카드 목록에서 빠지고, 다시 쓰려면 대본 기준으로 다시 불러오거나 직접 추가해야 합니다.
+          </p>
+        </div>
+      </OverlayModal>
 
       <ProcessingBadge step={step} />
     </div>

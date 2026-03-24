@@ -344,6 +344,25 @@ export default function Step2Panel({
   onCustomScriptSpeechStyleChange,
   onCustomScriptLanguageChange,
 }: Step2PanelProps) {
+  const topicTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  const resizeTopicTextarea = useCallback(() => {
+    const textarea = topicTextareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = '0px';
+    const computed = window.getComputedStyle(textarea);
+    const lineHeight = Number.parseFloat(computed.lineHeight || '24') || 24;
+    const borderHeight =
+      (Number.parseFloat(computed.borderTopWidth || '0') || 0) +
+      (Number.parseFloat(computed.borderBottomWidth || '0') || 0);
+    const maxHeight = lineHeight * 5 + 24 + borderHeight;
+    textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
+  }, []);
+
+  useEffect(() => {
+    resizeTopicTextarea();
+  }, [topic, resizeTopicTextarea]);
+
   const selectedLanguage = useMemo(
     () => SCRIPT_LANGUAGE_OPTIONS.find((item) => item.value === customScriptLanguage) || SCRIPT_LANGUAGE_OPTIONS[0],
     [customScriptLanguage]
@@ -354,9 +373,14 @@ export default function Step2Panel({
     [customScriptSpeechStyle]
   );
 
-  const visibleRecommendations = topicRecommendations.length
-    ? topicRecommendations.slice(0, 8)
-    : [...DEFAULT_TOPIC_RECOMMENDATIONS];
+  const visibleRecommendations = [
+    topic.trim(),
+    ...(topicRecommendations.length ? topicRecommendations : [...DEFAULT_TOPIC_RECOMMENDATIONS]),
+  ]
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .filter((item, index, array) => array.indexOf(item) === index)
+    .slice(0, 5);
 
   const selectedSpeechIndex = SPEECH_STYLE_OPTIONS.findIndex((item) => item.value === customScriptSpeechStyle);
   const selectedLanguageIndex = SCRIPT_LANGUAGE_OPTIONS.findIndex((item) => item.value === customScriptLanguage);
@@ -467,30 +491,33 @@ export default function Step2Panel({
           </button>
         </div>
 
-        <input
+        <textarea
+          ref={topicTextareaRef}
           value={topic}
           onChange={(e) => onTopicChange(e.target.value)}
-          className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-blue-400"
-          placeholder="예: 비 오는 도시 골목에서 다시 만난 두 사람"
+          rows={1}
+          className="max-h-[148px] min-h-[56px] w-full resize-none overflow-y-auto rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-400"
+          placeholder="예: 비 오는 도시 골목에서 다시 만난 두 사람
+장면이 길어지면 엔터로 줄을 나눠 자세히 적어도 됩니다"
         />
 
         <p className="mt-3 text-xs text-slate-500">
-          입력한 텍스트를 기준으로 한 문장 주제를 추천합니다
+          엔터로 줄을 나누며 최대 5줄 높이까지 입력할 수 있고, 더 길어지면 스크롤로 이어서 작성할 수 있습니다.
         </p>
 
-        <div className="mt-2 flex flex-wrap gap-2">
-          {visibleRecommendations.map((item) => {
+        <div className="mt-3 space-y-2">
+          {visibleRecommendations.map((item, index) => {
             const isActive = topic === item;
 
             return (
               <button
-                key={item}
+                key={`${index}-${item}`}
                 type="button"
                 onClick={() => onSelectTopicRecommendation(item)}
-                className={`rounded-full border px-3 py-2 text-xs font-bold leading-5 transition ${
+                className={`w-full rounded-2xl border px-4 py-3 text-left text-sm font-bold leading-6 transition ${
                   isActive
                     ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                    : 'border-slate-200 bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100'
                 }`}
               >
                 {item}

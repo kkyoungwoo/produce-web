@@ -112,6 +112,7 @@ export async function runOpenRouterText(request: OpenRouterRequest): Promise<str
 
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(normalizeGoogleTextModel(request.model))}:generateContent`, {
     method: 'POST',
+    cache: 'no-store',
     headers: {
       'x-goog-api-key': apiKey,
       'Content-Type': 'application/json',

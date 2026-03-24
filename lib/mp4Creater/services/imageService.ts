@@ -1,6 +1,7 @@
 import { CONFIG, ImageModelId } from '../config';
 import { ScriptScene, ReferenceImages } from '../types';
 import { makeScenePlaceholderImage } from '../utils/storyHelpers';
+import { getPrimaryFreeImageForScene } from './freeMediaService';
 
 function getGoogleAiStudioApiKey(): string {
   if (typeof window === 'undefined') return '';
@@ -80,7 +81,8 @@ export async function generateImage(
   const apiKey = getGoogleAiStudioApiKey();
 
   if (isSampleImageModel(modelId) || !apiKey) {
-    return fallback;
+    const freeImage = await getPrimaryFreeImageForScene(scene).catch(() => null);
+    return freeImage || fallback;
   }
 
   try {
@@ -107,12 +109,13 @@ export async function generateImage(
     });
 
     if (!response.ok) {
-      return fallback;
+      const freeImage = await getPrimaryFreeImageForScene(scene).catch(() => null);
+      return freeImage || fallback;
     }
 
     const json = await response.json();
-    return extractInlineImage(json) || fallback;
+    return extractInlineImage(json) || (await getPrimaryFreeImageForScene(scene).catch(() => null)) || fallback;
   } catch {
-    return fallback;
+    return (await getPrimaryFreeImageForScene(scene).catch(() => null)) || fallback;
   }
 }

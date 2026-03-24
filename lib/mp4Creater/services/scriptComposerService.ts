@@ -8,7 +8,7 @@ import {
   WorkflowPromptTemplate,
 } from '../types';
 import { translatePromptToEnglish } from './promptTranslationService';
-import { buildSelectableStoryDraft, normalizeStoryText } from '../utils/storyHelpers';
+import { buildSelectableStoryDraft, formatStoryTextForEditor, normalizeStoryText } from '../utils/storyHelpers';
 import { runTextAi } from './textAiService';
 import { getPromptRegistry } from './promptRegistryService';
 import { buildCreativeDirectionBlock, createCreativeDirection } from '../config/creativeVariance';
@@ -25,12 +25,215 @@ interface ScriptComposerOptions {
   customSettings?: CustomScriptSettings;
   generationIntent?: 'draft' | 'expand';
   expandByChars?: number;
+  generationNonce?: string;
 }
 
 export interface ScriptComposerResult {
   text: string;
   source: 'ai' | 'sample';
   analysis?: ConstitutionAnalysisSummary | null;
+}
+
+const SCRIPT_CHARACTER_RANGE_BY_TYPE: Record<ContentType, { min: number; max: number }> = {
+  music_video: { min: 130, max: 250 },
+  story: { min: 210, max: 390 },
+  cinematic: { min: 110, max: 210 },
+  info_delivery: { min: 390, max: 720 },
+};
+
+function createSeededRandom(seedText: string) {
+  let seed = Array.from(seedText || 'mp4Creater').reduce((acc, char, index) => {
+    return (acc + (char.charCodeAt(0) * (index + 17))) >>> 0;
+  }, 2166136261);
+
+  return () => {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    return seed / 4294967296;
+  };
+}
+
+function pickSample<T>(items: T[], random: () => number): T {
+  return items[Math.floor(random() * items.length)] || items[0];
+}
+
+function getScriptCharacterRange(contentType: ContentType, minutes: number) {
+  const safeMinutes = Math.max(1, Math.min(30, Math.round(minutes || 1)));
+  const range = SCRIPT_CHARACTER_RANGE_BY_TYPE[contentType] || SCRIPT_CHARACTER_RANGE_BY_TYPE.story;
+  return {
+    min: safeMinutes * range.min,
+    max: safeMinutes * range.max,
+    target: Math.round((safeMinutes * (range.min + range.max)) / 2),
+  };
+}
+
+function countScriptCharacters(text: string) {
+  return Array.from(text || '').length;
+}
+
+function getTtsOnlyRule(contentType: ContentType) {
+  if (contentType === 'music_video') {
+    return '결과는 TTS나 노래 보이스로 바로 읽거나 부를 수 있는 가사 본문만 작성한다. [Intro], [Verse], [Chorus], Scene, 장면, 화자 이름, 괄호 설명, 지문, 카메라 설명, 효과음 표기 없이 가사 줄만 남긴다.';
+  }
+  return '결과는 TTS로 바로 읽을 목소리 대본만 작성한다. Scene, 장면, 컷, 화자 이름, 대사 라벨, 괄호 설명, 카메라 지시, 행동 지문, 효과음 표기, 메타 설명 없이 낭독할 본문만 남긴다.';
+}
+
+function buildVoiceOnlySample(contentType: ContentType, topic: string, selections: StorySelectionState) {
+  const safeTopic = topic || '이번 주제';
+  if (contentType === 'music_video') {
+    return [
+      `${safeTopic} 끝에서 나는 아직 네 이름을 부른다`,
+      `지워 둔 마음까지 오늘 밤은 다시 흔든다`,
+      `멈춘 줄 알았던 박자도 내 안에서 살아난다`,
+      `돌아오지 않는 새벽이어도 나는 끝까지 간다`,
+    ].join('\n');
+  }
+  if (contentType === 'info_delivery') {
+    return [
+      `${safeTopic}를 볼 때 가장 먼저 확인할 것은 왜 지금 이 변화가 중요한지입니다.`,
+      `먼저 기준 하나를 잡고, 그다음 비용과 시간처럼 바로 비교되는 항목부터 차례로 보면 이해가 빨라집니다.`,
+      `숫자 하나와 짧은 사례 하나만 붙여도 복잡한 내용이 생활감 있는 정보로 바뀝니다.`,
+      `마지막에는 오늘 기억할 핵심 한 줄만 남기면 시청자는 다음 행동까지 자연스럽게 이어 갈 수 있습니다.`,
+    ].join('\n\n');
+  }
+  if (contentType === 'cinematic') {
+    return [
+      `${selections.protagonist || '그 사람'}은 ${selections.setting || '낯선 공간'}에 다시 들어서며 오래 숨겨 둔 진실과 마주한다.`,
+      `${selections.conflict || '지워지지 않는 선택'}은 조용한 숨결처럼 가까워지고, 한마디마다 밤의 공기가 더 무거워진다.`,
+      `그래도 물러서지 않겠다는 눈빛 하나가 남고, ${selections.endingTone || '긴 여운'}은 마지막 문장까지 천천히 번져 간다.`,
+    ].join('\n\n');
+  }
+  return [
+    `${selections.protagonist || '주인공'}은 ${selections.setting || '익숙한 공간'}에서 ${safeTopic}의 시작을 조용히 받아들인다.`,
+    `${selections.conflict || '남겨 둔 갈등'}은 작게 흔들리지만, 오늘만큼은 피하지 않겠다는 마음이 먼저 자라난다.`,
+    `${selections.mood || '잔잔한'} 기류 속에서도 한 걸음 더 나아가려는 선택이 생기고, 끝에는 ${selections.endingTone || '따뜻한 여운'}이 남는다.`,
+  ].join('\n\n');
+}
+
+function buildLengthPaddingParagraphs(options: ScriptComposerOptions) {
+  const topic = options.topic || '이번 이야기';
+  const protagonist = options.selections.protagonist || '주인공';
+  const setting = options.selections.setting || '익숙한 공간';
+  const conflict = options.selections.conflict || '남겨 둔 문제';
+  const mood = options.selections.mood || '몰입감 있는';
+  const endingTone = options.selections.endingTone || '여운 있는';
+  const random = createSeededRandom([
+    options.contentType,
+    topic,
+    protagonist,
+    setting,
+    conflict,
+    mood,
+    endingTone,
+    options.generationNonce || `${Date.now()}`,
+  ].join('::'));
+  const direction = createCreativeDirection(`${options.contentType}:${topic}:${options.generationNonce || Date.now()}`, 3, options.contentType);
+
+  if (options.contentType === 'music_video') {
+    const openers = ['젖은 네온 아래', '늦은 새벽 골목에서', '멈춘 플랫폼 끝에서', '유리창에 번진 불빛 속에서'];
+    const echoes = ['후렴처럼 다시 밀려와', '낮게 번져 와', '가만히 살아나', '천천히 커져 가'];
+    const lifts = ['남겨 둔 한마디도 이번엔 끝까지 부른다', '돌아서던 발끝마저 오늘은 리듬으로 남긴다', '지워 둔 마음까지 이번 밤의 멜로디로 묶는다', '사라진 줄 알았던 떨림을 다시 앞으로 끌고 간다'];
+    return Array.from({ length: 6 }, () => formatStoryTextForEditor([
+      `${pickSample(openers, random)} ${topic}의 그림자가 ${pickSample(echoes, random)}.`,
+      `${protagonist}의 숨과 ${conflict}이 같은 박자로 겹치고, ${direction.visualHook.toLowerCase()} 결의 장면이 짧게 박힌다.`,
+      `${pickSample(lifts, random)} ${endingTone} 공기가 마지막 줄까지 남는다.`
+    ].join(' ')));
+  }
+
+  if (options.contentType === 'info_delivery') {
+    const structures = ['기준부터 먼저 세우는 순서', '실수 포인트를 앞에서 끊어 주는 순서', '예시를 먼저 보여 주고 원리를 붙이는 순서', '비교 항목을 두세 개로 줄여 보는 순서'];
+    const benefits = ['이해 속도가 확실히 빨라집니다', '짧은 영상에서도 핵심이 덜 흔들립니다', '처음 보는 사람도 전체 흐름을 따라오기 쉬워집니다', '복잡한 내용을 바로 실행 가능한 정보로 바꿀 수 있습니다'];
+    return Array.from({ length: 6 }, () => formatStoryTextForEditor([
+      `${topic}를 설명할 때는 ${pickSample(structures, random)}가 특히 잘 먹힙니다.`,
+      `${setting} 기준의 짧은 사례 하나만 붙여도 ${conflict}이 왜 중요한지 훨씬 또렷하게 보입니다.`,
+      `${mood} 톤을 유지하되 문장은 단순하게 정리하면 ${pickSample(benefits, random)}.`
+    ].join(' ')));
+  }
+
+  if (options.contentType === 'cinematic') {
+    const textures = ['빛이 한 번 흔들리는 순간', '대답 없는 정적이 길어지는 찰나', '손끝이 멈칫하는 아주 짧은 틈', '카메라가 숨을 고르듯 느려지는 구간'];
+    const turns = ['긴장이 더 깊어진다', '같은 공간이 전혀 다른 의미로 바뀐다', '감정의 방향이 조용히 뒤집힌다', '다음 선택의 무게가 더 선명해진다'];
+    return Array.from({ length: 6 }, () => formatStoryTextForEditor([
+      `${pickSample(textures, random)}, ${protagonist}은 ${setting}의 공기를 다시 읽는다.`,
+      `${conflict}은 설명보다 표정과 움직임으로 먼저 드러나고, ${direction.narrativeAngle.toLowerCase()} 흐름 속에서 ${pickSample(turns, random)}.`,
+      `결국 ${endingTone} 잔상이 남아 마지막 컷 다음의 장면까지 상상하게 만든다.`
+    ].join(' ')));
+  }
+
+  const starts = ['조용하던 장면 한가운데서', '익숙한 공기가 미묘하게 달라지는 순간', '평범한 흐름이 한 번 어긋난 바로 뒤에', '별일 아닌 듯 지나가던 찰나에'];
+  const pushes = ['다음 선택이 밀려온다', '이야기의 결이 완전히 달라지기 시작한다', '숨겨 둔 감정이 조용히 떠오른다', '관계의 균형이 조금씩 이동한다'];
+  return Array.from({ length: 6 }, () => formatStoryTextForEditor([
+    `${pickSample(starts, random)} ${protagonist}은 ${setting}에서 ${topic}의 진짜 무게를 알아차린다.`,
+    `${conflict}은 더는 뒤로 미뤄지지 않고, ${mood} 기류 속에서도 ${pickSample(pushes, random)}.`,
+    `${direction.visualHook} 같은 인상이 짧게 남고, 끝에는 ${endingTone} 감정이 또렷하게 걸린다.`
+  ].join(' ')));
+}
+
+function trimScriptToMax(text: string, max: number) {
+  if (countScriptCharacters(text) <= max) return text;
+  const paragraphs = text.split(/\n{2,}/).map((item) => item.trim()).filter(Boolean);
+  const working = [...paragraphs];
+  while (working.length > 1 && countScriptCharacters(working.join('\n\n')) > max) {
+    working.pop();
+  }
+  let candidate = working.join('\n\n').trim();
+  if (countScriptCharacters(candidate) <= max) return candidate;
+
+  const sentences = candidate.split(/(?<=[.!?。！？])\s+|(?<=다\.)\s+|(?<=요\.)\s+|(?<=함\.)\s+/).map((item) => item.trim()).filter(Boolean);
+  if (sentences.length > 1) {
+    const kept = [];
+    for (const sentence of sentences) {
+      const next = [...kept, sentence].join(' ');
+      if (countScriptCharacters(next) > max) break;
+      kept.push(sentence);
+    }
+    if (kept.length) candidate = kept.join(' ').trim();
+  }
+
+  if (countScriptCharacters(candidate) <= max) return candidate;
+
+  const sliced = Array.from(candidate).slice(0, max).join('').trim();
+  const punctuationIndex = Math.max(
+    sliced.lastIndexOf('.'),
+    sliced.lastIndexOf('!'),
+    sliced.lastIndexOf('?'),
+    sliced.lastIndexOf('。'),
+    sliced.lastIndexOf('！'),
+    sliced.lastIndexOf('？'),
+    sliced.lastIndexOf('\n')
+  );
+  return (punctuationIndex > Math.max(40, Math.floor(max * 0.45)) ? sliced.slice(0, punctuationIndex + 1) : sliced).trim();
+}
+
+function fitScriptToCharacterRange(text: string, options: ScriptComposerOptions) {
+  const range = getScriptCharacterRange(options.contentType, options.customSettings?.expectedDurationMinutes || 1);
+  let candidate = normalizeStoryText(text);
+  const paddingParagraphs = buildLengthPaddingParagraphs(options);
+  const targetFloor = Math.max(range.min, Math.min(range.max, range.target));
+  let guard = 0;
+
+  while (countScriptCharacters(candidate) < targetFloor && guard < 14) {
+    const addition = paddingParagraphs[guard % paddingParagraphs.length] || paddingParagraphs[0] || '';
+    if (!addition) break;
+    const next = [candidate, addition].filter(Boolean).join('\n\n').trim();
+    if (countScriptCharacters(next) > range.max) break;
+    candidate = normalizeStoryText(next);
+    guard += 1;
+  }
+
+  if (countScriptCharacters(candidate) > range.max) {
+    candidate = trimScriptToMax(candidate, range.max);
+  }
+
+  if (countScriptCharacters(candidate) < range.min && paddingParagraphs.length) {
+    const addition = paddingParagraphs[0];
+    const room = range.max - countScriptCharacters(candidate);
+    if (room > 40) {
+      const sliced = trimScriptToMax(addition, room);
+      candidate = normalizeStoryText([candidate, sliced].filter(Boolean).join('\n\n'));
+    }
+  }
+
+  return formatStoryTextForEditor(candidate);
 }
 
 function resolveSpeechStyle(style: ScriptSpeechStyle | undefined) {
@@ -82,79 +285,45 @@ function formatScriptLanguageEnglish(language: ScriptLanguageOption | undefined)
 
 function createSilentFallback(topic: string, selections: StorySelectionState) {
   const direction = createCreativeDirection(`${topic}:${selections.protagonist}:${selections.setting}:${selections.conflict}`, 0);
-  return normalizeStoryText(`Scene 1
-오프닝 장면: ${topic || '이 이야기'}의 핵심 분위기를 ${selections.setting}에서 바로 보여준다.
-연출 축: ${direction.shotType}
-화면 자막: ${selections.conflict}
-연출 포인트: ${selections.mood} 톤으로 시선을 붙잡는다.
+  return normalizeStoryText(`${topic || '이 이야기'}의 핵심 이미지는 ${selections.setting}에서 바로 시작된다. ${selections.mood} 공기가 첫 장면부터 흐르고, 화면에는 ${selections.conflict}을 또렷하게 남기는 짧은 자막이 뜬다.
 
-Scene 2
-전개 장면: 주인공 ${selections.protagonist}의 행동과 표정으로 갈등을 이어 간다.
-화면 자막: 상황이 더 선명해지는 한 줄 메시지
-연출 포인트: 설명보다 장면 전환과 소품으로 정보를 전달한다. ${direction.visualHook}
+${selections.protagonist}의 움직임과 표정만으로 갈등이 이어진다. 설명 대신 소품과 시선, 전환 속도로 내용을 이해하게 만들고 ${direction.visualHook} 같은 시각적 포인트로 집중을 붙잡는다.
 
-Scene 3
-엔딩 장면: ${selections.endingTone} 톤으로 마무리한다.
-화면 자막: 마지막 한 줄 행동 유도 또는 여운
-연출 포인트: 내레이션 없이도 이해되게 컷과 자막만 정리한다. ${direction.subtitleTone}`);
+마지막에는 ${selections.endingTone} 흐름을 남기는 짧은 자막 하나로 정리한다. 내레이션 없이도 장면과 자막만으로 이해되게 구성하고 ${direction.subtitleTone}처럼 한 줄의 여운을 남긴다.`);
 }
 
 function createDialogueFallback(topic: string, selections: StorySelectionState, style: ScriptSpeechStyle) {
   const speechStyle = resolveSpeechStyle(style);
   const direction = createCreativeDirection(`${topic}:${selections.protagonist}:${selections.setting}:${selections.conflict}:${speechStyle}`, 0);
   if (speechStyle === 'da') {
-    return normalizeStoryText(`Scene 1
-${selections.protagonist}: ${topic || '이 이야기'}는 오늘 밤 시작된다.
-상대: 왜 지금이어야 하지?
-${selections.protagonist}: ${selections.conflict}는 더는 미룰 수 없기 때문이다.
-상대: 이번엔 ${direction.narrativeAngle.toLowerCase()}
+    return normalizeStoryText(`${topic || '이 이야기'}는 오늘 밤 시작된다. ${selections.protagonist || '나는'}는 ${selections.setting}에서 ${selections.conflict}을 더는 외면하지 않는다.
 
-Scene 2
-상대: 그러면 어떤 분위기로 가는 건가?
-${selections.protagonist}: ${selections.mood} 분위기다. 배경은 ${selections.setting}이다.
-상대: 결말은?
-${selections.protagonist}: ${selections.endingTone}으로 간다.`);
+이번 이야기는 ${selections.mood} 결로 밀고 간다. 망설임보다 선택을 먼저 내세우고, ${direction.narrativeAngle.toLowerCase()} 흐름으로 감정을 앞으로 끌고 간다.
+
+끝에서는 모든 답을 다 주지 않아도 된다. 대신 ${selections.endingTone}만은 분명하게 남겨서 마지막 한 줄이 오래 맴돌게 만든다.`);
   }
 
   if (speechStyle === 'eum') {
-    return normalizeStoryText(`Scene 1
-${selections.protagonist}: ${topic || '이 이야기'} 오늘 밤 시작함.
-상대: 왜 지금임?
-${selections.protagonist}: ${selections.conflict} 더는 못 미룸.
-상대: 이번엔 ${direction.narrativeAngle.toLowerCase()}
+    return normalizeStoryText(`${topic || '이 이야기'} 오늘 밤 시작함. ${selections.setting}에서 ${selections.conflict} 이제 못 미룸.
 
-Scene 2
-상대: 분위기 어떰?
-${selections.protagonist}: ${selections.mood} 분위기감. 배경 ${selections.setting}.
-상대: 결말은?
-${selections.protagonist}: ${selections.endingTone}으로 끝냄.`);
+전체 톤은 ${selections.mood} 쪽으로 감. 설명 길게 안 하고 감정이랑 선택을 바로 밀어 올림. ${direction.narrativeAngle.toLowerCase()} 결 유지함.
+
+마지막은 ${selections.endingTone} 쪽으로 정리함. 짧지만 계속 남는 한 줄로 끝냄.`);
   }
 
   if (speechStyle === 'yo') {
-    return normalizeStoryText(`Scene 1
-${selections.protagonist}: ${topic || '이 이야기'}는 오늘 밤 시작돼요.
-상대: 왜 지금이어야 하죠?
-${selections.protagonist}: ${selections.conflict}는 더는 미룰 수 없으니까요.
-상대: 이번엔 ${direction.narrativeAngle.toLowerCase()}
+    return normalizeStoryText(`${topic || '이 이야기'}는 오늘 밤 시작돼요. ${selections.setting}에서 마주한 ${selections.conflict}을 이제는 피하지 않기로 해요.
 
-Scene 2
-상대: 그럼 어떤 분위기로 가나요?
-${selections.protagonist}: ${selections.mood} 분위기로 가요. 배경은 ${selections.setting}이에요.
-상대: 결말은요?
-${selections.protagonist}: ${selections.endingTone}으로 마무리해요.`);
+전체 흐름은 ${selections.mood} 분위기로 가져가요. 설명을 늘어놓기보다 선택과 감정이 한 걸음씩 앞으로 나가게 만들고, ${direction.narrativeAngle.toLowerCase()} 결을 살려요.
+
+끝에서는 ${selections.endingTone}이 또렷하게 남아야 해요. 마지막 문장이 닫힘보다 여운으로 들리게 정리해요.`);
   }
 
-  return normalizeStoryText(`Scene 1
-${selections.protagonist}: ${topic || '이 이야기'}는 오늘 밤 시작된다.
-상대: 왜 지금이어야 해?
-${selections.protagonist}: ${selections.conflict}는 더는 미룰 수 없어.
-상대: 이번엔 ${direction.narrativeAngle.toLowerCase()}
+  return normalizeStoryText(`${topic || '이 이야기'}는 오늘 밤 시작된다. ${selections.setting}에서 마주한 ${selections.conflict}은 더는 피할 수 없다.
 
-Scene 2
-상대: 그럼 어떤 분위기로 가는 거야?
-${selections.protagonist}: ${selections.mood} 분위기로 간다. 배경은 ${selections.setting}이야.
-상대: 결말은?
-${selections.protagonist}: ${selections.endingTone}으로 마무리한다.`);
+전체 흐름은 ${selections.mood} 쪽으로 밀고 간다. 설명보다 선택과 감정의 전진을 먼저 보여 주고, ${direction.narrativeAngle.toLowerCase()} 결로 문장을 이어 간다.
+
+마지막에는 ${selections.endingTone}을 분명하게 남긴다. 단정한 마침보다 오래 남는 울림으로 끝맺는다.`);
 }
 
 function formatDuration(minutes: number) {
@@ -162,6 +331,14 @@ function formatDuration(minutes: number) {
   return `${safeMinutes} minute${safeMinutes > 1 ? 's' : ''}`;
 }
 
+function buildCharacterRangeGuide(options: ScriptComposerOptions) {
+  const range = getScriptCharacterRange(options.contentType, options.customSettings?.expectedDurationMinutes || 1);
+  return `글자수 규칙: 공백 포함 최종 대본은 ${range.min}자 이상 ${range.max}자 이하로 맞춘다. 가장 이상적인 목표치는 약 ${range.target}자다.`;
+}
+
+function buildFreshTakeGuide(options: ScriptComposerOptions) {
+  return `Fresh generation nonce: ${options.generationNonce || Date.now()}. 이전 시도나 방금 만든 결과를 재사용하지 말고, 같은 주제여도 전개와 문장 시작, 비유, 훅을 새롭게 바꾼다.`;
+}
 
 function resolveExpandByChars(options: ScriptComposerOptions) {
   return Math.max(300, Math.min(4000, Math.round(options.expandByChars || 800)));
@@ -182,22 +359,18 @@ function buildGenerationIntentGuide(options: ScriptComposerOptions) {
 
 function buildOutputFormatReminder(options: ScriptComposerOptions) {
   if (options.contentType === 'music_video') {
-    return [
-      '출력 형식: [Intro], [Verse 1], [Chorus], [Verse 2], [Bridge], [Outro] 중 필요한 블록을 사용한다.',
-      '각 블록 안에는 실제 가사 줄을 2~4줄 배치한다.',
-      '설명문이나 해설문 대신 가사만 쓴다.',
-    ].join(' ');
+    return '출력 형식: 4~6개의 짧은 가사 문단으로 쓰고 줄바꿈으로만 리듬을 만든다. 블록 제목, 괄호, 설명문 없이 실제로 부를 가사 줄만 남긴다.';
   }
 
   if (options.contentType === 'info_delivery') {
-    return '출력 형식: 4~6개의 문단형 정보 전달 대본으로 쓰고 첫 문단은 핵심 질문, 중간은 설명/예시/비교 블록, 마지막은 요약과 다음 행동으로 끝낸다. 대본 본문만 출력하고 목표, 주제, 장르, 설명 메모 같은 메타 문구는 본문에 쓰지 않는다.';
+    return '출력 형식: 4~6개의 정보 전달용 낭독 문단으로 쓰고 첫 문단은 핵심 질문, 중간은 설명/예시/비교, 마지막은 요약과 다음 행동으로 끝낸다. 대본 본문만 출력하고 장면 설명, 목표, 주제, 장르, 메모 같은 메타 문구는 본문에 쓰지 않는다.';
   }
 
   if (options.contentType === 'cinematic') {
-    return '출력 형식: 4~6개의 장면형 영화 대본으로 쓰고 각 문단이 하나의 시네마틱 장면처럼 읽히게 한다. 대본 본문만 출력하고 목표, 주제, 장르, 설명 메모 같은 메타 문구는 본문에 쓰지 않는다.';
+    return '출력 형식: 4~6개의 시네마틱 낭독 문단으로 쓰되 화면 설명이 아니라 목소리로 읽힐 문장만 남긴다. 대본 본문만 출력하고 장면 제목, 카메라 지시, 메타 문구는 본문에 쓰지 않는다.';
   }
 
-  return '출력 형식: 4~6개의 감정 중심 이야기 문단으로 쓰고, 각 문단이 사건과 감정을 함께 전진시켜야 한다. 대본 본문만 출력하고 목표, 주제, 장르, 설명 메모 같은 메타 문구는 본문에 쓰지 않는다.';
+  return '출력 형식: 4~6개의 이야기형 낭독 문단으로 쓰고 각 문단이 감정과 사건을 함께 전진시켜야 한다. 대본 본문만 출력하고 장면 설명, 목표, 주제, 장르, 메모 같은 메타 문구는 본문에 쓰지 않는다.';
 }
 
 function buildConceptLockGuide(options: ScriptComposerOptions) {
@@ -218,18 +391,18 @@ function buildConceptLockGuide(options: ScriptComposerOptions) {
 
 function buildParagraphCountGuide(options: ScriptComposerOptions) {
   if (options.contentType === 'music_video') {
-    return 'Target structure: 4 to 6 lyric blocks separated by blank lines.';
+    return 'Target structure: 4 to 6 blank-line-separated lyric paragraphs with no block labels.';
   }
 
   if (options.contentType === 'info_delivery') {
-    return 'Target structure: 4 to 6 blank-line-separated explainer paragraphs.';
+    return 'Target structure: 4 to 6 blank-line-separated TTS narration paragraphs.';
   }
 
   if (options.contentType === 'cinematic') {
-    return 'Target structure: 4 to 6 blank-line-separated cinematic scene paragraphs.';
+    return 'Target structure: 4 to 6 blank-line-separated cinematic narration paragraphs.';
   }
 
-  return 'Target structure: 4 to 6 blank-line-separated story paragraphs.';
+  return 'Target structure: 4 to 6 blank-line-separated story narration paragraphs.';
 }
 
 function createMusicVideoExpansionFallback(options: ScriptComposerOptions) {
@@ -241,20 +414,17 @@ function createMusicVideoExpansionFallback(options: ScriptComposerOptions) {
   const endingTone = options.selections.endingTone || '여운 있는 마감';
   const target = resolveExpandByChars(options);
   const extraBlocks = [
-    `[Bridge]
-${lead}의 숨 위로 ${mood} 불빛이 더 크게 번져
+    `${lead}의 숨 위로 ${mood} 불빛이 더 크게 번져
 ${direction.visualHook}
 끝내 숨겨 둔 ${conflict}마저 멜로디로 흘러와
 돌아갈 수 없는 마음도 오늘은 후렴이 되고
-멈춘 장면 같던 밤이 다시 앞으로 걸어가`,
-    `[Chorus]
-나는 너를 더 크게 불러, 이번엔 나를 먼저 불러
-사라진 줄 알았던 떨림을 끝까지 살려
-대답 없는 새벽이어도 이 노래는 계속돼
-${topic}의 마지막 줄까지 전부 안고 갈게`,
-    `[Outro]
-${endingTone} 공기 속에서도 나는 천천히 웃어
-남겨 둔 한마디까지 오늘의 노래로 남겨`,
+멈춘 장면 같던 밤이 다시 앞으로 걸어간다`,
+    `나는 너를 더 크게 부른다, 이번에는 나를 먼저 부른다
+사라진 줄 알았던 떨림을 끝까지 살린다
+대답 없는 새벽이어도 이 노래는 계속된다
+${topic}의 마지막 줄까지 전부 안고 간다`,
+    `${endingTone} 공기 속에서도 나는 천천히 웃는다
+남겨 둔 한마디까지 오늘의 노래로 남긴다`,
   ];
   const blockCount = target >= 1800 ? 3 : target >= 900 ? 2 : 1;
   return normalizeStoryText([options.currentScript?.trim() || '', ...extraBlocks.slice(0, blockCount)].filter(Boolean).join('\n\n'));
@@ -357,11 +527,18 @@ function applyCustomFallback(baseText: string, options: ScriptComposerOptions) {
     .split(/\n{2,}/)
     .map((item) => item.trim())
     .filter(Boolean);
+  const fillers = buildLengthPaddingParagraphs(options);
   const targetParagraphCount = Math.max(3, Math.min(36, Math.round((settings.expectedDurationMinutes || 1) * 1.2)));
   const cloned = [...paragraphs];
-  while (cloned.length < targetParagraphCount && paragraphs.length) {
-    cloned.push(paragraphs[(cloned.length - 1) % paragraphs.length]);
+  let fillerIndex = 0;
+
+  while (cloned.length < targetParagraphCount) {
+    const nextFiller = fillers[fillerIndex % Math.max(1, fillers.length)] || '';
+    if (!nextFiller) break;
+    cloned.push(nextFiller);
+    fillerIndex += 1;
   }
+
   const body = cloned.slice(0, targetParagraphCount);
   return normalizeStoryText(body.join('\n\n'));
 }
@@ -379,14 +556,17 @@ function createFallback(options: ScriptComposerOptions): string {
       ? createDialogueFallback(options.topic, options.selections, speechStyle)
       : normalizeStoryText(
           options.currentScript?.trim() ||
-            buildSelectableStoryDraft({
-              contentType: options.contentType,
-              topic: options.topic,
-              ...options.selections,
-            })
+            [
+              buildSelectableStoryDraft({
+                contentType: options.contentType,
+                topic: options.topic,
+                ...options.selections,
+              }),
+              createCreativeDirection(`${options.contentType}:${options.topic}:${options.generationNonce || Date.now()}`, 2, options.contentType).subtitleTone,
+            ].filter(Boolean).join('\n\n')
         );
 
-  return applyCustomFallback(baseText, options);
+  return fitScriptToCharacterRange(applyCustomFallback(baseText, options), options);
 }
 
 function buildConstitutionFallbackAnalysis(options: ScriptComposerOptions, source: 'ai' | 'sample'): ConstitutionAnalysisSummary {
@@ -451,6 +631,15 @@ function extractScriptFromText(raw: string) {
 
 function isVideoSectionHeading(line: string) {
   return /^(scene\s*\d+|장면\s*\d+|paragraph\s*\d+|문단\s*\d+|sequence\s*\d+|컷\s*\d+|\[(intro|verse|pre-chorus|chorus|bridge|hook|outro)[^\]]*\])/i.test(line.trim());
+}
+
+function sanitizeTtsOnlyLine(line: string) {
+  const trimmed = line.trim();
+  if (!trimmed) return '';
+  if (isVideoSectionHeading(trimmed)) return '';
+  const withoutBracketLabel = trimmed.replace(/^\[(intro|verse|pre-chorus|chorus|bridge|hook|outro)[^\]]*\]\s*/i, '').trim();
+  const withoutSpeaker = withoutBracketLabel.replace(/^[가-힣A-Za-z0-9 _-]{1,20}:\s*/, '').trim();
+  return withoutSpeaker;
 }
 
 function stripPromptLikeParagraphs(text: string) {
@@ -527,7 +716,7 @@ function ensureParagraphVideoScript(raw: string, options: ScriptComposerOptions)
 
   const explicitParagraphs = cleaned
     .split(/\n{2,}/)
-    .map((item) => item.trim())
+    .map((item) => item.split('\n').map((line) => sanitizeTtsOnlyLine(line)).filter(Boolean).join('\n').trim())
     .filter(Boolean);
   if (explicitParagraphs.length >= 3) {
     return normalizeStoryText(explicitParagraphs.join('\n\n'));
@@ -535,26 +724,16 @@ function ensureParagraphVideoScript(raw: string, options: ScriptComposerOptions)
 
   const lines = cleaned
     .split('\n')
-    .map((item) => item.trim())
+    .map((item) => sanitizeTtsOnlyLine(item))
     .filter(Boolean);
   if (lines.length >= 3) {
     const grouped: string[] = [];
     let bucket: string[] = [];
     lines.forEach((line, index) => {
-      const heading = isVideoSectionHeading(line);
-      if (heading && bucket.length) {
-        grouped.push(bucket.join('\n'));
-        bucket = [];
-      }
       bucket.push(line);
       const nextLine = lines[index + 1] || '';
       if (!nextLine) return;
-      if (isVideoSectionHeading(nextLine)) {
-        grouped.push(bucket.join('\n'));
-        bucket = [];
-        return;
-      }
-      if (!heading && bucket.length >= 3) {
+      if (bucket.length >= 3) {
         grouped.push(bucket.join('\n'));
         bucket = [];
       }
@@ -565,8 +744,8 @@ function ensureParagraphVideoScript(raw: string, options: ScriptComposerOptions)
     }
   }
 
-  const fallbackTarget = Math.max(3, Math.min(12, Math.round((options.customSettings?.expectedDurationMinutes || 3) * 1.2)));
-  return normalizeStoryText(chunkSentencesForVideoScript(cleaned, fallbackTarget).join('\n\n'));
+  const fallbackTarget = Math.max(3, Math.min(12, Math.round((options.customSettings?.expectedDurationMinutes || 1) * 1.2)));
+  return normalizeStoryText(chunkSentencesForVideoScript(lines.join(' ') || cleaned, fallbackTarget).join('\n\n'));
 }
 
 function parseJsonObject(raw: string) {
@@ -692,6 +871,7 @@ function buildCreativePayload(options: ScriptComposerOptions, task: 'script' | '
     options.selections.endingTone,
     options.currentScript || '',
     options.generationIntent || 'draft',
+    options.generationNonce || '',
   ].join('::');
   return buildCreativeDirectionBlock({
     task,
@@ -712,13 +892,17 @@ function buildConstitutionUserPayload(options: ScriptComposerOptions) {
     `주인공/화자: ${options.selections.protagonist}`,
     `핵심 갈등: ${options.selections.conflict}`,
     `결말 톤: ${options.selections.endingTone}`,
-    `예상 길이: ${Math.max(1, Math.min(30, options.customSettings?.expectedDurationMinutes || 3))}분`,
+    `예상 길이: ${Math.max(1, Math.min(30, options.customSettings?.expectedDurationMinutes || 1))}분`,
     `대본 언어: ${formatScriptLanguageLabel(options.customSettings?.language)}`,
     `선호 말투: ${formatSpeechStyleLabel(options.customSettings?.speechStyle)}`,
     `생성 작업: ${buildGenerationIntentGuide(options)}`,
     `콘셉트 고정 규칙: ${buildConceptLockGuide(options)}`,
     `문단 구조 가이드: ${buildParagraphCountGuide(options)}`,
     `출력 형식: ${buildOutputFormatReminder(options)}`,
+    buildCharacterRangeGuide(options),
+    `TTS 전용 규칙: ${getTtsOnlyRule(options.contentType)}`,
+    buildFreshTakeGuide(options),
+    `[항목별 대본 샘플]\n${buildVoiceOnlySample(options.contentType, options.topic, options.selections)}`,
     buildCreativePayload(options),
     `현재 초안: ${options.currentScript?.trim() || '없음'}`,
     `참고 텍스트: ${options.customSettings?.referenceText?.trim() || '없음'}`,
@@ -729,41 +913,72 @@ function buildConstitutionUserPayload(options: ScriptComposerOptions) {
   ].filter(Boolean).join('\n\n');
 }
 
-export async function composeScriptDraft(options: ScriptComposerOptions): Promise<ScriptComposerResult> {
+
+function createEmergencySampleScript(options: ScriptComposerOptions) {
   const fallback = createFallback(options);
+  const paragraphReady = fitScriptToCharacterRange(ensureParagraphVideoScript(fallback, options), options);
+  if ((paragraphReady || '').trim()) return paragraphReady;
+
+  const voiceOnly = fitScriptToCharacterRange(
+    ensureParagraphVideoScript(buildVoiceOnlySample(options.contentType, options.topic, options.selections), options),
+    options,
+  );
+  if ((voiceOnly || '').trim()) return voiceOnly;
+
+  return formatStoryTextForEditor([
+    `${options.topic || '이번 이야기'}는 지금부터 바로 시작됩니다.`,
+    `${options.selections.protagonist || '주인공'}은 ${options.selections.setting || '익숙한 공간'}에서 ${options.selections.conflict || '남겨 둔 문제'}와 마주합니다.`,
+    `${options.selections.mood || '몰입감 있는'} 흐름으로 장면을 밀고 가며, 끝에는 ${options.selections.endingTone || '여운'}을 남깁니다.`,
+  ].join('\n\n'));
+}
+
+export function buildSampleScriptDraft(options: ScriptComposerOptions): string {
+  return createEmergencySampleScript(options);
+}
+
+export async function composeScriptDraft(options: ScriptComposerOptions): Promise<ScriptComposerResult> {
+  const fallback = createEmergencySampleScript(options);
   const fallbackAnalysis = options.template.engine === 'channel_constitution_v32'
     ? buildConstitutionFallbackAnalysis(options, 'sample')
     : null;
-  const bundle = getPromptRegistry(options.contentType);
 
-  if (options.template.engine === 'channel_constitution_v32') {
-    const result = await runTextAi({
-      system: '당신은 유튜브 쇼츠 채널 헌법을 집행하는 분석형 대본 작성자다. 내부적으로 검증과 타겟팅을 수행하되 최종 출력은 JSON 객체 하나만 반환한다. 입력에 없는 사실은 추정하지 않는다. 사용자가 비슷한 결과를 직접 요구하지 않는 한 최근 결과를 답습하지 말고 매번 새 관점과 새 전개를 만든다.',
-      user: buildConstitutionUserPayload(options),
-      model: options.model || options.customSettings?.scriptModel || 'openrouter/auto',
-      maxTokens: 2600,
-      temperature: 0.72,
-      fallback: JSON.stringify({
-        targetProfile: fallbackAnalysis?.targetProfile,
-        safetyReview: fallbackAnalysis?.safetyReview,
-        monetizationReview: fallbackAnalysis?.monetizationReview,
-        selectedStructure: fallbackAnalysis?.selectedStructure,
-        titles: fallbackAnalysis?.titles,
-        keywords: fallbackAnalysis?.keywords,
-        script: fallback,
-      }, null, 2),
-    });
+  try {
+    const bundle = getPromptRegistry(options.contentType);
 
-    const parsed = parseConstitutionResponse(result.text || fallback, fallback, fallbackAnalysis || buildConstitutionFallbackAnalysis(options, result.source), result.source, options);
-    return {
-      text: parsed.text,
-      source: result.source,
-      analysis: parsed.analysis,
-    };
-  }
+    if (options.template.engine === 'channel_constitution_v32') {
+      const result = await runTextAi({
+        system: '당신은 유튜브 쇼츠 채널 헌법을 집행하는 분석형 대본 작성자다. 내부적으로 검증과 타겟팅을 수행하되 최종 출력은 JSON 객체 하나만 반환한다. 입력에 없는 사실은 추정하지 않는다. 사용자가 비슷한 결과를 직접 요구하지 않는 한 최근 결과를 답습하지 말고 매번 새 관점과 새 전개를 만든다.',
+        user: buildConstitutionUserPayload(options),
+        model: options.model || options.customSettings?.scriptModel || 'openrouter/auto',
+        maxTokens: 2600,
+        temperature: 0.72,
+        fallback: JSON.stringify({
+          targetProfile: fallbackAnalysis?.targetProfile,
+          safetyReview: fallbackAnalysis?.safetyReview,
+          monetizationReview: fallbackAnalysis?.monetizationReview,
+          selectedStructure: fallbackAnalysis?.selectedStructure,
+          titles: fallbackAnalysis?.titles,
+          keywords: fallbackAnalysis?.keywords,
+          script: fallback,
+        }, null, 2),
+      });
 
-  const requestPayload = await translatePromptToEnglish(
-    `Content type: ${options.contentType}
+      const parsed = parseConstitutionResponse(
+        result.text || fallback,
+        fallback,
+        fallbackAnalysis || buildConstitutionFallbackAnalysis(options, result.source),
+        result.source,
+        options,
+      );
+      return {
+        text: fitScriptToCharacterRange(parsed.text || fallback, options),
+        source: result.source,
+        analysis: parsed.analysis,
+      };
+    }
+
+    const requestPayload = await translatePromptToEnglish(
+      `Content type: ${options.contentType}
 Topic: ${options.topic || 'Auto-generated'}
 Genre: ${options.selections.genre}
 Mood: ${options.selections.mood}
@@ -778,11 +993,17 @@ Generation task: ${buildGenerationIntentGuide(options)}
 Concept lock guide: ${buildConceptLockGuide(options)}
 Paragraph structure guide: ${buildParagraphCountGuide(options)}
 Output format reminder: ${buildOutputFormatReminder(options)}
-Expected duration: ${options.customSettings?.expectedDurationMinutes || 3} minutes
+Expected duration: ${options.customSettings?.expectedDurationMinutes || 1} minutes
 Preferred speech style: ${formatSpeechStyleEnglish(options.customSettings?.speechStyle)}
 Script language: ${formatScriptLanguageEnglish(options.customSettings?.language)}
+Character range guide: ${buildCharacterRangeGuide(options)}
+TTS only rule: ${getTtsOnlyRule(options.contentType)}
+Fresh take rule: ${buildFreshTakeGuide(options)}
 Silent mode rule: ${options.customSettings?.language === 'mute' ? 'Do not write spoken dialogue or narration. Build the script around visual beats, actions, and short on-screen captions.' : 'Use normal spoken or narrated script flow.'}
 Reference notes: ${options.customSettings?.referenceText?.trim() || 'None'}
+
+[VOICE ONLY SAMPLE]
+${buildVoiceOnlySample(options.contentType, options.topic, options.selections)}
 
 [CREATIVE VARIANCE]
 ${buildCreativePayload(options)}
@@ -795,28 +1016,35 @@ ${options.currentScript || 'None'}
 
 [TRANSLATION RULE]
 ${bundle.translateRule}`,
-    { label: 'script composer request', preserveLineBreaks: true, maxChars: 12000 }
-  );
+      { label: 'script composer request', preserveLineBreaks: true, maxChars: 12000 },
+    );
 
-  const additionBlock = (options.promptAdditions || []).filter((item) => item.trim()).slice(0, 8);
-  const mergedPayload = additionBlock.length
-    ? `${requestPayload}
+    const additionBlock = (options.promptAdditions || []).filter((item) => item.trim()).slice(0, 8);
+    const mergedPayload = additionBlock.length
+      ? `${requestPayload}
 
 [ADDITIONAL GUIDANCE PHRASES]
 ${additionBlock.map((item, index) => `${index + 1}. ${item}`).join('\n')}`
-    : requestPayload;
+      : requestPayload;
 
-  const result = await runTextAi({
-    system: `${bundle.system} Step 1 콘셉트 고정 규칙을 끝까지 유지하고, 선택된 프롬프트의 출력 형식과 예시를 우선 규칙으로 따른다. 최종 출력에는 목표, 주제, 장르, 메모 같은 메타 문구를 섞지 말고, 현재 초안이 있으면 지우지 말고 이어서 확장한다. 사용자가 비슷한 결과를 직접 원하지 않는 한 방금 전 시도와 비슷한 문장, 후킹 방식, 이미지 은유, 장면 배치를 반복하지 않는다.`,
-    user: mergedPayload,
-    model: options.model || options.customSettings?.scriptModel || 'openrouter/auto',
-    temperature: options.conversationMode || options.template.mode === 'dialogue' ? 0.98 : 0.9,
-    fallback,
-  });
+    const result = await runTextAi({
+      system: `${bundle.system} Step 1 콘셉트 고정 규칙을 끝까지 유지하고, 선택된 프롬프트의 출력 형식과 예시를 우선 규칙으로 따른다. 최종 출력에는 목표, 주제, 장르, 메모 같은 메타 문구를 섞지 말고, 현재 초안이 있으면 지우지 말고 이어서 확장한다. 사용자가 비슷한 결과를 직접 원하지 않는 한 방금 전 시도와 비슷한 문장, 후킹 방식, 이미지 은유, 장면 배치를 반복하지 않는다.`,
+      user: mergedPayload,
+      model: options.model || options.customSettings?.scriptModel || 'openrouter/auto',
+      temperature: options.conversationMode || options.template.mode === 'dialogue' ? 0.98 : 0.9,
+      fallback,
+    });
 
-  return {
-    text: ensureParagraphVideoScript(result.text || fallback, options),
-    source: result.source,
-    analysis: null,
-  };
+    return {
+      text: fitScriptToCharacterRange(ensureParagraphVideoScript(result.text || fallback, options) || fallback, options),
+      source: result.source,
+      analysis: null,
+    };
+  } catch {
+    return {
+      text: fallback,
+      source: 'sample',
+      analysis: fallbackAnalysis,
+    };
+  }
 }

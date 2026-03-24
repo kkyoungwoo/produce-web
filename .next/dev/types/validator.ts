@@ -335,6 +335,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../../app/api/mp4Creater/free-media/search/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/free-media/search">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/free-media/search/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../../app/api/mp4Creater/heygen/tts/route.ts
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/heygen/tts">> = Specific
@@ -357,6 +366,69 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/reference-extract">> = Specific
   const handler = {} as typeof import("../../../app/api/mp4Creater/reference-extract/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/mp4Creater/render/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/render">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/render/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/mp4Creater/youtube/callback/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/youtube/callback">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/youtube/callback/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/mp4Creater/youtube/config/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/youtube/config">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/youtube/config/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/mp4Creater/youtube/connect/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/youtube/connect">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/youtube/connect/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/mp4Creater/youtube/disconnect/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/youtube/disconnect">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/youtube/disconnect/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/mp4Creater/youtube/status/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/youtube/status">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/youtube/status/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../../app/api/mp4Creater/youtube/upload/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/mp4Creater/youtube/upload">> = Specific
+  const handler = {} as typeof import("../../../app/api/mp4Creater/youtube/upload/route.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check

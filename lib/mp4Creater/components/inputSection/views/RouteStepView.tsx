@@ -229,6 +229,8 @@ export default function RouteStepView({ vm }: { vm: any }) {
       return (
         <Step3Panel
           contentType={contentType}
+          customScriptLanguage={customScriptLanguage}
+          expectedDurationMinutes={customScriptDurationMinutes}
           isGeneratingScript={isGeneratingScript}
           sceneCount={sceneCount}
           storyScript={storyScript}

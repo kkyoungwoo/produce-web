@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StudioState } from '../types';
 import { pickFolderPath } from '../services/folderPicker';
 import {
@@ -24,6 +24,8 @@ interface SettingsDrawerProps {
   onSave: (nextState: Partial<StudioState>) => void | Promise<void>;
 }
 
+type InlineFeedback = { tone: 'success' | 'error' | 'info'; message: string } | null;
+
 const cardClass = 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm';
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400';
 const isElevenLabsBgmModel = (modelId?: string | null) => (modelId || '').startsWith('elevenlabs');
@@ -44,6 +46,41 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const [showSecrets, setShowSecrets] = useState({
     openRouterApiKey: false,
     elevenLabsApiKey: false,
+    googleClientId: false,
+    googleClientSecret: false,
+  });
+  const [youtubeOAuthValues, setYoutubeOAuthValues] = useState({
+    googleClientId: '',
+    googleClientSecret: '',
+  });
+  const [youtubeConfigState, setYoutubeConfigState] = useState({
+    isLoading: false,
+    hasStoredSecret: false,
+    secretMask: '',
+    redirectUri: '',
+    source: 'missing' as 'env' | 'saved' | 'missing',
+  });
+  const [youtubeConnectionState, setYoutubeConnectionState] = useState<{
+    isChecking: boolean;
+    tone: 'success' | 'error' | 'info';
+    message: string;
+  } | null>(null);
+  const [youtubeFieldFeedback, setYoutubeFieldFeedback] = useState<Record<'googleClientId' | 'googleClientSecret', InlineFeedback>>({
+    googleClientId: null,
+    googleClientSecret: null,
+  });
+  const [isCheckingYoutubeFields, setIsCheckingYoutubeFields] = useState<Record<'googleClientId' | 'googleClientSecret', boolean>>({
+    googleClientId: false,
+    googleClientSecret: false,
+  });
+  const [youtubeConnectOverlay, setYoutubeConnectOverlay] = useState<{
+    active: boolean;
+    tone: 'info' | 'success' | 'error';
+    message: string;
+  }>({
+    active: false,
+    tone: 'info',
+    message: '',
   });
   const [routing, setRouting] = useState<StudioState['routing']>({
     scriptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
@@ -81,23 +118,25 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const [isPaidMode, setIsPaidMode] = useState(false);
   const [elevenLabsVoices, setElevenLabsVoices] = useState<Array<{ voice_id: string; name: string; preview_url?: string; labels?: { accent?: string; gender?: string; description?: string } }>>([]);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
-  const previewAudioRef = React.useRef<HTMLAudioElement | null>(null);
-  const bgmAudioRef = React.useRef<HTMLAudioElement | null>(null);
-  const previewUtteranceRef = React.useRef<SpeechSynthesisUtterance | null>(null);
-  const voicePreviewKeyRef = React.useRef('');
-  const bgmPreviewKeyRef = React.useRef('');
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
+  const previewUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const voicePreviewKeyRef = useRef('');
+  const bgmPreviewKeyRef = useRef('');
+  const youtubePopupRef = useRef<Window | null>(null);
+  const youtubePopupPollRef = useRef<number | null>(null);
 
   const visibleScriptModels = useMemo(
-    () => SCRIPT_MODEL_OPTIONS.filter((item) => isPaidMode || item.tier !== 'paid'),
-    [isPaidMode],
+    () => SCRIPT_MODEL_OPTIONS,
+    [],
   );
   const visibleImageModels = useMemo(
-    () => IMAGE_MODELS.filter((item) => isPaidMode || item.tier !== 'paid'),
-    [isPaidMode],
+    () => IMAGE_MODELS,
+    [],
   );
   const visibleVideoModels = useMemo(
-    () => VIDEO_MODEL_OPTIONS.filter((item) => isPaidMode || item.tier !== 'paid'),
-    [isPaidMode],
+    () => VIDEO_MODEL_OPTIONS,
+    [],
   );
 
   useEffect(() => {
@@ -138,10 +177,72 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     ));
     setProviderFeedback({});
     setIsCheckingProviders({});
+    setYoutubeConnectionState(null);
+    setYoutubeFieldFeedback({ googleClientId: null, googleClientSecret: null });
+    setYoutubeConnectOverlay({ active: false, tone: 'info', message: '' });
     setShowSecrets({
       openRouterApiKey: false,
       elevenLabsApiKey: false,
+      googleClientId: false,
+      googleClientSecret: false,
     });
+    setYoutubeOAuthValues({
+      googleClientId: '',
+      googleClientSecret: '',
+    });
+    setYoutubeConfigState({
+      isLoading: true,
+      hasStoredSecret: false,
+      secretMask: '',
+      redirectUri: '',
+      source: 'missing',
+    });
+    setYoutubeConnectionState(null);
+    setYoutubeFieldFeedback({
+      googleClientId: null,
+      googleClientSecret: null,
+    });
+    setIsCheckingYoutubeFields({
+      googleClientId: false,
+      googleClientSecret: false,
+    });
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const response = await fetch('/api/mp4Creater/youtube/config', { cache: 'no-store' });
+        const json = await response.json().catch(() => ({}));
+        if (cancelled) return;
+        if (response.ok) {
+          setYoutubeOAuthValues((prev) => ({
+            ...prev,
+            googleClientId: typeof json?.clientId === 'string' ? json.clientId : '',
+          }));
+          setYoutubeConfigState({
+            isLoading: false,
+            hasStoredSecret: Boolean(json?.clientSecretConfigured),
+            secretMask: typeof json?.clientSecretMask === 'string' ? json.clientSecretMask : '',
+            redirectUri: typeof json?.redirectUri === 'string' ? json.redirectUri : '',
+            source: json?.source === 'env' || json?.source === 'saved' ? json.source : 'missing',
+          });
+          return;
+        }
+      } catch {}
+
+      if (!cancelled) {
+        setYoutubeConfigState({
+          isLoading: false,
+          hasStoredSecret: false,
+          secretMask: '',
+          redirectUri: '',
+          source: 'missing',
+        });
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [open, studioState]);
 
   useEffect(() => {
@@ -376,18 +477,18 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     if (isPaidMode) return;
     setRouting((prev) => ({
       ...prev,
-      scriptModel: isPaidScriptModel(prev.scriptModel) ? freeScriptModel : prev.scriptModel,
-      textModel: isPaidScriptModel(prev.textModel) ? freeScriptModel : (prev.textModel || freeScriptModel),
-      sceneModel: isPaidScriptModel(prev.sceneModel) ? freeScriptModel : (prev.sceneModel || freeScriptModel),
-      imagePromptModel: isPaidScriptModel(prev.imagePromptModel) ? freeScriptModel : (prev.imagePromptModel || freeScriptModel),
-      motionPromptModel: isPaidScriptModel(prev.motionPromptModel) ? freeScriptModel : (prev.motionPromptModel || freeScriptModel),
-      imageModel: isPaidImageModel(prev.imageModel) ? freeImageModel : (prev.imageModel || freeImageModel),
+      scriptModel: prev.scriptModel || freeScriptModel,
+      textModel: prev.textModel || prev.scriptModel || freeScriptModel,
+      sceneModel: prev.sceneModel || prev.imagePromptModel || freeScriptModel,
+      imagePromptModel: prev.imagePromptModel || prev.sceneModel || freeScriptModel,
+      motionPromptModel: prev.motionPromptModel || prev.sceneModel || freeScriptModel,
+      imageModel: prev.imageModel || freeImageModel,
       imageProvider: 'sample',
       ttsProvider: 'qwen3Tts',
       audioProvider: 'qwen3Tts',
       backgroundMusicProvider: 'sample',
       videoProvider: 'sample',
-      videoModel: isPaidVideoModel(prev.videoModel) ? freeVideoModel : (prev.videoModel || freeVideoModel),
+      videoModel: prev.videoModel || freeVideoModel,
       musicVideoProvider: 'sample',
       musicVideoMode: 'sample',
       backgroundMusicModel: prev.backgroundMusicModel.startsWith('elevenlabs') ? 'sample-ambient-v1' : prev.backgroundMusicModel,
@@ -397,6 +498,127 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const handleTogglePaidMode = useCallback(() => {
     setIsPaidMode((prev) => !prev);
   }, []);
+
+
+  const refreshYoutubeConfigState = useCallback(async () => {
+    const response = await fetch('/api/mp4Creater/youtube/config', { cache: 'no-store' });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(json?.error || '유튜브 OAuth 설정을 불러오지 못했습니다.');
+    }
+
+    setYoutubeOAuthValues((prev) => ({
+      ...prev,
+      googleClientId: typeof json?.clientId === 'string' ? json.clientId : '',
+      googleClientSecret: '',
+    }));
+    setYoutubeConfigState({
+      isLoading: false,
+      hasStoredSecret: Boolean(json?.clientSecretConfigured),
+      secretMask: typeof json?.clientSecretMask === 'string' ? json.clientSecretMask : '',
+      redirectUri: typeof json?.redirectUri === 'string' ? json.redirectUri : '',
+      source: json?.source === 'env' || json?.source === 'saved' ? json.source : 'missing',
+    });
+    return json;
+  }, []);
+
+  const closeDrawerCleanly = useCallback(() => {
+    stopVoicePreview();
+    stopBgmPreview();
+    if (typeof document !== 'undefined') {
+      const active = document.activeElement as HTMLElement | null;
+      active?.blur?.();
+    }
+    if (typeof window !== 'undefined') {
+      window.requestAnimationFrame(() => {
+        onClose();
+      });
+      return;
+    }
+    onClose();
+  }, [onClose, stopBgmPreview, stopVoicePreview]);
+
+  const persistYoutubeConfigFromInputs = useCallback(async (options?: { requireClientIdWithSecret?: boolean }) => {
+    const googleClientId = youtubeOAuthValues.googleClientId.trim();
+    const googleClientSecret = youtubeOAuthValues.googleClientSecret.trim();
+    const hasYoutubeInput = Boolean(googleClientId) || Boolean(googleClientSecret);
+    const shouldSaveYoutubeConfig = youtubeConfigState.source === 'saved'
+      ? Boolean(googleClientId) || Boolean(googleClientSecret) || youtubeConfigState.hasStoredSecret
+      : hasYoutubeInput;
+
+    if (options?.requireClientIdWithSecret !== false && googleClientSecret && !googleClientId && youtubeConfigState.source !== 'env') {
+      throw new Error('Google Client ID를 함께 입력해 주세요.');
+    }
+
+    if (!shouldSaveYoutubeConfig) {
+      return {
+        clientIdConfigured: youtubeConfigState.source === 'env' ? true : Boolean(googleClientId),
+        clientSecretConfigured: youtubeConfigState.source === 'env' ? true : Boolean(googleClientSecret || youtubeConfigState.hasStoredSecret),
+      };
+    }
+
+    const youtubeConfigResponse = await fetch('/api/mp4Creater/youtube/config', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        clientId: googleClientId,
+        clientSecret: googleClientSecret,
+        keepExistingSecret: !googleClientSecret && youtubeConfigState.hasStoredSecret,
+      }),
+    });
+
+    const youtubeConfigJson = await youtubeConfigResponse.json().catch(() => ({}));
+    if (!youtubeConfigResponse.ok) {
+      throw new Error(youtubeConfigJson?.error || '유튜브 OAuth 키 저장에 실패했습니다.');
+    }
+
+    await refreshYoutubeConfigState().catch(() => undefined);
+    return youtubeConfigJson;
+  }, [refreshYoutubeConfigState, youtubeConfigState.hasStoredSecret, youtubeConfigState.source, youtubeOAuthValues.googleClientId, youtubeOAuthValues.googleClientSecret]);
+
+  const runYoutubeFieldCheck = useCallback(async (field: 'googleClientId' | 'googleClientSecret') => {
+    setIsCheckingYoutubeFields((prev) => ({ ...prev, [field]: true }));
+    try {
+      let result: InlineFeedback;
+
+      if (field === 'googleClientId') {
+        const googleClientId = youtubeOAuthValues.googleClientId.trim();
+        const isEnvReady = youtubeConfigState.source === 'env' && Boolean(googleClientId);
+        const looksLikeWebClient = /\.apps\.googleusercontent\.com$/i.test(googleClientId);
+
+        if (isEnvReady) {
+          result = { tone: 'success', message: '환경변수 Client ID가 준비되어 있습니다. 이 값으로 바로 유튜브 연결을 진행할 수 있습니다.' };
+        } else if (!googleClientId) {
+          result = { tone: 'error', message: 'Google Client ID를 입력해 주세요.' };
+        } else if (!looksLikeWebClient) {
+          result = { tone: 'error', message: '웹 OAuth Client ID 형식인지 확인해 주세요. 보통 .apps.googleusercontent.com 으로 끝납니다.' };
+        } else {
+          result = { tone: 'success', message: 'Client ID 형식이 정상입니다. 연결 확인 또는 연결 시작을 진행할 수 있습니다.' };
+        }
+      } else {
+        const googleClientSecret = youtubeOAuthValues.googleClientSecret.trim();
+        const hasEnvSecret = youtubeConfigState.source === 'env';
+        const hasStoredSecret = youtubeConfigState.hasStoredSecret;
+
+        if (hasEnvSecret) {
+          result = { tone: 'success', message: '환경변수 Client Secret이 준비되어 있습니다. 이 값으로 바로 유튜브 연결을 진행할 수 있습니다.' };
+        } else if (googleClientSecret) {
+          result = { tone: 'success', message: '새 Client Secret 입력이 확인되었습니다. 저장 없이 연결 확인/시작 버튼으로 바로 이어갈 수 있습니다.' };
+        } else if (hasStoredSecret) {
+          result = { tone: 'success', message: `저장된 Secret(${youtubeConfigState.secretMask || '기존 값'})을 그대로 사용합니다.` };
+        } else {
+          result = { tone: 'error', message: 'Google Client Secret을 입력해 주세요.' };
+        }
+      }
+
+      setYoutubeFieldFeedback((prev) => ({ ...prev, [field]: result }));
+      return result;
+    } finally {
+      setIsCheckingYoutubeFields((prev) => ({ ...prev, [field]: false }));
+    }
+  }, [youtubeConfigState.hasStoredSecret, youtubeConfigState.secretMask, youtubeConfigState.source, youtubeOAuthValues.googleClientId, youtubeOAuthValues.googleClientSecret]);
 
   const handleFolderPick = async () => {
     const picked = await pickFolderPath(storageDir);
@@ -418,14 +640,226 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     }
   }, [providerValues]);
 
+
+
+  const stopYoutubeConnectPolling = useCallback(() => {
+    if (youtubePopupPollRef.current !== null && typeof window !== 'undefined') {
+      window.clearInterval(youtubePopupPollRef.current);
+      youtubePopupPollRef.current = null;
+    }
+  }, []);
+
+  const closeYoutubePopup = useCallback(() => {
+    if (youtubePopupRef.current && !youtubePopupRef.current.closed) {
+      youtubePopupRef.current.close();
+    }
+    youtubePopupRef.current = null;
+  }, []);
+
+  const handleCancelYoutubeConnect = useCallback(() => {
+    stopYoutubeConnectPolling();
+    closeYoutubePopup();
+    setYoutubeConnectOverlay({
+      active: false,
+      tone: 'info',
+      message: '',
+    });
+    setYoutubeConnectionState({
+      isChecking: false,
+      tone: 'info',
+      message: '유튜브 연결을 취소했습니다.',
+    });
+  }, [closeYoutubePopup, stopYoutubeConnectPolling]);
+
+  const finalizeYoutubeConnectionCheck = useCallback(async () => {
+    const statusResponse = await fetch('/api/mp4Creater/youtube/status', { cache: 'no-store' });
+    const statusJson = await statusResponse.json().catch(() => ({}));
+    if (statusResponse.ok && statusJson?.connected) {
+      const parts = [statusJson?.channelTitle || null, statusJson?.email || null].filter(Boolean);
+      setYoutubeConnectOverlay({
+        active: false,
+        tone: 'success',
+        message: parts.length ? `연결 완료: ${parts.join(' · ')}` : '유튜브 계정 연결이 완료되었습니다.',
+      });
+      setYoutubeConnectionState({
+        isChecking: false,
+        tone: 'success',
+        message: parts.length ? `연결됨: ${parts.join(' · ')}` : '유튜브 계정 연결이 확인되었습니다.',
+      });
+      stopYoutubeConnectPolling();
+      closeYoutubePopup();
+      return true;
+    }
+    return false;
+  }, [closeYoutubePopup, stopYoutubeConnectPolling]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+
+    const handleMessage = (event: MessageEvent) => {
+      if (typeof window === 'undefined' || event.origin !== window.location.origin) return;
+      const payload = event.data as { type?: string; status?: 'success' | 'error'; message?: string } | null;
+      if (!payload || payload.type !== 'youtube-oauth-result') return;
+
+      if (payload.status === 'success') {
+        void finalizeYoutubeConnectionCheck();
+        return;
+      }
+
+      stopYoutubeConnectPolling();
+      closeYoutubePopup();
+      setYoutubeConnectOverlay({
+        active: false,
+        tone: 'error',
+        message: '',
+      });
+      setYoutubeConnectionState({
+        isChecking: false,
+        tone: 'error',
+        message: payload.message || '유튜브 연결 중 오류가 발생했습니다.',
+      });
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [closeYoutubePopup, finalizeYoutubeConnectionCheck, open, stopYoutubeConnectPolling]);
+
+  useEffect(() => () => {
+    stopYoutubeConnectPolling();
+    closeYoutubePopup();
+  }, [closeYoutubePopup, stopYoutubeConnectPolling]);
+
+  const handleCheckYoutubeConnection = useCallback(async () => {
+    setYoutubeConnectionState({
+      isChecking: true,
+      tone: 'info',
+      message: '유튜브 연결 상태를 확인하는 중입니다.',
+    });
+
+    try {
+      const persistedConfig = await persistYoutubeConfigFromInputs();
+      const configResponse = await fetch('/api/mp4Creater/youtube/config', { cache: 'no-store' });
+      const configJson = await configResponse.json().catch(() => ({}));
+      if (!configResponse.ok) {
+        throw new Error(configJson?.error || '유튜브 OAuth 설정을 확인하지 못했습니다.');
+      }
+
+      const configReady = Boolean(configJson?.clientIdConfigured ?? persistedConfig?.clientIdConfigured) && Boolean(configJson?.clientSecretConfigured ?? persistedConfig?.clientSecretConfigured);
+      if (!configReady) {
+        setYoutubeConnectionState({
+          isChecking: false,
+          tone: 'error',
+          message: 'Google Client ID와 Client Secret을 입력해 주세요. 입력 후 저장 없이도 바로 연결 상태를 확인할 수 있습니다.',
+        });
+        return;
+      }
+
+      if (await finalizeYoutubeConnectionCheck()) {
+        return;
+      }
+
+      setYoutubeConnectionState({
+        isChecking: false,
+        tone: 'info',
+        message: 'OAuth 키는 저장되어 있지만 아직 Google 계정 연결은 완료되지 않았습니다. 아래의 연결 시작 버튼을 눌러 진행해 주세요.',
+      });
+    } catch (error) {
+      setYoutubeConnectionState({
+        isChecking: false,
+        tone: 'error',
+        message: error instanceof Error ? error.message : '유튜브 연결 확인 중 오류가 발생했습니다.',
+      });
+    }
+  }, [finalizeYoutubeConnectionCheck, persistYoutubeConfigFromInputs]);
+
+  const handleStartYoutubeConnect = useCallback(async () => {
+    setYoutubeConnectionState({
+      isChecking: true,
+      tone: 'info',
+      message: '유튜브 연결 준비 상태를 확인하는 중입니다.',
+    });
+
+    try {
+      const persistedConfig = await persistYoutubeConfigFromInputs();
+      const configResponse = await fetch('/api/mp4Creater/youtube/config', { cache: 'no-store' });
+      const configJson = await configResponse.json().catch(() => ({}));
+      if (!configResponse.ok) {
+        throw new Error(configJson?.error || '유튜브 OAuth 설정을 확인하지 못했습니다.');
+      }
+      if (!(configJson?.clientIdConfigured ?? persistedConfig?.clientIdConfigured) || !(configJson?.clientSecretConfigured ?? persistedConfig?.clientSecretConfigured)) {
+        setYoutubeConnectionState({
+          isChecking: false,
+          tone: 'error',
+          message: 'Google Client ID와 Client Secret을 입력해 주세요. 입력 후 저장 없이도 새 창에서 바로 연결을 시작할 수 있습니다.',
+        });
+        return;
+      }
+
+      stopYoutubeConnectPolling();
+      closeYoutubePopup();
+
+      const popup = window.open('/api/mp4Creater/youtube/connect', 'mp4creater-youtube-connect', 'popup=yes,width=620,height=760,noopener');
+      if (!popup) {
+        setYoutubeConnectionState({
+          isChecking: false,
+          tone: 'error',
+          message: '새 창을 열지 못했습니다. 브라우저 팝업 차단을 해제한 뒤 다시 시도해 주세요.',
+        });
+        return;
+      }
+
+      youtubePopupRef.current = popup;
+      setYoutubeConnectOverlay({
+        active: true,
+        tone: 'info',
+        message: '현재 창은 잠시 대기 중입니다. 새 창에서 Google 계정 연결을 완료해 주세요.',
+      });
+      setYoutubeConnectionState({
+        isChecking: true,
+        tone: 'info',
+        message: '새 창에서 Google 로그인 및 권한 허용을 진행해 주세요.',
+      });
+
+      youtubePopupPollRef.current = window.setInterval(() => {
+        if (youtubePopupRef.current?.closed) {
+          stopYoutubeConnectPolling();
+          youtubePopupRef.current = null;
+          void finalizeYoutubeConnectionCheck().then((connected) => {
+            if (!connected) {
+              setYoutubeConnectOverlay({ active: false, tone: 'info', message: '' });
+              setYoutubeConnectionState({
+                isChecking: false,
+                tone: 'info',
+                message: '연결 창이 닫혔습니다. 연결이 완료되지 않았다면 다시 시도하거나 취소해 주세요.',
+              });
+            }
+          });
+        }
+      }, 1200);
+    } catch (error) {
+      stopYoutubeConnectPolling();
+      closeYoutubePopup();
+      setYoutubeConnectOverlay({ active: false, tone: 'error', message: '' });
+      setYoutubeConnectionState({
+        isChecking: false,
+        tone: 'error',
+        message: error instanceof Error ? error.message : '유튜브 연결 시작 중 오류가 발생했습니다.',
+      });
+    }
+  }, [closeYoutubePopup, finalizeYoutubeConnectionCheck, persistYoutubeConfigFromInputs, stopYoutubeConnectPolling]);
+
   const handleSave = async () => {
     if (!studioState) return;
     const googleApiKey = providerValues.openRouterApiKey.trim();
     const elevenLabsApiKey = providerValues.elevenLabsApiKey.trim();
-    const nextScriptModel = !isPaidMode && isPaidScriptModel(routing.scriptModel) ? freeScriptModel : (routing.scriptModel || freeScriptModel);
-    const nextPromptModel = !isPaidMode && isPaidScriptModel(routing.sceneModel) ? freeScriptModel : (routing.sceneModel || nextScriptModel);
-    const nextImageModel = !isPaidMode && isPaidImageModel(routing.imageModel) ? freeImageModel : (routing.imageModel || freeImageModel);
-    const nextVideoModel = !isPaidMode && isPaidVideoModel(routing.videoModel) ? freeVideoModel : (routing.videoModel || freeVideoModel);
+    const googleClientId = youtubeOAuthValues.googleClientId.trim();
+    const googleClientSecret = youtubeOAuthValues.googleClientSecret.trim();
+    const nextScriptModel = routing.scriptModel || freeScriptModel;
+    const nextPromptModel = routing.sceneModel || nextScriptModel;
+    const nextImageModel = routing.imageModel || freeImageModel;
+    const nextVideoModel = routing.videoModel || freeVideoModel;
     const wantsElevenTts = isPaidMode && routing.ttsProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
     const wantsElevenBgm = isPaidMode && routing.backgroundMusicProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
     const wantsPaidImage = isPaidMode && nextImageModel !== freeImageModel && Boolean(googleApiKey);
@@ -450,6 +884,15 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       backgroundMusicModel: wantsElevenBgm ? routing.backgroundMusicModel : (isElevenLabsBgmModel(routing.backgroundMusicModel) ? 'sample-ambient-v1' : routing.backgroundMusicModel),
     } as StudioState['routing'];
 
+    if (googleClientId || googleClientSecret || youtubeConfigState.source === 'saved') {
+      await persistYoutubeConfigFromInputs();
+      setYoutubeConnectionState({
+        isChecking: false,
+        tone: 'success',
+        message: '유튜브 OAuth 키가 저장되었습니다. 연결 확인 또는 연결 시작 버튼으로 바로 진행할 수 있습니다.',
+      });
+    }
+
     await onSave({
       storageDir,
       isStorageConfigured: Boolean(storageDir.trim()),
@@ -464,7 +907,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
         ...normalizedRouting,
       },
     });
-    onClose();
+    closeDrawerCleanly();
   };
 
   if (!open || !studioState) return null;
@@ -473,7 +916,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     <div
       className="fixed inset-0 z-[90] flex justify-end bg-slate-950/30 backdrop-blur-sm"
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) closeDrawerCleanly();
       }}
     >
       <div className="h-full w-full max-w-3xl overflow-y-auto border-l border-slate-200 bg-slate-50 px-5 pb-32 pt-5" onMouseDown={(event) => event.stopPropagation()}>
@@ -483,7 +926,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
             <h2 className="mt-1 text-2xl font-black text-slate-900">Google AI Studio / ElevenLabs 연결 설정</h2>
             <p className="mt-2 text-xs leading-5 text-slate-600">mp4Creater 안에서만 텍스트, 이미지, 영상, 음성 생성의 기본 연결과 샘플 모드를 관리합니다.</p>
           </div>
-          <button type="button" onClick={onClose} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">닫기</button>
+          <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={closeDrawerCleanly} disabled={youtubeConnectOverlay.active} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400">닫기</button>
         </div>
 
         <div className="mt-5 grid gap-4">
@@ -570,15 +1013,140 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
           <section className={cardClass}>
             <div className="flex items-center justify-between gap-3">
               <div>
+                <h3 className="text-base font-black text-slate-900">유튜브 업로드 OAuth</h3>
+                <p className="mt-1 text-xs text-slate-600">썸네일 화면에서 유튜브 자동 업로드를 사용하려면 Google OAuth Client ID / Client Secret을 입력해 주세요. 값은 서버 전용 설정 파일에 저장됩니다.</p>
+              </div>
+              <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+                {youtubeConfigState.isLoading ? '불러오는 중...' : youtubeConfigState.source === 'env' ? '환경변수 사용 중' : youtubeConfigState.source === 'saved' ? '설정 저장됨' : '미설정'}
+              </div>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs font-black text-slate-900">Google Client ID</div>
+                <div className="mt-1 text-[11px] text-slate-500">OAuth 동의 화면과 YouTube Data API가 연결된 웹 클라이언트 ID를 입력합니다.</div>
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    type={showSecrets.googleClientId ? 'text' : 'password'}
+                    value={youtubeOAuthValues.googleClientId}
+                    onChange={(e) => setYoutubeOAuthValues((prev) => ({ ...prev, googleClientId: e.target.value }))}
+                    className={inputClass}
+                    placeholder="1234567890-xxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecrets((prev) => ({ ...prev, googleClientId: !prev.googleClientId }))}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                    aria-label={showSecrets.googleClientId ? 'Client ID 숨기기' : 'Client ID 보기'}
+                    title={showSecrets.googleClientId ? '숨기기' : '보기'}
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M1 12c2.8-4.5 6.5-7 11-7s8.2 2.5 11 7c-2.8 4.5-6.5 7-11 7s-8.2-2.5-11-7z" />
+                      <circle cx="12" cy="12" r="3" />
+                      {showSecrets.googleClientId ? <path d="M3 3l18 18" /> : null}
+                    </svg>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void runYoutubeFieldCheck('googleClientId')}
+                  disabled={isCheckingYoutubeFields.googleClientId}
+                  className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  {isCheckingYoutubeFields.googleClientId ? '확인 중...' : '연결 확인'}
+                </button>
+                {youtubeFieldFeedback.googleClientId?.message ? (
+                  <p className={`mt-2 text-xs ${youtubeFieldFeedback.googleClientId.tone === 'success' ? 'text-emerald-600' : youtubeFieldFeedback.googleClientId.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+                    {youtubeFieldFeedback.googleClientId.message}
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs font-black text-slate-900">Google Client Secret</div>
+                <div className="mt-1 text-[11px] text-slate-500">저장된 Secret이 있으면 비워둬도 유지됩니다.</div>
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    type={showSecrets.googleClientSecret ? 'text' : 'password'}
+                    value={youtubeOAuthValues.googleClientSecret}
+                    onChange={(e) => setYoutubeOAuthValues((prev) => ({ ...prev, googleClientSecret: e.target.value }))}
+                    className={inputClass}
+                    placeholder={youtubeConfigState.hasStoredSecret ? `${youtubeConfigState.secretMask || '저장된 Secret 유지 중'} (새 값 입력 시 교체)` : 'GOCSPX-...'}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSecrets((prev) => ({ ...prev, googleClientSecret: !prev.googleClientSecret }))}
+                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                    aria-label={showSecrets.googleClientSecret ? 'Client Secret 숨기기' : 'Client Secret 보기'}
+                    title={showSecrets.googleClientSecret ? '숨기기' : '보기'}
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                      <path d="M1 12c2.8-4.5 6.5-7 11-7s8.2 2.5 11 7c-2.8 4.5-6.5 7-11 7s-8.2-2.5-11-7z" />
+                      <circle cx="12" cy="12" r="3" />
+                      {showSecrets.googleClientSecret ? <path d="M3 3l18 18" /> : null}
+                    </svg>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void runYoutubeFieldCheck('googleClientSecret')}
+                  disabled={isCheckingYoutubeFields.googleClientSecret}
+                  className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  {isCheckingYoutubeFields.googleClientSecret ? '확인 중...' : '연결 확인'}
+                </button>
+                {youtubeFieldFeedback.googleClientSecret?.message ? (
+                  <p className={`mt-2 text-xs ${youtubeFieldFeedback.googleClientSecret.tone === 'success' ? 'text-emerald-600' : youtubeFieldFeedback.googleClientSecret.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+                    {youtubeFieldFeedback.googleClientSecret.message}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void handleCheckYoutubeConnection()}
+                disabled={youtubeConnectionState?.isChecking || youtubeConnectOverlay.active}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                {youtubeConnectionState?.isChecking ? '확인 중...' : '유튜브 연결 확인'}
+              </button>
+              <button
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => void handleStartYoutubeConnect()}
+                disabled={youtubeConnectOverlay.active}
+                className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white hover:bg-red-500 disabled:bg-slate-300 disabled:text-slate-500"
+              >
+                유튜브 연결 시작
+              </button>
+            </div>
+            {youtubeConnectionState?.message ? (
+              <p className={`mt-2 text-xs ${youtubeConnectionState.tone === 'success' ? 'text-emerald-600' : youtubeConnectionState.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+                {youtubeConnectionState.message}
+              </p>
+            ) : null}
+
+            <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-3 text-[11px] leading-5 text-slate-600">
+              <div><span className="font-black text-slate-900">Redirect URI</span> · {youtubeConfigState.redirectUri || 'http://localhost:3000/api/mp4Creater/youtube/callback'}</div>
+              <div className="mt-1">Google Cloud Console의 승인된 리디렉션 URI에 위 주소를 그대로 등록해야 연결이 정상 동작합니다.</div>
+            </div>
+          </section>
+
+          <section className={cardClass}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
                 <h3 className="text-base font-black text-slate-900">기본 API 선택</h3>
-                <p className="mt-1 text-xs text-slate-600">무료 모드는 샘플과 무료 모델만 보이고, 유료 모드를 켜면 무료 모델과 유료 모델을 함께 선택할 수 있습니다.</p>
+                <p className="mt-1 text-xs text-slate-600">기본은 무료 모드로 저장되지만, 모델 목록은 항상 모두 보입니다. 유료 모델을 골라도 키가 없으면 실제 생성은 무료/샘플 흐름으로 안전하게 동작합니다.</p>
               </div>
               <button
                 type="button"
                 onClick={handleTogglePaidMode}
                 className={`rounded-xl border px-3 py-2 text-xs font-bold ${isPaidMode ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}
               >
-                {isPaidMode ? '유료모드 끄기' : '유료모드 켜기'}
+                {isPaidMode ? '유료 기능 끄기' : '유료 기능 켜기'}
               </button>
             </div>
 
@@ -589,7 +1157,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                   <div className="mb-1 text-xs font-bold text-slate-700">음성 공급자</div>
                   <select value={routing.ttsProvider === 'elevenLabs' && isPaidMode ? 'elevenLabs' : 'qwen3Tts'} onChange={(e) => setRouting((prev) => ({ ...prev, ttsProvider: e.target.value as 'qwen3Tts' | 'elevenLabs', audioProvider: e.target.value as 'qwen3Tts' | 'elevenLabs' }))} className={inputClass}>
                     <option value="qwen3Tts">🆓 qwen3-tts</option>
-                    {isPaidMode ? <option value="elevenLabs">ElevenLabs</option> : null}
+                    <option value="elevenLabs">💳 ElevenLabs</option>
                   </select>
                 </label>
                 <label className="mt-2 block">
@@ -645,7 +1213,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                     }}
                     className={inputClass}
                   >
-                    {BGM_MODEL_OPTIONS.filter((item) => isPaidMode || !item.id.startsWith('elevenlabs')).map((item) => (
+                    {BGM_MODEL_OPTIONS.map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.id.startsWith('elevenlabs') ? item.name : `🆓 ${item.name}`}
                       </option>
@@ -670,7 +1238,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 <p className="mt-1 text-xs text-slate-600">Google AI Studio 모델은 무료/유료를 구분해 드롭다운으로 제공합니다. 무료 API가 없는 항목은 샘플 모델로 최종 출력까지 테스트할 수 있습니다.</p>
               </div>
               <span className={`rounded-full px-3 py-1 text-[11px] font-black ${isPaidMode ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                {isPaidMode ? '무료 + 유료 표시' : '무료만 표시'}
+                {isPaidMode ? '유료 기능 사용 가능' : '무료 기본 세팅'}
               </span>
             </div>
 
@@ -743,10 +1311,43 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
           </section>
         </div>
 
+        {youtubeConnectOverlay.active ? (
+          <div className="absolute inset-0 z-[120] flex items-center justify-center bg-slate-900/35 px-5">
+            <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white/95 p-5 text-center shadow-2xl backdrop-blur">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-700">
+                <svg className="h-6 w-6 animate-pulse" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                  <path d="M12 3v4" />
+                  <path d="M18.36 5.64l-2.83 2.83" />
+                  <path d="M21 12h-4" />
+                  <path d="M18.36 18.36l-2.83-2.83" />
+                  <path d="M12 21v-4" />
+                  <path d="M5.64 18.36l2.83-2.83" />
+                  <path d="M3 12h4" />
+                  <path d="M5.64 5.64l2.83 2.83" />
+                </svg>
+              </div>
+              <div className="mt-4 text-base font-black text-slate-900">유튜브 연결 진행 중</div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{youtubeConnectOverlay.message || '새 창에서 Google 계정 연결을 완료해 주세요. 현재 창은 연결이 끝날 때까지 잠시 잠겨 있습니다.'}</p>
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-xs leading-5 text-slate-500">
+                새 창에서 계정 선택과 권한 허용을 마치면 이 화면이 자동으로 풀립니다. 연결 창을 닫아야 할 경우 아래 취소 버튼을 눌러 주세요.
+              </div>
+              <div className="mt-5 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleCancelYoutubeConnect}
+                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                >
+                  연결 취소
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         <div className="fixed bottom-0 right-0 z-[95] w-full max-w-3xl border-l border-t border-slate-300 bg-slate-200/95 px-5 py-4 backdrop-blur-sm">
           <div className="flex items-center justify-end gap-2">
-            <button type="button" onClick={onClose} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">취소</button>
-            <button type="button" onClick={handleSave} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white hover:bg-blue-500">저장</button>
+            <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={closeDrawerCleanly} disabled={youtubeConnectOverlay.active} className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400">취소</button>
+            <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={handleSave} disabled={youtubeConnectOverlay.active} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">저장</button>
           </div>
         </div>
       </div>

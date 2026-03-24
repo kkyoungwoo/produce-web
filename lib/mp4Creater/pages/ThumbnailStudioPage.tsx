@@ -6,6 +6,9 @@ import Header from '../components/Header';
 import { LoadingOverlay, StudioPageSkeleton } from '../components/LoadingOverlay';
 import { OverlayModal } from '../components/inputSection/ui';
 import { getProjectById, updateProject } from '../services/projectService';
+import { renderVideoWithFfmpeg } from '../services/serverRenderService';
+import { buildYoutubeMeta } from '../services/projectEnhancementService';
+import { disconnectYoutubeAccount, fetchYoutubeConnectionStatus, openYoutubeConnectWindow, uploadVideoToYoutube, type YoutubeConnectionStatus } from '../services/youtubeService';
 import { generateImage, getSelectedImageModel, isSampleImageModel } from '../services/imageService';
 import { readProjectNavigationProject, rememberProjectNavigationProject } from '../services/projectNavigationCache';
 import {
@@ -14,7 +17,7 @@ import {
   createSampleThumbnail,
   buildThumbnailLabel,
 } from '../services/thumbnailService';
-import { CharacterProfile, PromptedImageAsset, ReferenceImages, SavedProject } from '../types';
+import { CharacterProfile, PromptedImageAsset, ReferenceImages, SavedProject, YoutubeMetaDraft } from '../types';
 
 function resolveImageSrc(value?: string | null) {
   if (!value) return '';
@@ -142,6 +145,12 @@ export default function ThumbnailStudioPage() {
   const [activeThumbnailId, setActiveThumbnailId] = useState<string | null>(null);
   const [previewThumbnailId, setPreviewThumbnailId] = useState<string | null>(null);
   const [copyFeedbackMessage, setCopyFeedbackMessage] = useState<string | null>(null);
+  const [youtubeStatus, setYoutubeStatus] = useState<YoutubeConnectionStatus>({ connected: false });
+  const [isYoutubeLoading, setIsYoutubeLoading] = useState(false);
+  const [isYoutubeUploading, setIsYoutubeUploading] = useState(false);
+  const [youtubeTitle, setYoutubeTitle] = useState('');
+  const [youtubeDescription, setYoutubeDescription] = useState('');
+  const [youtubeTagsInput, setYoutubeTagsInput] = useState('');
   const stripRef = useRef<HTMLDivElement | null>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const copyFeedbackTimerRef = useRef<number | null>(null);
@@ -196,6 +205,47 @@ export default function ThumbnailStudioPage() {
       copyFeedbackTimerRef.current = null;
     }
   }, []);
+
+  const refreshYoutubeStatus = useCallback(async () => {
+    setIsYoutubeLoading(true);
+    try {
+      const status = await fetchYoutubeConnectionStatus();
+      setYoutubeStatus(status);
+      if (project?.id) {
+        const updated = await updateProject(project.id, {
+          youtubeConnectedAccount: status.connected ? {
+            email: status.email || null,
+            channelId: status.channelId || null,
+            channelTitle: status.channelTitle || null,
+          } : null,
+          youtubeChannelTitle: status.channelTitle || null,
+        });
+        if (updated) {
+          setProject(updated);
+          rememberProjectNavigationProject(updated);
+        }
+      }
+    } catch (error) {
+      console.error('[ThumbnailStudio] youtube status failed', error);
+    } finally {
+      setIsYoutubeLoading(false);
+    }
+  }, [project]);
+
+  useEffect(() => {
+    void refreshYoutubeStatus();
+  }, [refreshYoutubeStatus]);
+
+  useEffect(() => {
+    if (!project) return;
+    const meta = buildYoutubeMeta(project, {
+      aspectRatio: project.workflowDraft?.aspectRatio || project.assets?.[0]?.aspectRatio || '16:9',
+      durationSeconds: project.ttsDuration || project.sceneDuration || 0,
+    });
+    setYoutubeTitle(project.youtubeTitle || meta.title);
+    setYoutubeDescription(project.youtubeDescription || meta.description);
+    setYoutubeTagsInput((project.youtubeTags && project.youtubeTags.length ? project.youtubeTags : meta.tags).join(', '));
+  }, [project]);
 
   const activeThumbnail = useMemo(
     () => history.find((item) => item.id === activeThumbnailId) || null,
@@ -351,6 +401,129 @@ export default function ThumbnailStudioPage() {
     }
   }, [activeThumbnail, history, isSavingSelection, project, promptText]);
 
+  const handleDisconnectYoutube = useCallback(async () => {
+    try {
+      await disconnectYoutubeAccount();
+      setYoutubeStatus({ connected: false });
+      setStatusMessage('유튜브 연결을 해제했습니다.');
+      if (project?.id) {
+        const updated = await updateProject(project.id, {
+          youtubeConnectedAccount: null,
+          youtubeChannelTitle: null,
+        });
+        if (updated) {
+          setProject(updated);
+          rememberProjectNavigationProject(updated);
+        }
+      }
+    } catch (error) {
+      console.error('[ThumbnailStudio] youtube disconnect failed', error);
+      setStatusMessage('유튜브 연결 해제 중 오류가 발생했습니다.');
+    }
+  }, [project]);
+
+  const handleYoutubeUpload = useCallback(async () => {
+    if (!project || isYoutubeUploading) return;
+    if (!youtubeStatus.connected) {
+      openYoutubeConnectWindow();
+      return;
+    }
+
+    const meta: YoutubeMetaDraft = {
+      title: youtubeTitle.trim() || `${project.topic || project.name} 영상`,
+      description: youtubeDescription.trim() || `${project.topic || project.name} 프로젝트 영상`,
+      tags: youtubeTagsInput.split(',').map((item) => item.trim()).filter(Boolean),
+      privacyStatus: 'private',
+      isShortsEligible: buildYoutubeMeta(project, {
+        aspectRatio: project.workflowDraft?.aspectRatio || project.assets?.[0]?.aspectRatio || '16:9',
+        durationSeconds: project.ttsDuration || project.sceneDuration || 0,
+      }).isShortsEligible,
+    };
+
+    setIsYoutubeUploading(true);
+    setStatusMessage('최종 mp4를 ffmpeg로 만든 뒤 유튜브 비공개 업로드를 진행하는 중입니다.');
+
+    try {
+      const updatedUploading = await updateProject(project.id, {
+        youtubeConnectedAccount: youtubeStatus.connected ? {
+          email: youtubeStatus.email || null,
+          channelId: youtubeStatus.channelId || null,
+          channelTitle: youtubeStatus.channelTitle || null,
+        } : null,
+        youtubeChannelTitle: youtubeStatus.channelTitle || null,
+        youtubeUploadStatus: 'uploading',
+        youtubeTitle: meta.title,
+        youtubeDescription: meta.description,
+        youtubeTags: meta.tags,
+        youtubePrivacyStatus: 'private',
+        isShortsEligible: meta.isShortsEligible,
+        uploadErrorMessage: null,
+      });
+      if (updatedUploading) {
+        setProject(updatedUploading);
+        rememberProjectNavigationProject(updatedUploading);
+      }
+
+      const render = await renderVideoWithFfmpeg({
+        assets: project.assets || [],
+        backgroundTracks: project.backgroundMusicTracks || [],
+        previewMix: project.previewMix,
+        aspectRatio: project.workflowDraft?.aspectRatio || project.assets?.[0]?.aspectRatio || '16:9',
+        qualityMode: 'final',
+        enableSubtitles: Boolean(project.assets?.some((item) => item.subtitleData || item.audioData)),
+        subtitlePreset: project.subtitlePreset || null,
+        title: meta.title,
+      });
+
+      const file = new File([render.videoBlob], `mp4Creater_${project.id}.mp4`, { type: 'video/mp4' });
+      const uploaded = await uploadVideoToYoutube({ file, meta });
+      const uploadedAt = typeof uploaded?.uploadedAt === 'number'
+        ? uploaded.uploadedAt
+        : uploaded?.uploadedAt
+          ? Date.parse(String(uploaded.uploadedAt))
+          : Date.now();
+
+      const updated = await updateProject(project.id, {
+        youtubeConnectedAccount: youtubeStatus.connected ? {
+          email: youtubeStatus.email || null,
+          channelId: youtubeStatus.channelId || null,
+          channelTitle: youtubeStatus.channelTitle || null,
+        } : null,
+        youtubeChannelTitle: youtubeStatus.channelTitle || null,
+        youtubeUploadStatus: 'uploaded',
+        youtubeUploadedAt: Number.isFinite(uploadedAt) ? uploadedAt : Date.now(),
+        youtubeVideoId: uploaded?.videoId || null,
+        youtubePrivacyStatus: 'private',
+        youtubeTitle: meta.title,
+        youtubeDescription: meta.description,
+        youtubeTags: meta.tags,
+        isShortsEligible: meta.isShortsEligible,
+        uploadErrorMessage: null,
+      });
+      if (updated) {
+        setProject(updated);
+        rememberProjectNavigationProject(updated);
+      }
+      setStatusMessage('유튜브 비공개 업로드가 완료되었습니다.');
+    } catch (error: any) {
+      console.error('[ThumbnailStudio] youtube upload failed', error);
+      const updated = await updateProject(project.id, {
+        youtubeUploadStatus: 'error',
+        youtubeTitle: youtubeTitle.trim() || null,
+        youtubeDescription: youtubeDescription.trim() || null,
+        youtubeTags: youtubeTagsInput.split(',').map((item) => item.trim()).filter(Boolean),
+        uploadErrorMessage: error?.message || '유튜브 업로드 중 오류가 발생했습니다.',
+      });
+      if (updated) {
+        setProject(updated);
+        rememberProjectNavigationProject(updated);
+      }
+      setStatusMessage(error?.message || '유튜브 업로드 중 오류가 발생했습니다.');
+    } finally {
+      setIsYoutubeUploading(false);
+    }
+  }, [isYoutubeUploading, project, youtubeDescription, youtubeStatus, youtubeTagsInput, youtubeTitle]);
+
   if (isLoading && !project) {
     return <StudioPageSkeleton title="썸네일 제작 페이지를 준비하는 중" description="현재 프로젝트의 대본, 캐릭터, 화풍을 먼저 불러와 썸네일 작업 화면에 연결합니다." progressPercent={22} progressLabel="썸네일 스튜디오 준비" />;
   }
@@ -422,6 +595,96 @@ export default function ThumbnailStudioPage() {
                   >
                     {isGenerating ? '썸네일 생성 중...' : '썸네일 만들기'}
                   </button>
+                </div>
+              </div>
+
+              <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-rose-600">youtube upload</div>
+                <h2 className="mt-2 text-xl font-black text-slate-900">썸네일 확인 뒤 바로 유튜브 비공개 업로드</h2>
+                <div className="mt-5 space-y-4">
+                  <div className={`rounded-[24px] border px-4 py-4 text-sm ${youtubeStatus.connected ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-amber-200 bg-amber-50 text-amber-700'}`}>
+                    {youtubeStatus.connected
+                      ? `연결됨 · ${youtubeStatus.channelTitle || youtubeStatus.email || '유튜브 계정'}`
+                      : '아직 유튜브 계정이 연결되지 않았습니다. 연결 후 썸네일 화면에서 바로 비공개 업로드할 수 있습니다.'}
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">업로드 조건</div>
+                      <div className="mt-2">공개범위: <span className="font-black text-slate-900">비공개 고정</span></div>
+                      <div>쇼츠 가능: <span className="font-black text-slate-900">{buildYoutubeMeta(project, { aspectRatio: project.workflowDraft?.aspectRatio || project.assets?.[0]?.aspectRatio || '16:9', durationSeconds: project.ttsDuration || project.sceneDuration || 0 }).isShortsEligible ? '충족' : '미충족'}</span></div>
+                      <div>마지막 업로드 상태: <span className="font-black text-slate-900">{project.youtubeUploadStatus || 'idle'}</span></div>
+                      {project.youtubeUploadedAt ? <div>업로드 시각: <span className="font-black text-slate-900">{new Date(project.youtubeUploadedAt).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}</span></div> : null}
+                      {project.youtubeVideoId ? <div>영상 ID: <span className="font-black text-slate-900">{project.youtubeVideoId}</span></div> : null}
+                    </div>
+
+                    <div className="flex flex-wrap items-start gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (youtubeStatus.connected) {
+                            void refreshYoutubeStatus();
+                          } else {
+                            openYoutubeConnectWindow();
+                          }
+                        }}
+                        className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white hover:bg-slate-800"
+                      >
+                        {youtubeStatus.connected ? (isYoutubeLoading ? '연결 상태 확인 중...' : '연결 상태 새로고침') : '유튜브 연결'}
+                      </button>
+                      {youtubeStatus.connected ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleDisconnectYoutube()}
+                          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                        >
+                          연결 해제
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => void handleYoutubeUpload()}
+                        disabled={isYoutubeUploading || !project.assets?.length}
+                        className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-black text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+                      >
+                        {isYoutubeUploading ? '업로드 중...' : '비공개 업로드'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4">
+                    <label className="block">
+                      <div className="mb-2 text-sm font-black text-slate-800">영상 제목</div>
+                      <input
+                        value={youtubeTitle}
+                        onChange={(e) => setYoutubeTitle(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                        placeholder="유튜브 제목"
+                      />
+                    </label>
+                    <label className="block">
+                      <div className="mb-2 text-sm font-black text-slate-800">영상 설명</div>
+                      <textarea
+                        value={youtubeDescription}
+                        onChange={(e) => setYoutubeDescription(e.target.value)}
+                        rows={5}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                        placeholder="유튜브 설명"
+                      />
+                    </label>
+                    <label className="block">
+                      <div className="mb-2 text-sm font-black text-slate-800">태그</div>
+                      <input
+                        value={youtubeTagsInput}
+                        onChange={(e) => setYoutubeTagsInput(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-rose-400 focus:ring-2 focus:ring-rose-100"
+                        placeholder="tag1, tag2, tag3"
+                      />
+                    </label>
+                    {project.uploadErrorMessage ? (
+                      <div className="rounded-[20px] border border-red-200 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{project.uploadErrorMessage}</div>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             </section>

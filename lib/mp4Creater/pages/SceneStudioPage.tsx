@@ -31,11 +31,14 @@ import { generateMotionPrompt, generateScript } from '../services/geminiService'
 import { generateVideo } from '../services/videoService';
 import { generateVideoFromImage, getFalApiKey } from '../services/falService';
 import { getProjectById, getSavedProjects, updateProject, upsertWorkflowProject } from '../services/projectService';
+import { buildDefaultSubtitlePreset, buildScenePlanItems, buildScriptParagraphPlans, buildTtsFileItems, inferGenerationMode, inferSceneSourceType, sumSceneDuration, sumTtsDuration } from '../services/projectEnhancementService';
+import { renderVideoWithFfmpeg } from '../services/serverRenderService';
 import { CONFIG, PRICING } from '../config';
 import { clearProjectNavigationProject, readProjectNavigationProject, rememberProjectNavigationProject } from '../services/projectNavigationCache';
 import { estimateClipDuration, splitStoryIntoParagraphScenes } from '../utils/storyHelpers';
 import {
   applySelectionPromptsToScenes as applyDraftSelectionPromptsToScenes,
+  createAdditionalSceneAssetFromDraft,
   createInitialSceneAssetsFromDraft,
   createLightweightSceneAssetsFromDraft,
   createLocalScenesFromDraft,
@@ -45,7 +48,7 @@ import SceneStudioHeaderPanel from '../components/scene-studio/SceneStudioHeader
 import SceneStudioResultPanel from '../components/scene-studio/SceneStudioResultPanel';
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const MAX_SCENE_DURATION = 6;
-const clampSceneDuration = (value?: number | null) => Math.min(MAX_SCENE_DURATION, Math.max(3, Number((value || 3).toFixed(1))));
+const clampSceneDuration = (value?: number | null) => Math.min(MAX_SCENE_DURATION, Math.max(2, Number((value || 3).toFixed(1))));
 
 function stringifySummaryJson(value: unknown) {
   try {
@@ -235,7 +238,11 @@ const SceneStudioPage: React.FC = () => {
   const summaryCharacters = useMemo(() => draft.extractedCharacters.filter((item) => summaryCharacterIds.includes(item.id)), [draft.extractedCharacters, summaryCharacterIds]);
   const summarySelectedStyle = useMemo(() => draft.styleImages.find((item) => item.id === draft.selectedStyleImageId) || draft.styleImages[0] || null, [draft.selectedStyleImageId, draft.styleImages]);
   const summarySelectedPromptTemplate = useMemo(() => draft.promptTemplates.find((item) => item.id === draft.selectedPromptTemplateId) || draft.promptTemplates[0] || null, [draft.promptTemplates, draft.selectedPromptTemplateId]);
-  const summarySceneCount = useMemo(() => splitStoryIntoParagraphScenes(draft.script).length, [draft.script]);
+  const summarySceneCount = useMemo(() => {
+    const scriptSceneCount = splitStoryIntoParagraphScenes(draft.script).length;
+    if (scriptSceneCount) return scriptSceneCount;
+    return createLightweightSceneAssetsFromDraft(draft).length;
+  }, [draft]);
   const summarySections = useMemo(() => ([
     { id: 'step1' as const, label: '1단계 기본', description: '콘텐츠 유형과 화면 비율 등 시작 설정' },
     { id: 'step2' as const, label: '2단계 기획', description: '주제와 장르, 분위기, 배경 설정' },
@@ -244,6 +251,39 @@ const SceneStudioPage: React.FC = () => {
     { id: 'step5' as const, label: '5단계 화풍', description: '최종 영상용 화풍 카드와 프롬프트' },
     { id: 'step6' as const, label: '6단계 씬 전달', description: '씬 제작 화면으로 넘어온 최종 전달값' },
   ]), []);
+
+  const summarySceneImagePrompt = useMemo(() => (
+    currentProjectSummary?.prompts?.imagePrompt
+    || generatedData.map((item) => item.imagePrompt || item.visualPrompt).filter(Boolean).join('\n\n')
+    || null
+  ), [currentProjectSummary?.prompts?.imagePrompt, generatedData]);
+
+  const summarySceneVideoPrompt = useMemo(() => (
+    currentProjectSummary?.prompts?.videoPrompt
+    || generatedData.map((item) => item.videoPrompt).filter(Boolean).join('\n\n')
+    || null
+  ), [currentProjectSummary?.prompts?.videoPrompt, generatedData]);
+
+  const summaryPromptTransfer = useMemo(() => ({
+    selectedPromptTemplateName: summarySelectedPromptTemplate?.name || null,
+    storyPrompt: draft.promptPack?.storyPrompt || currentProjectSummary?.prompts?.scriptPrompt || null,
+    scenePrompt: draft.promptPack?.scenePrompt || currentProjectSummary?.prompts?.scenePrompt || null,
+    characterPrompt: draft.promptPack?.characterPrompt || null,
+    actionPrompt: draft.promptPack?.actionPrompt || currentProjectSummary?.prompts?.motionPrompt || null,
+    imagePromptBundle: summarySceneImagePrompt,
+    videoPromptBundle: summarySceneVideoPrompt,
+  }), [
+    currentProjectSummary?.prompts?.motionPrompt,
+    currentProjectSummary?.prompts?.scenePrompt,
+    currentProjectSummary?.prompts?.scriptPrompt,
+    draft.promptPack?.actionPrompt,
+    draft.promptPack?.characterPrompt,
+    draft.promptPack?.scenePrompt,
+    draft.promptPack?.storyPrompt,
+    summarySceneImagePrompt,
+    summarySceneVideoPrompt,
+    summarySelectedPromptTemplate?.name,
+  ]);
 
   const summaryJsonBySection = useMemo(() => {
     const selectedCharacters = summaryCharacters.map((character) => {
@@ -350,8 +390,10 @@ const SceneStudioPage: React.FC = () => {
 
     const step1 = {
       contentType: draft.contentType,
+      _comment_contentType: 'Step1에서 선택한 콘텐츠 유형',
       contentTypeLabel: getContentTypeLabel(draft.contentType),
       aspectRatio: draft.aspectRatio,
+      _comment_aspectRatio: 'Step1에서 선택한 화면 비율',
       hasSelectedContentType: Boolean(draft.hasSelectedContentType),
       hasSelectedAspectRatio: Boolean(draft.hasSelectedAspectRatio),
       completed: Boolean(draft.completedSteps?.step1),
@@ -359,6 +401,7 @@ const SceneStudioPage: React.FC = () => {
 
     const step2 = {
       topic: draft.topic || '',
+      _comment_topic: 'Step2에서 정한 프로젝트 주제',
       selections: {
         genre: draft.selections?.genre || '',
         mood: draft.selections?.mood || '',
@@ -367,6 +410,7 @@ const SceneStudioPage: React.FC = () => {
         protagonist: draft.selections?.protagonist || '',
         conflict: draft.selections?.conflict || '',
       },
+      _comment_selections: 'Step2에서 고른 장르, 분위기, 배경, 주인공, 갈등 값',
       customScriptSettings: {
         expectedDurationMinutes: draft.customScriptSettings?.expectedDurationMinutes || 3,
         speechStyle: draft.customScriptSettings?.speechStyle || 'default',
@@ -377,8 +421,11 @@ const SceneStudioPage: React.FC = () => {
 
     const step3 = {
       selectedPromptTemplate,
+      _comment_selectedPromptTemplate: 'Step3에서 선택한 프롬프트 카드',
       promptPack: draft.promptPack || null,
+      _comment_promptPack: '대본/씬/캐릭터/액션 생성에 쓰는 프롬프트 묶음',
       script: draft.script || '',
+      _comment_script: 'Step3 최종 대본',
       sceneCount: summarySceneCount,
       customScriptSettings: {
         referenceText: draft.customScriptSettings?.referenceText || '',
@@ -391,16 +438,20 @@ const SceneStudioPage: React.FC = () => {
 
     const step4 = {
       selectedCharacterIds: summaryCharacterIds,
+      _comment_selectedCharacterIds: 'Step4에서 선택된 출연자 ID 목록',
       selectedCharacterStyleId: draft.selectedCharacterStyleId || null,
       selectedCharacterStyleLabel: draft.selectedCharacterStyleLabel || null,
       selectedCharacterStylePrompt: draft.selectedCharacterStylePrompt || null,
+      _comment_selectedCharacterStylePrompt: 'Step4 공통 출연자 스타일 프롬프트',
       characters: selectedCharacters,
       completed: Boolean(draft.completedSteps?.step4),
     };
 
     const step5 = {
       selectedStyleImageId: draft.selectedStyleImageId || null,
+      _comment_selectedStyleImageId: 'Step5에서 선택한 최종 화풍 카드 ID',
       selectedStyle,
+      _comment_selectedStyle: 'Step5에서 선택된 최종 화풍 카드',
       styleImages: draft.styleImages.map((style) => ({
         id: style.id,
         label: style.label,
@@ -415,20 +466,30 @@ const SceneStudioPage: React.FC = () => {
 
     const step6 = {
       projectId: currentProjectId,
+      _comment_projectId: '현재 저장된 프로젝트 ID',
       projectNumber: currentProjectSummary?.projectNumber || null,
       contentType: draft.contentType,
+      _comment_contentType: 'Step1에서 선택한 콘텐츠 유형',
       contentTypeLabel: getContentTypeLabel(draft.contentType),
       aspectRatio: draft.aspectRatio,
+      _comment_aspectRatio: 'Step1에서 선택한 화면 비율',
       topic: draft.topic || '',
+      _comment_topic: 'Step2에서 정한 프로젝트 주제',
       script: draft.script || '',
+      _comment_script: 'Step3 최종 대본',
       sceneCount: summarySceneCount,
+      _comment_sceneCount: '현재 Step6에 전달된 총 씬 수',
       selectedCharacters,
+      _comment_selectedCharacters: 'Step4에서 선택된 출연자 정보',
       selectedCharacterStyle: {
         id: draft.selectedCharacterStyleId || null,
         label: draft.selectedCharacterStyleLabel || null,
         prompt: draft.selectedCharacterStylePrompt || null,
+        _comment_label: 'Step4에서 선택한 공통 출연자 스타일 이름',
+        _comment_prompt: 'Step4에서 선택한 공통 출연자 스타일 프롬프트',
       },
       selectedStyle,
+      _comment_selectedStyle: 'Step5에서 선택된 최종 화풍 카드',
       referenceImages: {
         characterCount: summaryCharacters.filter((item) => Boolean(item.imageData)).length,
         styleCount: summarySelectedStyle?.imageData ? 1 : 0,
@@ -436,9 +497,20 @@ const SceneStudioPage: React.FC = () => {
         styleStrength: draft.referenceImages?.styleStrength || 70,
       },
       promptTransfer: {
-        selectedPromptTemplate,
-        promptPack: draft.promptPack || null,
-        scenePrompt: draft.promptPack?.scenePrompt || null,
+        selectedPromptTemplateName: summaryPromptTransfer.selectedPromptTemplateName,
+        _comment_selectedPromptTemplateName: 'Step3에서 선택한 프롬프트 카드 이름',
+        storyPrompt: summaryPromptTransfer.storyPrompt,
+        _comment_storyPrompt: '대본 생성용 기본 스토리 프롬프트',
+        scenePrompt: summaryPromptTransfer.scenePrompt,
+        _comment_scenePrompt: '씬 분해와 장면 작성 기준 프롬프트',
+        characterPrompt: summaryPromptTransfer.characterPrompt,
+        _comment_characterPrompt: '출연자 캐릭터 설정 기준 프롬프트',
+        actionPrompt: summaryPromptTransfer.actionPrompt,
+        _comment_actionPrompt: '모션/행동 연출 기준 프롬프트',
+        imagePromptBundle: summaryPromptTransfer.imagePromptBundle,
+        _comment_imagePromptBundle: '현재 씬들에 배분된 이미지 프롬프트 묶음',
+        videoPromptBundle: summaryPromptTransfer.videoPromptBundle,
+        _comment_videoPromptBundle: '현재 씬들에 배분된 영상 프롬프트 묶음',
       },
       thumbnailContext: {
         selectedThumbnailId: currentProjectSummary?.selectedThumbnailId || null,
@@ -544,15 +616,16 @@ const SceneStudioPage: React.FC = () => {
 
   useEffect(() => {
     if (generatedData.length) return;
-    if (!draft.script?.trim()) return;
 
-    const localAssets = createEmptySceneAssetsFromDraft(draft);
+    const localAssets = createInitialSceneAssetsFromDraft(draft);
     if (!localAssets.length) return;
 
     assetsRef.current = localAssets;
     setGeneratedData(localAssets);
     setStep(GenerationStep.COMPLETED);
-    setProgressMessage((prev) => prev || '전달된 데이터로 씬 카드를 먼저 표시했습니다. 필요한 씬만 개별 생성하면 됩니다.');
+    setProgressMessage((prev) => prev || (draft.customScriptSettings?.language === 'mute' && !draft.script?.trim()
+      ? '무음 모드라 주제와 지금까지 입력한 내용을 바탕으로 씬용 이미지 / 영상 프롬프트를 자동 준비했습니다. 필요하면 문단 추가 버튼으로 장면을 더 늘릴 수 있습니다.'
+      : '전달된 데이터로 씬 카드를 먼저 표시했습니다. 필요한 씬만 개별 생성하면 됩니다.'));
   }, [draft, generatedData.length]);
 
   const selectedCharacterName = useMemo(
@@ -569,6 +642,35 @@ const SceneStudioPage: React.FC = () => {
     const picked = backgroundMusicTracks.find((item) => item.id === activeBackgroundTrackId) || backgroundMusicTracks[0];
     return picked ? [picked] : [];
   }, [backgroundMusicTracks, activeBackgroundTrackId]);
+
+  const buildProjectEnhancementPatch = useCallback((assets: GeneratedAsset[], overrides?: Partial<SavedProject>) => {
+    const subtitlePreset = overrides?.subtitlePreset || buildDefaultSubtitlePreset();
+    const sceneDrivenScript = (draft.script || '').trim() || assets.map((item) => item.narration).filter(Boolean).join('\n\n');
+    return {
+      script: sceneDrivenScript || null,
+      scriptParagraphs: buildScriptParagraphPlans(sceneDrivenScript),
+      sceneList: buildScenePlanItems(assets),
+      sceneDuration: sumSceneDuration(assets),
+      ttsFiles: buildTtsFileItems(assets, resolveSceneTtsOptions().provider),
+      ttsDuration: sumTtsDuration(assets),
+      generationMode: inferGenerationMode(studioState),
+      sceneSourceType: inferSceneSourceType(assets),
+      encodingMode: overrides?.encodingMode || 'browser',
+      subtitlePreset,
+      subtitlePosition: subtitlePreset.position,
+      subtitleBackgroundOpacity: subtitlePreset.backgroundOpacity,
+      prompts: {
+        scriptPrompt: draft.promptPack?.storyPrompt || null,
+        scenePrompt: draft.promptPack?.scenePrompt || null,
+        imagePrompt: assets.map((item) => item.imagePrompt || item.visualPrompt).filter(Boolean).join('\n\n') || null,
+        videoPrompt: assets.map((item) => item.videoPrompt).filter(Boolean).join('\n\n') || null,
+        motionPrompt: draft.promptPack?.actionPrompt || null,
+        thumbnailPrompt: overrides?.thumbnailPrompt ?? null,
+        youtubeMetaPrompt: overrides?.prompts?.youtubeMetaPrompt ?? null,
+      },
+      ...overrides,
+    } satisfies Partial<SavedProject>;
+  }, [draft.promptPack, draft.script, resolveSceneTtsOptions, studioState]);
 
   const buildReferenceImages = useCallback((): ReferenceImages => {
     const resolvedCharacterIds = draft.selectedCharacterIds.length ? draft.selectedCharacterIds : draft.extractedCharacters.map((item) => item.id);
@@ -649,7 +751,7 @@ const SceneStudioPage: React.FC = () => {
   const applyProjectToScreen = useCallback((project: SavedProject, options?: { message?: string }) => {
     const safeAssets = Array.isArray(project.assets) && project.assets.length
       ? project.assets.map((asset) => ({ ...asset, aspectRatio: asset?.aspectRatio || project.workflowDraft?.aspectRatio || '16:9' }))
-      : (project.workflowDraft ? createEmptySceneAssetsFromDraft(project.workflowDraft) : []);
+      : (project.workflowDraft ? createInitialSceneAssetsFromDraft(project.workflowDraft) : []);
 
     assetsRef.current = safeAssets;
     setGeneratedData([...safeAssets]);
@@ -704,6 +806,26 @@ const SceneStudioPage: React.FC = () => {
   }, []);
 
   const createScenePlan = useCallback(async (): Promise<ScriptScene[]> => {
+    const isMuteWithoutScript = draft.customScriptSettings?.language === 'mute' && !draft.script?.trim();
+    if (isMuteWithoutScript) {
+      if (assetsRef.current.length) {
+        return applyDraftSelectionPromptsToScenes(
+          assetsRef.current.map((asset, index) => ({
+            ...asset,
+            sceneNumber: index + 1,
+            narration: asset.narration || `추가 장면 ${index + 1}`,
+            visualPrompt: asset.imagePrompt || asset.visualPrompt || '',
+            imagePrompt: asset.imagePrompt || asset.visualPrompt || '',
+            videoPrompt: asset.videoPrompt || '',
+            targetDuration: clampSceneDuration(asset.targetDuration || estimateClipDuration(asset.narration || '장면')), 
+            aspectRatio: asset.aspectRatio || draft.aspectRatio || '16:9',
+          })),
+          draft,
+        );
+      }
+      return applyDraftSelectionPromptsToScenes(createLocalScenesFromDraft(draft), draft);
+    }
+
     const localScenes = createLocalScenesFromDraft(draft);
     const referenceImages = buildReferenceImages();
     const hasReferenceImage = referenceImages.character.length + referenceImages.style.length > 0;
@@ -1013,6 +1135,7 @@ const SceneStudioPage: React.FC = () => {
         cost: currentCostRef.current,
         backgroundMusicTracks: nextTracks,
         previewMix,
+        ...buildProjectEnhancementPatch(assetsRef.current),
       });
       setCurrentProjectId(saved.id);
       rememberProjectNavigationProject(saved);
@@ -1026,7 +1149,7 @@ const SceneStudioPage: React.FC = () => {
       setIsGeneratingScenes(false);
       window.setTimeout(() => setTaskProgressPercent(null), 900);
     }
-  }, [appendImageHistory, backgroundMusicTracks, buildReferenceImages, createScenePlan, currentProjectId, draft, persistWorkflowStep4, previewMix, studioState, updateAssetAt]);
+  }, [appendImageHistory, backgroundMusicTracks, buildProjectEnhancementPatch, buildReferenceImages, createScenePlan, currentProjectId, draft, persistWorkflowStep4, previewMix, studioState, updateAssetAt]);
 
   useEffect(() => {
     return () => {
@@ -1066,6 +1189,7 @@ const SceneStudioPage: React.FC = () => {
         previewMix,
         cost: currentCostRef.current,
         workflowDraft: buildSceneStudioWorkflowDraft(draft),
+        ...buildProjectEnhancementPatch(generatedData),
       });
       setProgressMessage('씬, 배경음, 프리뷰 설정을 자동 저장했습니다.');
     }, 1800);
@@ -1073,7 +1197,7 @@ const SceneStudioPage: React.FC = () => {
     return () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
-  }, [currentProjectId, generatedData, backgroundMusicTracks, previewMix, draft, isGeneratingScenes, isThumbnailGenerating, isGeneratingAllVideos, isVideoGenerating, animatingIndices]);
+  }, [buildProjectEnhancementPatch, currentProjectId, generatedData, backgroundMusicTracks, previewMix, draft, isGeneratingScenes, isThumbnailGenerating, isGeneratingAllVideos, isVideoGenerating, animatingIndices]);
 
   useEffect(() => {
     if (!currentProjectId || !studioState) return;
@@ -1160,6 +1284,7 @@ const SceneStudioPage: React.FC = () => {
       let result = null;
       let usedFallback = false;
       let usedSceneVideos = sceneVideoCount > 0;
+      let usedFfmpeg = false;
 
       try {
         result = await generateVideo(
@@ -1185,19 +1310,40 @@ const SceneStudioPage: React.FC = () => {
         setPreviewVideoMessage(fallbackMessage);
         setProgressMessage(fallbackMessage);
 
-        result = await generateVideo(
-          assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
-          progressHandler,
-          isAbortedRef,
-          {
-            enableSubtitles,
-            qualityMode: 'preview',
+        try {
+          result = await generateVideo(
+            assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
+            progressHandler,
+            isAbortedRef,
+            {
+              enableSubtitles,
+              qualityMode: 'preview',
+              backgroundTracks: effectiveBackgroundTracks,
+              previewMix,
+              aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
+              useSceneVideos: false,
+            }
+          );
+        } catch (secondaryError) {
+          console.error('[SceneStudioPage] browser safe render failed, switching to ffmpeg', secondaryError);
+          usedFfmpeg = true;
+          setTaskProgressPercent(35);
+          const ffmpegMessage = '브라우저 합치기가 불안정해 서버 ffmpeg 인코딩으로 전환합니다.';
+          setPreviewVideoStatus('loading');
+          setPreviewVideoMessage(ffmpegMessage);
+          setProgressMessage(ffmpegMessage);
+
+          result = await renderVideoWithFfmpeg({
+            assets: assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
             backgroundTracks: effectiveBackgroundTracks,
             previewMix,
             aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
-            useSceneVideos: false,
-          }
-        );
+            qualityMode,
+            enableSubtitles,
+            subtitlePreset: buildDefaultSubtitlePreset(),
+            title: renderTitle('ffmpeg'),
+          });
+        }
       }
 
       if (!result) {
@@ -1219,16 +1365,24 @@ const SceneStudioPage: React.FC = () => {
         triggerBlobDownload(result.videoBlob, `mp4Creater_${suffix}_${Date.now()}.mp4`);
       }
 
-      const successMessage = usedFallback
-        ? '안전 모드로 합본 영상을 만들었습니다. 브라우저 합치기 문제가 있어 이미지 기반으로 다시 합쳤습니다.'
-        : usedSceneVideos
-          ? `씬 영상 ${sceneVideoCount}개를 반영한 합본 영상이 준비되었습니다.`
-          : 'AI 씬 영상 없이도 이미지 기반 합본 영상이 준비되었습니다.';
+      const successMessage = usedFfmpeg
+        ? '서버 ffmpeg 인코딩으로 합본 영상을 만들었습니다. 브라우저 렌더가 불안정할 때 쓰는 안전 경로입니다.'
+        : usedFallback
+          ? '안전 모드로 합본 영상을 만들었습니다. 브라우저 합치기 문제가 있어 이미지 기반으로 다시 합쳤습니다.'
+          : usedSceneVideos
+            ? `씬 영상 ${sceneVideoCount}개를 반영한 합본 영상이 준비되었습니다.`
+            : 'AI 씬 영상 없이도 이미지 기반 합본 영상이 준비되었습니다.';
 
-      setPreviewVideoStatus(usedFallback || !usedSceneVideos ? 'fallback' : 'ready');
+      setPreviewVideoStatus(usedFallback || usedFfmpeg || !usedSceneVideos ? 'fallback' : 'ready');
       setPreviewVideoMessage(successMessage);
       setProgressMessage(downloadFile ? '합본 영상 저장이 완료되었습니다.' : '합본 영상 미리보기가 준비되었습니다.');
       setTaskProgressPercent(100);
+
+      if (currentProjectId) {
+        void updateProject(currentProjectId, buildProjectEnhancementPatch(assetsRef.current, {
+          encodingMode: usedFfmpeg ? 'ffmpeg' : 'browser',
+        }));
+      }
 
       return result;
     } catch (error) {
@@ -1243,7 +1397,7 @@ const SceneStudioPage: React.FC = () => {
       if (!downloadFile) setIsPreparingPreviewVideo(false);
       window.setTimeout(() => setTaskProgressPercent(null), 1200);
     }
-  }, [draft.aspectRatio, draft.topic, effectiveBackgroundTracks, isVideoGenerating, openApiModal, previewMix]);
+  }, [buildProjectEnhancementPatch, currentProjectId, draft.aspectRatio, draft.topic, effectiveBackgroundTracks, isVideoGenerating, openApiModal, previewMix]);
 
   const handleRegenerateImage = async (index: number) => {
     if (!acquireSceneActionLock(index, 'image')) return;
@@ -1480,6 +1634,15 @@ const SceneStudioPage: React.FC = () => {
     updateAssetAt(index, { targetDuration: clampSceneDuration(duration) });
   };
 
+  const handleAddParagraphScene = useCallback(() => {
+    const nextSceneNumber = assetsRef.current.length + 1;
+    const nextAsset = createAdditionalSceneAssetFromDraft(draft, nextSceneNumber);
+    assetsRef.current = [...assetsRef.current, nextAsset];
+    setGeneratedData([...assetsRef.current]);
+    setStep(GenerationStep.COMPLETED);
+    setProgressMessage('새 문단 장면을 추가했습니다. 무음 프로젝트도 대사 없이 이미지 / 영상 프롬프트를 바로 수정하며 이어서 제작할 수 있습니다.');
+  }, [draft]);
+
   const handleGenerateThumbnail = useCallback(async () => {
     if (!currentProjectId || isThumbnailGenerating) return;
     setIsThumbnailGenerating(true);
@@ -1674,8 +1837,25 @@ const SceneStudioPage: React.FC = () => {
             <div><span className="font-black text-slate-900">선택 출연자:</span> {summaryCharacters.map((item) => item.name).join(', ') || '없음'}</div>
             <div><span className="font-black text-slate-900">캐릭터 스타일:</span> {draft.selectedCharacterStyleLabel || '미선택'}</div>
             <div><span className="font-black text-slate-900">최종 화풍:</span> {summarySelectedStyle?.groupLabel || summarySelectedStyle?.label || '미선택'}</div>
-            <div><span className="font-black text-slate-900">씬 생성 기준 프롬프트:</span> {draft.promptPack?.scenePrompt || '없음'}</div>
+            <div><span className="font-black text-slate-900">씬 생성 기준 프롬프트:</span> {summaryPromptTransfer.scenePrompt || '없음'}</div>
           </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {[
+            { label: '프롬프트 카드', comment: 'Step3에서 선택한 프롬프트 카드 이름', value: summaryPromptTransfer.selectedPromptTemplateName || '없음' },
+            { label: '스토리 프롬프트', comment: '대본 전체 흐름을 잡는 기준값', value: summaryPromptTransfer.storyPrompt || '없음' },
+            { label: '씬 프롬프트', comment: '씬 분해와 장면 설명 생성에 쓰는 값', value: summaryPromptTransfer.scenePrompt || '없음' },
+            { label: '캐릭터 프롬프트', comment: '출연자 외형/톤 유지 기준값', value: summaryPromptTransfer.characterPrompt || '없음' },
+            { label: '액션 프롬프트', comment: '모션/행동 연출 기준값', value: summaryPromptTransfer.actionPrompt || '없음' },
+            { label: '이미지 프롬프트 묶음', comment: '현재 문단별 이미지 프롬프트 전체 묶음', value: summaryPromptTransfer.imagePromptBundle || '없음' },
+            { label: '영상 프롬프트 묶음', comment: '현재 문단별 영상 프롬프트 전체 묶음', value: summaryPromptTransfer.videoPromptBundle || '없음' },
+          ].map((item) => (
+            <div key={item.label} className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-blue-700">{item.label}</div>
+              <div className="mt-2 text-[11px] leading-5 text-slate-500">주석: {item.comment}</div>
+              <div className="mt-3 whitespace-pre-wrap break-words text-xs leading-6 text-slate-700">{item.value}</div>
+            </div>
+          ))}
         </div>
         {renderSummaryJsonCard('6단계 최종 전달 JSON', summaryJsonBySection.step6, 'blue')}
         {renderSummaryJsonCard('Step1~6 전체 검토 JSON', summaryJsonBySection.all)}
@@ -1745,6 +1925,7 @@ const SceneStudioPage: React.FC = () => {
           onVideoPromptChange={handleVideoPromptChange}
           onSelectedVisualTypeChange={handleSelectedVisualTypeChange}
           onDurationChange={handleDurationChange}
+          onAddParagraphScene={handleAddParagraphScene}
           onOpenSettings={() => setShowSettings(true)}
           onRequestProviderSetup={(kind) => openApiModal({
             title: kind === 'audio' ? '오디오 / 자막 기능 연결' : kind === 'video' ? '영상 기능 연결' : '텍스트 AI 연결',

@@ -1,5 +1,8 @@
+'use client';
+
 import Link from 'next/link';
 import React from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 interface HeaderProps {
   projectCount?: number;
@@ -25,18 +28,24 @@ function NavAction({
   onClick?: () => void;
   href?: string;
 }) {
-  const className = `mp4-glass-pill inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-black transition-colors ${active ? 'border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-100' : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50'}`;
+  const className = `${
+    active ? '' : 'mp4-glass-pill '
+  }inline-flex items-center justify-center rounded-xl border px-4 py-2 text-sm font-black transition-all duration-200 ${
+    active
+      ? 'border-blue-600 bg-blue-600 text-white shadow-sm shadow-blue-100'
+      : 'border-slate-200 bg-white text-slate-900 hover:bg-slate-50'
+  }`;
 
   if (href) {
     return (
-      <Link href={href} onClick={onClick} className={className}>
+      <Link href={href} onClick={onClick} className={className} style={active ? { color: '#ffffff' } : undefined}>
         {children}
       </Link>
     );
   }
 
   return (
-    <button type="button" onClick={onClick} className={className}>
+    <button type="button" onClick={onClick} className={className} style={active ? { color: '#ffffff' } : undefined}>
       {children}
     </button>
   );
@@ -44,43 +53,60 @@ function NavAction({
 
 const Header: React.FC<HeaderProps> = ({
   projectCount = 0,
-  selectedCharacterName,
-  storageDir,
   onOpenSettings,
   onGoGallery,
   viewMode = 'main',
   basePath = '/mp4Creater',
   currentSection,
 }) => {
-  const activeSection = currentSection || viewMode;
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const normalizedBasePath =
+    basePath.length > 1 && basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+
+  const currentView = searchParams.get('view');
+
+  // URL이 gallery면 props보다 우선해서 무조건 gallery 활성화
+  const isGalleryByUrl =
+    pathname === normalizedBasePath && currentView === 'gallery';
+
+  // URL 우선 -> 그다음 currentSection -> 마지막 viewMode
+  const isGalleryActive = isGalleryByUrl
+    ? true
+    : currentSection
+      ? currentSection === 'gallery'
+      : viewMode === 'gallery';
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/40 bg-white/45 backdrop-blur-xl">
       <div className="mp4-glass-panel mx-auto flex max-w-[1520px] flex-col gap-3 rounded-b-[28px] px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 shadow-lg shadow-blue-100">
-              <svg suppressHydrationWarning className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path suppressHydrationWarning strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                <path suppressHydrationWarning strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+          <Link
+            href={`${basePath}?view=gallery`}
+            onClick={onGoGallery}
+            className="flex min-w-0 items-center gap-3 rounded-3xl px-1 py-1 transition-all duration-300 hover:bg-white/35"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 via-sky-400 to-indigo-500 text-sm font-black text-white shadow-lg shadow-blue-100">
+              MP4
             </div>
 
             <div className="min-w-0">
               <div className="text-xl font-black text-slate-900 sm:text-2xl">
                 mp4Creater <span className="text-blue-600">스튜디오</span>
               </div>
-              <div className="mt-1 truncate text-xs text-slate-500">
-                {selectedCharacterName ? `캐릭터: ${selectedCharacterName}` : '캐릭터 미선택'}
-                {storageDir ? ` · 저장 위치: ${storageDir}` : ' · 저장 위치 미설정'}
-              </div>
             </div>
-          </div>
+          </Link>
 
           <div className="flex flex-wrap items-center gap-2">
-            <NavAction active={activeSection === 'gallery' || activeSection === 'main'} onClick={onGoGallery} href={`${basePath}?view=gallery`}>
+            <NavAction
+              active={isGalleryActive}
+              onClick={onGoGallery}
+              href={`${basePath}?view=gallery`}
+            >
               프로젝트 {projectCount > 0 ? `(${projectCount})` : ''}
             </NavAction>
+
             <button
               type="button"
               onClick={onOpenSettings}

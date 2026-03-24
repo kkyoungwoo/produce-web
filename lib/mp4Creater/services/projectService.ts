@@ -5,7 +5,7 @@
  */
 
 import { CONFIG } from '../config';
-import { SavedProject, GeneratedAsset, CostBreakdown, BackgroundMusicTrack, PreviewMixSettings, WorkflowDraft, AudioPreviewAsset, VideoPreviewAsset } from '../types';
+import { SavedProject, GeneratedAsset, CostBreakdown, BackgroundMusicTrack, PreviewMixSettings, WorkflowDraft, AudioPreviewAsset, VideoPreviewAsset, ScriptParagraphPlan, ScenePlanItem, TtsFileItem, SubtitlePresetState, YoutubeConnectedAccountInfo, YoutubeUploadStatus } from '../types';
 import { getSelectedImageModel } from './imageService';
 import { compactWorkflowDraftForStorage, createSelectedWorkflowDraftForTransport } from './workflowDraftService';
 import { deleteStudioProjects, fetchStudioProjectById, fetchStudioProjects, getCachedStudioState, saveProjectsToStudio, saveStudioProject, summarizeProjectForIndex } from './localFileApi';
@@ -185,6 +185,15 @@ function normalizeProject(raw: any): SavedProject {
       imageModel: typeof rawSettings?.imageModel === 'string' && rawSettings.imageModel
         ? rawSettings.imageModel
         : CONFIG.DEFAULT_IMAGE_MODEL,
+      videoModel: typeof rawSettings?.videoModel === 'string' && rawSettings.videoModel
+        ? rawSettings.videoModel
+        : CONFIG.DEFAULT_VIDEO_MODEL,
+      scriptModel: typeof rawSettings?.scriptModel === 'string' && rawSettings.scriptModel
+        ? rawSettings.scriptModel
+        : CONFIG.DEFAULT_SCRIPT_MODEL,
+      sceneModel: typeof rawSettings?.sceneModel === 'string' && rawSettings.sceneModel
+        ? rawSettings.sceneModel
+        : CONFIG.DEFAULT_SCRIPT_MODEL,
       outputMode: rawSettings?.outputMode === 'image' ? 'image' : 'video',
       elevenLabsModel: typeof rawSettings?.elevenLabsModel === 'string' && rawSettings.elevenLabsModel
         ? rawSettings.elevenLabsModel
@@ -216,6 +225,105 @@ function normalizeProject(raw: any): SavedProject {
     finalBackgroundMusic: raw?.finalBackgroundMusic ? normalizeTrack(raw?.finalBackgroundMusic, 0) : null,
     musicVideoPreview: normalizeVideoPreview(raw?.musicVideoPreview),
     finalMusicVideo: normalizeVideoPreview(raw?.finalMusicVideo),
+    script: typeof raw?.script === 'string' ? raw.script : null,
+    scriptParagraphs: Array.isArray(raw?.scriptParagraphs)
+      ? raw.scriptParagraphs
+          .filter((item: any) => item && typeof item.text === 'string')
+          .map((item: any, index: number) => ({
+            id: typeof item.id === 'string' ? item.id : `paragraph_${Date.now()}_${index}`,
+            index: typeof item.index === 'number' ? item.index : index,
+            text: item.text,
+            estimatedSeconds: typeof item.estimatedSeconds === 'number' ? item.estimatedSeconds : 0,
+            startAt: typeof item.startAt === 'number' ? item.startAt : undefined,
+            endAt: typeof item.endAt === 'number' ? item.endAt : undefined,
+          } satisfies ScriptParagraphPlan))
+      : [],
+    sceneList: Array.isArray(raw?.sceneList)
+      ? raw.sceneList
+          .filter((item: any) => item && typeof item.narration === 'string')
+          .map((item: any, index: number) => ({
+            id: typeof item.id === 'string' ? item.id : `scene_plan_${Date.now()}_${index}`,
+            sceneNumber: typeof item.sceneNumber === 'number' ? item.sceneNumber : index + 1,
+            paragraphId: typeof item.paragraphId === 'string' ? item.paragraphId : null,
+            narration: item.narration,
+            imagePrompt: typeof item.imagePrompt === 'string' ? item.imagePrompt : undefined,
+            videoPrompt: typeof item.videoPrompt === 'string' ? item.videoPrompt : undefined,
+            motionPrompt: typeof item.motionPrompt === 'string' ? item.motionPrompt : undefined,
+            estimatedSeconds: typeof item.estimatedSeconds === 'number' ? item.estimatedSeconds : 0,
+            targetDuration: typeof item.targetDuration === 'number' ? item.targetDuration : 5,
+            sceneSourceType: item.sceneSourceType === 'ai' || item.sceneSourceType === 'free-media' || item.sceneSourceType === 'sample' || item.sceneSourceType === 'mixed'
+              ? item.sceneSourceType
+              : undefined,
+            sourceAssetUrl: typeof item.sourceAssetUrl === 'string' ? item.sourceAssetUrl : null,
+          } satisfies ScenePlanItem))
+      : [],
+    sceneDuration: typeof raw?.sceneDuration === 'number' ? raw.sceneDuration : null,
+    ttsFiles: Array.isArray(raw?.ttsFiles)
+      ? raw.ttsFiles
+          .filter((item: any) => item && typeof item.sceneNumber === 'number')
+          .map((item: any, index: number) => ({
+            id: typeof item.id === 'string' ? item.id : `tts_${Date.now()}_${index}`,
+            sceneNumber: item.sceneNumber,
+            paragraphId: typeof item.paragraphId === 'string' ? item.paragraphId : null,
+            provider: item.provider === 'elevenLabs' || item.provider === 'qwen3Tts' || item.provider === 'heygen' ? item.provider : 'sample',
+            voiceId: typeof item.voiceId === 'string' ? item.voiceId : null,
+            modelId: typeof item.modelId === 'string' ? item.modelId : null,
+            duration: typeof item.duration === 'number' ? item.duration : 0,
+            audioData: typeof item.audioData === 'string' ? item.audioData : null,
+          } satisfies TtsFileItem))
+      : [],
+    ttsDuration: typeof raw?.ttsDuration === 'number' ? raw.ttsDuration : null,
+    generationMode: raw?.generationMode === 'premium' ? 'premium' : raw?.generationMode === 'free' ? 'free' : undefined,
+    sceneSourceType: raw?.sceneSourceType === 'ai' || raw?.sceneSourceType === 'free-media' || raw?.sceneSourceType === 'sample' || raw?.sceneSourceType === 'mixed'
+      ? raw.sceneSourceType
+      : undefined,
+    encodingMode: raw?.encodingMode === 'ffmpeg' ? 'ffmpeg' : raw?.encodingMode === 'browser' ? 'browser' : undefined,
+    subtitlePreset: raw?.subtitlePreset && typeof raw.subtitlePreset === 'object'
+      ? ({
+          size: raw.subtitlePreset.size === 'small' || raw.subtitlePreset.size === 'large' ? raw.subtitlePreset.size : 'medium',
+          position: raw.subtitlePreset.position === 'top' || raw.subtitlePreset.position === 'middle' ? raw.subtitlePreset.position : 'bottom',
+          fontFamily: typeof raw.subtitlePreset.fontFamily === 'string' && raw.subtitlePreset.fontFamily ? raw.subtitlePreset.fontFamily : 'Pretendard',
+          background: Boolean(raw.subtitlePreset.background),
+          backgroundOpacity: typeof raw.subtitlePreset.backgroundOpacity === 'number' ? raw.subtitlePreset.backgroundOpacity : 0.45,
+          segmentation: raw.subtitlePreset.segmentation === 'sentence' ? 'sentence' : 'paragraph',
+        } satisfies SubtitlePresetState)
+      : null,
+    subtitlePosition: raw?.subtitlePosition === 'top' || raw?.subtitlePosition === 'middle' || raw?.subtitlePosition === 'bottom'
+      ? raw.subtitlePosition
+      : null,
+    subtitleBackgroundOpacity: typeof raw?.subtitleBackgroundOpacity === 'number' ? raw.subtitleBackgroundOpacity : null,
+    prompts: raw?.prompts && typeof raw.prompts === 'object'
+      ? {
+          scriptPrompt: typeof raw.prompts.scriptPrompt === 'string' ? raw.prompts.scriptPrompt : null,
+          scenePrompt: typeof raw.prompts.scenePrompt === 'string' ? raw.prompts.scenePrompt : null,
+          imagePrompt: typeof raw.prompts.imagePrompt === 'string' ? raw.prompts.imagePrompt : null,
+          videoPrompt: typeof raw.prompts.videoPrompt === 'string' ? raw.prompts.videoPrompt : null,
+          motionPrompt: typeof raw.prompts.motionPrompt === 'string' ? raw.prompts.motionPrompt : null,
+          thumbnailPrompt: typeof raw.prompts.thumbnailPrompt === 'string' ? raw.prompts.thumbnailPrompt : null,
+          youtubeMetaPrompt: typeof raw.prompts.youtubeMetaPrompt === 'string' ? raw.prompts.youtubeMetaPrompt : null,
+        }
+      : null,
+    youtubeConnectedAccount: raw?.youtubeConnectedAccount && typeof raw.youtubeConnectedAccount === 'object'
+      ? ({
+          email: typeof raw.youtubeConnectedAccount.email === 'string' ? raw.youtubeConnectedAccount.email : null,
+          channelId: typeof raw.youtubeConnectedAccount.channelId === 'string' ? raw.youtubeConnectedAccount.channelId : null,
+          channelTitle: typeof raw.youtubeConnectedAccount.channelTitle === 'string' ? raw.youtubeConnectedAccount.channelTitle : null,
+        } satisfies YoutubeConnectedAccountInfo)
+      : null,
+    youtubeChannelTitle: typeof raw?.youtubeChannelTitle === 'string' ? raw.youtubeChannelTitle : null,
+    youtubeUploadStatus: raw?.youtubeUploadStatus === 'ready' || raw?.youtubeUploadStatus === 'uploading' || raw?.youtubeUploadStatus === 'uploaded' || raw?.youtubeUploadStatus === 'error'
+      ? raw.youtubeUploadStatus as YoutubeUploadStatus
+      : 'idle',
+    youtubeUploadedAt: typeof raw?.youtubeUploadedAt === 'number' ? raw.youtubeUploadedAt : null,
+    youtubeVideoId: typeof raw?.youtubeVideoId === 'string' ? raw.youtubeVideoId : null,
+    youtubePrivacyStatus: raw?.youtubePrivacyStatus === 'private' || raw?.youtubePrivacyStatus === 'unlisted' || raw?.youtubePrivacyStatus === 'public'
+      ? raw.youtubePrivacyStatus
+      : null,
+    youtubeTitle: typeof raw?.youtubeTitle === 'string' ? raw.youtubeTitle : null,
+    youtubeDescription: typeof raw?.youtubeDescription === 'string' ? raw.youtubeDescription : null,
+    youtubeTags: Array.isArray(raw?.youtubeTags) ? raw.youtubeTags.filter((item: any) => typeof item === 'string') : [],
+    isShortsEligible: typeof raw?.isShortsEligible === 'boolean' ? raw.isShortsEligible : false,
+    uploadErrorMessage: typeof raw?.uploadErrorMessage === 'string' ? raw.uploadErrorMessage : null,
   };
 }
 
@@ -229,10 +337,25 @@ function getCurrentSettings() {
   const imageModel =
     cachedRouting?.imageModel ||
     getSelectedImageModel();
+  const videoModel =
+    cachedRouting?.videoModel ||
+    CONFIG.DEFAULT_VIDEO_MODEL;
+  const scriptModel =
+    cachedRouting?.scriptModel ||
+    cachedRouting?.textModel ||
+    CONFIG.DEFAULT_SCRIPT_MODEL;
+  const sceneModel =
+    cachedRouting?.sceneModel ||
+    cachedRouting?.imagePromptModel ||
+    cachedRouting?.motionPromptModel ||
+    scriptModel;
   return {
     imageModel,
+    videoModel,
+    scriptModel,
+    sceneModel,
     outputMode: 'video' as const,
-    elevenLabsModel
+    elevenLabsModel,
   };
 }
 
@@ -426,6 +549,30 @@ export async function saveProject(
     finalBackgroundMusic?: BackgroundMusicTrack | null;
     musicVideoPreview?: VideoPreviewAsset | null;
     finalMusicVideo?: VideoPreviewAsset | null;
+    script?: string | null;
+    scriptParagraphs?: SavedProject['scriptParagraphs'];
+    sceneList?: SavedProject['sceneList'];
+    sceneDuration?: number | null;
+    ttsFiles?: SavedProject['ttsFiles'];
+    ttsDuration?: number | null;
+    generationMode?: SavedProject['generationMode'];
+    sceneSourceType?: SavedProject['sceneSourceType'];
+    encodingMode?: SavedProject['encodingMode'];
+    subtitlePreset?: SavedProject['subtitlePreset'];
+    subtitlePosition?: SavedProject['subtitlePosition'];
+    subtitleBackgroundOpacity?: SavedProject['subtitleBackgroundOpacity'];
+    prompts?: SavedProject['prompts'];
+    youtubeConnectedAccount?: SavedProject['youtubeConnectedAccount'];
+    youtubeChannelTitle?: SavedProject['youtubeChannelTitle'];
+    youtubeUploadStatus?: SavedProject['youtubeUploadStatus'];
+    youtubeUploadedAt?: SavedProject['youtubeUploadedAt'];
+    youtubeVideoId?: SavedProject['youtubeVideoId'];
+    youtubePrivacyStatus?: SavedProject['youtubePrivacyStatus'];
+    youtubeTitle?: SavedProject['youtubeTitle'];
+    youtubeDescription?: SavedProject['youtubeDescription'];
+    youtubeTags?: SavedProject['youtubeTags'];
+    isShortsEligible?: SavedProject['isShortsEligible'];
+    uploadErrorMessage?: SavedProject['uploadErrorMessage'];
   }
 ): Promise<SavedProject> {
   const id = extras?.projectId?.trim() || `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -467,6 +614,30 @@ export async function saveProject(
     finalBackgroundMusic: extras?.finalBackgroundMusic || null,
     musicVideoPreview: extras?.musicVideoPreview || null,
     finalMusicVideo: extras?.finalMusicVideo || null,
+    script: extras?.script ?? null,
+    scriptParagraphs: extras?.scriptParagraphs || [],
+    sceneList: extras?.sceneList || [],
+    sceneDuration: typeof extras?.sceneDuration === 'number' ? extras.sceneDuration : null,
+    ttsFiles: extras?.ttsFiles || [],
+    ttsDuration: typeof extras?.ttsDuration === 'number' ? extras.ttsDuration : null,
+    generationMode: extras?.generationMode,
+    sceneSourceType: extras?.sceneSourceType,
+    encodingMode: extras?.encodingMode || 'browser',
+    subtitlePreset: extras?.subtitlePreset || null,
+    subtitlePosition: extras?.subtitlePosition || null,
+    subtitleBackgroundOpacity: typeof extras?.subtitleBackgroundOpacity === 'number' ? extras.subtitleBackgroundOpacity : null,
+    prompts: extras?.prompts || null,
+    youtubeConnectedAccount: extras?.youtubeConnectedAccount || null,
+    youtubeChannelTitle: extras?.youtubeChannelTitle || null,
+    youtubeUploadStatus: extras?.youtubeUploadStatus || 'idle',
+    youtubeUploadedAt: typeof extras?.youtubeUploadedAt === 'number' ? extras.youtubeUploadedAt : null,
+    youtubeVideoId: extras?.youtubeVideoId || null,
+    youtubePrivacyStatus: extras?.youtubePrivacyStatus || null,
+    youtubeTitle: extras?.youtubeTitle || null,
+    youtubeDescription: extras?.youtubeDescription || null,
+    youtubeTags: extras?.youtubeTags || [],
+    isShortsEligible: Boolean(extras?.isShortsEligible),
+    uploadErrorMessage: extras?.uploadErrorMessage || null,
   };
 
   const next = [project, ...current].sort((a, b) => b.createdAt - a.createdAt);
@@ -491,6 +662,30 @@ export async function upsertWorkflowProject(options: {
   finalBackgroundMusic?: BackgroundMusicTrack | null;
   musicVideoPreview?: VideoPreviewAsset | null;
   finalMusicVideo?: VideoPreviewAsset | null;
+  script?: SavedProject['script'];
+  scriptParagraphs?: SavedProject['scriptParagraphs'];
+  sceneList?: SavedProject['sceneList'];
+  sceneDuration?: SavedProject['sceneDuration'];
+  ttsFiles?: SavedProject['ttsFiles'];
+  ttsDuration?: SavedProject['ttsDuration'];
+  generationMode?: SavedProject['generationMode'];
+  sceneSourceType?: SavedProject['sceneSourceType'];
+  encodingMode?: SavedProject['encodingMode'];
+  subtitlePreset?: SavedProject['subtitlePreset'];
+  subtitlePosition?: SavedProject['subtitlePosition'];
+  subtitleBackgroundOpacity?: SavedProject['subtitleBackgroundOpacity'];
+  prompts?: SavedProject['prompts'];
+  youtubeConnectedAccount?: SavedProject['youtubeConnectedAccount'];
+  youtubeChannelTitle?: SavedProject['youtubeChannelTitle'];
+  youtubeUploadStatus?: SavedProject['youtubeUploadStatus'];
+  youtubeUploadedAt?: SavedProject['youtubeUploadedAt'];
+  youtubeVideoId?: SavedProject['youtubeVideoId'];
+  youtubePrivacyStatus?: SavedProject['youtubePrivacyStatus'];
+  youtubeTitle?: SavedProject['youtubeTitle'];
+  youtubeDescription?: SavedProject['youtubeDescription'];
+  youtubeTags?: SavedProject['youtubeTags'];
+  isShortsEligible?: SavedProject['isShortsEligible'];
+  uploadErrorMessage?: SavedProject['uploadErrorMessage'];
 }): Promise<SavedProject> {
   const safeTopic = options.topic?.trim() || '새 프로젝트';
   const patch = {
@@ -507,6 +702,30 @@ export async function upsertWorkflowProject(options: {
     finalBackgroundMusic: options.finalBackgroundMusic || null,
     musicVideoPreview: options.musicVideoPreview || null,
     finalMusicVideo: options.finalMusicVideo || null,
+    script: options.script ?? null,
+    scriptParagraphs: options.scriptParagraphs || [],
+    sceneList: options.sceneList || [],
+    sceneDuration: typeof options.sceneDuration === 'number' ? options.sceneDuration : null,
+    ttsFiles: options.ttsFiles || [],
+    ttsDuration: typeof options.ttsDuration === 'number' ? options.ttsDuration : null,
+    generationMode: options.generationMode,
+    sceneSourceType: options.sceneSourceType,
+    encodingMode: options.encodingMode || 'browser',
+    subtitlePreset: options.subtitlePreset || null,
+    subtitlePosition: options.subtitlePosition || null,
+    subtitleBackgroundOpacity: typeof options.subtitleBackgroundOpacity === 'number' ? options.subtitleBackgroundOpacity : null,
+    prompts: options.prompts || null,
+    youtubeConnectedAccount: options.youtubeConnectedAccount || null,
+    youtubeChannelTitle: options.youtubeChannelTitle || null,
+    youtubeUploadStatus: options.youtubeUploadStatus || 'idle',
+    youtubeUploadedAt: typeof options.youtubeUploadedAt === 'number' ? options.youtubeUploadedAt : null,
+    youtubeVideoId: options.youtubeVideoId || null,
+    youtubePrivacyStatus: options.youtubePrivacyStatus || null,
+    youtubeTitle: options.youtubeTitle || null,
+    youtubeDescription: options.youtubeDescription || null,
+    youtubeTags: options.youtubeTags || [],
+    isShortsEligible: Boolean(options.isShortsEligible),
+    uploadErrorMessage: options.uploadErrorMessage || null,
   } as Partial<SavedProject>;
 
   if (options.projectId) {
@@ -534,6 +753,30 @@ export async function upsertWorkflowProject(options: {
       finalBackgroundMusic: options.finalBackgroundMusic || null,
       musicVideoPreview: options.musicVideoPreview || null,
       finalMusicVideo: options.finalMusicVideo || null,
+      script: options.script ?? null,
+      scriptParagraphs: options.scriptParagraphs || [],
+      sceneList: options.sceneList || [],
+      sceneDuration: typeof options.sceneDuration === 'number' ? options.sceneDuration : null,
+      ttsFiles: options.ttsFiles || [],
+      ttsDuration: typeof options.ttsDuration === 'number' ? options.ttsDuration : null,
+      generationMode: options.generationMode,
+      sceneSourceType: options.sceneSourceType,
+      encodingMode: options.encodingMode || 'browser',
+      subtitlePreset: options.subtitlePreset || null,
+      subtitlePosition: options.subtitlePosition || null,
+      subtitleBackgroundOpacity: typeof options.subtitleBackgroundOpacity === 'number' ? options.subtitleBackgroundOpacity : null,
+      prompts: options.prompts || null,
+      youtubeConnectedAccount: options.youtubeConnectedAccount || null,
+      youtubeChannelTitle: options.youtubeChannelTitle || null,
+      youtubeUploadStatus: options.youtubeUploadStatus || 'idle',
+      youtubeUploadedAt: typeof options.youtubeUploadedAt === 'number' ? options.youtubeUploadedAt : null,
+      youtubeVideoId: options.youtubeVideoId || null,
+      youtubePrivacyStatus: options.youtubePrivacyStatus || null,
+      youtubeTitle: options.youtubeTitle || null,
+      youtubeDescription: options.youtubeDescription || null,
+      youtubeTags: options.youtubeTags || [],
+      isShortsEligible: Boolean(options.isShortsEligible),
+      uploadErrorMessage: options.uploadErrorMessage || null,
     }
   );
 }
@@ -718,6 +961,66 @@ export async function duplicateProject(id: string): Promise<SavedProject | null>
 }
 
 
+function buildWorkflowTransferSummary(project: SavedProject) {
+  const draft = project.workflowDraft || null;
+  const selectedCharacters = Array.isArray(draft?.extractedCharacters)
+    ? draft.extractedCharacters.map((character) => ({
+        id: character.id,
+        name: character.name,
+        role: character.role || character.roleLabel || null,
+      }))
+    : [];
+  const selectedStyle = Array.isArray(draft?.styleImages)
+    ? draft.styleImages.find((style) => style.id === draft?.selectedStyleImageId) || draft.styleImages[0] || null
+    : null;
+  const selectedPromptTemplate = Array.isArray(draft?.promptTemplates)
+    ? draft.promptTemplates.find((template) => template.id === draft?.selectedPromptTemplateId) || draft.promptTemplates[0] || null
+    : null;
+
+  return {
+    topic: draft?.topic || project.topic || '',
+    _comment_topic: 'Step2에서 정한 프로젝트 주제',
+    contentType: draft?.contentType || null,
+    _comment_contentType: 'Step1에서 선택한 콘텐츠 유형',
+    aspectRatio: draft?.aspectRatio || null,
+    _comment_aspectRatio: 'Step1에서 선택한 화면 비율',
+    selections: draft?.selections || null,
+    _comment_selections: 'Step2에서 고른 장르, 분위기, 배경, 주인공, 갈등 값',
+    selectedCharacters,
+    _comment_selectedCharacters: 'Step4에서 선택된 출연자 목록',
+    selectedCharacterStyleLabel: draft?.selectedCharacterStyleLabel || null,
+    _comment_selectedCharacterStyleLabel: 'Step4의 공통 출연자 스타일 이름',
+    selectedCharacterStylePrompt: draft?.selectedCharacterStylePrompt || null,
+    _comment_selectedCharacterStylePrompt: 'Step4의 공통 출연자 스타일 프롬프트',
+    selectedStyleLabel: selectedStyle?.groupLabel || selectedStyle?.label || null,
+    _comment_selectedStyleLabel: 'Step5에서 선택한 최종 화풍 카드 이름',
+    selectedStylePrompt: selectedStyle?.prompt || null,
+    _comment_selectedStylePrompt: 'Step5에서 선택한 최종 화풍 프롬프트',
+    selectedPromptTemplateName: selectedPromptTemplate?.name || null,
+    _comment_selectedPromptTemplateName: 'Step3에서 선택한 프롬프트 카드 이름',
+    promptTransfer: {
+      storyPrompt: draft?.promptPack?.storyPrompt || project.prompts?.scriptPrompt || null,
+      _comment_storyPrompt: '대본 생성용 기본 스토리 프롬프트',
+      scenePrompt: draft?.promptPack?.scenePrompt || project.prompts?.scenePrompt || null,
+      _comment_scenePrompt: '씬 분해와 장면 작성 기준 프롬프트',
+      characterPrompt: draft?.promptPack?.characterPrompt || null,
+      _comment_characterPrompt: '출연자 캐릭터 설정 기준 프롬프트',
+      actionPrompt: draft?.promptPack?.actionPrompt || project.prompts?.motionPrompt || null,
+      _comment_actionPrompt: '모션/행동 연출 기준 프롬프트',
+      imagePrompt: project.prompts?.imagePrompt || null,
+      _comment_imagePrompt: '씬별 이미지 프롬프트를 합쳐 둔 값',
+      videoPrompt: project.prompts?.videoPrompt || null,
+      _comment_videoPrompt: '씬별 영상 프롬프트를 합쳐 둔 값',
+    },
+    script: project.script || draft?.script || '',
+    _comment_script: 'Step3 최종 대본 또는 Step6에서 편집된 최신 대본',
+    paragraphCount: Array.isArray(project.scriptParagraphs) ? project.scriptParagraphs.length : 0,
+    _comment_paragraphCount: 'Step6에서 씬으로 나뉜 총 문단 수',
+    sceneCount: Array.isArray(project.sceneList) ? project.sceneList.length : 0,
+    _comment_sceneCount: '현재 프로젝트에 저장된 총 씬 수',
+  };
+}
+
 export function buildProjectsExportPayload(projects: SavedProject[]) {
   const normalizedProjects = Array.isArray(projects)
     ? projects.map((project) => sanitizeProjectForTransport(project))
@@ -725,10 +1028,13 @@ export function buildProjectsExportPayload(projects: SavedProject[]) {
 
   return {
     format: 'mp4creater-project-export',
-    version: 1,
+    version: 2,
     exportedAt: Date.now(),
     projectCount: normalizedProjects.length,
-    projects: normalizedProjects,
+    projects: normalizedProjects.map((project) => ({
+      ...project,
+      workflowTransferSummary: buildWorkflowTransferSummary(project),
+    })),
   };
 }
 

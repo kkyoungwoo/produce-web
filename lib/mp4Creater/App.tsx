@@ -103,6 +103,9 @@ function createOptimisticWorkflowProject(options: {
     lastSavedAt: now,
     settings: {
       imageModel: CONFIG.DEFAULT_IMAGE_MODEL,
+      videoModel: CONFIG.DEFAULT_VIDEO_MODEL,
+      scriptModel: options.workflowDraft?.customScriptSettings?.scriptModel || options.workflowDraft?.openRouterModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+      sceneModel: options.workflowDraft?.customScriptSettings?.scriptModel || options.workflowDraft?.openRouterModel || CONFIG.DEFAULT_SCRIPT_MODEL,
       outputMode: options.workflowDraft?.outputMode || 'video',
       elevenLabsModel: CONFIG.DEFAULT_ELEVENLABS_MODEL,
     },
@@ -189,6 +192,29 @@ const resolveBasePath = (pathname?: string | null) => {
   if (markerIndex < 0) return value;
   return value.slice(0, markerIndex + '/mp4Creater'.length);
 };
+
+function applyStudioDefaultsToWorkflowDraft(baseDraft: WorkflowDraft, studioState?: StudioState | null): WorkflowDraft {
+  const routing = studioState?.routing;
+  return {
+    ...baseDraft,
+    openRouterModel: routing?.scriptModel || routing?.textModel || baseDraft.openRouterModel,
+    customScriptSettings: {
+      expectedDurationMinutes: baseDraft.customScriptSettings?.expectedDurationMinutes || 1,
+      speechStyle: baseDraft.customScriptSettings?.speechStyle || 'default',
+      language: baseDraft.customScriptSettings?.language || 'ko',
+      referenceText: baseDraft.customScriptSettings?.referenceText || '',
+      referenceLinks: baseDraft.customScriptSettings?.referenceLinks || [],
+      scriptModel: routing?.scriptModel || routing?.textModel || baseDraft.customScriptSettings?.scriptModel || baseDraft.openRouterModel,
+    },
+    ttsProvider: baseDraft.ttsProvider || routing?.ttsProvider || 'qwen3Tts',
+    elevenLabsVoiceId: baseDraft.elevenLabsVoiceId ?? routing?.elevenLabsVoiceId ?? null,
+    elevenLabsModelId: baseDraft.elevenLabsModelId ?? routing?.elevenLabsModelId ?? routing?.audioModel ?? null,
+    heygenVoiceId: baseDraft.heygenVoiceId ?? routing?.heygenVoiceId ?? null,
+    qwenVoicePreset: baseDraft.qwenVoicePreset || routing?.qwenVoicePreset || 'qwen-default',
+    qwenStylePreset: baseDraft.qwenStylePreset || routing?.qwenStylePreset || 'balanced',
+    updatedAt: Date.now(),
+  };
+}
 
 let hasBootstrappedSession = false;
 
@@ -492,7 +518,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       }
 
       const currentState = await ensureRuntimeStorageReady(studioStateRef.current || studioState || createDefaultStudioState());
-      const nextDraft = createDefaultWorkflowDraft(forceType || 'story');
+      const nextDraft = applyStudioDefaultsToWorkflowDraft(createDefaultWorkflowDraft(forceType || 'story'), currentState);
       const safeProjectName = projectName?.trim() || '';
       if (safeProjectName) nextDraft.topic = safeProjectName;
       const topic = safeProjectName || nextDraft.topic || '새 프로젝트';
@@ -862,14 +888,34 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
     setViewMode('main');
 
+    const baseStudioState = studioStateRef.current || createDefaultStudioState();
+    const nextRouting = {
+      ...baseStudioState.routing,
+      imageModel: project.settings?.imageModel || baseStudioState.routing.imageModel,
+      videoModel: project.settings?.videoModel || baseStudioState.routing.videoModel,
+      scriptModel: project.settings?.scriptModel || baseStudioState.routing.scriptModel || baseStudioState.routing.textModel,
+      textModel: project.settings?.scriptModel || baseStudioState.routing.textModel || baseStudioState.routing.scriptModel,
+      sceneModel: project.settings?.sceneModel || baseStudioState.routing.sceneModel || baseStudioState.routing.imagePromptModel,
+      imagePromptModel: project.settings?.sceneModel || baseStudioState.routing.imagePromptModel || baseStudioState.routing.sceneModel,
+      motionPromptModel: project.settings?.sceneModel || baseStudioState.routing.motionPromptModel || baseStudioState.routing.sceneModel,
+      elevenLabsModelId: project.settings?.elevenLabsModel || baseStudioState.routing.elevenLabsModelId || baseStudioState.routing.audioModel,
+      audioModel: project.settings?.elevenLabsModel || baseStudioState.routing.audioModel,
+    };
+
+    const nextState = {
+      ...baseStudioState,
+      routing: nextRouting,
+      updatedAt: Date.now(),
+      ...(mergedWorkflowDraft
+        ? {
+            workflowDraft: mergedWorkflowDraft,
+            lastContentType: mergedWorkflowDraft.contentType || baseStudioState.lastContentType || 'story',
+          }
+        : {}),
+    };
+    setStudioState(nextState);
+
     if (mergedWorkflowDraft) {
-      const nextState = {
-        ...(studioStateRef.current || createDefaultStudioState()),
-        workflowDraft: mergedWorkflowDraft,
-        lastContentType: mergedWorkflowDraft.contentType || studioStateRef.current?.lastContentType || 'story',
-        updatedAt: Date.now(),
-      };
-      setStudioState(nextState);
       pendingWorkflowDraftRef.current = mergedWorkflowDraft;
       if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
       workflowDraftSaveTimerRef.current = window.setTimeout(() => {
@@ -959,20 +1005,53 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     });
     setStudioState(nextState);
     setShowStartupWizard(!nextState.isStorageConfigured || !nextState.storageDir?.trim());
+
+    if (currentProjectId && partial.routing) {
+      const currentProject = await updateProject(currentProjectId, {
+        settings: {
+          imageModel: partial.routing.imageModel || nextState.routing.imageModel,
+          videoModel: partial.routing.videoModel || nextState.routing.videoModel,
+          scriptModel: partial.routing.scriptModel || partial.routing.textModel || nextState.routing.scriptModel || nextState.routing.textModel,
+          sceneModel: partial.routing.sceneModel || partial.routing.imagePromptModel || partial.routing.motionPromptModel || nextState.routing.sceneModel,
+          outputMode: nextState.workflowDraft?.outputMode || 'video',
+          elevenLabsModel: partial.routing.elevenLabsModelId || partial.routing.audioModel || nextState.routing.elevenLabsModelId || nextState.routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+        },
+      });
+      if (currentProject) {
+        applyProjectListSnapshot([currentProject, ...savedProjects.filter((item) => item.id !== currentProject.id)]);
+      }
+    }
   };
 
   const handleQuickRoutingUpdate = async (patch: Partial<StudioState['routing']>) => {
     const currentState = studioStateRef.current;
     if (!currentState) return;
+    const nextRouting = {
+      ...currentState.routing,
+      ...patch,
+    };
     const nextState = await saveStudioState({
       ...currentState,
-      routing: {
-        ...currentState.routing,
-        ...patch,
-      },
+      routing: nextRouting,
       updatedAt: Date.now(),
     });
     setStudioState(nextState);
+
+    if (currentProjectId) {
+      const currentProject = await updateProject(currentProjectId, {
+        settings: {
+          imageModel: nextRouting.imageModel || CONFIG.DEFAULT_IMAGE_MODEL,
+          videoModel: nextRouting.videoModel || CONFIG.DEFAULT_VIDEO_MODEL,
+          scriptModel: nextRouting.scriptModel || nextRouting.textModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+          sceneModel: nextRouting.sceneModel || nextRouting.imagePromptModel || nextRouting.motionPromptModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+          outputMode: nextState.workflowDraft?.outputMode || 'video',
+          elevenLabsModel: nextRouting.elevenLabsModelId || nextRouting.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+        },
+      });
+      if (currentProject) {
+        applyProjectListSnapshot([currentProject, ...savedProjects.filter((item) => item.id !== currentProject.id)]);
+      }
+    }
   };
 
   const handleSaveWorkflowDraft = (draftPatch: Partial<WorkflowDraft>) => {
