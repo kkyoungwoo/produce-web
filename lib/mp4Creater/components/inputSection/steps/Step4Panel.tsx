@@ -632,20 +632,9 @@ export default function Step4Panel({
                   <div key={character.id} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="flex items-start gap-3">
-                        {resolveCharacterPreview(character) ? (
-                          <img
-                            src={resolveCharacterPreview(character)}
-                            alt={`${character.name} 대표 미리보기`}
-                            className="h-16 w-16 rounded-2xl object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-200 text-lg font-black text-slate-600">
-                            {getCharacterInitial(character.name)}
-                          </div>
-                        )}
-                        <div>
+                        <div className='flex'>
                           <div className="text-lg font-black text-slate-900">{character.name}</div>
-                          <div className="mt-1 text-xs text-slate-500">
+                          <div className="mt-1 text-xs text-slate-500 ml-4">
                             {character.roleLabel ||
                               (character.role === 'lead' ? '주인공' : character.role === 'support' ? '조연' : '출연자')}
                             {' · '}

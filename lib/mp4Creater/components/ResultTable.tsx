@@ -10,10 +10,34 @@ import { downloadProjectZip } from '../utils/csvHelper';
 import { downloadSrt } from '../services/srtService';
 import { prepareDavinciResolveImport, saveDavinciResolvePackageZip } from '../services/davinciResolveService';
 import HelpTip from './HelpTip';
+import SceneStudioPreviewPage from './scene-studio/SceneStudioPreviewPage';
 import { blobFromDataValue, extensionFromMime, triggerSequentialDownloads } from '../utils/downloadHelpers';
 
 type PreviewVideoStatus = 'idle' | 'loading' | 'ready' | 'fallback' | 'error';
 type SceneEditorMode = 'narration' | 'image' | 'video';
+type ScenePreviewMode = 'image' | 'video' | 'audio';
+type ModelPickerKind = 'image' | 'video' | 'audio';
+
+interface AudioHistoryEntry {
+  id: string;
+  data: string;
+  createdAt: number;
+  label?: string;
+  duration?: number | null;
+}
+
+interface QuickModelOption {
+  id: string;
+  label: string;
+  helper?: string;
+}
+
+interface QuickModelSelector {
+  currentId?: string | null;
+  currentLabel: string;
+  options: QuickModelOption[];
+  onSelect?: (id: string) => void;
+}
 
 interface ResultTableProps {
   data: GeneratedAsset[];
@@ -61,10 +85,28 @@ interface ResultTableProps {
   storageDir?: string;
   projectId?: string | null;
   projectNumber?: number | null;
+  imageModelSelector?: QuickModelSelector;
+  videoModelSelector?: QuickModelSelector;
+  audioModelSelector?: QuickModelSelector;
 }
 
 const formatSeconds = (value?: number | null) => (typeof value === 'number' ? `${value.toFixed(1)}초` : '-');
 const MAX_SCENE_DURATION = 6;
+const clampMediaVolume = (value?: number | null) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return 1;
+  return Math.max(0, Math.min(1, value));
+};
+
+const getAdjustedAudioDuration = (audioDuration?: number | null, silenceTrim?: number | null) => {
+  const baseDuration = typeof audioDuration === 'number' && !Number.isNaN(audioDuration) ? audioDuration : 0;
+  if (!baseDuration) return 0;
+  const trimRatio = Math.max(0, Math.min(100, silenceTrim ?? 0)) / 100;
+  return Math.max(0, baseDuration * (1 - trimRatio));
+};
+
+const getSceneCutDuration = (row: GeneratedAsset, silenceTrim?: number | null) => {
+  return Math.max(3, Math.min(row.targetDuration || 3, getAdjustedAudioDuration(row.audioDuration, silenceTrim) || row.targetDuration || 3));
+};
 
 const resolveImageSrc = (value?: string | null) => {
   if (!value) return '';
@@ -150,23 +192,22 @@ async function createLowQualityPreview(src: string): Promise<string> {
 
 function collectMediaHistory(row: GeneratedAsset, kind: 'image' | 'video'): AssetHistoryItem[] {
   const currentData = kind === 'image' ? row.imageData : row.videoData;
-  const current: AssetHistoryItem[] = currentData ? [{
+  const history = (kind === 'image' ? row.imageHistory : row.videoHistory) || [];
+  if (!currentData) return history.filter((item) => Boolean(item?.data));
+
+  const latestHistory = history[0];
+  if (latestHistory?.data === currentData) {
+    return history.filter((item) => Boolean(item?.data));
+  }
+
+  return [{
     id: `${kind}_current_${row.sceneNumber}`,
     kind,
     data: currentData,
-    sourceMode: row.sourceMode === 'ai' ? 'ai' : 'sample',
+    sourceMode: (row.sourceMode === 'ai' ? 'ai' : 'sample') as 'ai' | 'sample',
     createdAt: Date.now(),
-    label: kind === 'image' ? '현재 사용 중 이미지' : '현재 사용 중 영상',
-  }] : [];
-  const history = (kind === 'image' ? row.imageHistory : row.videoHistory) || [];
-  const deduped: AssetHistoryItem[] = [];
-  const seen = new Set<string>();
-  [...current, ...history].forEach((item) => {
-    if (!item?.data || seen.has(item.data)) return;
-    seen.add(item.data);
-    deduped.push(item);
-  });
-  return deduped;
+    label: kind === 'image' ? '현재 이미지' : '현재 동영상',
+  }, ...history].filter((item) => Boolean(item?.data));
 }
 
 
@@ -271,8 +312,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
   storageDir,
   projectId,
   projectNumber,
+  imageModelSelector,
+  videoModelSelector,
+  audioModelSelector,
 }) => {
-  const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
   const [previewOpen, setPreviewOpen] = useState(false);
   const [davinciStatusMessage, setDavinciStatusMessage] = useState('');
   const [davinciPackagePath, setDavinciPackagePath] = useState<string | null>(null);
@@ -282,7 +325,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [sequenceSceneIndex, setSequenceSceneIndex] = useState(0);
   const [sequencePlaying, setSequencePlaying] = useState(false);
   const [sequenceRunId, setSequenceRunId] = useState(0);
-  const [imageLightbox, setImageLightbox] = useState<{ src: string; title: string; aspectRatio?: GeneratedAsset['aspectRatio'] } | null>(null);
+  const [mediaLightbox, setMediaLightbox] = useState<{ kind: ScenePreviewMode; src: string; title: string; aspectRatio?: GeneratedAsset['aspectRatio'] } | null>(null);
   const [mediaViewer, setMediaViewer] = useState<{ kind: 'image' | 'video'; sceneNumber: number; entries: AssetHistoryItem[]; currentIndex: number; aspectRatio?: GeneratedAsset['aspectRatio'] } | null>(null);
   const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
   const previewSequenceAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -292,15 +335,27 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const sceneStripRef = useRef<HTMLDivElement | null>(null);
   const sceneCardRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const sceneMediaStripRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const lastAutoFocusedSceneRef = useRef<number | null>(null);
-  const [previewImageMap, setPreviewImageMap] = useState<Record<string, string>>({});
+    const [previewImageMap, setPreviewImageMap] = useState<Record<string, string>>({});
   const [sceneEditorModes, setSceneEditorModes] = useState<Record<number, SceneEditorMode>>({});
+  const [scenePreviewModes, setScenePreviewModes] = useState<Record<number, ScenePreviewMode>>({});
   const [sceneAudioRates, setSceneAudioRates] = useState<Record<number, number>>({});
+  const [sceneAudioHistory, setSceneAudioHistory] = useState<Record<number, AudioHistoryEntry[]>>({});
+  const [sceneAudioIndices, setSceneAudioIndices] = useState<Record<number, number>>({});
+  const [sceneNarrationVolumes, setSceneNarrationVolumes] = useState<Record<number, number>>({});
+  const [sceneVideoAudioVolumes, setSceneVideoAudioVolumes] = useState<Record<number, number>>({});
+  const [sceneSilenceTrim, setSceneSilenceTrim] = useState<Record<number, number>>({});
   const [sceneMediaIndices, setSceneMediaIndices] = useState<Record<string, number>>({});
   const [sceneMediaShift, setSceneMediaShift] = useState<Record<string, number>>({});
   const [sceneActionLocks, setSceneActionLocks] = useState<Record<string, boolean>>({});
+  const [activeModelPicker, setActiveModelPicker] = useState<{ index: number; kind: ModelPickerKind } | null>(null);
+  const [sceneInlineSettingsOpen, setSceneInlineSettingsOpen] = useState<Record<number, boolean>>({});
   const sceneActionLocksRef = useRef<Record<string, boolean>>({});
   const previewQueueRef = useRef<Set<string>>(new Set());
+  const sceneAudioStripRefs = useRef<Record<number, HTMLDivElement | null>>({});
+  const sceneAudioElementRefs = useRef<Record<number, HTMLAudioElement | null>>({});
+  const sceneVideoElementRefs = useRef<Record<number, HTMLVideoElement | null>>({});
+  const scenePreviewSignatureRefs = useRef<Record<string, string>>({});
+  const scenePreviewSignatureInitRef = useRef(false);
 
   const summary = useMemo(() => {
     const imageCount = data.filter((item) => item.imageData).length;
@@ -469,6 +524,109 @@ const ResultTable: React.FC<ResultTableProps> = ({
     });
   }, [data]);
 
+  useEffect(() => {
+    setSceneAudioHistory((prev) => {
+      let changed = false;
+      const next: Record<number, AudioHistoryEntry[]> = { ...prev };
+
+      data.forEach((row, index) => {
+        const existing = next[index] || [];
+        const merged = [...existing];
+        const currentAudio = row.audioData?.trim()
+          ? {
+              id: `audio_current_${row.sceneNumber}_${index}`,
+              data: row.audioData,
+              createdAt: Date.now(),
+              label: existing.length ? '최신 오디오' : '현재 오디오',
+              duration: row.audioDuration,
+            }
+          : null;
+
+        if (currentAudio && !merged.some((item) => item.data === currentAudio.data)) {
+          merged.push(currentAudio);
+        }
+
+        if (merged.length !== existing.length) {
+          next[index] = merged;
+          changed = true;
+        } else if (!next[index] && merged.length) {
+          next[index] = merged;
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [data]);
+
+  useEffect(() => {
+    setSceneAudioIndices((prev) => {
+      let changed = false;
+      const next = { ...prev } as Record<string, number> & Record<number, number>;
+      Object.entries(sceneAudioHistory as Record<string, AudioHistoryEntry[]>).forEach(([indexKey, entries]) => {
+        if (!entries.length) return;
+        const index = Number(indexKey);
+        const latestEntry = entries[entries.length - 1] || null;
+        const signatureKey = `${index}__audio_sig`;
+        const signature = `${latestEntry?.id || ''}:${latestEntry?.data?.slice(0, 48) || ''}:${entries.length}`;
+        if ((next as Record<string, unknown>)[signatureKey] !== signature) {
+          next[index] = entries.length - 1;
+          (next as Record<string, unknown>)[signatureKey] = signature;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [sceneAudioHistory]);
+
+  useEffect(() => {
+    setScenePreviewModes((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      const nextSignatures: Record<string, string> = {};
+
+      data.forEach((row, index) => {
+        const latestImage = collectOrderedMediaHistory(row, 'image').slice(-1)[0] || null;
+        const latestVideo = collectOrderedMediaHistory(row, 'video').slice(-1)[0] || null;
+        const latestAudio = row.audioData?.trim()
+          ? `${row.audioData.slice(0, 64)}:${row.audioDuration || 0}`
+          : '';
+
+        const imageKey = `image-${index}`;
+        const videoKey = `video-${index}`;
+        const audioKey = `audio-${index}`;
+
+        const imageSignature = latestImage ? `${latestImage.id}:${latestImage.data.slice(0, 64)}` : '';
+        const videoSignature = latestVideo ? `${latestVideo.id}:${latestVideo.data.slice(0, 64)}` : '';
+
+        nextSignatures[imageKey] = imageSignature;
+        nextSignatures[videoKey] = videoSignature;
+        nextSignatures[audioKey] = latestAudio;
+
+        if (!scenePreviewSignatureInitRef.current) return;
+
+        if (row.selectedVisualType === 'image' && imageSignature && scenePreviewSignatureRefs.current[imageKey] !== imageSignature && next[index] !== 'image') {
+          next[index] = 'image';
+          changed = true;
+        }
+
+        if (row.selectedVisualType === 'video' && videoSignature && scenePreviewSignatureRefs.current[videoKey] !== videoSignature && next[index] !== 'video') {
+          next[index] = 'video';
+          changed = true;
+        }
+
+        if (latestAudio && scenePreviewSignatureRefs.current[audioKey] !== latestAudio && next[index] !== 'audio') {
+          next[index] = 'audio';
+          changed = true;
+        }
+      });
+
+      scenePreviewSignatureRefs.current = nextSignatures;
+      scenePreviewSignatureInitRef.current = true;
+      return changed ? next : prev;
+    });
+  }, [data]);
+
   const getDisplayImageSrc = (src: string) => previewImageMap[src] || src;
 
   const getSceneEditorMode = (_row: GeneratedAsset, index: number): SceneEditorMode => {
@@ -504,6 +662,57 @@ const ResultTable: React.FC<ResultTableProps> = ({
     element.defaultPlaybackRate = rate;
   };
 
+  const getSceneNarrationVolume = (index: number) => sceneNarrationVolumes[index] ?? 1;
+  const getSceneVideoAudioVolume = (index: number) => sceneVideoAudioVolumes[index] ?? 1;
+  const getSceneSilenceTrim = (index: number) => sceneSilenceTrim[index] ?? 0;
+
+  const applySceneNarrationState = (index: number, element: HTMLAudioElement | null) => {
+    if (!element) return;
+    applyAudioPlaybackRate(element, getSceneAudioRate(index));
+    element.volume = clampMediaVolume(getSceneNarrationVolume(index));
+  };
+
+  const applySceneVideoState = (index: number, element: HTMLVideoElement | null) => {
+    if (!element) return;
+    element.volume = clampMediaVolume(getSceneVideoAudioVolume(index));
+  };
+
+  const getScenePreviewMode = (row: GeneratedAsset, index: number): ScenePreviewMode => {
+    const savedMode = scenePreviewModes[index];
+    if (savedMode === 'audio' && row.audioData) return 'audio';
+    if (savedMode === 'video' && hasRenderableVideo(row)) return 'video';
+    if (savedMode === 'image' && hasRenderableImage(row)) return 'image';
+    if (hasRenderableImage(row)) return 'image';
+    if (hasRenderableVideo(row)) return 'video';
+    if (row.audioData) return 'audio';
+    return 'image';
+  };
+
+  const getSceneAudioEntries = (index: number) => sceneAudioHistory[index] || [];
+
+  const getSceneAudioIndex = (index: number, total: number) => {
+    if (total <= 1) return Math.max(0, total - 1);
+    const savedIndex = sceneAudioIndices[index];
+    if (typeof savedIndex !== 'number') return total - 1;
+    return Math.max(0, Math.min(total - 1, savedIndex));
+  };
+
+  const shiftSceneAudioIndex = (index: number, total: number, direction: -1 | 1) => {
+    if (total <= 1) return;
+    setSceneAudioIndices((prev) => {
+      const current = typeof prev[index] === 'number' ? prev[index] : total - 1;
+      return {
+        ...prev,
+        [index]: Math.max(0, Math.min(total - 1, current + direction)),
+      };
+    });
+  };
+
+  const getModelSelector = (kind: ModelPickerKind) => {
+    if (kind === 'image') return imageModelSelector;
+    if (kind === 'video') return videoModelSelector;
+    return audioModelSelector;
+  };
 
   const getSceneMediaKey = (index: number, kind: 'image' | 'video') => `${index}-${kind}`;
 
@@ -567,14 +776,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
     },
   };
 
-  const scrollToSceneCard = (index: number) => {
-    const target = sceneCardRefs.current[index];
-    if (!target) return;
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  const togglePanel = (key: string) => {
-    setOpenPanels((prev) => ({ ...prev, [key]: !prev[key] }));
+  const preventButtonFocusScroll = (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
   };
 
   const openPreviewAtScene = (index: number, autoplay: boolean = true) => {
@@ -617,23 +820,35 @@ const ResultTable: React.FC<ResultTableProps> = ({
   }, [data, sceneMediaIndices]);
 
   useEffect(() => {
-    if (isGenerating) return;
-    if (activeSceneIndex < 0 || lastAutoFocusedSceneRef.current === activeSceneIndex) return;
-    lastAutoFocusedSceneRef.current = activeSceneIndex;
-    const target = sceneCardRefs.current[activeSceneIndex];
-    if (!target) return;
-    window.setTimeout(() => {
-      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }, 120);
-  }, [activeSceneIndex, isGenerating]);
+    Object.entries(sceneAudioHistory as Record<string, AudioHistoryEntry[]>).forEach(([indexKey, entries]) => {
+      if (!entries.length) return;
+      const index = Number(indexKey);
+      const container = sceneAudioStripRefs.current[index];
+      if (!container) return;
+      const selectedIndex = getSceneAudioIndex(index, entries.length);
+      const target = container.querySelector<HTMLElement>(`[data-scene-audio-card="${index}-${selectedIndex}"]`);
+      if (target) scrollElementIntoView(target);
+    });
+  }, [sceneAudioHistory, sceneAudioIndices]);
 
   useEffect(() => {
-    if (!previewOpen) return;
-    if (finalVideoUrl) return;
-    if (!onPreparePreviewVideo) return;
-    if (isPreparingPreviewVideo) return;
-    void onPreparePreviewVideo();
-  }, [finalVideoUrl, isPreparingPreviewVideo, onPreparePreviewVideo, previewOpen]);
+    Object.entries(sceneAudioElementRefs.current as Record<string, HTMLAudioElement | null>).forEach(([indexKey, element]) => {
+      applySceneNarrationState(Number(indexKey), element);
+    });
+  }, [sceneAudioRates, sceneNarrationVolumes]);
+
+  useEffect(() => {
+    Object.entries(sceneVideoElementRefs.current as Record<string, HTMLVideoElement | null>).forEach(([indexKey, element]) => {
+      applySceneVideoState(Number(indexKey), element);
+    });
+  }, [sceneVideoAudioVolumes]);
+
+  useEffect(() => {
+    setActiveModelPicker((prev) => {
+      if (!prev) return prev;
+      return data[prev.index] ? prev : null;
+    });
+  }, [data.length]);
 
   useEffect(() => {
     if (!previewOpen) {
@@ -670,13 +885,13 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
     if (narrationAudio) {
       narrationAudio.currentTime = 0;
-      narrationAudio.volume = previewMix?.narrationVolume || 1;
+      narrationAudio.volume = clampMediaVolume(previewMix?.narrationVolume || 1);
       void narrationAudio.play().catch(() => {});
     }
 
     if (bgmAudio && mainBgm?.audioData) {
       bgmAudio.loop = true;
-      bgmAudio.volume = previewMix?.backgroundMusicVolume || mainBgm.volume || 0.28;
+      bgmAudio.volume = clampMediaVolume(previewMix?.backgroundMusicVolume || mainBgm.volume || 0.28);
       if (bgmAudio.paused) {
         void bgmAudio.play().catch(() => {});
       }
@@ -726,24 +941,6 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <span className="rounded-full bg-slate-100 px-3 py-2">총 {formatSeconds(totalDuration)}</span>
               </div>
             </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                <div className={`${getAspectRatioPreviewClass(data[0]?.aspectRatio || '16:9', true)} overflow-hidden rounded-xl border border-slate-200 bg-white`} />
-                <div className="text-sm font-black text-slate-900">{data[0]?.aspectRatio || '16:9'}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">최종 출력</div>
-            </div>
-          </div>
-
-          <div className="grid gap-2 lg:grid-cols-4">
-            <button type="button" onClick={() => setPreviewOpen(true)} className="rounded-2xl bg-slate-900 px-4 py-3 text-sm font-black text-white hover:bg-slate-800">미리보기</button>
-            {onGenerateAllImages && (
-              <button type="button" onClick={() => void onGenerateAllImages?.()} disabled={isGenerating} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isGenerating ? '이미지 생성 중...' : '전체 이미지 생성'}</button>
-            )}
-            {onGenerateAllVideos && (
-              <button type="button" onClick={() => void onGenerateAllVideos?.()} disabled={Boolean(isGeneratingAllVideos) || isGenerating} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500">{isGeneratingAllVideos ? '영상 생성 중...' : '전체 영상 생성'}</button>
-            )}
           </div>
         {false && (
           <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${isGenerating || activeOverallProgress !== null ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
@@ -837,7 +1034,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                           <button type="button" onClick={() => {
                             if (!bgmAudioRef.current) return;
                             if (bgmAudioRef.current.paused) {
-                              bgmAudioRef.current.volume = previewMix?.backgroundMusicVolume || track.volume || 0.28;
+                              bgmAudioRef.current.volume = clampMediaVolume(previewMix?.backgroundMusicVolume || track.volume || 0.28);
                               bgmAudioRef.current.play();
                             } else {
                               bgmAudioRef.current.pause();
@@ -861,10 +1058,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
         </div>
       )}
 
-      <div className="mt-4 space-y-3">
+      <div className="mt-4 space-y-4">
         {displayedScenes.map((row, index) => {
-          const imageSrc = resolveImageSrc(row.imageData);
-          const audioSrc = resolveNarrationAudioSrc(row.audioData);
           const isAnimating = animatingIndices?.has(index) || false;
           const sceneProgress = sceneProgressMap?.[index] || null;
           const isSceneWorking = Boolean(sceneActionLocks[`image-${index}`] || sceneActionLocks[`video-${index}`] || sceneActionLocks[`audio-${index}`]) || isAnimating || row.status === 'generating' || Boolean(sceneProgress && sceneProgress.percent < 100);
@@ -872,18 +1067,62 @@ const ResultTable: React.FC<ResultTableProps> = ({
           const editorMeta = sceneEditorMeta[editorMode];
           const editorValue = getSceneEditorValue(row, editorMode);
           const selectedVisualType = getPreferredVisualType(row);
-          const activeHistoryKind = selectedVisualType === 'video' && hasRenderableVideo(row) ? 'video' : 'image';
-          const visualEntries = collectOrderedMediaHistory(row, activeHistoryKind);
-          const visualEntryIndex = getSceneMediaIndex(index, activeHistoryKind, visualEntries.length);
-          const visualEntry = visualEntries[visualEntryIndex] || null;
-          const visualPayload = activeHistoryKind === 'video'
-            ? { kind: 'video' as const, src: resolveVideoSrc(visualEntry?.data || row.videoData) }
-            : { kind: 'image' as const, src: resolveImageSrc(visualEntry?.data || row.imageData) };
-          const displayImageSrc = visualPayload.kind === 'image' && visualPayload.src ? getDisplayImageSrc(visualPayload.src) : '';
-          const sceneMediaKey = getSceneMediaKey(index, activeHistoryKind);
-          const sceneMediaOffset = sceneMediaShift[sceneMediaKey] || 0;
-          const hasPrevVisualEntry = visualEntryIndex > 0;
-          const hasNextVisualEntry = visualEntryIndex < visualEntries.length - 1;
+          const previewMode = getScenePreviewMode(row, index);
+
+          const imageEntries = collectOrderedMediaHistory(row, 'image');
+          const imageEntryIndex = getSceneMediaIndex(index, 'image', imageEntries.length);
+          const imageEntry = imageEntries[imageEntryIndex] || null;
+          const imageSrc = resolveImageSrc(imageEntry?.data || row.imageData);
+          const displayImageSrc = imageSrc ? getDisplayImageSrc(imageSrc) : '';
+          const imageHasPrev = imageEntryIndex > 0;
+          const imageHasNext = imageEntryIndex < imageEntries.length - 1;
+
+          const videoEntries = collectOrderedMediaHistory(row, 'video');
+          const videoEntryIndex = getSceneMediaIndex(index, 'video', videoEntries.length);
+          const videoEntry = videoEntries[videoEntryIndex] || null;
+          const videoSrc = resolveVideoSrc(videoEntry?.data || row.videoData);
+          const videoHasPrev = videoEntryIndex > 0;
+          const videoHasNext = videoEntryIndex < videoEntries.length - 1;
+
+          const audioEntries = getSceneAudioEntries(index);
+          const audioEntryIndex = getSceneAudioIndex(index, audioEntries.length);
+          const audioEntry = audioEntries[audioEntryIndex] || null;
+          const audioSrc = resolveNarrationAudioSrc(audioEntry?.data || row.audioData);
+          const audioHasPrev = audioEntryIndex > 0;
+          const audioHasNext = audioEntryIndex < audioEntries.length - 1;
+
+          const previewHistoryCount = previewMode === 'audio'
+            ? audioEntries.length
+            : previewMode === 'video'
+              ? videoEntries.length
+              : imageEntries.length;
+          const previewHistoryIndex = previewMode === 'audio'
+            ? audioEntryIndex
+            : previewMode === 'video'
+              ? videoEntryIndex
+              : imageEntryIndex;
+          const previewHasPrev = previewMode === 'audio'
+            ? audioHasPrev
+            : previewMode === 'video'
+              ? videoHasPrev
+              : imageHasPrev;
+          const previewHasNext = previewMode === 'audio'
+            ? audioHasNext
+            : previewMode === 'video'
+              ? videoHasNext
+              : imageHasNext;
+          const previewHistoryLabel = previewMode === 'audio'
+            ? (audioEntry?.label || `오디오 ${audioEntryIndex + 1}`)
+            : previewMode === 'video'
+              ? (videoEntry?.label || `영상 ${videoEntryIndex + 1}`)
+              : (imageEntry?.label || `이미지 ${imageEntryIndex + 1}`);
+          const sceneMediaOffset = previewMode === 'video'
+            ? (sceneMediaShift[getSceneMediaKey(index, 'video')] || 0)
+            : (sceneMediaShift[getSceneMediaKey(index, 'image')] || 0);
+          const narrationVolume = getSceneNarrationVolume(index);
+          const videoAudioVolume = getSceneVideoAudioVolume(index);
+          const silenceTrim = getSceneSilenceTrim(index);
+          const canGenerateVideo = Boolean(imageEntry?.data || row.imageData || imageEntries.length);
 
           return (
             <div
@@ -891,245 +1130,372 @@ const ResultTable: React.FC<ResultTableProps> = ({
               ref={(node) => {
                 sceneCardRefs.current[index] = node;
               }}
-              className={`overflow-hidden rounded-[24px] border bg-white shadow-sm transition-all duration-300 ${activeSceneIndex === index ? 'border-blue-300 ring-2 ring-blue-100' : 'border-slate-200'}`}
+              className={`overflow-visible rounded-[28px] border bg-white shadow-sm transition-all duration-300 ${activeSceneIndex === index ? 'border-blue-300 ring-2 ring-blue-100' : 'border-slate-200'}`}
             >
-              <div className="flex flex-col gap-3 xl:grid xl:grid-cols-[232px_minmax(0,1fr)_186px] xl:gap-0">
+              <div className="flex flex-col gap-0 xl:grid xl:grid-cols-[236px_minmax(0,1fr)_204px]">
                 <div className="border-b border-slate-200 bg-slate-50 p-3 xl:border-b-0 xl:border-r">
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <span className="rounded-full bg-slate-900 px-3 py-1 text-xs font-black text-white">씬 {row.sceneNumber}</span>
-                    <span className={`rounded-full px-3 py-1 text-xs font-black ${selectedVisualType === 'video' && row.videoData ? 'bg-emerald-100 text-emerald-700' : row.imageData ? 'bg-blue-100 text-blue-700' : 'bg-slate-200 text-slate-700'}`}>{selectedVisualType === 'video' && row.videoData ? '영상' : row.imageData ? '이미지' : '빈 씬'}</span>
-                  </div>
 
-                  <div className="group/scene-preview relative flex h-[190px] items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white px-2 py-2 xl:h-[172px]">
-                    {visualPayload.kind === 'video' && visualPayload.src ? (
-                      <video className="max-h-full max-w-full rounded-2xl object-contain transition-all duration-200" style={{ transform: `translateX(${sceneMediaOffset * 10}px)`, opacity: 1 }} playsInline muted controls preload="metadata">
-                        <source src={visualPayload.src} type="video/mp4" />
-                      </video>
-                    ) : displayImageSrc ? (
-                      <button type="button" onClick={() => setImageLightbox({ src: displayImageSrc, title: `씬 ${row.sceneNumber}`, aspectRatio: row.aspectRatio })} className="block text-left">
-                        <img src={displayImageSrc} alt={`씬 ${row.sceneNumber}`} className={`max-h-full max-w-full rounded-2xl object-contain transition-all duration-200 hover:scale-[1.01] ${isSceneWorking ? 'opacity-70' : ''}`} style={{ transform: `translateX(${sceneMediaOffset * 10}px)` }} />
-                      </button>
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 text-sm font-bold text-slate-400">빈 씬</div>
-                    )}
-                    {isSceneWorking && (
-                      <div className="absolute inset-0 flex flex-col justify-end bg-white/75 p-4 backdrop-blur-[1px]">
-                        {isAnimating ? (
-                          <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white/92">
-                            <div className="relative h-20 w-20">
-                              <svg viewBox="0 0 80 80" className="h-20 w-20 -rotate-90">
-                                <circle cx="40" cy="40" r="32" className="fill-none stroke-slate-200" strokeWidth="6" />
-                                <circle
-                                  cx="40"
-                                  cy="40"
-                                  r="32"
-                                  className="fill-none stroke-violet-600 transition-all duration-300"
-                                  strokeWidth="6"
-                                  strokeLinecap="round"
-                                  strokeDasharray={201}
-                                  strokeDashoffset={201 - ((sceneProgress?.percent ?? 12) / 100) * 201}
-                                />
-                              </svg>
-                              <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-slate-900">{sceneProgress?.percent ?? 12}%</div>
-                            </div>
-                            <div className="px-4 text-center text-xs font-black text-slate-700">{sceneProgress?.label || '영상 만드는 중'}</div>
-                          </div>
-                        ) : (
-                          <div className="rounded-2xl border border-slate-200 bg-white/95 p-3">
-                            <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
-                              <span>{sceneProgress?.label || '생성 중'}</span>
-                              <span>{sceneProgress?.percent ?? 52}%</span>
-                            </div>
-                            <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                              <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${sceneProgress?.percent ?? 52}%` }} />
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    {visualEntries.length > 0 && !isSceneWorking && (
-                      <div className="pointer-events-none absolute inset-x-2 bottom-2 flex items-center justify-between gap-2 opacity-100 transition-opacity duration-200">
-                        <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, -1)} disabled={!hasPrevVisualEntry} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white disabled:cursor-not-allowed disabled:opacity-45">←</button>
-                        <div className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-3 py-1.5 text-[11px] font-black text-slate-700 shadow-sm">{visualEntries.length ? `${visualEntryIndex + 1}/${visualEntries.length}` : '0/0'}</div>
-                        <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, 1)} disabled={!hasNextVisualEntry} className="pointer-events-auto rounded-full border border-slate-200 bg-white/95 px-2.5 py-1.5 text-xs font-black text-slate-700 shadow-sm hover:bg-white disabled:cursor-not-allowed disabled:opacity-45">→</button>
-                      </div>
-                    )}
-                  </div>
-                  {visualEntries.length > 0 && (
-                    <div className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 p-2">
-                      <div className="flex items-center justify-between gap-2 px-1 pb-2 text-[11px] font-bold text-slate-600">
-                        <span>{activeHistoryKind === 'video' ? '영상 히스토리' : '이미지 히스토리'} · 오른쪽으로 누적</span>
-                        <div className="flex items-center gap-2">
-                          <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, -1)} disabled={!hasPrevVisualEntry} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45">←</button>
-                          <span>{visualEntry?.label || `생성본 ${visualEntryIndex + 1}`}</span>
-                          <button type="button" onClick={() => shiftSceneMediaIndex(index, activeHistoryKind, visualEntries.length, 1)} disabled={!hasNextVisualEntry} className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-black text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-45">→</button>
-                        </div>
-                      </div>
-                      <div
-                        ref={(node) => {
-                          sceneMediaStripRefs.current[sceneMediaKey] = node;
-                        }}
-                        onWheel={(event) => handleHorizontalWheel(event, 0.9)}
-                        className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                      >
-                        {visualEntries.map((entry, entryIndex) => {
-                          const selectedEntry = entryIndex === visualEntryIndex;
-                          const entryImageSrc = activeHistoryKind === 'image' ? getDisplayImageSrc(resolveImageSrc(entry.data)) : '';
-                          const entryVideoSrc = activeHistoryKind === 'video' ? resolveVideoSrc(entry.data) : '';
-                          return (
-                            <button
-                              key={entry.id || `${sceneMediaKey}-${entryIndex}`}
-                              type="button"
-                              data-scene-media-card={`${sceneMediaKey}-${entryIndex}`}
-                              onClick={() => {
-                                setSceneMediaIndices((prev) => ({ ...prev, [sceneMediaKey]: entryIndex }));
-                              }}
-                              className={`w-[110px] shrink-0 overflow-hidden rounded-2xl border text-left transition ${selectedEntry ? 'border-blue-400 ring-2 ring-blue-100' : 'border-slate-200 bg-white hover:border-blue-200'}`}
-                            >
-                              <div className={`flex h-[72px] items-center justify-center overflow-hidden ${activeHistoryKind === 'video' ? 'bg-slate-900' : 'bg-slate-100'}`}>
-                                {activeHistoryKind === 'video' && entryVideoSrc ? (
-                                  <video className="h-full w-full object-cover" playsInline muted preload="metadata">
-                                    <source src={entryVideoSrc} type="video/mp4" />
-                                  </video>
-                                ) : entryImageSrc ? (
-                                  <img src={entryImageSrc} alt={entry.label || `씬 ${row.sceneNumber} 미디어 ${entryIndex + 1}`} className="h-full w-full object-cover" />
-                                ) : (
-                                  <div className="px-2 text-center text-[10px] font-black text-slate-400">미리보기 없음</div>
-                                )}
-                              </div>
-                              <div className="space-y-1 px-2 py-2">
-                                <div className="truncate text-[11px] font-black text-slate-800">{entry.label || `생성본 ${entryIndex + 1}`}</div>
-                                <div className="text-[10px] text-slate-500">{entry.sourceMode === 'sample' ? '샘플' : 'AI'} · {entryIndex + 1}/{visualEntries.length}</div>
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="mt-2 inline-flex w-full rounded-2xl border border-slate-200 bg-white p-1">
-                    <button
-                      type="button"
-                      disabled={!hasRenderableImage(row)}
-                      onClick={() => onSelectedVisualTypeChange?.(index, 'image')}
-                      className={`flex-1 rounded-2xl px-3 py-2 text-sm font-black transition ${selectedVisualType === 'image' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'} disabled:cursor-not-allowed disabled:text-slate-300`}
-                    >
-                      이미지
-                    </button>
-                    <button
-                      type="button"
-                      disabled={!hasRenderableVideo(row)}
-                      onClick={() => onSelectedVisualTypeChange?.(index, 'video')}
-                      className={`flex-1 rounded-2xl px-3 py-2 text-sm font-black transition ${selectedVisualType === 'video' ? 'bg-violet-600 text-white' : 'text-slate-600 hover:bg-slate-50'} disabled:cursor-not-allowed disabled:text-slate-300`}
-                    >
-                      영상
-                    </button>
-                  </div>
-                </div>
-
-                <div className="min-w-0 p-3 space-y-3">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">문단 내용 / 프롬프트</div>
-                    <div className="text-[11px] text-slate-400">한 카드 안에서 바로 수정</div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {(['narration', 'image', 'video'] as SceneEditorMode[]).map((mode) => {
-                      const selected = editorMode === mode;
-                      const tone = sceneEditorMeta[mode];
-                      return (
-                        <button
-                          key={`${row.sceneNumber}-${mode}`}
-                          type="button"
-                          onClick={() => setSceneEditorModes((prev) => ({ ...prev, [index]: mode }))}
-                          className={`rounded-2xl px-4 py-2 text-sm font-black transition ${selected ? tone.badgeClass : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
-                        >
-                          {tone.label}
-                        </button>
-                      );
-                    })}
-                    <span className="ml-auto rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">컷 {formatSeconds(row.targetDuration)}</span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">오디오 {formatSeconds(row.audioDuration)}</span>
-                  </div>
-
-                  <textarea
-                    value={editorValue}
-                    placeholder={editorMeta.placeholder}
-                    disabled={isSceneWorking}
-                    onChange={(e) => handleSceneEditorChange(row, index, editorMode, e.target.value)}
-                    className="min-h-[120px] w-full resize-none rounded-[20px] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400"
-                  />
-
-                  <div className="grid gap-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <div className="flex items-center justify-between gap-3 text-xs font-black text-slate-600">
-                        <span>컷 길이</span>
-                        <span>{formatSeconds(row.targetDuration)}</span>
-                      </div>
-                      <input type="range" min="3" max={MAX_SCENE_DURATION} step="0.5" value={Math.min(MAX_SCENE_DURATION, row.targetDuration || 5)} onChange={(e) => onDurationChange?.(index, Number(e.target.value))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                      <div className="flex items-center justify-between gap-2 text-xs font-black text-slate-600">
-                        <span>오디오</span>
-                        <div className="flex items-center gap-2">
-                          <select
-                            value={String(getSceneAudioRate(index))}
-                            onChange={(e) => setSceneAudioRates((prev) => ({ ...prev, [index]: Number(e.target.value) }))}
-                            className="rounded-xl border border-slate-200 bg-white px-2 py-1 text-[11px] font-black text-slate-700 outline-none"
+                  <div className="mx-auto w-[220px] max-w-full">
+                    <div className="group/scene-preview relative flex h-[220px] w-[220px] max-w-full items-center justify-center overflow-hidden rounded-[24px] border border-slate-200 bg-white p-3 shadow-inner shadow-slate-100/70">
+                      {previewMode === 'video' && videoSrc ? (
+                        <>
+                          <video
+                            key={videoSrc}
+                            src={videoSrc}
+                            ref={(node) => {
+                              sceneVideoElementRefs.current[index] = node;
+                              applySceneVideoState(index, node);
+                            }}
+                            className="h-full w-full rounded-2xl object-contain"
+                            style={{ transform: `translateX(${sceneMediaOffset * 10}px)` }}
+                            playsInline
+                            controls
+                            preload="metadata"
+                            onLoadedData={(event) => applySceneVideoState(index, event.currentTarget)}
+                            onPlay={(event) => applySceneVideoState(index, event.currentTarget)}
+                          />
+                          <button
+                            type="button"
+                            onMouseDown={preventButtonFocusScroll}
+                            onClick={() => setMediaLightbox({ kind: 'video', src: videoSrc, title: `씬 ${row.sceneNumber} 영상`, aspectRatio: row.aspectRatio })}
+                            className="absolute right-2 top-2 rounded-full border border-slate-200 bg-white/95 px-2.5 py-1 text-[11px] font-black text-slate-700 shadow-sm hover:bg-white"
                           >
-                            {[0.5, 0.75, 1, 1.25, 1.5, 1.75, 2].map((rate) => (
-                              <option key={`audio-rate-${index}-${rate}`} value={rate}>{rate}x</option>
-                            ))}
-                          </select>
-                          <button type="button" onClick={() => togglePanel(`audio-${index}`)} className={`rounded-full px-3 py-1 ${openPanels[`audio-${index}`] ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-700'}`}>{openPanels[`audio-${index}`] ? '숨김' : '열기'}</button>
-                        </div>
-                      </div>
-                      {openPanels[`audio-${index}`] ? (
-                        audioSrc ? (
+                            크게 보기
+                          </button>
+                        </>
+                      ) : previewMode === 'audio' && audioSrc ? (
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-2 rounded-2xl bg-emerald-50 px-3 text-center">
+                          <div className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-emerald-700">오디오 {audioEntryIndex + 1}/{Math.max(1, audioEntries.length)}</div>
+                          <div className="text-sm font-black text-slate-900">{previewHistoryLabel}</div>
+                          <div className="text-[11px] leading-5 text-slate-500">길이 {formatSeconds(getAdjustedAudioDuration(audioEntry?.duration || row.audioDuration, silenceTrim) || audioEntry?.duration || row.audioDuration)}</div>
                           <audio
                             controls
-                            className="mt-2 w-full"
-                            ref={(node) => applyAudioPlaybackRate(node, getSceneAudioRate(index))}
-                            onPlay={(event) => applyAudioPlaybackRate(event.currentTarget, getSceneAudioRate(index))}
+                            className="w-full"
+                            ref={(node) => {
+                              sceneAudioElementRefs.current[index] = node;
+                              applySceneNarrationState(index, node);
+                            }}
+                            onPlay={(event) => applySceneNarrationState(index, event.currentTarget)}
                           >
                             <source src={audioSrc} type="audio/mpeg" />
                           </audio>
-                        ) : (
-                          <div className="mt-2 text-sm text-slate-500">오디오가 아직 없습니다.</div>
-                        )
+                        </div>
+                      ) : displayImageSrc ? (
+                        <>
+                          <button type="button" onMouseDown={preventButtonFocusScroll} onClick={() => setMediaLightbox({ kind: 'image', src: displayImageSrc, title: `씬 ${row.sceneNumber} 이미지`, aspectRatio: row.aspectRatio })} className="block h-full w-full text-left">
+                            <img src={displayImageSrc} alt={`씬 ${row.sceneNumber}`} className={`h-full w-full rounded-2xl object-contain transition-all duration-200 hover:scale-[1.01] ${isSceneWorking ? 'opacity-70' : ''}`} style={{ transform: `translateX(${sceneMediaOffset * 10}px)` }} />
+                          </button>
+                          <button
+                            type="button"
+                            onMouseDown={preventButtonFocusScroll}
+                            onClick={() => setMediaLightbox({ kind: 'image', src: displayImageSrc, title: `씬 ${row.sceneNumber} 이미지`, aspectRatio: row.aspectRatio })}
+                            className="absolute right-2 top-2 rounded-full border border-slate-200 bg-white/95 px-2.5 py-1 text-[11px] font-black text-slate-700 shadow-sm hover:bg-white"
+                          >
+                            크게 보기
+                          </button>
+                        </>
                       ) : (
-                        <div className="mt-2 text-sm text-slate-500">{row.audioData ? `오디오 ${formatSeconds(row.audioDuration)} · ${getSceneAudioRate(index)}x` : '오디오 없음'}</div>
+                        <div className="flex h-full w-full items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 text-center text-sm font-bold text-slate-400">생성 후 여기서 결과를 바로 확인합니다.</div>
                       )}
+
+                      {isSceneWorking && (
+                        <div className="absolute inset-0 flex flex-col justify-end bg-white/80 p-3 backdrop-blur-[1px]">
+                          {isAnimating ? (
+                            <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white/92">
+                              <div className="relative h-20 w-20">
+                                <svg viewBox="0 0 80 80" className="h-20 w-20 -rotate-90">
+                                  <circle cx="40" cy="40" r="32" className="fill-none stroke-slate-200" strokeWidth="6" />
+                                  <circle
+                                    cx="40"
+                                    cy="40"
+                                    r="32"
+                                    className="fill-none stroke-violet-600 transition-all duration-300"
+                                    strokeWidth="6"
+                                    strokeLinecap="round"
+                                    strokeDasharray={201}
+                                    strokeDashoffset={201 - ((sceneProgress?.percent ?? 12) / 100) * 201}
+                                  />
+                                </svg>
+                                <div className="absolute inset-0 flex items-center justify-center text-sm font-black text-slate-900">{sceneProgress?.percent ?? 12}%</div>
+                              </div>
+                              <div className="px-4 text-center text-xs font-black text-slate-700">{sceneProgress?.label || '영상 만드는 중'}</div>
+                            </div>
+                          ) : (
+                            <div className="rounded-2xl border border-slate-200 bg-white/95 p-3">
+                              <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
+                                <span>{sceneProgress?.label || '생성 중'}</span>
+                                <span>{sceneProgress?.percent ?? 52}%</span>
+                              </div>
+                              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                                <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${sceneProgress?.percent ?? 52}%` }} />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="mt-2 space-y-2">
+                      <div className="inline-flex w-full rounded-2xl border border-slate-200 bg-white p-1">
+                        <button
+                          type="button"
+                          disabled={!hasRenderableImage(row)}
+                          onMouseDown={preventButtonFocusScroll}
+                          onClick={() => {
+                            setScenePreviewModes((prev) => ({ ...prev, [index]: 'image' }));
+                            onSelectedVisualTypeChange?.(index, 'image');
+                          }}
+                          className={`flex-1 rounded-2xl px-2.5 py-2 text-[11px] font-black transition ${previewMode === 'image' ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-50'} disabled:cursor-not-allowed disabled:text-slate-300`}
+                        >
+                          이미지
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!hasRenderableVideo(row)}
+                          onMouseDown={preventButtonFocusScroll}
+                          onClick={() => {
+                            setScenePreviewModes((prev) => ({ ...prev, [index]: 'video' }));
+                            onSelectedVisualTypeChange?.(index, 'video');
+                          }}
+                          className={`flex-1 rounded-2xl px-2.5 py-2 text-[11px] font-black transition ${previewMode === 'video' ? 'bg-violet-600 text-white' : 'text-slate-600 hover:bg-slate-50'} disabled:cursor-not-allowed disabled:text-slate-300`}
+                        >
+                          영상
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!audioSrc}
+                          onMouseDown={preventButtonFocusScroll}
+                          onClick={() => setScenePreviewModes((prev) => ({ ...prev, [index]: 'audio' }))}
+                          className={`flex-1 rounded-2xl px-2.5 py-2 text-[11px] font-black transition ${previewMode === 'audio' ? 'bg-emerald-600 text-white' : 'text-slate-600 hover:bg-slate-50'} disabled:cursor-not-allowed disabled:text-slate-300`}
+                        >
+                          오디오
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2 py-2">
+                        <button
+                          type="button"
+                          onMouseDown={preventButtonFocusScroll}
+                          onClick={() => {
+                            if (previewMode === 'audio') shiftSceneAudioIndex(index, audioEntries.length, -1);
+                            else shiftSceneMediaIndex(index, previewMode === 'video' ? 'video' : 'image', previewMode === 'video' ? videoEntries.length : imageEntries.length, -1);
+                          }}
+                          disabled={!previewHasPrev}
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-xs font-black text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          ←
+                        </button>
+                        <div className="min-w-0 flex-1 text-center">
+                          <div className="truncate text-[11px] font-black text-slate-800">{previewHistoryLabel}</div>
+                          <div className="mt-0.5 text-[10px] font-bold text-slate-400">{previewHistoryCount ? `${previewHistoryIndex + 1}/${previewHistoryCount}` : '0/0'}</div>
+                        </div>
+                        <button
+                          type="button"
+                          onMouseDown={preventButtonFocusScroll}
+                          onClick={() => {
+                            if (previewMode === 'audio') shiftSceneAudioIndex(index, audioEntries.length, 1);
+                            else shiftSceneMediaIndex(index, previewMode === 'video' ? 'video' : 'image', previewMode === 'video' ? videoEntries.length : imageEntries.length, 1);
+                          }}
+                          disabled={!previewHasNext}
+                          className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-xs font-black text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                        >
+                          →
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="min-w-0 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500"><span className="rounded-full bg-slate-900 px-4 py-1 mr-5 text-xs font-black text-white">씬 {row.sceneNumber}</span>{sceneInlineSettingsOpen[index] ? '씬 설정' : '문단 내용 / 프롬프트'}</div>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-500">
+                      <span className="rounded-full bg-slate-100 px-3 py-1">컷 {formatSeconds(getSceneCutDuration(row, silenceTrim))}</span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1">비율 {row.aspectRatio || '16:9'}</span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1">오디오 {formatSeconds(getAdjustedAudioDuration(row.audioDuration, silenceTrim) || row.audioDuration)}</span>
+                    </div>
+                  </div>
+
+                  <div className="relative mt-2">
+                    <div className={`overflow-hidden transition-all duration-300 ease-out ${sceneInlineSettingsOpen[index] ? 'max-h-0 -translate-y-1 opacity-0 pointer-events-none' : 'max-h-[196px] translate-y-0 opacity-100'}`}>
+                      <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-2.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {(['narration', 'image', 'video'] as SceneEditorMode[]).map((mode) => {
+                            const selected = editorMode === mode;
+                            const tone = sceneEditorMeta[mode];
+                            return (
+                              <button
+                                key={`${row.sceneNumber}-${mode}`}
+                                type="button"
+                                onMouseDown={preventButtonFocusScroll}
+                                onClick={() => setSceneEditorModes((prev) => ({ ...prev, [index]: mode }))}
+                                className={`rounded-2xl px-3.5 py-2 text-sm font-black transition ${selected ? tone.badgeClass : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                              >
+                                {tone.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        <textarea
+                          value={editorValue}
+                          placeholder={editorMeta.placeholder}
+                          disabled={isSceneWorking}
+                          onChange={(e) => handleSceneEditorChange(row, index, editorMode, e.target.value)}
+                          className="mt-2 h-[88px] w-full resize-none overflow-y-auto rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400"
+                        />
+                      </div>
+                    </div>
+
+                    <div className={`overflow-hidden transition-all duration-300 ease-out ${sceneInlineSettingsOpen[index] ? 'max-h-[228px] translate-y-0 opacity-100' : 'max-h-0 translate-y-1 opacity-0 pointer-events-none'}`}>
+                      <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4 auto-rows-fr">
+                        <div className="flex min-h-[112px] flex-col rounded-[22px] border border-slate-200 bg-slate-50 px-3 py-3">
+                          <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
+                            <span>컷 길이</span>
+                            <span>{formatSeconds(row.targetDuration)}</span>
+                          </div>
+                          <input type="range" min="3" max={MAX_SCENE_DURATION} step="0.5" value={Math.min(MAX_SCENE_DURATION, row.targetDuration || 5)} onChange={(e) => onDurationChange?.(index, Number(e.target.value))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
+                          <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">Step1 비율은 유지하고 컷 길이만 조절합니다.</div>
+                        </div>
+                        <div className="flex min-h-[112px] flex-col rounded-[22px] border border-slate-200 bg-slate-50 px-3 py-3">
+                          <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600"><span>공백 제거</span><span>{silenceTrim}%</span></div>
+                          <input type="range" min="0" max="100" step="5" value={silenceTrim} onChange={(e) => setSceneSilenceTrim((prev) => ({ ...prev, [index]: Number(e.target.value) }))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-emerald-600" />
+                          <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">다음 오디오 생성 전에 무음 구간을 얼마나 줄일지 정합니다.</div>
+                        </div>
+                        <div className="flex min-h-[112px] flex-col rounded-[22px] border border-slate-200 bg-slate-50 px-3 py-3">
+                          <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600"><span>TTS 볼륨</span><span>{Math.round(narrationVolume * 100)}%</span></div>
+                          <input type="range" min="0" max="1.6" step="0.05" value={narrationVolume} onChange={(e) => setSceneNarrationVolumes((prev) => ({ ...prev, [index]: Number(e.target.value) }))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
+                          <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">오디오 확인과 팝업 재생에 바로 반영됩니다.</div>
+                        </div>
+                        <div className="flex min-h-[112px] flex-col rounded-[22px] border border-slate-200 bg-slate-50 px-3 py-3">
+                          <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600"><span>동영상 오디오</span><span>{Math.round(videoAudioVolume * 100)}%</span></div>
+                          <input type="range" min="0" max="1" step="0.05" value={videoAudioVolume} onChange={(e) => setSceneVideoAudioVolumes((prev) => ({ ...prev, [index]: Number(e.target.value) }))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-violet-600" />
+                          <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">영상 원본 오디오가 있을 때만 따로 맞춥니다.</div>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 <div className="border-t border-slate-200 bg-slate-50 p-3 xl:border-l xl:border-t-0">
-                  <div className="space-y-3">
-                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">생성 버튼</div>
-                    <div className="grid gap-2 sm:grid-cols-3 xl:grid-cols-1">
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">생성 작업</div>
+                  <div className="mt-2 space-y-2.5">
                     {onRegenerateImage && (
-                      <button type="button" disabled={isSceneWorking} onClick={() => { void runSceneAction(`image-${index}`, async () => { await Promise.resolve(onRegenerateImage?.(index)); }); }} className="rounded-2xl bg-blue-600 px-3 py-2.5 text-[13px] font-black leading-tight text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">
-                        {row.imageData ? '이미지 다시 생성' : '이미지 생성'}
-                      </button>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={isSceneWorking}
+                            onMouseDown={preventButtonFocusScroll}
+                            onClick={() => {
+                              setActiveModelPicker(null);
+                              setSceneInlineSettingsOpen((prev) => ({ ...prev, [index]: false }));
+                              setSceneEditorModes((prev) => ({ ...prev, [index]: 'image' }));
+                              setScenePreviewModes((prev) => ({ ...prev, [index]: 'image' }));
+                              onSelectedVisualTypeChange?.(index, 'image');
+                              void runSceneAction(`image-${index}`, async () => {
+                                await Promise.resolve(onRegenerateImage?.(index));
+                              });
+                            }}
+                            className="flex-1 rounded-2xl bg-blue-600 px-3 py-3 text-[13px] font-black leading-tight text-white hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                          >
+                            {isSceneWorking && row.status === 'generating' && previewMode === 'image' ? '이미지 생성 중...' : '이미지 생성'}
+                          </button>
+                          <button
+                            type="button"
+                            onMouseDown={preventButtonFocusScroll}
+                            onClick={() => setActiveModelPicker({ index, kind: 'image' })}
+                            className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                            aria-label="이미지 모델 설정"
+                          >
+                            ⚙
+                          </button>
+                        </div>
+                      </div>
                     )}
+
                     {onGenerateAnimation && (
-                      <button type="button" disabled={isSceneWorking || !row.imageData} onClick={() => { void runSceneAction(`video-${index}`, async () => { await Promise.resolve(onGenerateAnimation?.(index, { sourceImageData: activeHistoryKind === 'image' ? (visualEntry?.data || row.imageData || null) : (row.imageData || null) })); }); }} className="rounded-2xl bg-violet-600 px-3 py-2.5 text-[13px] font-black leading-tight text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500">
-                        {isAnimating ? '영상 생성 중...' : '영상 생성'}
-                      </button>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={isSceneWorking || !canGenerateVideo}
+                            onMouseDown={preventButtonFocusScroll}
+                            onClick={() => {
+                              setActiveModelPicker(null);
+                              setSceneInlineSettingsOpen((prev) => ({ ...prev, [index]: false }));
+                              setSceneEditorModes((prev) => ({ ...prev, [index]: 'video' }));
+                              setScenePreviewModes((prev) => ({ ...prev, [index]: 'video' }));
+                              onSelectedVisualTypeChange?.(index, 'video');
+                              void runSceneAction(`video-${index}`, async () => {
+                                await Promise.resolve(onGenerateAnimation?.(index, { sourceImageData: imageEntry?.data || row.imageData || null }));
+                              });
+                            }}
+                            className="flex-1 rounded-2xl bg-violet-600 px-3 py-3 text-[13px] font-black leading-tight text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                          >
+                            {isAnimating ? '영상 생성 중...' : '영상 생성'}
+                          </button>
+                          <button
+                            type="button"
+                            onMouseDown={preventButtonFocusScroll}
+                            onClick={() => setActiveModelPicker({ index, kind: 'video' })}
+                            className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                            aria-label="영상 모델 설정"
+                          >
+                            ⚙
+                          </button>
+                        </div>
+                      </div>
                     )}
+
                     {onRegenerateAudio && (
-                      <button type="button" disabled={isSceneWorking} onClick={() => { void runSceneAction(`audio-${index}`, async () => { await Promise.resolve(onRegenerateAudio?.(index)); }); }} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">오디오 생성</button>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={isSceneWorking}
+                            onMouseDown={preventButtonFocusScroll}
+                            onClick={() => {
+                              setActiveModelPicker(null);
+                              setSceneInlineSettingsOpen((prev) => ({ ...prev, [index]: false }));
+                              setSceneEditorModes((prev) => ({ ...prev, [index]: 'narration' }));
+                              setScenePreviewModes((prev) => ({ ...prev, [index]: 'audio' }));
+                              void runSceneAction(`audio-${index}`, async () => {
+                                await Promise.resolve(onRegenerateAudio?.(index));
+                              });
+                            }}
+                            className="flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
+                          >
+                            오디오 생성
+                          </button>
+                          <button
+                            type="button"
+                            onMouseDown={preventButtonFocusScroll}
+                            onClick={() => setActiveModelPicker({ index, kind: 'audio' })}
+                            className="rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                            aria-label="오디오 모델 설정"
+                          >
+                            ⚙
+                          </button>
+                        </div>
+                      </div>
                     )}
+
+                    <button
+                      type="button"
+                      onMouseDown={preventButtonFocusScroll}
+                      onClick={() => { setActiveModelPicker(null); setSceneInlineSettingsOpen((prev) => ({ ...prev, [index]: !prev[index] })); }}
+                      className={`w-full rounded-2xl border px-3 py-3 text-sm font-bold transition ${sceneInlineSettingsOpen[index] ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      {sceneInlineSettingsOpen[index] ? '설정 닫기' : '설정 열기'}
+                    </button>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
           );
         })}
       </div>
-
       {onAddParagraphScene && (
         <div className="mt-4">
           <button
@@ -1147,6 +1513,39 @@ const ResultTable: React.FC<ResultTableProps> = ({
       )}
     </div>
 
+
+      {activeModelPicker && getModelSelector(activeModelPicker.kind) && (
+        <div className="fixed inset-0 z-[66] flex items-center justify-center bg-slate-950/45 p-4" onClick={() => setActiveModelPicker(null)}>
+          <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className={`inline-flex rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${activeModelPicker.kind === 'image' ? 'bg-blue-50 text-blue-700' : activeModelPicker.kind === 'video' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>{activeModelPicker.kind === 'image' ? '이미지 AI 모델' : activeModelPicker.kind === 'video' ? '영상 AI 모델' : '오디오 / TTS 모델'}</div>
+                <div className="mt-3 text-xl font-black text-slate-900">씬 {data[activeModelPicker.index]?.sceneNumber} 모델 선택</div>
+                <div className="mt-1 text-sm leading-6 text-slate-500">생성 버튼 오른쪽 톱니바퀴에서 빠르게 바꾸는 팝업 디자인입니다. 이후 고도화할 수 있도록 단순한 선택 구조만 유지했습니다.</div>
+              </div>
+              <button type="button" onClick={() => setActiveModelPicker(null)} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
+            </div>
+
+            <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-3">
+              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">현재 선택</div>
+              <div className="mt-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-900">{getModelSelector(activeModelPicker.kind)?.currentLabel}</div>
+              <select
+                value={getModelSelector(activeModelPicker.kind)?.currentId || ''}
+                onChange={(e) => getModelSelector(activeModelPicker.kind)?.onSelect?.(e.target.value)}
+                className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-400"
+              >
+                {(getModelSelector(activeModelPicker.kind)?.options || []).map((option) => (
+                  <option key={option.id} value={option.id}>{option.label}</option>
+                ))}
+              </select>
+              {getModelSelector(activeModelPicker.kind)?.options.find((item) => item.id === getModelSelector(activeModelPicker.kind)?.currentId)?.helper && (
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs leading-5 text-slate-500">{getModelSelector(activeModelPicker.kind)?.options.find((item) => item.id === getModelSelector(activeModelPicker.kind)?.currentId)?.helper}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {mediaViewer && (
         <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/75 p-4" onClick={() => setMediaViewer(null)}>
           <div className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
@@ -1162,9 +1561,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 {mediaViewer.kind === 'image' ? (
                   <img src={getDisplayImageSrc(resolveImageSrc(mediaViewer.entries[mediaViewer.currentIndex]?.data))} alt={`씬 ${mediaViewer.sceneNumber} 이미지`} className={`${getAspectRatioClass(mediaViewer.aspectRatio || '16:9')} max-h-[72vh] max-w-full rounded-[24px] object-contain`} />
                 ) : (
-                  <video controls className="max-h-[72vh] w-full rounded-[24px] border border-slate-800 bg-black">
-                    <source src={resolveVideoSrc(mediaViewer.entries[mediaViewer.currentIndex]?.data)} type="video/mp4" />
-                  </video>
+                  <video key={resolveVideoSrc(mediaViewer.entries[mediaViewer.currentIndex]?.data)} src={resolveVideoSrc(mediaViewer.entries[mediaViewer.currentIndex]?.data)} controls className="max-h-[72vh] w-full rounded-[24px] border border-slate-800 bg-black" />
                 )}
               </div>
               <div className="overflow-y-auto border-t border-slate-200 bg-slate-50 p-4 lg:border-l lg:border-t-0">
@@ -1202,377 +1599,105 @@ const ResultTable: React.FC<ResultTableProps> = ({
         </div>
       )}
 
-      {imageLightbox && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/75 p-4" onClick={() => setImageLightbox(null)}>
+      {mediaLightbox && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/75 p-4" onClick={() => setMediaLightbox(null)}>
           <div className="relative max-h-[92vh] w-full max-w-5xl rounded-[28px] border border-slate-200 bg-white p-4 shadow-2xl" onClick={(event) => event.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">이미지 크게 보기</div>
-                <div className="mt-1 text-lg font-black text-slate-900">{imageLightbox.title}</div>
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-blue-600">{mediaLightbox.kind === 'video' ? '영상 크게 보기' : mediaLightbox.kind === 'audio' ? '오디오 확인' : '이미지 크게 보기'}</div>
+                <div className="mt-1 text-lg font-black text-slate-900">{mediaLightbox.title}</div>
               </div>
-              <button type="button" onClick={() => setImageLightbox(null)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
+              <button type="button" onClick={() => setMediaLightbox(null)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
             </div>
             <div className="flex max-h-[78vh] items-center justify-center overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50 p-3">
-              <img src={imageLightbox.src} alt={imageLightbox.title} className={`${getAspectRatioClass(imageLightbox.aspectRatio || '16:9')} mx-auto max-h-[74vh] max-w-full rounded-2xl object-contain`} />
+              {mediaLightbox.kind === 'video' ? (
+                <video className={`${getAspectRatioClass(mediaLightbox.aspectRatio || '16:9')} mx-auto max-h-[74vh] max-w-full rounded-2xl object-contain`} controls playsInline preload="metadata">
+                  <source src={mediaLightbox.src} type="video/mp4" />
+                </video>
+              ) : mediaLightbox.kind === 'audio' ? (
+                <audio className="w-full max-w-xl" controls>
+                  <source src={mediaLightbox.src} type="audio/mpeg" />
+                </audio>
+              ) : (
+                <img src={mediaLightbox.src} alt={mediaLightbox.title} className={`${getAspectRatioClass(mediaLightbox.aspectRatio || '16:9')} mx-auto max-h-[74vh] max-w-full rounded-2xl object-contain`} />
+              )}
             </div>
           </div>
         </div>
       )}
 
-      {previewOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 p-3 sm:p-6" onClick={() => setPreviewOpen(false)}>
-          <div className="mx-auto flex w-full max-w-6xl flex-col rounded-[32px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:px-6">
-              <div>
-                <div className="text-[11px] font-black uppercase tracking-[0.2em] text-blue-600">웹 미리보기</div>
-                <h3 className="mt-1 text-2xl font-black text-slate-900">최종 출력 전 결과 미리보기</h3>
-                <p className="mt-2 text-sm text-slate-600">웹 미리보기는 저화질로 빠르게 확인하고, 최종 다운로드는 원본 품질로 저장됩니다.</p>
-              </div>
-              <button type="button" onClick={() => setPreviewOpen(false)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
-            </div>
 
-            <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">씬 작업 도구</div>
-                  <h4 className="mt-2 text-lg font-black text-slate-900">{currentTopic || '프로젝트'} 씬 카드</h4>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">장면 편집은 작업 화면에서 진행하고, 최종 확인은 결과 미리보기에서 먼저 검토합니다.</p>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-                  <span className="rounded-full bg-white px-3 py-2">씬 {data.length}개</span>
-                  <span className="rounded-full bg-white px-3 py-2">이미지 {summary.imageCount}개</span>
-                  <span className="rounded-full bg-white px-3 py-2">오디오 {summary.audioCount}개</span>
-                  <span className="rounded-full bg-white px-3 py-2">영상 {summary.videoCount}개</span>
-                </div>
-              </div>
-              {false && (
-                <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-                  <div className="text-sm font-bold text-slate-700">{progressMessage || '현재 작업 상태'}</div>
-                  {activeOverallProgress !== null && (
-                    <div className="mt-2">
-                      <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
-                        <span>{progressLabel || '현재 작업 진행률'}</span>
-                        <span>{activeOverallProgress}%</span>
-                      </div>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                        <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${activeOverallProgress}%` }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
-                <div className={`rounded-2xl border p-4 ${previewVideoTone.panelClass}`}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">합본 영상 상태</div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full px-3 py-1 text-xs font-black ${previewVideoTone.badgeClass}`}>{previewVideoTone.badge}</span>
-                        {finalVideoUrl && <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">즉시 재생 가능</span>}
-                      </div>
-                    </div>
-                    {onPreparePreviewVideo && (
-                      <button
-                        type="button"
-                        onClick={() => void onPreparePreviewVideo()}
-                        disabled={isPreparingPreviewVideo}
-                        className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
-                      >
-                        {isPreparingPreviewVideo ? '합본 영상 생성 중...' : '합본 영상 다시 시도'}
-                      </button>
-                    )}
-                  </div>
-
-                  <p className="mt-3 text-sm leading-6 text-slate-700">
-                    {previewVideoMessage || (finalVideoUrl ? '합본 영상이 준비되었습니다.' : '결과보기를 열면 여기에서 합본 영상 상태를 먼저 안내합니다.')}
-                  </p>
-
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    <button type="button" onClick={() => exportAssetsToZip(data, 'mp4Creater_storyboard')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">결과표 XLSX</button>
-                    <button type="button" onClick={() => downloadProjectZip(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">CSV / ZIP</button>
-                    <button type="button" onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">SRT</button>
-                    <button
-                      type="button"
-                      onClick={() => void handlePrepareDavinciImport()}
-                      disabled={isDavinciPreparing}
-                      className="rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-black text-white hover:bg-indigo-500 disabled:bg-slate-300 disabled:text-slate-500"
-                    >
-                      {isDavinciPreparing ? '다빈치 자동 Import 준비 중...' : '다빈치 자동 Import'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDownloadDavinciPackage()}
-                      disabled={isDavinciPreparing}
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
-                    >
-                      다빈치 패키지 ZIP
-                    </button>
-                    {onExportVideo && (
-                      <>
-                        <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: true, qualityMode: downloadQuality })} disabled={isExporting} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isExporting ? '렌더링 중...' : '최종 출력 (자막 O)'}</button>
-                        <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: false, qualityMode: downloadQuality })} disabled={isExporting} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">최종 출력 (자막 X)</button>
-                      </>
-                    )}
-                  </div>
-
-                  {davinciStatusMessage ? (
-                    <div className="mt-4 rounded-[24px] border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm leading-6 text-indigo-900">
-                      <div className="font-black">{davinciStatusMessage}</div>
-                      {davinciPackagePath ? <div className="mt-2 break-all text-xs font-bold text-indigo-800">패키지 경로: {davinciPackagePath}</div> : null}
-                      {davinciLaunchUri ? <div className="mt-1 break-all text-[11px] font-semibold text-indigo-700">브리지 호출 URI: {davinciLaunchUri}</div> : null}
-                    </div>
-                  ) : null}
-
-                  {false && (
-                    <div className="mt-3 rounded-2xl border border-white/70 bg-white/70 p-3">
-                      <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
-                        <span>{progressLabel || '합본 영상 생성 진행률'}</span>
-                        <span>{activeOverallProgress}%</span>
-                      </div>
-                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white">
-                        <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${activeOverallProgress}%` }} />
-                      </div>
-                    </div>
-                  )}
-
-                  {finalVideoUrl ? (
-                    <div className="mt-4 space-y-3">
-                      <div className="text-sm font-bold text-slate-700">{finalVideoTitle || '결과 미리보기'}</div>
-                      <video controls className="w-full rounded-2xl border border-slate-200 bg-slate-950">
-                        <source src={finalVideoUrl} type="video/mp4" />
-                      </video>
-                    </div>
-                  ) : (
-                    <div className="mt-4 rounded-2xl border border-dashed border-white/80 bg-white/70 p-4">
-                      <div className="flex items-center gap-3">
-                        {(previewVideoStatus === 'loading' || isPreparingPreviewVideo) && <span className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />}
-                        <div className="text-sm font-black text-slate-900">
-                          {previewVideoStatus === 'error' ? '합본 영상을 아직 만들지 못했습니다.' : '합본 영상 준비 중입니다.'}
-                        </div>
-                      </div>
-                      <p className="mt-2 text-xs leading-5 text-slate-500">AI 씬 영상이 없더라도 이미지 기반 합본을 먼저 시도합니다. 브라우저 합치기가 불안정하면 안전 모드로 다시 시도합니다.</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-            <div className="border-b border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
-              <div className="grid gap-4 xl:grid-cols-[1.16fr_0.84fr]">
-                <div className="rounded-[24px] border border-slate-200 bg-white p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">연속 재생 미리보기</div>
-                      <div className="mt-2 text-lg font-black text-slate-900">한 화면에서 문단별로 이어서 보기</div>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">합본처럼 보이되 실제로는 문단별 씬을 순서대로 넘겨 줍니다. 이미지와 영상이 섞여 있어도 같은 플레이어에서 점검할 수 있습니다.</p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => startSequencePlayback(true)} className="rounded-2xl bg-slate-900 px-4 py-2 text-sm font-black text-white hover:bg-slate-800">처음부터 재생</button>
-                      <button type="button" onClick={() => sequencePlaying ? stopSequencePlayback() : startSequencePlayback(false)} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">{sequencePlaying ? '일시정지' : '현재 씬부터 재생'}</button>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 grid gap-4 lg:grid-cols-[1.06fr_0.94fr]">
-                    <div className="overflow-hidden rounded-[24px] border border-slate-200 bg-slate-950">
-                      {sequenceScene && getSceneVisualPayload(sequenceScene).kind === 'video' && getSceneVisualPayload(sequenceScene).src ? (
-                        <video ref={previewSequenceVideoRef} className="aspect-video w-full bg-black object-contain" playsInline muted controls={false}>
-                          <source src={getSceneVisualPayload(sequenceScene).src} type="video/mp4" />
-                        </video>
-                      ) : sequenceScene && getSceneVisualPayload(sequenceScene).src ? (
-                        <img src={getDisplayImageSrc(getSceneVisualPayload(sequenceScene).src)} alt={`연속 재생 씬 ${sequenceScene.sceneNumber}`} className={`${getAspectRatioClass(sequenceScene.aspectRatio || '16:9')} w-full object-cover`} />
-                      ) : (
-                        <div className="flex aspect-video items-center justify-center bg-slate-900 px-6 text-center text-sm font-bold text-slate-300">아직 이미지나 영상이 없는 씬입니다. 이미지 만들기 후 다시 재생해 주세요.</div>
-                      )}
-                    </div>
-                    <div className="space-y-3">
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">씬 {sequenceScene?.sceneNumber || Math.min(sequenceSceneIndex + 1, data.length)}</span>
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">{formatSeconds(sequenceSceneDuration)}</span>
-                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${sequenceScene && getPreferredVisualType(sequenceScene) === 'video' && sequenceScene.videoData ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{sequenceScene && getPreferredVisualType(sequenceScene) === 'video' && sequenceScene.videoData ? '영상 재생' : '이미지 재생'}</span>
-                        </div>
-                        <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{sequenceScene?.narration || '씬을 준비하면 이곳에서 순서대로 재생됩니다.'}</p>
-                        {sequenceScene?.audioData ? (
-                          <div className="mt-4">
-                            <div className="mb-2 flex items-center justify-between gap-2 text-xs font-black text-slate-600">
-                              <span>오디오 속도</span>
-                              <span>{sequenceSceneAudioRate}x</span>
-                            </div>
-                            <audio ref={previewSequenceAudioRef} controls className="w-full" onPlay={(event) => applyAudioPlaybackRate(event.currentTarget, sequenceSceneAudioRate)} onLoadedMetadata={(event) => applyAudioPlaybackRate(event.currentTarget, sequenceSceneAudioRate)} onEnded={() => { if (sequencePlaying) advanceSequencePlayback(); }}>
-                              <source src={resolveNarrationAudioSrc(sequenceScene.audioData)} type="audio/mpeg" />
-                            </audio>
-                          </div>
-                        ) : (
-                          <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-3 text-xs font-bold text-slate-500">현재 씬에 나레이션 오디오가 없어서 지정된 컷 길이 기준으로 다음 씬으로 넘어갑니다.</div>
-                        )}
-                      </div>
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                        <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">재생 큐</div>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {data.map((scene, queueIndex) => (
-                            <button key={`queue-${scene.sceneNumber}-${queueIndex}`} type="button" onClick={() => { setSequenceSceneIndex(queueIndex); setSequenceRunId((prev) => prev + 1); }} className={`rounded-full px-3 py-2 text-xs font-black transition ${queueIndex === sequenceSceneIndex ? 'bg-blue-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                              {scene.sceneNumber}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[24px] border border-slate-200 bg-white p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <div className="text-xs font-black uppercase tracking-[0.16em] text-violet-600">미리보기 사운드</div>
-                      <div className="mt-2 text-lg font-black text-slate-900">나레이션 / 배경음 / 배경 생성</div>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">이 팝업 안에서 볼륨을 바로 조절하고, 배경음을 추가 생성해 같은 자리에서 다시 확인할 수 있습니다.</p>
-                    </div>
-                    {onCreateBackgroundTrack && (
-                      <button type="button" onClick={onCreateBackgroundTrack} className="rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">새 배경음 생성</button>
-                    )}
-                  </div>
-                  <div className="mt-4 grid gap-4">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-center justify-between gap-3 text-sm font-black text-slate-900"><span>나레이션 볼륨</span><span>{Math.round((previewMix?.narrationVolume || 1) * 100)}%</span></div>
-                      <input type="range" min="0" max="1.6" step="0.05" value={previewMix?.narrationVolume || 1} onChange={(e) => onPreviewMixChange?.({ ...(previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 }), narrationVolume: Number(e.target.value) })} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
-                    </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                      <div className="flex items-center justify-between gap-3 text-sm font-black text-slate-900"><span>배경음 볼륨</span><span>{Math.round((previewMix?.backgroundMusicVolume || mainBgm?.volume || 0.28) * 100)}%</span></div>
-                      <input type="range" min="0" max="1" step="0.02" value={previewMix?.backgroundMusicVolume || mainBgm?.volume || 0.28} onChange={(e) => onPreviewMixChange?.({ ...(previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 }), backgroundMusicVolume: Number(e.target.value) })} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-violet-600" />
-                    </div>
-                  </div>
-                  {backgroundMusicTracks.length > 0 ? (
-                    <div className="mt-4 space-y-3">
-                      {backgroundMusicTracks.map((track) => {
-                        const active = track.id === (mainBgm?.id || '');
-                        return (
-                          <div key={`preview-bgm-${track.id}`} className={`rounded-2xl border p-4 ${active ? 'border-violet-300 bg-violet-50/60' : 'border-slate-200 bg-slate-50'}`}>
-                            <div className="flex items-start justify-between gap-3">
-                              <div className="min-w-0">
-                                <div className="truncate text-sm font-black text-slate-900">{track.title}</div>
-                                <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-500">{track.prompt}</p>
-                              </div>
-                              <button type="button" onClick={() => onSelectBackgroundTrack?.(track.id)} className={`rounded-xl px-3 py-2 text-xs font-black ${active ? 'bg-violet-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>{active ? '선택됨' : '이 트랙 사용'}</button>
-                            </div>
-                            {(() => {
-                              const backgroundAudioSrc = resolveBackgroundAudioSrc(track.audioData);
-                              if (!active || !backgroundAudioSrc) return null;
-                              return (
-                                <audio ref={bgmAudioRef} controls className="mt-3 w-full">
-                                  <source src={backgroundAudioSrc} type="audio/wav" />
-                                </audio>
-                              );
-                            })()}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm font-bold text-slate-500">배경음이 아직 없습니다. 위 버튼으로 샘플 배경음을 추가해 보세요.</div>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4 sm:grid-cols-4 sm:px-6">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">씬</div>
-                <div className="mt-2 text-2xl font-black text-slate-900">{data.length}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">예상 길이</div>
-                <div className="mt-2 text-2xl font-black text-slate-900">{formatSeconds(totalDuration)}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">나레이션</div>
-                <div className="mt-2 text-2xl font-black text-slate-900">{summary.audioCount}/{data.length}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">배경음</div>
-                <div className="mt-2 text-sm font-black text-slate-900">{mainBgm?.title || '미선택'}</div>
-              </div>
-            </div>
-
-            <div ref={thumbnailToolbarRef} className="flex flex-wrap items-center gap-2 border-b border-slate-200 px-5 py-4 sm:px-6">
-              {onGenerateThumbnail && (
-                <button type="button" onClick={() => void onGenerateThumbnail?.()} disabled={isThumbnailGenerating} className="rounded-2xl bg-violet-600 px-4 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:bg-slate-300 disabled:text-slate-500">{isThumbnailGenerating ? '썸네일 생성 중...' : 'AI 썸네일 생성'}</button>
-              )}
-              {onGenerateAllImages && (
-                <button type="button" onClick={() => void onGenerateAllImages?.()} disabled={isGenerating} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGenerating ? '전체 생성 중...' : '전체 이미지 생성'}</button>
-              )}
-              {onGenerateAllVideos && (
-                <button type="button" onClick={() => void onGenerateAllVideos?.()} disabled={Boolean(isGeneratingAllVideos) || isGenerating} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isGeneratingAllVideos ? '모든 영상 생성 중...' : '모든 씬 영상 생성'}</button>
-              )}
-              {onExportVideo && (
-                <>
-                  <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: true, qualityMode: downloadQuality })} disabled={isExporting} className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500">{isExporting ? '렌더링 중...' : '최종 출력 (자막 O)'}</button>
-                  <button type="button" onClick={() => onExportVideo?.({ enableSubtitles: false, qualityMode: downloadQuality })} disabled={isExporting} className="rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-[13px] font-bold leading-tight text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">최종 출력 (자막 X)</button>
-                </>
-              )}
-            </div>
-
-            <div className="px-5 py-5 sm:px-6">
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
-                {data.map((row, index) => (
-                  <div key={`preview-${row.sceneNumber}-${index}`} className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
-                    <div className="grid gap-4 lg:grid-cols-[250px_minmax(0,1fr)]">
-                      <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                        <div className="mb-3 flex items-center justify-between gap-3">
-                          <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-black text-blue-700">씬 {row.sceneNumber}</span>
-                          <div className={`${getAspectRatioPreviewClass(row.aspectRatio || '16:9', true)} overflow-hidden rounded-xl border border-slate-200 bg-slate-100`} />
-                        </div>
-                        <div className="relative flex h-[250px] items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 px-3">
-                          {getSceneVisualPayload(row).kind === 'video' && getSceneVisualPayload(row).src ? (
-                            <video className="max-h-[250px] max-w-full rounded-2xl object-contain" playsInline muted controls preload="metadata">
-                              <source src={getSceneVisualPayload(row).src} type="video/mp4" />
-                            </video>
-                          ) : getSceneVisualPayload(row).src ? (
-                            <button type="button" onClick={() => setImageLightbox({ src: getDisplayImageSrc(getSceneVisualPayload(row).src), title: `미리보기 씬 ${row.sceneNumber}`, aspectRatio: row.aspectRatio })} className="block text-left"><img src={getDisplayImageSrc(getSceneVisualPayload(row).src)} alt={`미리보기 씬 ${row.sceneNumber}`} className="max-h-[250px] max-w-full rounded-2xl object-contain" /></button>
-                          ) : (
-                            <div className="max-w-[210px] text-center text-sm font-bold text-slate-400">이미지 생성 후 이 자리에서 장면을 확인할 수 있습니다.</div>
-                          )}
-                          {sceneProgressMap?.[index] && sceneProgressMap[index].percent < 100 && (
-                            <div className="absolute inset-0 flex items-end bg-white/70 p-3">
-                              <div className="w-full rounded-2xl border border-slate-200 bg-white/90 p-3">
-                                <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
-                                  <span>{sceneProgressMap[index].label}</span>
-                                  <span>{sceneProgressMap[index].percent}%</span>
-                                </div>
-                                <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                                  <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${sceneProgressMap[index].percent}%` }} />
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">{formatSeconds(row.targetDuration)}</span>
-                          <span className={`rounded-full px-3 py-1 text-xs font-bold ${getPreferredVisualType(row) === 'video' && row.videoData ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                            {getPreferredVisualType(row) === 'video' && row.videoData ? '씬 영상 선택' : '이미지 선택'}
-                          </span>
-                          <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">비율 {row.aspectRatio || '16:9'}</span>
-                        </div>
-                        <div className="rounded-2xl border border-slate-200 bg-white p-3">
-                          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">결과 카드</div>
-                          <p className="mt-2 text-sm leading-6 text-slate-600">세로형 씬도 과하게 길어지지 않도록 높이를 250px 안에서 맞춰 보여줍니다.</p>
-                        </div>
-                        {row.audioData && (
-                          <audio controls className="w-full">
-                            <source src={resolveNarrationAudioSrc(row.audioData)} type="audio/mpeg" />
-                          </audio>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <SceneStudioPreviewPage
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        currentTopic={currentTopic}
+        data={data}
+        summary={summary}
+        totalDuration={totalDuration}
+        progressMessage={progressMessage}
+        activeOverallProgress={activeOverallProgress}
+        progressLabel={progressLabel}
+        previewVideoTone={previewVideoTone}
+        previewVideoStatus={previewVideoStatus}
+        previewVideoMessage={previewVideoMessage}
+        finalVideoUrl={finalVideoUrl}
+        finalVideoTitle={finalVideoTitle}
+        onPreparePreviewVideo={onPreparePreviewVideo}
+        isPreparingPreviewVideo={isPreparingPreviewVideo}
+        handlePrepareDavinciImport={handlePrepareDavinciImport}
+        handleDownloadDavinciPackage={handleDownloadDavinciPackage}
+        isDavinciPreparing={isDavinciPreparing}
+        davinciStatusMessage={davinciStatusMessage}
+        davinciPackagePath={davinciPackagePath}
+        davinciLaunchUri={davinciLaunchUri}
+        onExportVideo={onExportVideo}
+        downloadQuality={downloadQuality}
+        isExporting={isExporting}
+        sequencePlaying={sequencePlaying}
+        sequenceScene={sequenceScene}
+        sequenceSceneIndex={sequenceSceneIndex}
+        sequenceSceneDuration={sequenceSceneDuration}
+        sequenceSceneAudioRate={sequenceSceneAudioRate}
+        previewSequenceVideoRef={previewSequenceVideoRef}
+        previewSequenceAudioRef={previewSequenceAudioRef}
+        onToggleSequencePlayback={() => {
+          if (sequencePlaying) {
+            stopSequencePlayback();
+          } else {
+            startSequencePlayback(false);
+          }
+        }}
+        onSelectSequenceScene={(queueIndex) => {
+          setSequenceSceneIndex(queueIndex);
+          setSequenceRunId((prev) => prev + 1);
+        }}
+        onSequenceAudioPlay={(element) => applyAudioPlaybackRate(element, sequenceSceneAudioRate)}
+        onSequenceAudioLoadedMetadata={(element) => applyAudioPlaybackRate(element, sequenceSceneAudioRate)}
+        onSequenceAudioEnded={() => {
+          if (sequencePlaying) {
+            advanceSequencePlayback();
+          }
+        }}
+        previewMix={previewMix}
+        onPreviewMixChange={onPreviewMixChange}
+        mainBgm={mainBgm}
+        backgroundMusicTracks={backgroundMusicTracks}
+        onSelectBackgroundTrack={onSelectBackgroundTrack}
+        onCreateBackgroundTrack={onCreateBackgroundTrack}
+        bgmAudioRef={bgmAudioRef}
+        thumbnailToolbarRef={thumbnailToolbarRef}
+        onGenerateThumbnail={onGenerateThumbnail}
+        isThumbnailGenerating={isThumbnailGenerating}
+        onGenerateAllImages={onGenerateAllImages}
+        onGenerateAllVideos={onGenerateAllVideos}
+        isGeneratingAllVideos={isGeneratingAllVideos}
+        isGenerating={isGenerating}
+        sceneProgressMap={sceneProgressMap}
+        getSceneVisualPayload={getSceneVisualPayload}
+        getDisplayImageSrc={getDisplayImageSrc}
+        getPreferredVisualType={getPreferredVisualType}
+        onOpenMediaLightbox={(lightbox) => setMediaLightbox(lightbox)}
+      />
 
       {shouldShowFooter && (
         <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">

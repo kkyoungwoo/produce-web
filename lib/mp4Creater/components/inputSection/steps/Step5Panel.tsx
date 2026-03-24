@@ -32,7 +32,13 @@ const SAMPLE_STYLE_PALETTES: Array<{ match: RegExp; from: string; to: string; ba
 ];
 
 function resolvePalette(label: string) {
-  return SAMPLE_STYLE_PALETTES.find((item) => item.match.test(label)) || { from: '#4338ca', to: '#8b5cf6', badge: '최종 화풍 샘플' };
+  return (
+    SAMPLE_STYLE_PALETTES.find((item) => item.match.test(label)) || {
+      from: '#4338ca',
+      to: '#8b5cf6',
+      badge: '최종 화풍 샘플',
+    }
+  );
 }
 
 function buildSamplePreview(label: string, subtitle: string) {
@@ -71,21 +77,37 @@ export default function Step5Panel({
   onSelectStyle,
 }: Step5PanelProps) {
   const styleItems = useMemo(
-    () => styleGroups.flatMap((group) => group.items.map((item) => ({ ...item, groupLabel: item.groupLabel || group.label }))),
+    () =>
+      styleGroups.flatMap((group) =>
+        group.items.map((item) => ({
+          ...item,
+          groupLabel: item.groupLabel || group.label,
+        }))
+      ),
     [styleGroups]
   );
 
   const selectedCard = useMemo(
-    () => styleItems.find((item) => item.id === selectedStyleImageId) || styleItems[0] || null,
+    () =>
+      selectedStyleImageId
+        ? styleItems.find((item) => item.id === selectedStyleImageId) || null
+        : null,
     [selectedStyleImageId, styleItems]
   );
 
   const stylePresetCards = useMemo(
-    () => STYLE_SAMPLE_PRESETS.map((preset) => {
-      const matched = styleItems.find((item) => (item.groupLabel || item.label) === preset.label || item.id === preset.id) || null;
-      const selected = Boolean(matched && matched.id === selectedStyleImageId);
-      return { preset, matched, selected };
-    }),
+    () =>
+      STYLE_SAMPLE_PRESETS.map((preset) => {
+        const matched =
+          styleItems.find(
+            (item) =>
+              (item.groupLabel || item.label) === preset.label || item.id === preset.id
+          ) || null;
+        const selected = Boolean(
+          selectedStyleImageId && matched && matched.id === selectedStyleImageId
+        );
+        return { preset, matched, selected };
+      }),
     [selectedStyleImageId, styleItems]
   );
 
@@ -95,58 +117,64 @@ export default function Step5Panel({
 
   return (
     <div className="space-y-6">
-
       <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">샘플 화풍 선택</div>
+            <div className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">
+              샘플 화풍 선택
+            </div>
             <h3 className="mt-2 text-lg font-black text-slate-900">Step5 화풍 카드</h3>
           </div>
-          <div className="text-xs text-slate-500">원하는 화풍을 누르면 바로 선택됩니다.</div>
+          <div className="text-xs text-slate-500">
+            원하는 화풍을 누르면 바로 선택됩니다.
+          </div>
         </div>
 
         <div className="mt-4 grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 2xl:grid-cols-6">
-  {stylePresetCards.map(({ preset, matched, selected }) => (
-    <button
-      key={preset.id}
-      type="button"
-      onClick={() => handleSelectPreset(preset.id)}
-      className={`overflow-hidden rounded-[20px] border text-left shadow-sm transition ${
-        selected
-          ? 'border-violet-400 ring-2 ring-violet-200'
-          : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'
-      }`}
-    >
-      <div className="relative overflow-hidden border-b border-slate-200 bg-slate-100">
-        {selected ? (
-          <span className="absolute right-2 top-2 z-10 rounded-full bg-violet-600 px-2.5 py-1 text-[10px] font-black text-white shadow-sm">
-            선택됨
-          </span>
-        ) : null}
+          {stylePresetCards.map(({ preset, matched, selected }) => (
+            <button
+              key={preset.id}
+              type="button"
+              onClick={() => handleSelectPreset(preset.id)}
+              className={`overflow-hidden rounded-[20px] border text-left shadow-sm transition ${
+                selected
+                  ? 'border-violet-400 ring-2 ring-violet-200'
+                  : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'
+              }`}
+            >
+              <div className="relative overflow-hidden border-b border-slate-200 bg-slate-100">
+                {selected ? (
+                  <span className="absolute right-2 top-2 z-10 rounded-full bg-violet-600 px-2.5 py-1 text-[10px] font-black text-white shadow-sm">
+                    선택됨
+                  </span>
+                ) : null}
 
-        <img
-          src={preset.imageData || buildSamplePreview(preset.label, preset.description)}
-          alt={`${preset.label} 샘플`}
-          className="aspect-[16/10] w-full object-cover"
-          onError={(event) => {
-            event.currentTarget.onerror = null;
-            event.currentTarget.src = buildSamplePreview(preset.label, preset.description);
-          }}
-        />
-      </div>
+                <img
+                  src={preset.imageData || buildSamplePreview(preset.label, preset.description)}
+                  alt={`${preset.label} 샘플`}
+                  className="aspect-[16/10] w-full object-cover"
+                  onError={(event) => {
+                    event.currentTarget.onerror = null;
+                    event.currentTarget.src = buildSamplePreview(
+                      preset.label,
+                      preset.description
+                    );
+                  }}
+                />
+              </div>
 
-      <div className="p-3">
-        <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">
-          최종 영상 화풍
+              <div className="p-3">
+                <div className="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">
+                  최종 영상 화풍
+                </div>
+                <div className="mt-2 text-sm font-black text-slate-900">{preset.label}</div>
+                <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-slate-600">
+                  {preset.description}
+                </p>
+              </div>
+            </button>
+          ))}
         </div>
-        <div className="mt-2 text-sm font-black text-slate-900">{preset.label}</div>
-        <p className="mt-1.5 line-clamp-2 text-[11px] leading-5 text-slate-600">
-          {preset.description}
-        </p>
-      </div>
-    </button>
-  ))}
-</div>
       </section>
     </div>
   );

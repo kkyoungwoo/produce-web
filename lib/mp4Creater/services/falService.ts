@@ -16,6 +16,7 @@ type GoogleVideoModelConfig = {
 };
 
 const DEFAULT_GOOGLE_VIDEO_MODEL = 'veo-3.1-fast-generate-preview';
+const STATIC_SAMPLE_VIDEO_URL = '/mp4Creater/samples/videos/scene_preview_sample.webm';
 
 const GOOGLE_VIDEO_MODEL_CONFIGS: Record<string, GoogleVideoModelConfig> = {
   'veo-3.1-fast-generate-preview': {
@@ -60,17 +61,21 @@ function resolveSampleCanvasSize(aspectRatio: AspectRatio = '16:9') {
   return { width: 960, height: 540 };
 }
 
+function getStaticSampleVideoResult(): GeneratedVideoResult {
+  return { videoUrl: STATIC_SAMPLE_VIDEO_URL, sourceMode: 'sample' };
+}
+
 async function createSampleVideoFromImage(imageBase64: string, aspectRatio: AspectRatio = '16:9', motionPrompt?: string): Promise<GeneratedVideoResult | null> {
   const freeVideoUrl = motionPrompt ? await getPrimaryFreeVideoForPrompt(motionPrompt).catch(() => null) : null;
   if (freeVideoUrl) {
     return { videoUrl: freeVideoUrl, sourceMode: 'sample' };
   }
   if (typeof window === 'undefined' || typeof document === 'undefined' || typeof MediaRecorder === 'undefined') {
-    return null;
+    return getStaticSampleVideoResult();
   }
 
   const source = normalizeImageToDataUrl(imageBase64);
-  if (!source) return null;
+  if (!source) return getStaticSampleVideoResult();
 
   const image = await new Promise<HTMLImageElement | null>((resolve) => {
     const img = new Image();
@@ -79,14 +84,14 @@ async function createSampleVideoFromImage(imageBase64: string, aspectRatio: Aspe
     img.src = source;
   });
 
-  if (!image) return null;
+  if (!image) return getStaticSampleVideoResult();
 
   const { width, height } = resolveSampleCanvasSize(aspectRatio);
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
   const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
+  if (!ctx) return getStaticSampleVideoResult();
 
   const stream = canvas.captureStream(12);
   const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
@@ -146,7 +151,7 @@ async function createSampleVideoFromImage(imageBase64: string, aspectRatio: Aspe
   });
 
   const videoBlob = new Blob(chunks, { type: mimeType || 'video/webm' });
-  if (!videoBlob.size) return null;
+  if (!videoBlob.size) return getStaticSampleVideoResult();
   return {
     videoUrl: URL.createObjectURL(videoBlob),
     sourceMode: 'sample',

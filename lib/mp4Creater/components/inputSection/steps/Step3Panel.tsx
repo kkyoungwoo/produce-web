@@ -462,6 +462,8 @@ export default function Step3Panel({
   const [railFocusIndex, setRailFocusIndex] = useState<number | null>(null);
 
   const prevCharacterCountRef = useRef(extractedCharacters.length);
+  const castSectionRef = useRef<HTMLElement | null>(null);
+  const highlightResetTimerRef = useRef<number | null>(null);
 
   const selectedCount = selectedCharacterIds.length;
   const isMuteScriptMode = customScriptLanguage === 'mute';
@@ -491,6 +493,134 @@ export default function Step3Panel({
     [storyScript, savedScriptSnapshot]
   );
 
+
+  const needsCastSelectionGuidance = useMemo(() => {
+    if (!isMuteScriptMode && !hasStoryScript) return false;
+
+    if (!selectedCharacterIds.length) return true;
+
+    const selectedCharacters = extractedCharacters.filter((character) =>
+      selectedCharacterIds.includes(character.id)
+    );
+
+    if (!selectedCharacters.length) return true;
+
+    return selectedCharacters.some((character) => {
+      const rawVoiceProvider = character.voiceProvider;
+      const voiceProvider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' =
+        rawVoiceProvider === 'elevenLabs' ||
+        rawVoiceProvider === 'chatterbox' ||
+        rawVoiceProvider === 'qwen3Tts'
+          ? rawVoiceProvider
+          : 'qwen3Tts';
+
+      const currentVoiceId = character.voiceId || character.voiceHint || '';
+
+      if (voiceProvider === 'qwen3Tts') {
+        return !(currentVoiceId || 'qwen-default');
+      }
+
+      if (voiceProvider === 'chatterbox') {
+        return !(currentVoiceId || CHATTERBOX_VOICE_OPTIONS[0]?.id);
+      }
+
+      return !(currentVoiceId || elevenLabsVoices[0]?.voice_id);
+    });
+  }, [
+    elevenLabsVoices,
+    extractedCharacters,
+    hasStoryScript,
+    isMuteScriptMode,
+    selectedCharacterIds,
+  ]);
+
+  const scrollToCastSelection = useCallback(() => {
+    const target = castSectionRef.current;
+    if (!target) return;
+
+    if (highlightResetTimerRef.current !== null) {
+      window.clearTimeout(highlightResetTimerRef.current);
+      highlightResetTimerRef.current = null;
+    }
+
+    setHighlightCastSelection(true);
+
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const behavior: ScrollBehavior = prefersReducedMotion ? 'auto' : 'smooth';
+
+    const findScrollableParent = (node: HTMLElement | null): HTMLElement | null => {
+      let current = node?.parentElement ?? null;
+
+      while (current) {
+        const style = window.getComputedStyle(current);
+        const overflowY = style.overflowY;
+        const isScrollable =
+          (overflowY === 'auto' || overflowY === 'scroll' || overflowY === 'overlay') &&
+          current.scrollHeight > current.clientHeight;
+
+        if (isScrollable) return current;
+        current = current.parentElement;
+      }
+
+      return null;
+    };
+
+    const runScroll = () => {
+      target.scrollIntoView({
+        behavior,
+        block: 'start',
+        inline: 'nearest',
+      });
+
+      const scrollParent = findScrollableParent(target);
+      if (scrollParent) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const nextTop = scrollParent.scrollTop + (targetRect.top - parentRect.top) - 16;
+
+        scrollParent.scrollTo({
+          top: Math.max(0, nextTop),
+          behavior,
+        });
+      }
+
+      const absoluteTop = window.scrollY + target.getBoundingClientRect().top - 16;
+      window.scrollTo({
+        top: Math.max(0, absoluteTop),
+        behavior,
+      });
+    };
+
+    const retryDelays = [0, 40, 120, 240, 420];
+    retryDelays.forEach((delay) => {
+      window.setTimeout(() => {
+        window.requestAnimationFrame(runScroll);
+      }, delay);
+    });
+
+    highlightResetTimerRef.current = window.setTimeout(() => {
+      setHighlightCastSelection(false);
+      highlightResetTimerRef.current = null;
+    }, 1800);
+  }, []);
+
+  const isNextButtonAttempt = useCallback((target: EventTarget | null) => {
+    if (!(target instanceof Element)) return false;
+
+    const button = target.closest('button, [role="button"]');
+    if (!(button instanceof HTMLElement)) return false;
+
+    const label = (button.textContent || '').replace(/\s+/g, '');
+    const ariaLabel = (button.getAttribute('aria-label') || '').replace(/\s+/g, '');
+
+    return (
+      label.includes('다음으로') ||
+      label === '다음' ||
+      ariaLabel.includes('다음으로') ||
+      ariaLabel === '다음'
+    );
+  }, []);
+
   useEffect(() => {
     if (isGeneratingScript) {
       setSavedScriptSnapshot(storyScript || '');
@@ -499,10 +629,43 @@ export default function Step3Panel({
 
   useEffect(() => {
     if (!castSelectionHighlightTick) return;
-    setHighlightCastSelection(true);
-    const timer = window.setTimeout(() => setHighlightCastSelection(false), 1800);
-    return () => window.clearTimeout(timer);
-  }, [castSelectionHighlightTick]);
+    scrollToCastSelection();
+  }, [castSelectionHighlightTick, scrollToCastSelection]);
+
+  useEffect(() => {
+    return () => {
+      if (highlightResetTimerRef.current !== null) {
+        window.clearTimeout(highlightResetTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!needsCastSelectionGuidance) return;
+
+    const handlePointerDownCapture = (event: PointerEvent | MouseEvent | TouchEvent) => {
+      if (!isNextButtonAttempt(event.target)) return;
+      scrollToCastSelection();
+    };
+
+    const handleKeyDownCapture = (event: KeyboardEvent) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      if (!isNextButtonAttempt(event.target)) return;
+      scrollToCastSelection();
+    };
+
+    document.addEventListener('pointerdown', handlePointerDownCapture, true);
+    document.addEventListener('mousedown', handlePointerDownCapture, true);
+    document.addEventListener('touchstart', handlePointerDownCapture, true);
+    document.addEventListener('keydown', handleKeyDownCapture, true);
+
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDownCapture, true);
+      document.removeEventListener('mousedown', handlePointerDownCapture, true);
+      document.removeEventListener('touchstart', handlePointerDownCapture, true);
+      document.removeEventListener('keydown', handleKeyDownCapture, true);
+    };
+  }, [isNextButtonAttempt, needsCastSelectionGuidance, scrollToCastSelection]);
 
   useEffect(() => {
     if (showInlineAddCharacterCard) {
@@ -677,6 +840,7 @@ export default function Step3Panel({
       </section>
 
       <section
+        ref={castSectionRef}
         data-step3-cast-section
         className={`rounded-[28px] border bg-white p-5 shadow-sm transition-all duration-300 ${
           highlightCastSelection

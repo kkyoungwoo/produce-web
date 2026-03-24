@@ -583,7 +583,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           <motion.div
             layout="position"
             transition={galleryLayoutTransition}
-            className="mb-5 w-full overflow-hidden rounded-[28px] border border-white/80 bg-white/70 p-5 shadow-[0_18px_44px_rgba(150,190,225,0.16)] backdrop-blur-2xl lg:mx-auto lg:w-[1000px] lg:max-w-[1000px]"
+            className="mb-5 w-full overflow-hidden rounded-[28px] border border-white/80 bg-white/70 p-5 shadow-[0_18px_44px_rgba(150,190,225,0.16)] backdrop-blur-2xl lg:mx-auto lg:w-[1106px] lg:max-w-[1106px]"
           >
             <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
               <div>

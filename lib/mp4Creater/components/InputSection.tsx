@@ -1261,16 +1261,76 @@ const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const scrollToStep3CastSelection = () => {
-    window.requestAnimationFrame(() => {
+    const scrollToTarget = () => {
       const target = document.querySelector<HTMLElement>('[data-step3-cast-section]');
       if (!target) {
+        return false;
+      }
+
+      const top = Math.max(0, window.scrollY + target.getBoundingClientRect().top - 12);
+      window.scrollTo({ top, behavior: 'smooth' });
+      return true;
+    };
+
+    window.requestAnimationFrame(() => {
+      if (scrollToTarget()) return;
+
+      let attempt = 0;
+      const maxAttempts = 12;
+
+      const retry = () => {
+        if (scrollToTarget()) return;
+        attempt += 1;
+        if (attempt >= maxAttempts) {
+          scrollStageIntoFocus(3);
+          return;
+        }
+        window.setTimeout(retry, 80);
+      };
+
+      window.setTimeout(retry, 60);
+    });
+  };
+
+  useEffect(() => {
+    if (!step3CastSelectionHighlightTick) return;
+
+    let cancelled = false;
+    let retryTimer: number | null = null;
+    let attempt = 0;
+    const maxAttempts = 14;
+
+    const run = () => {
+      if (cancelled) return;
+
+      const target = document.querySelector<HTMLElement>('[data-step3-cast-section]');
+      if (target) {
+        const top = Math.max(0, window.scrollY + target.getBoundingClientRect().top - 12);
+        window.scrollTo({ top, behavior: 'smooth' });
+        return;
+      }
+
+      attempt += 1;
+      if (attempt >= maxAttempts) {
         scrollStageIntoFocus(3);
         return;
       }
-      const top = Math.max(0, window.scrollY + target.getBoundingClientRect().top - 12);
-      window.scrollTo({ top, behavior: 'smooth' });
+
+      retryTimer = window.setTimeout(run, 80);
+    };
+
+    const rafId = window.requestAnimationFrame(() => {
+      retryTimer = window.setTimeout(run, 60);
     });
-  };
+
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(rafId);
+      if (retryTimer !== null) {
+        window.clearTimeout(retryTimer);
+      }
+    };
+  }, [step3CastSelectionHighlightTick, openStage, extractedCharacters.length, selectedCharacterIds.length]);
 
   const openOnly = (stage: StepId) => {
     if (!canOpenStage(stage)) return;

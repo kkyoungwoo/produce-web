@@ -33,7 +33,7 @@ import { generateVideoFromImage, getFalApiKey } from '../services/falService';
 import { getProjectById, getSavedProjects, updateProject, upsertWorkflowProject } from '../services/projectService';
 import { buildDefaultSubtitlePreset, buildScenePlanItems, buildScriptParagraphPlans, buildTtsFileItems, inferGenerationMode, inferSceneSourceType, sumSceneDuration, sumTtsDuration } from '../services/projectEnhancementService';
 import { renderVideoWithFfmpeg } from '../services/serverRenderService';
-import { CONFIG, PRICING } from '../config';
+import { CHATTERBOX_TTS_PRESET_OPTIONS, CONFIG, ELEVENLABS_MODELS, IMAGE_MODELS, PRICING, QWEN_TTS_PRESET_OPTIONS, VIDEO_MODEL_OPTIONS } from '../config';
 import { clearProjectNavigationProject, readProjectNavigationProject, rememberProjectNavigationProject } from '../services/projectNavigationCache';
 import { estimateClipDuration, splitStoryIntoParagraphScenes } from '../utils/storyHelpers';
 import {
@@ -649,6 +649,135 @@ const SceneStudioPage: React.FC = () => {
     return picked ? [picked] : [];
   }, [backgroundMusicTracks, activeBackgroundTrackId]);
 
+  const updateQuickRouting = useCallback(async (routingPatch: Partial<StudioState['routing']>, draftPatch?: Partial<WorkflowDraft>) => {
+    const baseState = studioStateRef.current || studioState || createDefaultStudioState();
+    const defaultRouting = createDefaultStudioState().routing;
+    const nextWorkflowDraft = { ...ensureWorkflowDraft(baseState), ...(draftPatch || {}) };
+    const nextState = await saveStudioState({
+      ...baseState,
+      workflowDraft: nextWorkflowDraft,
+      routing: {
+        ...defaultRouting,
+        ...(baseState.routing || {}),
+        ...routingPatch,
+      },
+      updatedAt: Date.now(),
+    });
+    setStudioState(nextState);
+  }, [studioState]);
+
+  const selectedImageModelId = useMemo(() => studioState?.routing?.imageModel || getSelectedImageModel(), [studioState?.routing?.imageModel]);
+  const selectedImageModelLabel = useMemo(() => IMAGE_MODELS.find((item) => item.id === selectedImageModelId)?.name || selectedImageModelId || CONFIG.DEFAULT_IMAGE_MODEL, [selectedImageModelId]);
+  const selectedVideoModelLabel = useMemo(() => VIDEO_MODEL_OPTIONS.find((item) => item.id === selectedVideoModel)?.name || selectedVideoModel, [selectedVideoModel]);
+
+  const quickImageModelOptions = useMemo(() => IMAGE_MODELS.map((item) => ({
+    id: item.id,
+    label: item.name,
+    helper: `${item.provider} · ${item.description}`,
+  })), []);
+
+  const quickVideoModelOptions = useMemo(() => VIDEO_MODEL_OPTIONS.map((item) => ({
+    id: item.id,
+    label: item.name,
+    helper: `${item.provider} · ${item.tier === 'paid' ? '유료' : '무료'} 모델`,
+  })), []);
+
+  const selectedAudioModelMeta = useMemo(() => {
+    const tts = resolveSceneTtsOptions();
+    if (tts.provider === 'elevenLabs') {
+      const model = ELEVENLABS_MODELS.find((item) => item.id === tts.modelId) || ELEVENLABS_MODELS[0];
+      return {
+        currentId: `elevenLabs:${model?.id || CONFIG.DEFAULT_ELEVENLABS_MODEL}`,
+        currentLabel: `ElevenLabs · ${model?.name || tts.modelId}`,
+      };
+    }
+    if (tts.provider === 'chatterbox') {
+      const preset = CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === tts.qwenPreset) || CHATTERBOX_TTS_PRESET_OPTIONS[0];
+      return {
+        currentId: `chatterbox:${preset?.id || 'chatterbox-clear'}`,
+        currentLabel: `Chatterbox · ${preset?.name || tts.qwenPreset}`,
+      };
+    }
+    if (tts.provider === 'heygen') {
+      return {
+        currentId: `heygen:${tts.voiceId || 'default'}`,
+        currentLabel: 'HeyGen · 기본 보이스',
+      };
+    }
+    const preset = QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === tts.qwenPreset) || QWEN_TTS_PRESET_OPTIONS[0];
+    return {
+      currentId: `qwen3Tts:${preset?.id || 'qwen-default'}`,
+      currentLabel: `qwen3-tts · ${preset?.name || tts.qwenPreset}`,
+    };
+  }, [resolveSceneTtsOptions]);
+
+  const quickAudioModelOptions = useMemo(() => ([
+    ...QWEN_TTS_PRESET_OPTIONS.map((item) => ({ id: `qwen3Tts:${item.id}`, label: item.name, helper: 'qwen3-tts 무료 보이스' })),
+    ...CHATTERBOX_TTS_PRESET_OPTIONS.map((item) => ({ id: `chatterbox:${item.id}`, label: item.name, helper: 'Chatterbox 로컬 보이스' })),
+    ...ELEVENLABS_MODELS.slice(0, 4).map((item) => ({ id: `elevenLabs:${item.id}`, label: `ElevenLabs ${item.name}`, helper: item.description })),
+    { id: 'heygen:default', label: 'HeyGen 기본 보이스', helper: 'HeyGen TTS 사용' },
+  ]), []);
+
+  const handleQuickImageModelSelect = useCallback((modelId: string) => {
+    void updateQuickRouting({
+      imageModel: modelId,
+      imageProvider: modelId === 'sample-scene-image' ? 'sample' : 'openrouter',
+    });
+  }, [updateQuickRouting]);
+
+  const handleQuickVideoModelSelect = useCallback((modelId: string) => {
+    void updateQuickRouting({
+      videoModel: modelId,
+      videoProvider: modelId === CONFIG.DEFAULT_VIDEO_MODEL ? 'sample' : 'elevenLabs',
+    });
+  }, [updateQuickRouting]);
+
+  const handleQuickAudioModelSelect = useCallback((value: string) => {
+    const [provider, rawId] = value.split(':');
+    if (provider === 'elevenLabs') {
+      void updateQuickRouting({
+        ttsProvider: 'elevenLabs',
+        audioProvider: 'elevenLabs',
+        audioModel: rawId || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+        elevenLabsModelId: rawId || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+      }, {
+        ttsProvider: 'elevenLabs',
+        elevenLabsModelId: rawId || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+      });
+      return;
+    }
+    if (provider === 'chatterbox') {
+      void updateQuickRouting({
+        ttsProvider: 'chatterbox',
+        audioProvider: 'chatterbox',
+        chatterboxVoicePreset: rawId || 'chatterbox-clear',
+      }, {
+        ttsProvider: 'chatterbox',
+        chatterboxVoicePreset: rawId || 'chatterbox-clear',
+      });
+      return;
+    }
+    if (provider === 'heygen') {
+      void updateQuickRouting({
+        ttsProvider: 'heygen',
+        audioProvider: 'heygen',
+        heygenVoiceId: rawId || 'default',
+      }, {
+        ttsProvider: 'heygen',
+        heygenVoiceId: rawId || 'default',
+      });
+      return;
+    }
+    void updateQuickRouting({
+      ttsProvider: 'qwen3Tts',
+      audioProvider: 'qwen3Tts',
+      qwenVoicePreset: rawId || 'qwen-default',
+    }, {
+      ttsProvider: 'qwen3Tts',
+      qwenVoicePreset: rawId || 'qwen-default',
+    });
+  }, [updateQuickRouting]);
+
   const buildProjectEnhancementPatch = useCallback((assets: GeneratedAsset[], overrides?: Partial<SavedProject>) => {
     const subtitlePreset = overrides?.subtitlePreset || buildDefaultSubtitlePreset();
     const sceneDrivenScript = (draft.script || '').trim() || assets.map((item) => item.narration).filter(Boolean).join('\n\n');
@@ -781,7 +910,6 @@ const SceneStudioPage: React.FC = () => {
 
   const appendImageHistory = useCallback((asset: GeneratedAsset, imageData: string, sourceMode: 'ai' | 'sample', label: string) => {
     const prev = Array.isArray(asset.imageHistory) ? asset.imageHistory : [];
-    if (prev[0]?.data === imageData) return prev;
     return [
       {
         id: `image_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -797,7 +925,6 @@ const SceneStudioPage: React.FC = () => {
 
   const appendVideoHistory = useCallback((asset: GeneratedAsset, videoData: string, sourceMode: 'ai' | 'sample', label: string) => {
     const prev = Array.isArray(asset.videoHistory) ? asset.videoHistory : [];
-    if (prev[0]?.data === videoData) return prev;
     return [
       {
         id: `video_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -1058,7 +1185,7 @@ const SceneStudioPage: React.FC = () => {
 
         try {
           imageData = await withSoftTimeout(
-            generateImage({ ...assetsRef.current[i], aspectRatio: currentAspectRatio }, referenceImages, { qualityMode: 'draft' }),
+            generateImage({ ...assetsRef.current[i], aspectRatio: currentAspectRatio }, referenceImages, { qualityMode: 'final' }),
             12000,
             null
           );
@@ -1414,7 +1541,7 @@ const SceneStudioPage: React.FC = () => {
     try {
       const imageModel = getSelectedImageModel();
       const usesSampleImageFlow = isSampleImageModel(imageModel);
-      const imageData = await generateImage(assetsRef.current[index], buildReferenceImages(), { qualityMode: 'draft' });
+      const imageData = await generateImage(assetsRef.current[index], buildReferenceImages(), { qualityMode: 'final' });
       if (imageData) {
         updateAssetAt(index, {
           imageData,
@@ -1458,19 +1585,6 @@ const SceneStudioPage: React.FC = () => {
     updateAssetAt(index, { status: 'generating' });
     setTaskProgressPercent(12);
     setSceneProgress(index, 24, '오디오 다시 생성');
-    const tts = resolveSceneTtsOptions();
-    if (tts.provider !== 'qwen3Tts' && !tts.apiKey) {
-      updateAssetAt(index, { status: 'completed' });
-      releaseSceneActionLock(index, 'audio');
-      setTaskProgressPercent(null);
-      openApiModal({
-        title: tts.provider === 'heygen' ? '오디오 생성에는 HeyGen API 키가 필요합니다' : '오디오 생성에는 ElevenLabs API 키가 필요합니다',
-        description: '키를 넣고 저장하면 현재 씬의 오디오만 바로 다시 만들 수 있습니다.',
-        focusField: tts.provider === 'heygen' ? 'heygen' : 'elevenLabs',
-      });
-      return;
-    }
-
     try {
       const audio = await generateSceneAudioAsset(assetsRef.current[index].narration);
       if (audio.audioData) {
@@ -1518,7 +1632,7 @@ const SceneStudioPage: React.FC = () => {
         motionPrompt,
         falKey || undefined,
         assetsRef.current[index].aspectRatio || draft.aspectRatio || '16:9',
-        'preview',
+        'final',
         selectedVideoModel || undefined,
       );
       if (videoResult?.videoUrl) {
@@ -1575,7 +1689,7 @@ const SceneStudioPage: React.FC = () => {
           motionPrompt,
           falKey || undefined,
           asset.aspectRatio || draft.aspectRatio || '16:9',
-          'preview',
+          'final',
           selectedVideoModel || undefined,
         );
         if (videoResult?.videoUrl) {
@@ -1968,6 +2082,24 @@ const SceneStudioPage: React.FC = () => {
           onGenerateAllImages={() => void handleGenerate({ preserveExistingCards: true, generateAudio: false })}
           onGenerateAllVideos={() => void handleGenerateAllVideos()}
           isGeneratingAllVideos={isGeneratingAllVideos}
+          imageModelSelector={{
+            currentId: selectedImageModelId,
+            currentLabel: selectedImageModelLabel,
+            options: quickImageModelOptions,
+            onSelect: handleQuickImageModelSelect,
+          }}
+          videoModelSelector={{
+            currentId: selectedVideoModel,
+            currentLabel: selectedVideoModelLabel,
+            options: quickVideoModelOptions,
+            onSelect: handleQuickVideoModelSelect,
+          }}
+          audioModelSelector={{
+            currentId: selectedAudioModelMeta.currentId,
+            currentLabel: selectedAudioModelMeta.currentLabel,
+            options: quickAudioModelOptions,
+            onSelect: handleQuickAudioModelSelect,
+          }}
           onFooterBack={handleGoBackToWorkflow}
           footerBackLabel="이전으로"
           thumbnailToolbarRef={thumbnailToolbarRef}

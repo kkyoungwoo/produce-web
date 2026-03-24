@@ -375,6 +375,20 @@ async function getNextProjectNumber(): Promise<number> {
   return resolveNextProjectNumber(indexed);
 }
 
+async function persistProjectDetailIfPossible(project: SavedProject): Promise<SavedProject> {
+  const cachedState = getCachedStudioState();
+  if (!cachedState?.isStorageConfigured || !cachedState.storageDir?.trim()) {
+    return project;
+  }
+
+  try {
+    return await saveStudioProject(project, { storageDir: cachedState.storageDir });
+  } catch (error) {
+    console.warn('[Project] project detail persist failed before index write. Falling back to inline payload.', error);
+    return project;
+  }
+}
+
 async function syncProjectsAcrossStorage(
   projects: SavedProject[],
   options?: { immediateStudioSync?: boolean; changedProjects?: SavedProject[]; removedProjectIds?: string[] }
@@ -640,10 +654,11 @@ export async function saveProject(
     uploadErrorMessage: extras?.uploadErrorMessage || null,
   };
 
-  const next = [project, ...current].sort((a, b) => b.createdAt - a.createdAt);
-  await syncProjectsAcrossStorage(next, { immediateStudioSync: true, changedProjects: [project] });
+  const persistedProject = await persistProjectDetailIfPossible(project);
+  const next = [persistedProject, ...current.filter((item) => item.id !== persistedProject.id)].sort((a, b) => b.createdAt - a.createdAt);
+  await syncProjectsAcrossStorage(next, { immediateStudioSync: true, changedProjects: [] });
 
-  return (await readIndexedProjectById(project.id)) || project;
+  return (await readIndexedProjectById(persistedProject.id)) || persistedProject;
 }
 
 
@@ -822,17 +837,15 @@ export async function updateProject(
     thumbnail,
   });
 
-  await writeIndexedProject(nextProject);
+  const persistedProject = await persistProjectDetailIfPossible(nextProject);
+  await writeIndexedProject(persistedProject);
   const cachedSummaries = getCachedStudioState()?.projects || [];
   const fallbackProjects = cachedSummaries.length
     ? undefined
     : (await readIndexedProjects()).filter((project) => project.id !== id);
-  const syncPayload = mergeProjectsForStudioSync(nextProject, fallbackProjects);
+  const syncPayload = mergeProjectsForStudioSync(persistedProject, fallbackProjects);
   scheduleStudioSync(syncPayload);
-  void saveStudioProject(nextProject).catch((error) => {
-    console.warn('[Project] project detail sync failed. IndexedDB backup is still safe.', error);
-  });
-  return nextProject;
+  return persistedProject;
 }
 
 

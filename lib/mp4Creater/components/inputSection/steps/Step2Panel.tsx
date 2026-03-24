@@ -31,6 +31,7 @@ const SCRIPT_LANGUAGE_OPTIONS: Array<{ value: ScriptLanguageOption; label: strin
 
 const QUICK_DURATION_OPTIONS = [1, 3, 5, 10, 15] as const;
 const DURATION_MARK_OPTIONS = [1, 3, 5, 8, 10, 15, 20, 25, 30] as const;
+
 const SPEECH_STYLE_OPTIONS: Array<{ value: ScriptSpeechStyle; label: string; hint: string }> = [
   { value: 'default', label: '기본', hint: '가장 무난한 기본 대화체' },
   { value: 'yo', label: '요체', hint: '부드럽고 친근한 말투' },
@@ -64,7 +65,9 @@ function ScrollArrow({
       aria-label={direction === 'left' ? '왼쪽으로 이동' : '오른쪽으로 이동'}
       tabIndex={visible ? 0 : -1}
       onClick={onClick}
-      className={`absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-700 shadow-sm backdrop-blur transition-all duration-300 ${direction === 'left' ? 'left-1.5' : 'right-1.5'} ${visible ? 'pointer-events-auto opacity-100 scale-100 hover:bg-slate-50' : 'pointer-events-none opacity-0 scale-95'}`}
+      className={`absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-slate-700 shadow-sm backdrop-blur transition-all duration-300 ${
+        direction === 'left' ? 'left-1.5' : 'right-1.5'
+      } ${visible ? 'pointer-events-auto scale-100 opacity-100 hover:bg-slate-50' : 'pointer-events-none scale-95 opacity-0'}`}
     >
       <span className="text-base font-black">{direction === 'left' ? '‹' : '›'}</span>
     </button>
@@ -86,7 +89,13 @@ function HorizontalOptionRail({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hideTimerRef = useRef<number | null>(null);
-  const draggingRef = useRef({ active: false, startX: 0, startScrollLeft: 0, moved: false, suppressClick: false });
+  const draggingRef = useRef({
+    active: false,
+    startX: 0,
+    startScrollLeft: 0,
+    moved: false,
+    suppressClick: false,
+  });
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -133,10 +142,13 @@ function HorizontalOptionRail({
     updateScrollState();
     const container = containerRef.current;
     if (!container) return;
+
     const handleResize = () => updateScrollState();
     const handleScroll = () => updateScrollState();
+
     container.addEventListener('scroll', handleScroll, { passive: true });
     window.addEventListener('resize', handleResize);
+
     return () => {
       container.removeEventListener('scroll', handleScroll);
       window.removeEventListener('resize', handleResize);
@@ -165,7 +177,7 @@ function HorizontalOptionRail({
       nextScrollLeft = maxScrollLeft;
     } else {
       const containerWidth = container.clientWidth;
-      const targetLeft = selectedElement.offsetLeft - (containerWidth / 2) + (selectedElement.offsetWidth / 2);
+      const targetLeft = selectedElement.offsetLeft - containerWidth / 2 + selectedElement.offsetWidth / 2;
       nextScrollLeft = Math.min(Math.max(0, targetLeft), maxScrollLeft);
     }
 
@@ -177,13 +189,16 @@ function HorizontalOptionRail({
     revealArrowsTemporarily();
   }, [selectedIndex, itemCount, selectedKey, revealArrowsTemporarily]);
 
-  useEffect(() => () => clearHideTimer(), [clearHideTimer]);
+  useEffect(() => {
+    return () => clearHideTimer();
+  }, [clearHideTimer]);
 
   const scrollByDirection = (direction: 'left' | 'right') => {
     const container = containerRef.current;
     if (!container) return;
     if (direction === 'left' && !canScrollLeft) return;
     if (direction === 'right' && !canScrollRight) return;
+
     revealArrowsTemporarily();
     container.scrollBy({
       left: direction === 'left' ? -step : step,
@@ -198,15 +213,20 @@ function HorizontalOptionRail({
       onFocusCapture={() => revealArrowsTemporarily()}
     >
       <ScrollArrow direction="left" visible={showArrows && canScrollLeft} onClick={() => scrollByDirection('left')} />
+
       <div
         ref={containerRef}
         style={{ touchAction: 'pan-x' }}
-        className={`flex gap-2 overflow-x-auto overscroll-x-contain scroll-smooth pb-1 pl-0.5 pr-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'}`}
+        className={`flex gap-2 overflow-x-auto overscroll-x-contain scroll-smooth pb-1 pl-0.5 pr-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${
+          isDragging ? 'cursor-grabbing select-none' : 'cursor-grab'
+        }`}
         onPointerDown={(event) => {
           if (event.button !== 0) return;
           if (isInteractiveTarget(event.target)) return;
+
           const container = containerRef.current;
           if (!container) return;
+
           draggingRef.current = {
             active: true,
             startX: event.clientX,
@@ -214,19 +234,23 @@ function HorizontalOptionRail({
             moved: false,
             suppressClick: draggingRef.current.suppressClick,
           };
+
           container.setPointerCapture(event.pointerId);
           revealArrowsTemporarily();
         }}
         onPointerMove={(event) => {
           const container = containerRef.current;
           if (!container || !draggingRef.current.active) return;
+
           const deltaX = event.clientX - draggingRef.current.startX;
           if (!draggingRef.current.moved && Math.abs(deltaX) < 8) return;
+
           if (!draggingRef.current.moved) {
             draggingRef.current.moved = true;
             draggingRef.current.suppressClick = true;
             setIsDragging(true);
           }
+
           revealArrowsTemporarily();
           container.scrollLeft = draggingRef.current.startScrollLeft - deltaX;
         }}
@@ -234,9 +258,11 @@ function HorizontalOptionRail({
           const container = containerRef.current;
           draggingRef.current.active = false;
           setIsDragging(false);
+
           if (container?.hasPointerCapture(event.pointerId)) {
             container.releasePointerCapture(event.pointerId);
           }
+
           updateScrollState();
           revealArrowsTemporarily();
         }}
@@ -244,9 +270,11 @@ function HorizontalOptionRail({
           const container = containerRef.current;
           draggingRef.current.active = false;
           setIsDragging(false);
+
           if (container?.hasPointerCapture(event.pointerId)) {
             container.releasePointerCapture(event.pointerId);
           }
+
           updateScrollState();
         }}
         onClickCapture={(event) => {
@@ -259,6 +287,7 @@ function HorizontalOptionRail({
       >
         {children}
       </div>
+
       <ScrollArrow direction="right" visible={showArrows && canScrollRight} onClick={() => scrollByDirection('right')} />
     </div>
   );
@@ -287,7 +316,9 @@ function CompactOption({
       data-no-drag="true"
       data-option-index={index}
       onClick={onClick}
-      className={`${minWidth} shrink-0 snap-start rounded-[18px] border px-3 py-2.5 text-left transition-all duration-300 ${active ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+      className={`${minWidth} shrink-0 snap-start rounded-[18px] border px-3 py-2.5 text-left transition-all duration-300 ${
+        active ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:bg-slate-50'
+      }`}
     >
       <div className="flex items-start gap-2.5">
         {leading ? <div className="pt-0.5 text-lg leading-none">{leading}</div> : null}
@@ -349,13 +380,16 @@ export default function Step2Panel({
   const resizeTopicTextarea = useCallback(() => {
     const textarea = topicTextareaRef.current;
     if (!textarea) return;
+
     textarea.style.height = '0px';
+
     const computed = window.getComputedStyle(textarea);
     const lineHeight = Number.parseFloat(computed.lineHeight || '24') || 24;
     const borderHeight =
       (Number.parseFloat(computed.borderTopWidth || '0') || 0) +
       (Number.parseFloat(computed.borderBottomWidth || '0') || 0);
     const maxHeight = lineHeight * 5 + 24 + borderHeight;
+
     textarea.style.height = `${Math.min(textarea.scrollHeight, maxHeight)}px`;
   }, []);
 
@@ -373,14 +407,19 @@ export default function Step2Panel({
     [customScriptSpeechStyle]
   );
 
-  const visibleRecommendations = [
-    topic.trim(),
-    ...(topicRecommendations.length ? topicRecommendations : [...DEFAULT_TOPIC_RECOMMENDATIONS]),
-  ]
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .filter((item, index, array) => array.indexOf(item) === index)
-    .slice(0, 5);
+  const visibleRecommendations = useMemo(() => {
+    return (topicRecommendations.length ? topicRecommendations : [...DEFAULT_TOPIC_RECOMMENDATIONS])
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .filter((item, index, array) => array.indexOf(item) === index)
+      .slice(0, 5);
+  }, [topicRecommendations]);
+
+  const selectedRecommendation = useMemo(() => {
+    const trimmedTopic = topic.trim();
+    if (!trimmedTopic) return null;
+    return visibleRecommendations.find((item) => item === trimmedTopic) ?? null;
+  }, [topic, visibleRecommendations]);
 
   const selectedSpeechIndex = SPEECH_STYLE_OPTIONS.findIndex((item) => item.value === customScriptSpeechStyle);
   const selectedLanguageIndex = SCRIPT_LANGUAGE_OPTIONS.findIndex((item) => item.value === customScriptLanguage);
@@ -497,8 +536,8 @@ export default function Step2Panel({
           onChange={(e) => onTopicChange(e.target.value)}
           rows={1}
           className="max-h-[148px] min-h-[56px] w-full resize-none overflow-y-auto rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-blue-400"
-          placeholder="예: 비 오는 도시 골목에서 다시 만난 두 사람
-장면이 길어지면 엔터로 줄을 나눠 자세히 적어도 됩니다"
+          placeholder={`예: 비 오는 도시 골목에서 다시 만난 두 사람
+장면이 길어지면 엔터로 줄을 나눠 자세히 적어도 됩니다`}
         />
 
         <p className="mt-3 text-xs text-slate-500">
@@ -507,7 +546,7 @@ export default function Step2Panel({
 
         <div className="mt-3 space-y-2">
           {visibleRecommendations.map((item, index) => {
-            const isActive = topic === item;
+            const isActive = selectedRecommendation === item;
 
             return (
               <button

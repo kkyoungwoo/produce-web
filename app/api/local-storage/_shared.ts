@@ -96,6 +96,7 @@ export type StudioState = {
 export const DEFAULT_STORAGE_DIR = './local-data/tubegen-studio';
 const STUDIO_STATE_FILENAME = 'studio-state.json';
 const PROJECTS_DIRNAME = 'projects';
+const MEDIA_DIRNAME = 'media';
 const SAFE_DEFAULT_STORAGE_DIR = path.join(os.homedir(), '.tubegen-studio');
 
 function isLegacyDefaultStorageDir(input?: string) {
@@ -195,8 +196,249 @@ export const resolveStorageDir = (input?: string) => {
 };
 
 export const stateFilePath = (storageDir: string) => path.join(resolveStorageDir(storageDir), STUDIO_STATE_FILENAME);
+
+export const mediaDirPath = (storageDir: string) => path.join(resolveStorageDir(storageDir), MEDIA_DIRNAME);
+export const mediaFilePath = (storageDir: string, relativePath: string) => path.join(mediaDirPath(storageDir), normalizeRelativeMediaPath(relativePath));
+
+function buildMediaUrl(storageDir: string, relativePath: string) {
+  const query = new URLSearchParams({ file: normalizeRelativeMediaPath(relativePath) });
+  const trimmedStorageDir = storageDir?.trim();
+  if (trimmedStorageDir) query.set('storageDir', trimmedStorageDir);
+  return `/api/local-storage/media?${query.toString()}`;
+}
+
+function getMediaContentType(relativePath: string) {
+  return MEDIA_CONTENT_TYPES[path.extname(relativePath).toLowerCase()] || 'application/octet-stream';
+}
+
+async function persistInlineMedia(storageDir: string, relativeBasePath: string, dataUrl: string) {
+  const parsed = parseDataUrl(dataUrl);
+  if (!parsed) return null;
+  const ext = extensionFromMimeType(parsed.mimeType);
+  const relativePath = normalizeRelativeMediaPath(`${relativeBasePath}${ext}`);
+  const absolutePath = mediaFilePath(storageDir, relativePath);
+  await fs.mkdir(path.dirname(absolutePath), { recursive: true });
+  await fs.writeFile(absolutePath, parsed.buffer);
+  return {
+    file: relativePath,
+    url: buildMediaUrl(storageDir, relativePath),
+    mimeType: parsed.mimeType,
+    absolutePath,
+  };
+}
+
+async function hydrateMediaField(target: Record<string, any>, dataKey: string, fileKey: string, storageDir: string) {
+  const relativePath = typeof target?.[fileKey] === 'string' ? target[fileKey].trim() : '';
+  if (!relativePath) return;
+  try {
+    const absolutePath = mediaFilePath(storageDir, relativePath);
+    if (!(await pathExists(absolutePath))) return;
+    target[dataKey] = buildMediaUrl(storageDir, relativePath);
+    target[`${dataKey}LocalPath`] = absolutePath;
+    target[`${dataKey}ContentType`] = getMediaContentType(relativePath);
+  } catch {
+    // noop
+  }
+}
+
+async function persistMediaField(target: Record<string, any>, dataKey: string, fileKey: string, storageDir: string, relativeBasePath: string) {
+  const value = target?.[dataKey];
+  if (!isDataUrl(value)) return;
+  const persisted = await persistInlineMedia(storageDir, relativeBasePath, value);
+  if (!persisted) return;
+  target[fileKey] = persisted.file;
+  target[`${dataKey}LocalPath`] = persisted.absolutePath;
+  target[`${dataKey}ContentType`] = persisted.mimeType;
+  target[dataKey] = persisted.url;
+}
+
+async function persistProjectMedia(storageDir: string, project: any) {
+  const projectId = sanitizePathSegment(typeof project?.id === 'string' ? project.id : `project-${Date.now()}`);
+  await persistMediaField(project, 'thumbnail', 'thumbnailFile', storageDir, `${projectId}/thumbnail`);
+
+  if (Array.isArray(project?.thumbnailHistory)) {
+    for (let index = 0; index < project.thumbnailHistory.length; index += 1) {
+      const item = project.thumbnailHistory[index];
+      if (!item || typeof item !== 'object') continue;
+      const itemId = sanitizePathSegment(item.id || `thumbnail-history-${index}`);
+      await persistMediaField(item, 'imageData', 'imageFile', storageDir, `${projectId}/thumbnail-history/${itemId}`);
+    }
+  }
+
+  if (Array.isArray(project?.assets)) {
+    for (let index = 0; index < project.assets.length; index += 1) {
+      const asset = project.assets[index];
+      if (!asset || typeof asset !== 'object') continue;
+      const assetId = sanitizePathSegment(asset.id || `scene-${index + 1}`);
+      await persistMediaField(asset, 'imageData', 'imageFile', storageDir, `${projectId}/assets/${assetId}/image`);
+      await persistMediaField(asset, 'audioData', 'audioFile', storageDir, `${projectId}/assets/${assetId}/audio`);
+      await persistMediaField(asset, 'videoData', 'videoFile', storageDir, `${projectId}/assets/${assetId}/video`);
+      if (Array.isArray(asset.imageHistory)) {
+        for (let h = 0; h < asset.imageHistory.length; h += 1) {
+          const historyItem = asset.imageHistory[h];
+          if (!historyItem || typeof historyItem !== 'object') continue;
+          const historyId = sanitizePathSegment(historyItem.id || `image-history-${h}`);
+          await persistMediaField(historyItem, 'data', 'file', storageDir, `${projectId}/assets/${assetId}/image-history/${historyId}`);
+        }
+      }
+      if (Array.isArray(asset.videoHistory)) {
+        for (let h = 0; h < asset.videoHistory.length; h += 1) {
+          const historyItem = asset.videoHistory[h];
+          if (!historyItem || typeof historyItem !== 'object') continue;
+          const historyId = sanitizePathSegment(historyItem.id || `video-history-${h}`);
+          await persistMediaField(historyItem, 'data', 'file', storageDir, `${projectId}/assets/${assetId}/video-history/${historyId}`);
+        }
+      }
+    }
+  }
+
+  const persistTrackArray = async (tracks: any[], prefix: string) => {
+    for (let index = 0; index < tracks.length; index += 1) {
+      const track = tracks[index];
+      if (!track || typeof track !== 'object') continue;
+      const trackId = sanitizePathSegment(track.id || `${prefix}-${index}`);
+      await persistMediaField(track, 'audioData', 'audioFile', storageDir, `${projectId}/${prefix}/${trackId}`);
+    }
+  };
+
+  if (Array.isArray(project?.backgroundMusicTracks)) {
+    await persistTrackArray(project.backgroundMusicTracks, 'background-music');
+  }
+
+  const singularMediaFields: Array<[any, string, string, string]> = [
+    [project?.voicePreviewAsset, 'audioData', 'audioFile', `${projectId}/preview/voice`],
+    [project?.scriptPreviewAsset, 'audioData', 'audioFile', `${projectId}/preview/script`],
+    [project?.finalVoiceAsset, 'audioData', 'audioFile', `${projectId}/preview/final-voice`],
+    [project?.backgroundMusicPreview, 'audioData', 'audioFile', `${projectId}/preview/background-music`],
+    [project?.finalBackgroundMusic, 'audioData', 'audioFile', `${projectId}/preview/final-background-music`],
+    [project?.musicVideoPreview, 'videoData', 'videoFile', `${projectId}/preview/music-video`],
+    [project?.finalMusicVideo, 'videoData', 'videoFile', `${projectId}/preview/final-music-video`],
+  ];
+
+  for (const [target, dataKey, fileKey, relativeBasePath] of singularMediaFields) {
+    if (!target || typeof target !== 'object') continue;
+    await persistMediaField(target, dataKey, fileKey, storageDir, relativeBasePath);
+  }
+}
+
+async function hydrateProjectMedia(storageDir: string, project: any) {
+  await hydrateMediaField(project, 'thumbnail', 'thumbnailFile', storageDir);
+
+  if (Array.isArray(project?.thumbnailHistory)) {
+    for (const item of project.thumbnailHistory) {
+      if (!item || typeof item !== 'object') continue;
+      await hydrateMediaField(item, 'imageData', 'imageFile', storageDir);
+    }
+  }
+
+  if (Array.isArray(project?.assets)) {
+    for (const asset of project.assets) {
+      if (!asset || typeof asset !== 'object') continue;
+      await hydrateMediaField(asset, 'imageData', 'imageFile', storageDir);
+      await hydrateMediaField(asset, 'audioData', 'audioFile', storageDir);
+      await hydrateMediaField(asset, 'videoData', 'videoFile', storageDir);
+      if (Array.isArray(asset.imageHistory)) {
+        for (const historyItem of asset.imageHistory) {
+          if (!historyItem || typeof historyItem !== 'object') continue;
+          await hydrateMediaField(historyItem, 'data', 'file', storageDir);
+        }
+      }
+      if (Array.isArray(asset.videoHistory)) {
+        for (const historyItem of asset.videoHistory) {
+          if (!historyItem || typeof historyItem !== 'object') continue;
+          await hydrateMediaField(historyItem, 'data', 'file', storageDir);
+        }
+      }
+    }
+  }
+
+  if (Array.isArray(project?.backgroundMusicTracks)) {
+    for (const track of project.backgroundMusicTracks) {
+      if (!track || typeof track !== 'object') continue;
+      await hydrateMediaField(track, 'audioData', 'audioFile', storageDir);
+    }
+  }
+
+  const singularTargets = [
+    project?.voicePreviewAsset,
+    project?.scriptPreviewAsset,
+    project?.finalVoiceAsset,
+    project?.backgroundMusicPreview,
+    project?.finalBackgroundMusic,
+    project?.musicVideoPreview,
+    project?.finalMusicVideo,
+  ];
+
+  for (const target of singularTargets) {
+    if (!target || typeof target !== 'object') continue;
+    await hydrateMediaField(target, 'audioData', 'audioFile', storageDir);
+    await hydrateMediaField(target, 'videoData', 'videoFile', storageDir);
+  }
+}
+
 export const projectDetailDirPath = (storageDir: string) => path.join(resolveStorageDir(storageDir), PROJECTS_DIRNAME);
 export const projectDetailFilePath = (storageDir: string, projectId: string) => path.join(projectDetailDirPath(storageDir), `${projectId}.json`);
+
+
+
+const DATA_URL_PATTERN = /^data:([^;,]+)?(;base64)?,(.*)$/i;
+const MEDIA_CONTENT_TYPES: Record<string, string> = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.m4a': 'audio/mp4',
+  '.aac': 'audio/aac',
+  '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
+};
+
+function isDataUrl(value: unknown): value is string {
+  return typeof value === 'string' && DATA_URL_PATTERN.test(value.trim());
+}
+
+function parseDataUrl(value: string) {
+  const match = value.trim().match(DATA_URL_PATTERN);
+  if (!match) return null;
+  const mimeType = (match[1] || 'application/octet-stream').toLowerCase();
+  const isBase64 = Boolean(match[2]);
+  const payload = match[3] || '';
+  const buffer = isBase64
+    ? Buffer.from(payload, 'base64')
+    : Buffer.from(decodeURIComponent(payload), 'utf-8');
+  return { mimeType, buffer };
+}
+
+function extensionFromMimeType(mimeType: string, fallback = '.bin') {
+  if (mimeType.includes('png')) return '.png';
+  if (mimeType.includes('jpeg') || mimeType.includes('jpg')) return '.jpg';
+  if (mimeType.includes('webp')) return '.webp';
+  if (mimeType.includes('gif')) return '.gif';
+  if (mimeType.includes('mpeg')) return '.mp3';
+  if (mimeType.includes('wav')) return '.wav';
+  if (mimeType.includes('ogg')) return '.ogg';
+  if (mimeType.includes('mp4')) return mimeType.startsWith('audio/') ? '.m4a' : '.mp4';
+  if (mimeType.includes('aac')) return '.aac';
+  if (mimeType.includes('webm')) return '.webm';
+  return fallback;
+}
+
+function sanitizePathSegment(value: string) {
+  return value.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || 'file';
+}
+
+function normalizeRelativeMediaPath(value: string) {
+  const normalized = value.replace(/\\/g, '/').replace(/^\/+/, '');
+  const resolved = path.posix.normalize(normalized);
+  if (!resolved || resolved === '.' || resolved.startsWith('..')) {
+    throw new Error('invalid_media_path');
+  }
+  return resolved;
+}
 
 async function pathExists(targetPath: string) {
   try {
@@ -387,7 +629,10 @@ export async function readProjectDetail(storageDir: string, projectId: string): 
   const filePath = projectDetailFilePath(storageDir, safeProjectId);
   if (!(await pathExists(filePath))) return null;
   const raw = await fs.readFile(filePath, 'utf-8');
-  return safeJsonParse<any | null>(raw, null);
+  const parsed = safeJsonParse<any | null>(raw, null);
+  if (!parsed) return null;
+  await hydrateProjectMedia(storageDir, parsed);
+  return parsed;
 }
 
 export async function writeProjectDetail(storageDir: string, project: any): Promise<any> {
@@ -395,10 +640,12 @@ export async function writeProjectDetail(storageDir: string, project: any): Prom
   if (!project?.id) {
     throw new Error('project_id_required');
   }
+  const persistedProject = cloneValue(project);
+  await persistProjectMedia(storageDir, persistedProject);
   const filePath = projectDetailFilePath(storageDir, project.id);
   await fs.mkdir(path.dirname(filePath), { recursive: true });
-  await fs.writeFile(filePath, JSON.stringify(project, null, 2), 'utf-8');
-  return project;
+  await fs.writeFile(filePath, JSON.stringify(persistedProject, null, 2), 'utf-8');
+  return persistedProject;
 }
 
 export async function deleteProjectDetails(storageDir: string, projectIds: string[]): Promise<number> {
@@ -408,9 +655,15 @@ export async function deleteProjectDetails(storageDir: string, projectIds: strin
     const safeProjectId = projectId?.trim();
     if (!safeProjectId) continue;
     const filePath = projectDetailFilePath(storageDir, safeProjectId);
+    const mediaProjectDir = path.join(mediaDirPath(storageDir), sanitizePathSegment(safeProjectId));
     try {
       await fs.unlink(filePath);
       deleted += 1;
+    } catch {
+      // noop
+    }
+    try {
+      await fs.rm(mediaProjectDir, { recursive: true, force: true });
     } catch {
       // noop
     }

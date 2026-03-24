@@ -504,12 +504,13 @@ export async function fetchStudioProjectById(projectId: string, options?: { stor
   }
 }
 
-export async function saveStudioProject(project: SavedProject, options?: { storageDir?: string }): Promise<void> {
+export async function saveStudioProject(project: SavedProject, options?: { storageDir?: string }): Promise<SavedProject> {
   const storageDir = options?.storageDir || getCachedStorageDir();
-  await requestJson('/api/local-storage/project', {
+  const response = await requestJson<{ project?: SavedProject }>('/api/local-storage/project', {
     method: 'POST',
     body: JSON.stringify({ storageDir, project: normalizeProjectContentTypes(project) }),
   });
+  return normalizeProjectContentTypes(response?.project || project);
 }
 
 export async function deleteStudioProjects(projectIds: string[], options?: { storageDir?: string }): Promise<void> {

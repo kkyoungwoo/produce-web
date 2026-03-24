@@ -55,8 +55,9 @@ export async function POST(request: NextRequest) {
   try {
     const resolvedStorageDir = resolveProjectStorageDir(current.storageDir, body?.storageDir);
     await writeProjectDetail(resolvedStorageDir, project);
+    const hydratedProject = await readProjectDetail(resolvedStorageDir, project.id);
     const nextIndex = [
-      normalizeProjectSummary(project),
+      normalizeProjectSummary(hydratedProject || project),
       ...(Array.isArray(current.projectIndex) ? current.projectIndex : []).filter((item) => item?.id !== project.id),
     ].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      project,
+      project: hydratedProject || project,
       projectIndex: savedState.projectIndex || [],
     });
   } catch (error) {
