@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { AnimatePresence, motion } from 'framer-motion';
 import { SavedProject } from '../types';
 import { formatKRW } from '../config';
 import { rememberProjectNavigationProject } from '../services/projectNavigationCache';
@@ -75,8 +76,10 @@ const getSeededHue = (seed: string) => {
 
 const resolveThumbnailBackground = (project: SavedProject) => {
   const hue = getSeededHue(project.id || project.name || 'project');
-  const secondaryHue = (hue + 46) % 360;
-  return `linear-gradient(135deg, hsl(${hue} 78% 86%), hsl(${secondaryHue} 70% 74%))`;
+  const blueHue = 200 + (hue % 18);
+  const secondaryBlueHue = 210 + (hue % 12);
+
+  return `linear-gradient(135deg, hsl(${blueHue} 95% 95%), hsl(${secondaryBlueHue} 85% 88%), #ffffff)`;
 };
 
 const getCompletedMinutesLabel = (project: SavedProject) => {
@@ -117,6 +120,17 @@ const resolveLastWorkedStep = (project: SavedProject): 1 | 2 | 3 | 4 | 5 | 6 => 
   return 1;
 };
 
+const getGalleryFrameWidthClass = (cardCount: number) => {
+  if (cardCount <= 1) return 'max-w-[270px]';
+  if (cardCount === 2) return 'max-w-[550px]';
+  if (cardCount === 3) return 'max-w-[830px]';
+  if (cardCount === 4) return 'max-w-[1110px]';
+  return 'max-w-7xl';
+};
+
+const itemTransition = { duration: 0.22 };
+const groupTransition = { duration: 0.28 };
+
 const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   projects,
   isLoading = false,
@@ -155,7 +169,22 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
   const isAllSelected = sortedProjects.length > 0 && selectedProjectIds.length === sortedProjects.length;
   const hasSelection = selectedProjectIds.length > 0;
-  const isInteractionLocked = isCreatingProject || isSubmittingNameModal || Boolean(duplicatingProjectId) || Object.keys(deletingProjectIds).length > 0;
+  const isInteractionLocked =
+    isCreatingProject ||
+    isSubmittingNameModal ||
+    Boolean(duplicatingProjectId) ||
+    Object.keys(deletingProjectIds).length > 0;
+
+  const totalDisplayCardCount = useMemo(() => {
+    const createCard = 1;
+    const projectCards = sortedProjects.length;
+    const loadingCards = isLoading && !sortedProjects.length ? 3 : 0;
+    const emptyCard = !isLoading && !sortedProjects.length ? 1 : 0;
+    return createCard + projectCards + loadingCards + emptyCard;
+  }, [isLoading, sortedProjects.length]);
+
+  const shouldCenterWholeBox = totalDisplayCardCount <= 4;
+  const galleryFrameWidthClass = getGalleryFrameWidthClass(totalDisplayCardCount);
 
   const formatDate = (timestamp: number) => {
     if (!timestamp) return '-';
@@ -179,7 +208,9 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   };
 
   const toggleSelectAll = () => {
-    setSelectedProjectIds((prev) => (prev.length === sortedProjects.length ? [] : sortedProjects.map((project) => project.id)));
+    setSelectedProjectIds((prev) =>
+      prev.length === sortedProjects.length ? [] : sortedProjects.map((project) => project.id)
+    );
   };
 
   const openProjectScene = (project: SavedProject) => {
@@ -220,11 +251,17 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
   const submitNameModal = async () => {
     if (!nameModal || isSubmittingNameModal) return;
+
     const trimmed = pendingName.trim();
     if (!trimmed) return;
+
     const maxLength = getProjectNameLimit(trimmed);
     if (trimmed.length > maxLength) {
-      window.alert(HANGUL_NAME_REGEX.test(trimmed) ? '프로젝트 이름은 한글 기준 공백 포함 30자까지 입력할 수 있습니다.' : '프로젝트 이름은 영어 기준 공백 포함 50자까지 입력할 수 있습니다.');
+      window.alert(
+        HANGUL_NAME_REGEX.test(trimmed)
+          ? '프로젝트 이름은 한글 기준 공백 포함 30자까지 입력할 수 있습니다.'
+          : '프로젝트 이름은 영어 기준 공백 포함 50자까지 입력할 수 있습니다.'
+      );
       return;
     }
 
@@ -256,19 +293,22 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
     }
   };
 
-
-
   const handleBulkDelete = async () => {
     if (!hasSelection || isInteractionLocked) return;
+
     const idsToDelete = Array.from(new Set(selectedProjectIds.filter(Boolean)));
     if (!idsToDelete.length) return;
-    const confirmed = window.confirm(`선택한 ${idsToDelete.length}개 프로젝트를 삭제할까요?
-삭제 후에는 프로젝트 목록에서 제거됩니다.`);
+
+    const confirmed = window.confirm(
+      `선택한 ${idsToDelete.length}개 프로젝트를 삭제할까요?\n삭제 후에는 프로젝트 목록에서 제거됩니다.`
+    );
     if (!confirmed) return;
+
     const nextDeletingMap = idsToDelete.reduce<Record<string, boolean>>((acc, id) => {
       acc[id] = true;
       return acc;
     }, {});
+
     setDeletingProjectIds((prev) => ({ ...prev, ...nextDeletingMap }));
 
     try {
@@ -294,6 +334,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
   const handleExportSelected = async () => {
     if (!selectedProjects.length) return;
+
     try {
       const resolvedProjects = await Promise.all(
         selectedProjects.map(async (project) => {
@@ -301,7 +342,9 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
           return detailed || project;
         })
       );
+
       const payload = buildProjectsExportPayload(resolvedProjects);
+
       triggerTextDownload(
         JSON.stringify(payload, null, 2),
         `mp4creater-projects-${new Date().toISOString().slice(0, 10)}.json`,
@@ -320,6 +363,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !onImportProjects) return;
+
     try {
       await onImportProjects(file);
     } catch (error) {
@@ -340,32 +384,56 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
     const isDuplicating = duplicatingProjectId === project.id;
 
     return (
-      <article
+      <motion.article
         key={project.id}
-        className={`mp4-glass-panel group relative overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm transition-all ${isDeleting ? 'pointer-events-none scale-95 opacity-50' : 'hover:-translate-y-0.5 hover:shadow-lg'}`}
+        layout
+        initial={{ opacity: 0, y: 8, scale: 0.988 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: -6, scale: 0.988 }}
+        transition={itemTransition}
+        className={`group relative overflow-hidden rounded-[24px] border border-white/70 bg-white/65 shadow-[0_16px_40px_rgba(120,170,220,0.16)] backdrop-blur-xl ${
+          isDeleting ? 'pointer-events-none' : ''
+        }`}
       >
-        <div className="relative h-[132px] overflow-hidden border-b border-slate-200" style={{ background: cardBackground }}>
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/70 via-sky-50/50 to-blue-100/30" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/95" />
+        <div className="pointer-events-none absolute inset-0 rounded-[24px] ring-1 ring-inset ring-sky-100/80" />
+
+        <div
+          className="relative h-[132px] overflow-hidden border-b border-sky-100/80"
+          style={{ background: cardBackground }}
+        >
           {thumbSrc ? (
-            <img src={thumbSrc} alt={project.name} className="h-full w-full object-cover opacity-90" />
+            <img
+              src={thumbSrc}
+              alt={project.name}
+              className="h-full w-full object-cover opacity-[0.94] transition-transform duration-500 ease-out group-hover:scale-[1.02]"
+            />
           ) : (
             <div className="h-full w-full" />
           )}
-          <div className="absolute inset-0 bg-slate-900/12" />
 
-          <label className="absolute left-3 top-3 z-20 inline-flex cursor-pointer items-center gap-2 rounded-full px-2.5 py-1.5 text-[11px] font-black text-slate-700 shadow-sm">
+          <div className="absolute inset-0 bg-gradient-to-b from-white/10 via-transparent to-sky-100/20" />
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.8),transparent_45%)]" />
+
+          <label className="absolute left-3 top-3 z-20 inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/80 bg-white/60 px-2.5 py-1.5 text-[11px] font-black text-slate-700 shadow-sm backdrop-blur-md">
             <input
               type="checkbox"
               checked={isChecked}
               onChange={() => toggleProjectSelection(project.id)}
               onClick={(event) => event.stopPropagation()}
-              className="h-3.5 w-3.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              className="h-3.5 w-3.5 rounded border-sky-200 bg-transparent text-sky-500 focus:ring-sky-400"
               aria-label={`${project.name} 선택`}
             />
-            {typeof project.projectNumber === 'number' ? <span className="rounded-full px-2.5 py-1 font-bold text-slate-600">#{project.projectNumber}</span> : null}
+            {typeof project.projectNumber === 'number' ? (
+              <span className="rounded-full bg-sky-50 px-2.5 py-1 font-bold text-sky-700">
+                #{project.projectNumber}
+              </span>
+            ) : null}
           </label>
 
           {completedMinutes ? (
-            <div className="absolute left-3 bottom-3 rounded-full bg-emerald-50/95 px-2.5 py-1 text-[11px] font-black text-emerald-700 shadow-sm">
+            <div className="absolute left-3 bottom-3 rounded-full border border-sky-200 bg-white/65 px-2.5 py-1 text-[11px] font-black text-sky-700 shadow-sm backdrop-blur-md">
               {completedMinutes}
             </div>
           ) : null}
@@ -378,7 +446,11 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                 event.stopPropagation();
                 void handleDuplicate(project);
               }}
-              className={`absolute right-3 top-3 z-20 rounded-full px-2.5 py-1 text-[11px] font-black shadow-sm transition-colors ${isInteractionLocked ? 'cursor-not-allowed bg-slate-200 text-slate-400' : 'bg-white/95 text-slate-700 hover:bg-white'}`}
+              className={`absolute right-3 top-3 z-20 rounded-full border px-2.5 py-1 text-[11px] font-black shadow-sm backdrop-blur-md transition-all duration-300 ${
+                isInteractionLocked
+                  ? 'cursor-not-allowed border-slate-200 bg-white/40 text-slate-400'
+                  : 'border-white/80 bg-white/60 text-sky-700 hover:bg-white/85'
+              }`}
             >
               {isDuplicating ? '복사중...' : '복사'}
             </button>
@@ -393,62 +465,94 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                   event.stopPropagation();
                   openRenameModal(project);
                 }}
-                className="group/project-name relative rounded-xl bg-slate-900/38 px-3 py-2 text-base font-black text-white backdrop-blur-[1.5px] transition disabled:cursor-not-allowed disabled:opacity-70"
+                className="group/project-name relative rounded-xl border border-white/80 bg-white/55 px-3 py-2 text-base font-black text-slate-700 shadow-sm backdrop-blur-md transition-all duration-300 hover:bg-white/75 disabled:cursor-not-allowed disabled:opacity-70"
                 aria-label={`${project.name} 이름 변경`}
               >
-                <span className="block transition-opacity group-hover/project-name:opacity-0 group-focus-visible/project-name:opacity-0">{project.name}</span>
-                <span className="pointer-events-none absolute inset-0 flex items-center justify-center whitespace-nowrap rounded-xl bg-slate-900/54 px-3 py-2 text-sm font-black text-white opacity-0 transition-opacity group-hover/project-name:opacity-100 group-focus-visible/project-name:opacity-100">이름 변경</span>
+                <span className="block transition-opacity duration-300 group-hover/project-name:opacity-0 group-focus-visible/project-name:opacity-0">
+                  {project.name}
+                </span>
+                <span className="pointer-events-none absolute inset-0 flex items-center justify-center whitespace-nowrap rounded-xl bg-white/80 px-3 py-2 text-sm font-black text-sky-700 opacity-0 transition-opacity duration-300 group-hover/project-name:opacity-100 group-focus-visible/project-name:opacity-100">
+                  이름 변경
+                </span>
               </button>
             </div>
           </div>
         </div>
 
         <div className="space-y-3 p-3">
-  <div>
-    <div className="text-[11px] text-slate-500">
-      {formatDate(getProjectCreatedAt(project))}
-    </div>
+          <div>
+            <div className="text-[11px] text-slate-500">
+              {formatDate(getProjectCreatedAt(project))}
+            </div>
 
-    <div className="mt-2 flex min-h-[28px] flex-wrap gap-2 text-[11px]">
-      {project.workflowDraft?.script ? (
-        <span className="rounded-full bg-violet-50 px-2.5 py-1 font-bold text-violet-700">
-          대본 포함
-        </span>
-      ) : null}
+            <div className="mt-2 flex min-h-[28px] flex-wrap gap-2 text-[11px]">
+              {project.workflowDraft?.script ? (
+                <span className="rounded-full border border-sky-100 bg-sky-50/90 px-2.5 py-1 font-bold text-sky-700">
+                  대본 포함
+                </span>
+              ) : null}
 
-      {totalCost !== undefined ? (
-        <span className="rounded-full bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700">
-          {formatKRW(totalCost)}
-        </span>
-      ) : null}
-    </div>
-  </div>
+              {totalCost !== undefined ? (
+                <span className="rounded-full border border-blue-100 bg-white px-2.5 py-1 font-bold text-blue-700">
+                  {formatKRW(totalCost)}
+                </span>
+              ) : null}
+            </div>
+          </div>
 
-  <div className="grid grid-cols-3 gap-2">
-    <button
-      type="button"
-      disabled={isInteractionLocked}
-      onClick={() => openProjectScene(project)}
-      className="col-span-2 rounded-[18px] border border-white/70 bg-white/70 px-2 py-2 text-[11px] font-black text-slate-900 shadow-[0_12px_32px_rgba(15,23,42,0.10)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:bg-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400"
-    >
-      제작하기
-    </button>
-    <button
-      type="button"
-      disabled={isInteractionLocked}
-      onClick={() => openProjectThumbnailStudio(project)}
-      className="rounded-xl border border-slate-200 bg-white px-2 py-2 text-[11px] font-black text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
-    >
-      썸네일 제작
-    </button>
-  </div>
-</div>
-      </article>
+          <div className="grid grid-cols-3 gap-2">
+            <motion.button
+              type="button"
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.99 }}
+              disabled={isInteractionLocked}
+              onClick={() => openProjectScene(project)}
+              className="col-span-2 rounded-[18px] border border-sky-200 bg-gradient-to-r from-white via-sky-50 to-blue-100 px-2 py-2 text-[11px] font-black text-sky-700 shadow-[0_8px_20px_rgba(140,190,235,0.18)] backdrop-blur-md transition-all duration-300 hover:shadow-[0_10px_24px_rgba(140,190,235,0.22)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              제작하기
+            </motion.button>
+
+            <motion.button
+              type="button"
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.99 }}
+              disabled={isInteractionLocked}
+              onClick={() => openProjectThumbnailStudio(project)}
+              className="rounded-xl border border-sky-100 bg-white/80 px-2 py-2 text-[11px] font-black text-slate-700 shadow-sm backdrop-blur-md transition-all duration-300 hover:bg-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              썸네일 제작
+            </motion.button>
+          </div>
+        </div>
+      </motion.article>
     );
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-6">
+    <div
+      className="relative min-h-screen overflow-hidden"
+      style={{
+        background:
+          'linear-gradient(180deg, #f8fcff 0%, #f2f8ff 40%, #edf6ff 100%)',
+      }}
+    >
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: `
+            radial-gradient(circle at 12% 15%, rgba(186, 224, 255, 0.45), transparent 22%),
+            radial-gradient(circle at 84% 12%, rgba(219, 238, 255, 0.55), transparent 24%),
+            radial-gradient(circle at 50% 78%, rgba(210, 232, 255, 0.40), transparent 28%)
+          `,
+        }}
+      />
+
+      <div className="pointer-events-none absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(180,210,240,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(180,210,240,0.12)_1px,transparent_1px)] [background-size:72px_72px]" />
+
+      <div className="pointer-events-none absolute -left-24 top-10 h-72 w-72 rounded-full bg-sky-200/50 blur-3xl" />
+      <div className="pointer-events-none absolute right-[-70px] top-[18%] h-80 w-80 rounded-full bg-blue-100/70 blur-3xl" />
+      <div className="pointer-events-none absolute bottom-[-90px] left-[22%] h-80 w-80 rounded-full bg-white blur-3xl" />
+
       <input
         ref={importInputRef}
         type="file"
@@ -457,121 +561,210 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
         className="hidden"
       />
 
-      <div className="mp4-glass-hero mb-5 flex flex-col gap-3 rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">보관함</div>
-            <h2 className="mt-1 text-2xl font-black text-slate-900">저장된 프로젝트</h2>
-            <p className="mt-2 text-sm text-slate-500">프로젝트 데이터는 번호별 폴더가 아니라 단일 JSON 저장소 기준으로 관리되어 복사, 삭제, 가져오기가 더 빠르게 동작합니다.</p>
-          </div>
+      <motion.section
+        layout
+        transition={groupTransition}
+        className={`relative z-10 mx-auto flex min-h-screen w-full flex-col px-4 py-8 ${
+          shouldCenterWholeBox ? 'justify-center' : 'justify-start'
+        }`}
+      >
+        <motion.div
+          layout
+          transition={groupTransition}
+          className={`mx-auto w-full ${galleryFrameWidthClass}`}
+        >
+          <motion.div
+            layout
+            transition={groupTransition}
+            className="mb-5 overflow-hidden rounded-[28px] border border-white/80 bg-white/70 p-5 shadow-[0_18px_44px_rgba(150,190,225,0.16)] backdrop-blur-2xl"
+          >
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <div className="text-xs font-black uppercase tracking-[0.24em] text-sky-500">
+                  보관함
+                </div>
+                <h2 className="mt-1 text-2xl font-black text-slate-700">
+                  저장된 프로젝트
+                </h2>
+                <p className="mt-2 text-sm text-slate-500">
+                  프로젝트 데이터는 번호별 폴더가 아니라 단일 JSON 저장소 기준으로 관리되어 복사, 삭제, 가져오기가 더 빠르게 동작합니다.
+                </p>
+              </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                {hasSelection ? (
+                  <button
+                    type="button"
+                    onClick={handleExportSelected}
+                    className="rounded-2xl border border-sky-100 bg-white/85 px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm backdrop-blur-md transition-all duration-300 hover:bg-white"
+                  >
+                    내보내기 ({selectedProjectIds.length})
+                  </button>
+                ) : null}
 
-            {hasSelection ? (
-              <button
-                type="button"
-                onClick={handleExportSelected}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-              >
-                내보내기 ({selectedProjectIds.length})
-              </button>
-            ) : null}
-                        {hasSelection ? (
-              <button
-                type="button"
-                disabled={isInteractionLocked}
-                onClick={() => void handleBulkDelete()}
-                className="rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm font-black text-red-700 shadow-sm transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-              >
-                삭제 ({selectedProjectIds.length})
-              </button>
-            ) : null}
-            {sortedProjects.length > 0 ? (
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-bold text-slate-700">
-                <input
-                  type="checkbox"
-                  checked={isAllSelected}
-                  onChange={toggleSelectAll}
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                전체 선택
-              </label>
-            ) : null}
-                        <button
+                {hasSelection ? (
+                  <button
+                    type="button"
+                    disabled={isInteractionLocked}
+                    onClick={() => void handleBulkDelete()}
+                    className="rounded-2xl border border-rose-100 bg-white/85 px-4 py-2.5 text-sm font-black text-rose-500 shadow-sm backdrop-blur-md transition-all duration-300 hover:bg-white disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                  >
+                    삭제 ({selectedProjectIds.length})
+                  </button>
+                ) : null}
+
+                {sortedProjects.length > 0 ? (
+                  <label className="inline-flex cursor-pointer items-center gap-2 rounded-2xl border border-sky-100 bg-white/85 px-3 py-2 text-sm font-bold text-slate-700 backdrop-blur-md">
+                    <input
+                      type="checkbox"
+                      checked={isAllSelected}
+                      onChange={toggleSelectAll}
+                      className="h-4 w-4 rounded border-sky-200 bg-transparent text-sky-500 focus:ring-sky-400"
+                    />
+                    전체 선택
+                  </label>
+                ) : null}
+
+                <button
+                  type="button"
+                  onClick={handleImportClick}
+                  className="rounded-2xl border border-sky-100 bg-white/85 px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm backdrop-blur-md transition-all duration-300 hover:bg-white"
+                >
+                  가져오기
+                </button>
+              </div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            layout
+            transition={groupTransition}
+            className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4"
+          >
+            <motion.button
+              layout
+              initial={{ opacity: 0, y: 8, scale: 0.988 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -6, scale: 0.988 }}
+              transition={itemTransition}
               type="button"
-              onClick={handleImportClick}
-              className="rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+              disabled={isInteractionLocked}
+              onClick={openCreateProject}
+              className={`group relative flex min-h-[238px] items-center justify-center overflow-hidden rounded-[24px] border border-dashed p-6 text-left shadow-[0_16px_40px_rgba(120,170,220,0.16)] backdrop-blur-xl transition-all duration-300 ${
+                isInteractionLocked
+                  ? 'cursor-wait border-slate-200 bg-white/50 text-slate-400'
+                  : 'border-sky-200 bg-white/70 hover:bg-white/85'
+              }`}
             >
-              가져오기
-            </button>
-          </div>
-        </div>
-      </div>
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white via-sky-50 to-blue-100/70" />
+              <div className="pointer-events-none absolute -right-10 -top-10 h-28 w-28 rounded-full bg-sky-100/90 blur-2xl" />
+              <motion.div
+                whileHover={{ y: -1 }}
+                className="relative inline-flex items-center gap-2 rounded-2xl border border-sky-100 bg-white/90 px-4 py-3 text-sm font-black text-sky-700 shadow-sm backdrop-blur-md"
+              >
+                제작하기 <span aria-hidden="true">→</span>
+              </motion.div>
+            </motion.button>
 
-      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <button
-          type="button"
-          disabled={isInteractionLocked}
-          onClick={openCreateProject}
-          className={`mp4-glass-panel flex min-h-[238px] items-center justify-center rounded-[24px] border border-dashed p-6 text-left shadow-sm transition-all ${isInteractionLocked ? 'cursor-wait border-slate-300 bg-slate-200/90 text-slate-500' : 'border-blue-300 bg-gradient-to-br from-blue-50 via-white to-cyan-50 hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-lg'}`}
-        >
-          <div className={`inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-black ${isInteractionLocked ? 'bg-slate-500 text-white' : 'bg-blue-600 text-white'}`}>
-            제작하기 <span aria-hidden="true">→</span>
-          </div>
-        </button>
+            <AnimatePresence initial={false}>
+              {isLoading && !sortedProjects.length ? (
+                Array.from({ length: 3 }).map((_, index) => (
+                  <motion.div
+                    key={`skeleton-${index}`}
+                    layout
+                    initial={{ opacity: 0, y: 8, scale: 0.988 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -6, scale: 0.988 }}
+                    transition={{ duration: 0.18 + index * 0.04 }}
+                    className="min-h-[238px] overflow-hidden rounded-[24px] border border-white/80 bg-white/70 p-4 shadow-[0_16px_40px_rgba(120,170,220,0.14)] backdrop-blur-xl"
+                  >
+                    <div className="h-[132px] animate-pulse rounded-2xl bg-sky-50" />
+                    <div className="mt-4 h-4 w-2/3 animate-pulse rounded bg-sky-50" />
+                    <div className="mt-2 h-3 w-1/3 animate-pulse rounded bg-sky-50" />
+                    <div className="mt-6 h-10 animate-pulse rounded-2xl bg-sky-50" />
+                  </motion.div>
+                ))
+              ) : null}
 
-        {isLoading && !sortedProjects.length ? (
-          Array.from({ length: 3 }).map((_, index) => (
-            <div key={`skeleton-${index}`} className="min-h-[238px] animate-pulse rounded-[24px] border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="h-[132px] rounded-2xl bg-slate-100" />
-              <div className="mt-4 h-4 w-2/3 rounded bg-slate-100" />
-              <div className="mt-2 h-3 w-1/3 rounded bg-slate-100" />
-              <div className="mt-6 h-10 rounded-2xl bg-slate-100" />
-            </div>
-          ))
+              {!isLoading && !sortedProjects.length ? (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0, y: 8, scale: 0.988 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.988 }}
+                  transition={itemTransition}
+                  className="flex min-h-[238px] items-center justify-center rounded-[24px] border border-white/80 bg-white/70 p-6 text-center text-sm leading-6 text-slate-500 shadow-[0_16px_40px_rgba(120,170,220,0.14)] backdrop-blur-xl sm:col-span-1 xl:col-span-3"
+                >
+                  아직 저장된 프로젝트가 없습니다. 왼쪽 카드에서 새 프로젝트를 시작하거나 JSON 파일을 가져오세요.
+                </motion.div>
+              ) : null}
+
+              {sortedProjects.map(renderProjectCard)}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
+      </motion.section>
+
+      <AnimatePresence>
+        {nameModal ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={itemTransition}
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-white/40 p-4 backdrop-blur-sm"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setNameModal(null);
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, y: 8, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -4, scale: 0.99 }}
+              transition={itemTransition}
+              className="w-full max-w-md rounded-2xl border border-white/90 bg-white/85 p-5 shadow-[0_16px_40px_rgba(120,170,220,0.18)] backdrop-blur-2xl"
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              <h3 className="text-base font-black text-slate-700">
+                {nameModal.mode === 'create' ? '프로젝트 이름을 적어주세요' : '프로젝트 이름 수정'}
+              </h3>
+
+              <input
+                autoFocus
+                value={pendingName}
+                onChange={(event) => setPendingName(clampProjectName(event.target.value))}
+                maxLength={getProjectNameLimit(pendingName)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    void submitNameModal();
+                  }
+                }}
+                placeholder="프로젝트 이름"
+                className="mt-3 w-full rounded-xl border border-sky-100 bg-white px-3 py-2 text-sm text-slate-700 outline-none placeholder:text-slate-400 focus:border-sky-300"
+              />
+
+              <div className="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNameModal(null)}
+                  className="rounded-xl border border-sky-100 bg-white px-3 py-2 text-xs font-bold text-slate-600 transition-all duration-300 hover:bg-sky-50"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void submitNameModal()}
+                  disabled={!pendingName.trim() || isSubmittingNameModal}
+                  className="rounded-xl border border-sky-200 bg-gradient-to-r from-white via-sky-50 to-blue-100 px-3 py-2 text-xs font-black text-sky-700 shadow-sm transition-all duration-300 hover:brightness-[1.02] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  확인
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         ) : null}
-
-        {!isLoading && !sortedProjects.length ? (
-          <div className="flex min-h-[238px] items-center justify-center rounded-[24px] border border-slate-200 bg-white p-6 text-center text-sm leading-6 text-slate-500 shadow-sm sm:col-span-1 xl:col-span-3">
-            아직 저장된 프로젝트가 없습니다. 왼쪽 카드에서 새 프로젝트를 시작하거나 JSON 파일을 가져오세요.
-          </div>
-        ) : null}
-
-        {sortedProjects.map(renderProjectCard)}
-      </div>
-
-      {nameModal ? (
-        <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/35 p-4"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setNameModal(null);
-          }}
-        >
-          <div className="mp4-glass-panel w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-            <h3 className="text-base font-black text-slate-900">
-              {nameModal.mode === 'create' ? '프로젝트 이름을 적어주세요' : '프로젝트 이름 수정'}
-            </h3>
-            <input
-              autoFocus
-              value={pendingName}
-              onChange={(event) => setPendingName(clampProjectName(event.target.value))}
-              maxLength={getProjectNameLimit(pendingName)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  void submitNameModal();
-                }
-              }}
-              placeholder="프로젝트 이름"
-              className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 outline-none focus:border-blue-400"
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setNameModal(null)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">취소</button>
-              <button type="button" onClick={() => void submitNameModal()} disabled={!pendingName.trim() || isSubmittingNameModal} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-500 disabled:bg-slate-300">확인</button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      </AnimatePresence>
     </div>
   );
 };

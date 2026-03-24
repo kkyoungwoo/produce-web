@@ -1,5 +1,4 @@
 import { SavedProject } from '../types';
-import { createSelectedWorkflowDraftForTransport } from './workflowDraftService';
 
 const PROJECT_NAVIGATION_CACHE_KEY = 'mp4creater_scene_project_cache';
 
@@ -9,29 +8,31 @@ type ProjectNavigationCachePayload = {
   project: SavedProject;
 };
 
-function clonePromptedImages(items: any) {
-  if (!Array.isArray(items)) return [];
-  return items.map((item) => ({
+function cloneWorkflowImageForNavigation(item: any) {
+  if (!item || typeof item !== 'object') return item;
+  return {
     ...item,
-    imageData: null,
     data: undefined,
     thumbnailData: undefined,
     imageHistory: [],
     videoHistory: [],
-  }));
+  };
+}
+
+function clonePromptedImages(items: any) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => cloneWorkflowImageForNavigation(item));
 }
 
 function cloneWorkflowDraftForNavigation(draft: any) {
   if (!draft || typeof draft !== 'object') return draft;
-  const selectedDraft = createSelectedWorkflowDraftForTransport(draft as any) || draft;
   return {
-    ...selectedDraft,
-    styleImages: clonePromptedImages(selectedDraft.styleImages),
-    characterImages: clonePromptedImages(selectedDraft.characterImages),
-    extractedCharacters: Array.isArray(selectedDraft.extractedCharacters)
-      ? selectedDraft.extractedCharacters.map((character: any) => ({
+    ...draft,
+    styleImages: clonePromptedImages(draft.styleImages),
+    characterImages: clonePromptedImages(draft.characterImages),
+    extractedCharacters: Array.isArray(draft.extractedCharacters)
+      ? draft.extractedCharacters.map((character: any) => ({
           ...character,
-          imageData: null,
           generatedImages: clonePromptedImages(character?.generatedImages),
         }))
       : [],

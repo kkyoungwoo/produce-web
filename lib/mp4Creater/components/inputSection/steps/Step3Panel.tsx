@@ -399,11 +399,11 @@ export default function Step3Panel({
   sceneCount,
   storyScript,
   selectedScriptModel,
-  scriptModelOptions,
-  extractedCharacters,
-  selectedCharacterIds,
+  scriptModelOptions: scriptModelOptionsProp,
+  extractedCharacters: extractedCharactersProp,
+  selectedCharacterIds: selectedCharacterIdsProp,
   isHydratingCharacters,
-  elevenLabsVoices,
+  elevenLabsVoices: elevenLabsVoicesProp,
   activeVoicePreviewCharacterId,
   voicePreviewMessage,
   onGenerateScript,
@@ -420,6 +420,11 @@ export default function Step3Panel({
   onCreateCharacterFromForm,
   castSelectionHighlightTick = 0,
 }: Step3PanelProps) {
+  const scriptModelOptions = Array.isArray(scriptModelOptionsProp) ? scriptModelOptionsProp : [];
+  const extractedCharacters = Array.isArray(extractedCharactersProp) ? extractedCharactersProp : [];
+  const selectedCharacterIds = Array.isArray(selectedCharacterIdsProp) ? selectedCharacterIdsProp : [];
+  const elevenLabsVoices = Array.isArray(elevenLabsVoicesProp) ? elevenLabsVoicesProp : [];
+
   const [highlightCastSelection, setHighlightCastSelection] = useState(false);
   const [manualCharacterName, setManualCharacterName] = useState('');
   const [manualCharacterPosition, setManualCharacterPosition] = useState('');
@@ -427,7 +432,6 @@ export default function Step3Panel({
   const [showInlineAddCharacterCard, setShowInlineAddCharacterCard] = useState(false);
   const [savedScriptSnapshot, setSavedScriptSnapshot] = useState(storyScript || '');
   const [railFocusIndex, setRailFocusIndex] = useState<number | null>(null);
-  const [newlyAddedCharacterId, setNewlyAddedCharacterId] = useState<string | null>(null);
 
   const prevCharacterCountRef = useRef(extractedCharacters.length);
 
@@ -470,19 +474,11 @@ export default function Step3Panel({
 
   useEffect(() => {
     if (extractedCharacters.length > prevCharacterCountRef.current) {
-      const latestCharacter = extractedCharacters[extractedCharacters.length - 1];
       setShowInlineAddCharacterCard(false);
       setRailFocusIndex(extractedCharacters.length - 1);
-      setNewlyAddedCharacterId(latestCharacter?.id || null);
     }
     prevCharacterCountRef.current = extractedCharacters.length;
   }, [extractedCharacters]);
-
-  useEffect(() => {
-    if (!newlyAddedCharacterId) return;
-    const timer = window.setTimeout(() => setNewlyAddedCharacterId(null), 1800);
-    return () => window.clearTimeout(timer);
-  }, [newlyAddedCharacterId]);
 
   const stopCardToggle = (event: React.SyntheticEvent) => {
     event.stopPropagation();
@@ -698,18 +694,14 @@ export default function Step3Panel({
 
                 const googleVoiceId = voiceProvider === 'google' ? currentVoiceId : '';
                 const selected = selectedCharacterIds.includes(character.id);
-                const isNewlyAdded = newlyAddedCharacterId === character.id;
-
                 return (
                   <div
                     key={character.id}
                     data-rail-index={index}
-                    className={`relative flex min-h-[272px] w-[360px] shrink-0 snap-start flex-col rounded-[22px] border px-4 py-3 transition-all duration-500 ${
+                    className={`relative flex min-h-[272px] w-[360px] shrink-0 snap-start flex-col rounded-[22px] border px-4 py-3 transition-all duration-300 ${
                       selected
-                        ? 'border-blue-400 bg-blue-50 shadow-sm ring-2 ring-blue-100'
+                        ? 'border-sky-400 bg-sky-100 shadow-sm ring-2 ring-sky-200'
                         : 'border-slate-200 bg-slate-50'
-                    } ${
-                      isNewlyAdded ? 'scale-[1.02] shadow-xl ring-4 ring-blue-200' : ''
                     }`}
                   >
                     <div
@@ -771,7 +763,7 @@ export default function Step3Panel({
                     <div
                       data-card-drag-zone="true"
                       data-card-wheel-zone="true"
-                      className="mt-3 flex flex-col rounded-[18px] border border-dashed border-slate-200/70 bg-white/70 px-3 py-2.5"
+                      className={`mt-3 flex flex-col rounded-[18px] border px-3 py-2.5 ${selected ? 'border-sky-200 bg-sky-50/80' : 'border-dashed border-slate-200/70 bg-white/70'}`}
                     >
                       <div className="grid gap-2.5">
                         <div>

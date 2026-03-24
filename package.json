@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "framer-motion": "^12.38.0",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",

@@ -120,6 +120,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
     handlePreviewCharacterVoice,
     getCharacterVoiceSummary,
     step3CastSelectionHighlightTick,
+    setStep3CastSelectionHighlightTick,
     newCharacterName,
     newCharacterPrompt,
     setNewCharacterName,
@@ -132,7 +133,9 @@ export default function RouteStepView({ vm }: { vm: any }) {
 
   const currentRouteStep = (routeStep || 1) as 1 | 2 | 3 | 4 | 5;
   const [stepShellVisible, setStepShellVisible] = useState(false);
-  const [step4LocalStage, setStep4LocalStage] = useState<'style' | 'workspace'>(selectedCharacterStyleId ? 'workspace' : 'style');
+  const [step4LocalStage, setStep4LocalStage] = useState<'style' | 'workspace'>(
+    selectedCharacterStyleId ? 'workspace' : 'style'
+  );
   const previousRouteStepRef = useRef(currentRouteStep);
 
   useEffect(() => {
@@ -160,11 +163,15 @@ export default function RouteStepView({ vm }: { vm: any }) {
 
   if (!routeStep) return null;
 
-
   const normalizedSelectedCharacterIds = Array.isArray(selectedCharacterIds)
-    ? selectedCharacterIds.filter((characterId: any) => extractedCharacters.some((character: any) => character.id === characterId))
+    ? selectedCharacterIds.filter((characterId: any) =>
+        extractedCharacters.some((character: any) => character.id === characterId)
+      )
     : [];
-  const selectedCharactersForStep4 = extractedCharacters.filter((character: any) => normalizedSelectedCharacterIds.includes(character.id));
+
+  const selectedCharactersForStep4 = extractedCharacters.filter((character: any) =>
+    normalizedSelectedCharacterIds.includes(character.id)
+  );
 
   const renderRouteContent = () => {
     if (currentRouteStep === 1) {
@@ -199,13 +206,17 @@ export default function RouteStepView({ vm }: { vm: any }) {
         <Step2Panel
           topic={topic}
           isRefreshingTopic={isRefreshingTopic}
-          isInitialLoadingRecommendations={isRefreshingTopic && topicRecommendations.length === 0}
+          isInitialLoadingRecommendations={
+            isRefreshingTopic && topicRecommendations.length === 0
+          }
           topicRecommendations={topicRecommendations}
           customScriptDurationMinutes={customScriptDurationMinutes}
           customScriptSpeechStyle={customScriptSpeechStyle}
           customScriptLanguage={customScriptLanguage}
           onTopicChange={setTopic}
-          onRefreshTopic={() => { void refreshTopicRecommendation(); }}
+          onRefreshTopic={() => {
+            void refreshTopicRecommendation();
+          }}
           onSelectTopicRecommendation={(value) => setTopic(value)}
           onCustomScriptDurationChange={setCustomScriptDurationMinutes}
           onCustomScriptSpeechStyleChange={setCustomScriptSpeechStyle}
@@ -243,7 +254,9 @@ export default function RouteStepView({ vm }: { vm: any }) {
             setPromptPreviewId(targetTemplate.id);
           }}
           onStoryScriptChange={setStoryScript}
-          onSaveStoryScript={() => { void hydrateCharactersForScript({ preserveSelection: true }); }}
+          onSaveStoryScript={() => {
+            void hydrateCharactersForScript({ preserveSelection: false });
+          }}
           onCustomScriptReferenceTextChange={setCustomScriptReferenceText}
           onApplyScriptReferenceSuggestion={applyScriptReferenceSuggestion}
           onRefreshScriptReferenceSuggestions={refreshScriptReferenceSuggestions}
@@ -290,7 +303,9 @@ export default function RouteStepView({ vm }: { vm: any }) {
           localStage={step4LocalStage}
           isExtracting={isExtracting}
           characterLoadingProgress={characterLoadingProgress}
-          onHydrateCharacters={() => { void hydrateCharactersForScript({ preserveSelection: true }); }}
+          onHydrateCharacters={() => {
+            void hydrateCharactersForScript({ preserveSelection: true });
+          }}
           onLocalStageChange={setStep4LocalStage}
           onSelectCharacterStyle={vm.setSelectedCharacterStyleId}
           onUploadCharacterImage={handleCharacterUploadForId}
@@ -298,8 +313,17 @@ export default function RouteStepView({ vm }: { vm: any }) {
           onToggleCharacter={toggleCharacterSelection}
           onSelectCharacterImage={selectCharacterImageById}
           onCharacterPromptChange={updateCharacterPrompt}
-          onCreateVariants={(character, options) => { void createCharacterVariants(character, options); }}
-          uploadInput={<input ref={characterUploadInputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => void handleUpload(e, 'character')} />}
+          onCreateVariants={(character, options) => createCharacterVariants(character, options)}
+          uploadInput={
+            <input
+              ref={characterUploadInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => void handleUpload(e, 'character')}
+            />
+          }
         />
       );
     }
@@ -311,9 +335,13 @@ export default function RouteStepView({ vm }: { vm: any }) {
         newStyleName={newStyleName}
         newStylePrompt={newStylePrompt}
         isExtracting={isExtracting}
-        onEnsureStyleRecommendations={() => { void ensureStyleRecommendations('manual'); }}
+        onEnsureStyleRecommendations={() => {
+          void ensureStyleRecommendations('manual');
+        }}
         onCreateStyle={createNewStyleByPrompt}
-        onCreateVariants={(styleCard) => { void createStyleVariants(styleCard); }}
+        onCreateVariants={(styleCard) => {
+          void createStyleVariants(styleCard);
+        }}
         onApplyStyleSample={applyStyleSampleFromPreset}
         onSelectStyle={setSelectedStyleImageId}
         onStyleNameChange={setNewStyleName}
@@ -327,7 +355,9 @@ export default function RouteStepView({ vm }: { vm: any }) {
       void handleOpenSceneStudioClick();
       return;
     }
+
     if (!nextRouteStep) return;
+
     if (currentRouteStep === 4 && step4LocalStage === 'style') {
       if (!selectedCharacterStyleId) return;
       setStep4LocalStage('workspace');
@@ -336,34 +366,63 @@ export default function RouteStepView({ vm }: { vm: any }) {
       });
       return;
     }
+
     if (currentRouteStep === 3) {
+      const hasSelectedCharacters = normalizedSelectedCharacterIds.length > 0;
+
+      if (!hasSelectedCharacters) {
+        if (typeof setStep3CastSelectionHighlightTick === 'function') {
+          setStep3CastSelectionHighlightTick((prev: number) => prev + 1);
+        }
+        return;
+      }
+
       window.requestAnimationFrame(() => {
         void completeStage(currentRouteStep, nextRouteStep as StepId);
       });
       return;
     }
+
+    if (!canMoveNext) return;
+
     void completeStage(currentRouteStep, nextRouteStep as StepId);
   };
 
-  const canMoveNext = currentRouteStep === 1
-    ? Boolean(hasSelectedContentType && hasSelectedAspectRatio)
-    : currentRouteStep === 4 && step4LocalStage === 'style'
-      ? Boolean(selectedCharacterStyleId)
-    : Boolean(routeStepCompleted[currentRouteStep]);
+  const canMoveNext =
+    currentRouteStep === 1
+      ? Boolean(hasSelectedContentType && hasSelectedAspectRatio)
+      : currentRouteStep === 4 && step4LocalStage === 'style'
+        ? Boolean(selectedCharacterStyleId)
+        : Boolean(routeStepCompleted[currentRouteStep]);
 
   return (
     <div className="mp4-editor-shell mx-auto my-6 w-full max-w-[1520px] px-4 pb-32 sm:px-6 lg:px-8">
       <div className="mp4-stage-card rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">{currentRouteStep}단계</div>
-        <h1 className="mt-2 text-2xl font-black text-slate-900">{STEP_META[currentRouteStep - 1]?.title}</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">{STEP_META[currentRouteStep - 1]?.subtitle}</p>
+        <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">
+          {currentRouteStep}단계
+        </div>
+        <h1 className="mt-2 text-2xl font-black text-slate-900">
+          {STEP_META[currentRouteStep - 1]?.title}
+        </h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          {STEP_META[currentRouteStep - 1]?.subtitle}
+        </p>
       </div>
+
       {notice && (
         <div className="mp4-glass-panel mt-6 rounded-3xl border border-blue-200 bg-blue-50 px-5 py-4 text-sm leading-6 text-blue-900 shadow-sm">
           {notice}
         </div>
       )}
-      <div className={`mt-6 min-h-[420px] ${currentRouteStep === 3 ? '' : 'transition-all duration-300'} ${stepShellVisible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}>{renderRouteContent()}</div>
+
+      <div
+        className={`mt-6 min-h-[420px] ${
+          currentRouteStep === 3 ? '' : 'transition-all duration-300'
+        } ${stepShellVisible ? 'translate-y-0 opacity-100' : 'translate-y-1 opacity-0'}`}
+      >
+        {renderRouteContent()}
+      </div>
+
       <div className="pointer-events-none fixed inset-x-0 bottom-5 z-40 flex justify-center px-4">
         <div className="mp4-glass-panel pointer-events-auto inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-3 py-3 shadow-xl shadow-slate-200/70 backdrop-blur-md">
           <button
@@ -386,11 +445,16 @@ export default function RouteStepView({ vm }: { vm: any }) {
           >
             {currentRouteStep === 1 ? '돌아가기' : '이전으로'}
           </button>
+
           <button
             type="button"
             onClick={handleNextRouteStep}
-            disabled={!canMoveNext}
-            className={`min-w-[140px] rounded-full px-6 py-3 text-sm font-black transition ${canMoveNext ? 'bg-blue-600 text-white hover:bg-blue-500' : 'bg-slate-300 text-slate-100 hover:bg-slate-300'} disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100`}
+            aria-disabled={!canMoveNext}
+            className={`min-w-[140px] rounded-full px-6 py-3 text-sm font-black transition ${
+              canMoveNext
+                ? 'bg-blue-600 text-white hover:bg-blue-500'
+                : 'cursor-pointer bg-slate-300 text-slate-100 hover:bg-slate-300'
+            }`}
           >
             {currentRouteStep === 5 ? '영상 제작하기' : '다음으로'}
           </button>
@@ -399,16 +463,24 @@ export default function RouteStepView({ vm }: { vm: any }) {
 
       <OverlayModal
         open={Boolean(promptPreviewId)}
-        title={syncedPromptTemplates.find((item: any) => item.id === promptPreviewId)?.name || '프롬프트 보기'}
-        description={syncedPromptTemplates.find((item: any) => item.id === promptPreviewId)?.description || '선택한 프롬프트 본문을 팝업에서 크게 확인합니다.'}
+        title={
+          syncedPromptTemplates.find((item: any) => item.id === promptPreviewId)?.name ||
+          '프롬프트 보기'
+        }
+        description={
+          syncedPromptTemplates.find((item: any) => item.id === promptPreviewId)?.description ||
+          '선택한 프롬프트 본문을 팝업에서 크게 확인합니다.'
+        }
         onClose={() => setPromptPreviewId(null)}
-        footer={(
+        footer={
           <>
             {promptPreviewId && (
               <button
                 type="button"
                 onClick={() => {
-                  const target = syncedPromptTemplates.find((item: any) => item.id === promptPreviewId);
+                  const target = syncedPromptTemplates.find(
+                    (item: any) => item.id === promptPreviewId
+                  );
                   if (!target) return;
                   updatePromptTemplate(target.id, { prompt: promptPreviewDraft });
                   setNotice('프롬프트 수정이 저장되었습니다. 대본생성 시 바로 반영됩니다.');
@@ -420,10 +492,15 @@ export default function RouteStepView({ vm }: { vm: any }) {
               </button>
             )}
           </>
-        )}
+        }
       >
         <textarea
-          value={promptPreviewDraft || syncedPromptTemplates.find((item: any) => item.id === promptPreviewId)?.prompt || selectedPromptTemplate?.prompt || ''}
+          value={
+            promptPreviewDraft ||
+            syncedPromptTemplates.find((item: any) => item.id === promptPreviewId)?.prompt ||
+            selectedPromptTemplate?.prompt ||
+            ''
+          }
           onChange={(event) => setPromptPreviewDraft(event.target.value)}
           className="min-h-[420px] w-full rounded-2xl border border-blue-400 px-4 py-4 text-sm leading-7 text-black outline-none placeholder:text-blue-100"
           placeholder="프롬프트를 불러오는 중입니다."

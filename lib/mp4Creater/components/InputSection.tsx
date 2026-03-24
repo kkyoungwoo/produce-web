@@ -53,7 +53,6 @@ import { scrollElementIntoView } from '../utils/horizontalScroll';
 import {
   CONTENT_TYPE_CARDS,
   FIELD_OPTIONS_BY_TYPE,
-  MAX_CHARACTER_VARIANT_COUNT,
   MAX_STYLE_CARD_COUNT,
   MAX_UPLOAD_FILE_COUNT,
   MAX_UPLOAD_FILE_SIZE_MB,
@@ -76,6 +75,8 @@ import RouteStepView from './inputSection/views/RouteStepView';
 const CHARACTER_STYLE_OPTIONS = WORKFLOW_CHARACTER_STYLE_OPTIONS;
 
 const SCRIPT_DURATION_PRESETS = [1, 3, 5, 8, 10, 15, 20, 25, 30] as const;
+
+const CHARACTER_GENERATION_FAILSAFE_MS = 120000;
 
 function normalizeScriptDurationPreset(value: number) {
   const safe = Number.isFinite(value) ? Math.max(1, Math.min(30, Math.round(value))) : 3;
@@ -234,6 +235,29 @@ const InputSection: React.FC<InputSectionProps> = ({
   const characterVoiceUtteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   const extractedCharactersRef = useRef<CharacterProfile[]>(initial.extractedCharacters || []);
   const selectedCharacterIdsRef = useRef<string[]>(initial.selectedCharacterIds || []);
+  const characterGenerationTimeoutsRef = useRef<Record<string, number>>({});
+
+  const clearCharacterGenerationFailsafe = (characterId: string) => {
+    const timeoutId = characterGenerationTimeoutsRef.current[characterId];
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+      delete characterGenerationTimeoutsRef.current[characterId];
+    }
+  };
+
+  const scheduleCharacterGenerationFailsafe = (characterId: string, characterName: string) => {
+    clearCharacterGenerationFailsafe(characterId);
+    characterGenerationTimeoutsRef.current[characterId] = window.setTimeout(() => {
+      setCharacterLoadingProgress((prev) => {
+        if (prev[characterId] === undefined) return prev;
+        const next = { ...prev };
+        delete next[characterId];
+        return next;
+      });
+      delete characterGenerationTimeoutsRef.current[characterId];
+      setNotice(`${characterName} 캐릭터 생성 응답이 2분을 넘어 로딩 상태를 정리했습니다. 다시 시도해 주세요.`);
+    }, CHARACTER_GENERATION_FAILSAFE_MS);
+  };
 
   useEffect(() => {
     extractedCharactersRef.current = extractedCharacters;
@@ -242,6 +266,15 @@ const InputSection: React.FC<InputSectionProps> = ({
   useEffect(() => {
     selectedCharacterIdsRef.current = selectedCharacterIds;
   }, [selectedCharacterIds]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(characterGenerationTimeoutsRef.current).forEach((timeoutId) => {
+        window.clearTimeout(timeoutId);
+      });
+      characterGenerationTimeoutsRef.current = {};
+    };
+  }, []);
 
   const replaceExtractedCharacters = (nextCharacters: CharacterProfile[], options?: { persistDraft?: boolean }) => {
     extractedCharactersRef.current = nextCharacters;
@@ -1050,10 +1083,15 @@ const InputSection: React.FC<InputSectionProps> = ({
     resetCharactersAndStyles();
   };
 
+  const clearSelectedCharacters = () => {
+    selectedCharacterIdsRef.current = [];
+    setSelectedCharacterIds([]);
+  };
+
   const resetCharactersAndStyles = () => {
     setExtractedCharacters([]);
     setStyleImages([]);
-    setSelectedCharacterIds([]);
+    clearSelectedCharacters();
     setSelectedStyleImageId(null);
     setExpandedCharacterEditorId(null);
     setExpandedStyleEditorId(null);
@@ -1609,7 +1647,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       void sampleDraft.then(async (result) => {
         setStoryScript(result.text);
         setConstitutionAnalysis(result.analysis || null);
-        await hydrateCharactersFromScriptText(result.text, { preserveSelection: true });
+        await hydrateCharactersFromScriptText(result.text, { preserveSelection: false });
         setNotice(contentType === 'music_video' ? '뮤직비디오 프롬프트를 반영한 가사형 대본을 생성했습니다.' : '선택한 프롬프트를 반영한 대본을 생성했습니다.');
       });
       return;
@@ -1653,7 +1691,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       });
       setStoryScript(result.text);
       setConstitutionAnalysis(result.analysis || null);
-      await hydrateCharactersFromScriptText(result.text, { preserveSelection: true });
+      await hydrateCharactersFromScriptText(result.text, { preserveSelection: false });
       setNotice(result.source === 'ai'
         ? `현재 대본을 약 ${chars}자 확장했습니다. 기존 내용을 유지한 채 뒤를 자연스럽게 이어 붙였습니다.`
         : contentType === 'music_video'
@@ -1735,7 +1773,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       });
       setStoryScript(result.text);
       setConstitutionAnalysis(result.analysis || null);
-      await hydrateCharactersFromScriptText(result.text, { preserveSelection: true });
+      await hydrateCharactersFromScriptText(result.text, { preserveSelection: false });
       setNotice(result.source === 'ai' ? `선택한 프롬프트 "${template.name}"로 AI 초안을 만들었습니다.` : 'API 연결이 없어 현재는 정해진 샘플 로직으로 대본을 채웠습니다. Google AI Studio를 등록하면 실제 AI 생성으로 전환됩니다.');
       openStageWithIntent(3, false);
     } finally {
@@ -1758,6 +1796,10 @@ const InputSection: React.FC<InputSectionProps> = ({
     const allowAi = !forceSample && Boolean(studioState?.providers?.openRouterApiKey);
     if (!allowAi && !forceSample) {
       promptTextAiSetup('캐릭터 추출은 지금 샘플 보조 모드로도 테스트할 수 있습니다. Google AI Studio를 연결하면 대본 속 역할을 더 정교하게 추출합니다.');
+    }
+
+    if (!options?.preserveSelection) {
+      clearSelectedCharacters();
     }
 
     setIsExtracting(true);
@@ -1835,7 +1877,11 @@ const InputSection: React.FC<InputSectionProps> = ({
       setExtractedCharacters(normalizedCharacters);
       setSelectedCharacterIds(nextSelectedIds);
       setCharacterCarouselIndices({});
-      setNotice(allowAi ? '3단계 대본 기준으로 출연자 후보를 다시 불러왔습니다. Step4에서는 선택된 출연자 이미지에만 집중하면 됩니다.' : 'API 연결이 없어 기본 주인공 1명과 조연 1명을 채웠습니다. Step4 흐름은 그대로 테스트할 수 있습니다.');
+      setNotice(allowAi
+        ? (options?.preserveSelection
+          ? '3단계 대본 기준으로 출연자 후보를 다시 불러왔습니다. Step4에서는 선택된 출연자 이미지에만 집중하면 됩니다.'
+          : '3단계 대본 기준으로 출연자 후보를 새로 불러왔습니다. 필요한 출연자를 다시 선택해 Step4로 넘겨 주세요.')
+        : 'API 연결이 없어 기본 주인공 1명과 조연 1명을 채웠습니다. Step4 흐름은 그대로 테스트할 수 있습니다.');
       return { characters: normalizedCharacters, selectedIds: nextSelectedIds };
     } finally {
       setIsExtracting(false);
@@ -1980,24 +2026,26 @@ const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const chooseCharacterImage = (characterId: string, image: PromptedImageAsset) => {
+    const currentCharacter = extractedCharactersRef.current.find((item) => item.id === characterId) || null;
+    const isSameImageSelected = currentCharacter?.selectedImageId === image.id;
     const nextCharacters = extractedCharactersRef.current.map((item) => (
       item.id === characterId
-        ? { ...item, selectedImageId: image.id, imageData: image.imageData, prompt: image.prompt || item.prompt }
+        ? {
+            ...item,
+            selectedImageId: isSameImageSelected ? null : image.id,
+            imageData: isSameImageSelected ? null : image.imageData,
+            prompt: isSameImageSelected ? item.prompt : (image.prompt || item.prompt),
+          }
         : item
     ));
-    const nextSelectedCharacterIds = selectedCharacterIdsRef.current.includes(characterId)
-      ? selectedCharacterIdsRef.current
-      : [...selectedCharacterIdsRef.current, characterId];
 
     extractedCharactersRef.current = nextCharacters;
-    selectedCharacterIdsRef.current = nextSelectedCharacterIds;
     setExtractedCharacters(nextCharacters);
-    setSelectedCharacterIds(nextSelectedCharacterIds);
 
     if (onSaveWorkflowDraft) {
       onSaveWorkflowDraft({
         extractedCharacters: nextCharacters,
-        selectedCharacterIds: nextSelectedCharacterIds,
+        selectedCharacterIds: selectedCharacterIdsRef.current,
       });
     }
 
@@ -2013,49 +2061,55 @@ const InputSection: React.FC<InputSectionProps> = ({
   ) => {
     const existingImages = character.generatedImages || [];
     if (characterLoadingProgress[character.id] !== undefined) return;
-    if (existingImages.length >= MAX_CHARACTER_VARIANT_COUNT) {
-      setNotice(`${character.name} 캐릭터 카드는 최대 ${MAX_CHARACTER_VARIANT_COUNT}장까지 유지합니다. 과도한 생성은 미리 막았습니다.`);
-      return;
-    }
 
     const pendingIndex = existingImages.length;
     setCharacterCarouselIndices((prev) => ({ ...prev, [character.id]: pendingIndex }));
-    await simulateProgress((value: number) => setCharacterLoadingProgress((prev) => ({ ...prev, [character.id]: value })));
+    scheduleCharacterGenerationFailsafe(character.id, character.name);
 
-    const variationHints = [
-      options?.sourceLabel ? `Reference candidate: ${options.sourceLabel}` : '',
-      options?.sourceLabel ? 'Keep the same character identity, face mood, hairstyle family, outfit direction, lighting tone, and silhouette as closely as possible.' : '',
-      options?.note?.trim() ? `Change request: ${options.note.trim()}` : '',
-    ].filter(Boolean).join('\n');
+    try {
+      await simulateProgress((value: number) => setCharacterLoadingProgress((prev) => ({ ...prev, [character.id]: value })));
 
-    const variants = createPromptVariants({
-      title: character.name,
-      prompt: [buildCharacterStyledPrompt(character.prompt || character.description), variationHints].filter(Boolean).join('\n\n'),
-      kind: 'character',
-      count: 1,
-      existingCount: existingImages.length,
-    });
-    setExtractedCharacters((prev) =>
-      prev.map((item) =>
-        item.id === character.id
-          ? {
-              ...item,
-              generatedImages: [...(item.generatedImages || []), ...variants],
-              selectedImageId: item.selectedImageId || null,
-              imageData: item.imageData || null,
-            }
-          : item
-      )
-    );
-    setSelectedCharacterIds((prev) => (prev.includes(character.id) ? prev : [...prev, character.id]));
-    setCharacterCarouselIndices((prev) => ({ ...prev, [character.id]: pendingIndex }));
-    setCharacterLoadingProgress((prev) => { const next = { ...prev }; delete next[character.id]; return next; });
-    requestWorkflowDraftSave('action');
-    setNotice(
-      options?.note?.trim() || options?.sourceLabel
-        ? `${character.name} 기준으로 요청한 느낌을 반영한 새 후보 1장을 추가했습니다.`
-        : `${character.name} 기준으로 새로운 후보 1장을 오른쪽 슬롯에 추가했습니다. 새 후보는 현재 공통 캐릭터 스타일을 반영하되 직전 후보와 다른 결을 우선합니다.`
-    );
+      const variationHints = [
+        options?.sourceLabel ? `Reference candidate: ${options.sourceLabel}` : '',
+        options?.sourceLabel ? 'Keep the same character identity, face mood, hairstyle family, outfit direction, lighting tone, and silhouette as closely as possible.' : '',
+        options?.note?.trim() ? `Change request: ${options.note.trim()}` : '',
+      ].filter(Boolean).join('\n');
+
+      const variants = createPromptVariants({
+        title: character.name,
+        prompt: [buildCharacterStyledPrompt(character.prompt || character.description), variationHints].filter(Boolean).join('\n\n'),
+        kind: 'character',
+        count: 1,
+        existingCount: existingImages.length,
+      });
+      setExtractedCharacters((prev) =>
+        prev.map((item) =>
+          item.id === character.id
+            ? {
+                ...item,
+                generatedImages: [...(item.generatedImages || []), ...variants],
+                selectedImageId: item.selectedImageId || null,
+                imageData: item.imageData || null,
+              }
+            : item
+        )
+      );
+      setCharacterCarouselIndices((prev) => ({ ...prev, [character.id]: pendingIndex }));
+      requestWorkflowDraftSave('action');
+      setNotice(
+        options?.note?.trim() || options?.sourceLabel
+          ? `${character.name} 기준으로 요청한 느낌을 반영한 새 후보 1장을 추가했습니다.`
+          : `${character.name} 기준으로 새로운 후보 1장을 오른쪽 슬롯에 추가했습니다. 새 후보는 현재 공통 캐릭터 스타일을 반영하되 직전 후보와 다른 결을 우선합니다.`
+      );
+    } finally {
+      clearCharacterGenerationFailsafe(character.id);
+      setCharacterLoadingProgress((prev) => {
+        if (prev[character.id] === undefined) return prev;
+        const next = { ...prev };
+        delete next[character.id];
+        return next;
+      });
+    }
   };
 
   const updateStylePrompt = (styleId: string, prompt: string) => {
@@ -2130,7 +2184,6 @@ const InputSection: React.FC<InputSectionProps> = ({
     nextCharacter.selectedImageId = null;
     nextCharacter.imageData = null;
     setExtractedCharacters((prev) => [...prev, nextCharacter]);
-    setSelectedCharacterIds((prev) => [...new Set([...prev, nextCharacter.id])]);
     setCharacterCarouselIndices((prev) => ({ ...prev, [nextCharacter.id]: 0 }));
     return nextCharacter;
   };
@@ -2196,7 +2249,6 @@ const InputSection: React.FC<InputSectionProps> = ({
     nextCharacter.selectedImageId = null;
     nextCharacter.imageData = null;
     setExtractedCharacters((prev) => [...prev, nextCharacter]);
-    setSelectedCharacterIds((prev) => [...new Set([...prev, nextCharacter.id])]);
     setCharacterCarouselIndices((prev) => ({ ...prev, [nextCharacter.id]: 0 }));
     requestWorkflowDraftSave('action');
     setNotice(`${trimmedName} 출연자를 ${trimmedPosition} 포지션으로 추가했습니다. 입력한 설명은 캐릭터 카드와 다음 단계 이미지 흐름에 그대로 반영됩니다.`);
@@ -2253,7 +2305,6 @@ const InputSection: React.FC<InputSectionProps> = ({
         };
       })
     );
-    setSelectedCharacterIds((prev) => (prev.includes(characterId) ? prev : [...prev, characterId]));
     setNotice(`${preset.name} 기본 예시를 ${extractedCharacters.find((item) => item.id === characterId)?.name || '출연자'} 카드에 적용했습니다.`);
   };
 
@@ -2540,7 +2591,6 @@ const InputSection: React.FC<InputSectionProps> = ({
               imageData: targetImage.imageData,
             };
           }));
-          setSelectedCharacterIds((prev) => (prev.includes(characterUploadTargetId) ? prev : [...prev, characterUploadTargetId]));
           requestWorkflowDraftSave('action');
           setNotice('업로드한 이미지를 선택한 출연자 카드에 추가했고, 그 이미지를 기준으로 유사 이미지도 이어서 만들 수 있게 했습니다.');
         }
@@ -2560,7 +2610,6 @@ const InputSection: React.FC<InputSectionProps> = ({
           return created;
         });
         setExtractedCharacters((prev) => [...prev, ...uploadedCharacters]);
-        setSelectedCharacterIds((prev) => [...new Set([...prev, ...uploadedCharacters.map((item) => item.id)])]);
         setCharacterCarouselIndices((prev) => ({
           ...prev,
           ...Object.fromEntries(uploadedCharacters.map((item) => [item.id, 0])),
