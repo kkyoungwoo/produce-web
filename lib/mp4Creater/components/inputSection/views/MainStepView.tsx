@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+// @ts-nocheck
 import React from 'react';
 import HelpTip from '../../HelpTip';
 import { IMAGE_MODELS, SCRIPT_MODEL_OPTIONS } from '../../../config';

@@ -1,4 +1,4 @@
-﻿import type { ProductItem } from "@/lib/i18n/types";
+import type { ProductItem } from "@/lib/i18n/types";
 
 export type WorkbenchLabels = {
   runLabel: string;

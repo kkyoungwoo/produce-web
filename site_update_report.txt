@@ -1,0 +1,92 @@
+WORKVISA / MP4 + ROUTING REVIEW REPORT
+====================================
+
+기준
+- 사용자 업로드 원본 ZIP 기준으로 재작업
+- 이전 자동 정리본은 사용하지 않음
+- mp4Creater 기능 보존 우선
+- /ko, /en 같은 locale URL 노출 제거
+- UTF-8 BOM 전수 제거
+
+삭제한 파일
+-----------
+- lib/mp4Creater/ClientOnlyApp.tsx
+- lib/mp4Creater/agents/stepAgentRegistry.ts
+- lib/mp4Creater/components/TubeGenMergedStudioSingleFile.tsx
+- lib/mp4Creater/components/inputSection/stepMessages.ts
+- public/mp4Creater/flow-render.svg
+- public/mp4Creater/flow-story.svg
+
+삭제 근거
+---------
+- lib/mp4Creater/ClientOnlyApp.tsx
+  app/mp4Creater 쪽 진입점에서 사용되지 않는 중복 클라이언트 래퍼
+- lib/mp4Creater/agents/stepAgentRegistry.ts
+  mp4Creater 엔트리/라우트/API 기준 import graph에서 미참조
+- lib/mp4Creater/components/TubeGenMergedStudioSingleFile.tsx
+  mp4Creater 엔트리/라우트/API 기준 미참조
+- lib/mp4Creater/components/inputSection/stepMessages.ts
+  mp4Creater 엔트리/라우트/API 기준 미참조
+- public/mp4Creater/flow-render.svg
+  프로젝트 내 참조 없음
+- public/mp4Creater/flow-story.svg
+  프로젝트 내 참조 없음
+
+주요 수정 파일
+--------------
+- app/page.tsx
+- app/about/page.tsx
+- app/contact/page.tsx
+- app/db-cleanup/page.tsx
+- app/services/page.tsx
+- app/services/[slug]/layout.tsx
+- app/services/[slug]/page.tsx
+- app/services/[slug]/workbench/page.tsx
+- app/[locale]/page.tsx
+- app/[locale]/about/page.tsx
+- app/[locale]/contact/page.tsx
+- app/[locale]/db-cleanup/page.tsx
+- app/[locale]/services/page.tsx
+- app/[locale]/services/[slug]/page.tsx
+- app/[locale]/services/[slug]/workbench/page.tsx
+- app/not-found.tsx
+- app/sitemap.ts
+- components/footer.tsx
+- components/header.tsx
+- components/service-detail-interactive.tsx
+- components/service-detail-interactive-shell.tsx
+- components/site-frame.tsx
+- lib/i18n/seo.ts
+- lib/mp4Creater/types.ts
+
+핵심 수정 내용
+--------------
+1. 라우팅 평탄화
+   - /, /about, /contact, /db-cleanup, /services, /services/[slug], /services/[slug]/workbench 추가
+   - 기존 /[locale]/... 페이지는 루트 경로로 redirect 처리
+   - Header / NotFound / 상세 카드 링크를 모두 루트 경로 기준으로 수정
+
+2. 공통 사이트 프레임 추가
+   - components/site-frame.tsx 추가
+   - 루트 사이트 페이지에서 동일한 Header/Footer/PageFx 레이아웃 사용
+
+3. SEO / sitemap 정리
+   - canonical / json-ld / sitemap 경로를 locale prefix 없는 루트 경로로 수정
+   - /ko, /en alternates 제거
+
+4. mp4Creater 안정성 보강
+   - youtubeAuth.ts는 실제 API route에서 참조 중이므로 유지
+   - SavedProject.settings 타입을 현재 저장 로직에 맞게 확장
+   - backgroundMusicProvider 타입을 실제 사용 값('google' | 'sample')에 맞춤
+
+검수 결과
+---------
+- mp4Creater import graph 재확인: 삭제 후 미참조 파일 0건
+- 변경 파일 TypeScript transpile 문법 검사: OK
+- scripts/verify-encoding.mjs: OK
+- /ko, /en URL 링크 패턴 검색: UI/SEO 경로 기준 제거 확인
+
+주의 사항
+---------
+- 업로드된 프로젝트에는 node_modules가 없어 next build 전체 실행 검증은 불가
+- 대신 구조 검수, 참조 검수, 인코딩 검수, 변경 파일 문법 검수로 마무리함

@@ -1,4 +1,4 @@
-﻿export const CHUNK_SIZE = 50;
+export const CHUNK_SIZE = 50;
 
 export const HIDDEN_META_KEYS = new Set([
   "resultCode",

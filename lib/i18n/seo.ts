@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import { getPublicApiProducts } from "@/lib/products/public-api-products";
 
 import type { Locale } from "./config";
-import { locales } from "./config";
 import { getLocaleContent } from "./translations";
 import type { ProductItem } from "./types";
 
@@ -62,22 +61,22 @@ function buildProductKeywords(product: ProductItem): string[] {
   );
 }
 
-function buildProductCatalog(locale: Locale) {
-  const t = getLocaleContent(locale);
-  const products = getPublicApiProducts(locale);
+function buildProductCatalog() {
+  const t = getLocaleContent("ko");
+  const products = getPublicApiProducts("ko");
 
   return {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
     name: `${t.brand} 데이터 페이지 모음`,
-    url: `${SITE_URL}/${locale}/services`,
+    url: `${SITE_URL}/services`,
     mainEntity: {
       "@type": "ItemList",
       numberOfItems: products.length,
       itemListElement: products.map((item, index) => ({
         "@type": "ListItem",
         position: index + 1,
-        url: `${SITE_URL}/${locale}/services/${item.slug}`,
+        url: `${SITE_URL}/services/${item.slug}`,
         name: item.title,
         description: item.summary,
       })),
@@ -86,12 +85,11 @@ function buildProductCatalog(locale: Locale) {
 }
 
 export function createPageMetadata(locale: Locale, page: PageKey): Metadata {
-  const t = getLocaleContent(locale);
+  void locale;
+  const t = getLocaleContent("ko");
   const pageSeo = t.seo[page];
   const pagePath = getPathByPage(page);
-  const canonical = `${SITE_URL}/${locale}${pagePath}`;
-
-  const languageAlternates = Object.fromEntries(locales.map((lang) => [lang, `${SITE_URL}/${lang}${pagePath}`]));
+  const canonical = `${SITE_URL}${pagePath}`;
   const keywords = uniqueKeywords(pageSeo.keywords, CORE_SEO_KEYWORDS);
 
   return {
@@ -100,14 +98,10 @@ export function createPageMetadata(locale: Locale, page: PageKey): Metadata {
     keywords,
     alternates: {
       canonical,
-      languages: {
-        ...languageAlternates,
-        "x-default": `${SITE_URL}/ko${pagePath}`,
-      },
     },
     openGraph: {
       type: "website",
-      locale,
+      locale: "ko",
       title: pageSeo.title,
       description: pageSeo.description,
       url: canonical,
@@ -144,8 +138,9 @@ export function createPageMetadata(locale: Locale, page: PageKey): Metadata {
 }
 
 export function createProductMetadata(locale: Locale, product: ProductItem): Metadata {
-  const t = getLocaleContent(locale);
-  const canonical = `${SITE_URL}/${locale}/services/${product.slug}`;
+  void locale;
+  const t = getLocaleContent("ko");
+  const canonical = `${SITE_URL}/services/${product.slug}`;
 
   return {
     title: `${product.title} | ${t.brand}`,
@@ -153,14 +148,10 @@ export function createProductMetadata(locale: Locale, product: ProductItem): Met
     keywords: buildProductKeywords(product),
     alternates: {
       canonical,
-      languages: {
-        ...Object.fromEntries(locales.map((lang) => [lang, `${SITE_URL}/${lang}/services/${product.slug}`])),
-        "x-default": `${SITE_URL}/ko/services/${product.slug}`,
-      },
     },
     openGraph: {
       type: "website",
-      locale,
+      locale: "ko",
       title: product.title,
       description: product.summary,
       url: canonical,
@@ -233,16 +224,17 @@ export function siteBaseMetadata(): Metadata {
 }
 
 export function buildJsonLd(locale: Locale, page: PageKey) {
-  const t = getLocaleContent(locale);
+  void locale;
+  const t = getLocaleContent("ko");
   const pagePath = getPathByPage(page);
-  const pageUrl = `${SITE_URL}/${locale}${pagePath}`;
+  const pageUrl = `${SITE_URL}${pagePath}`;
 
   const pageSchema = {
     "@context": "https://schema.org",
     "@type": page === "contact" ? "ContactPage" : "WebPage",
     name: t.seo[page].title,
     description: t.seo[page].description,
-    inLanguage: locale,
+    inLanguage: "ko",
     url: pageUrl,
     isPartOf: {
       "@type": "WebSite",
@@ -261,7 +253,7 @@ export function buildJsonLd(locale: Locale, page: PageKey) {
       "@type": "ContactPoint",
       contactType: "customer support",
       email: t.contact.emailValue,
-      availableLanguage: ["ko", "en", "ja", "zh"],
+      availableLanguage: ["ko"],
     },
     knowsAbout: CORE_SEO_KEYWORDS,
   };
@@ -273,7 +265,7 @@ export function buildJsonLd(locale: Locale, page: PageKey) {
     url: SITE_URL,
     potentialAction: {
       "@type": "SearchAction",
-      target: `${SITE_URL}/${locale}/services?q={search_term_string}`,
+      target: `${SITE_URL}/services?q={search_term_string}`,
       "query-input": "required name=search_term_string",
     },
   };
@@ -310,7 +302,7 @@ export function buildJsonLd(locale: Locale, page: PageKey) {
   };
 
   if (page === "home") {
-    return [pageSchema, organizationSchema, websiteSchema, faqSchema, buildProductCatalog(locale)];
+    return [pageSchema, organizationSchema, websiteSchema, faqSchema, buildProductCatalog()];
   }
 
   if (page === "about") {
@@ -323,7 +315,7 @@ export function buildJsonLd(locale: Locale, page: PageKey) {
         name: "GORHROD",
         jobTitle: "Public API Data Workflow Developer",
         knowsAbout: ["Public API", "Data Exploration", "Next.js", "Data Pipeline"],
-        url: `${SITE_URL}/ko/about`,
+        url: `${SITE_URL}/about`,
       },
     ];
   }
@@ -333,20 +325,21 @@ export function buildJsonLd(locale: Locale, page: PageKey) {
   }
 
   if (page === "services") {
-    return [pageSchema, organizationSchema, buildProductCatalog(locale)];
+    return [pageSchema, organizationSchema, buildProductCatalog()];
   }
 
   return [pageSchema, organizationSchema];
 }
 
 export function buildProductJsonLd(locale: Locale, product: ProductItem) {
+  void locale;
   return {
     "@context": "https://schema.org",
     "@type": "Dataset",
     name: product.title,
     description: product.description,
     identifier: product.portalDataId,
-    url: `${SITE_URL}/${locale}/services/${product.slug}`,
+    url: `${SITE_URL}/services/${product.slug}`,
     creator: {
       "@type": "Organization",
       name: "GORHROD LAB",
@@ -354,7 +347,7 @@ export function buildProductJsonLd(locale: Locale, product: ProductItem) {
     includedInDataCatalog: {
       "@type": "DataCatalog",
       name: "WORKVISA DATA LAB",
-      url: `${SITE_URL}/${locale}/services`,
+      url: `${SITE_URL}/services`,
     },
     keywords: buildProductKeywords(product),
     variableMeasured: [product.collectFocus, product.portalDataId],

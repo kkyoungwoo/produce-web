@@ -1,11 +1,11 @@
-﻿import type { Locale } from "@/lib/i18n/config";
+import type { Locale } from "@/lib/i18n/config";
 import { getLocaleContent } from "@/lib/i18n/translations";
 
 type FooterProps = {
-  locale: Locale;
+  locale?: Locale;
 };
 
-export default function Footer({ locale }: FooterProps) {
+export default function Footer({ locale = "ko" }: FooterProps) {
   const t = getLocaleContent(locale);
 
   return (

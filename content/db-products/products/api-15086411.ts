@@ -1,4 +1,4 @@
-﻿import type { ProductItem } from "@/lib/i18n/types";
+import type { ProductItem } from "@/lib/i18n/types";
 
 import { ACCOUNT_GUIDE_URL, serviceKeyCredential } from "../shared";
 

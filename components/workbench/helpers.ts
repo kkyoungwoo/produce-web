@@ -1,4 +1,4 @@
-﻿import {
+import {
   ARCH_SIGUNGU_NAME_MAP,
   COLUMN_LABEL_KR,
   REGION_NAME_MAP,

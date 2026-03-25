@@ -1,4 +1,4 @@
-﻿import { productCatalog } from "@/content/db-products";
+import { productCatalog } from "@/content/db-products";
 import type { Locale } from "@/lib/i18n/config";
 import type {
   CollectorKey,

@@ -2,7 +2,6 @@ export const dynamic = "force-static";
 
 import type { MetadataRoute } from "next";
 
-import { locales } from "@/lib/i18n/config";
 import { SITE_URL } from "@/lib/i18n/seo";
 import { getPublicApiProductSlugs } from "@/lib/products/public-api-products";
 
@@ -19,34 +18,21 @@ function getLastModified(): Date {
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = getLastModified();
-  const localizedRoutes = ["", "/about", "/services", "/db-cleanup", "/contact"];
+  const staticRoutes = ["", "/about", "/services", "/db-cleanup", "/contact", "/mp4Creater"];
 
-  const rootEntry: MetadataRoute.Sitemap = [
-    {
-      url: SITE_URL,
-      lastModified,
-      changeFrequency: "daily",
-      priority: 0.92,
-    },
-  ];
+  const rootEntries = staticRoutes.map((route) => ({
+    url: `${SITE_URL}${route}`,
+    lastModified,
+    changeFrequency: route === "" ? ("daily" as const) : ("weekly" as const),
+    priority: route === "" ? 1 : route === "/services" ? 0.95 : 0.8,
+  }));
 
-  const localizedEntries = locales.flatMap((locale) => {
-    const staticRoutes = localizedRoutes.map((route) => ({
-      url: `${SITE_URL}/${locale}${route}`,
-      lastModified,
-      changeFrequency: route === "" ? ("daily" as const) : ("weekly" as const),
-      priority: route === "" ? 1 : route === "/services" ? 0.95 : 0.8,
-    }));
+  const productEntries = getPublicApiProductSlugs("ko").map((slug) => ({
+    url: `${SITE_URL}/services/${slug}`,
+    lastModified,
+    changeFrequency: "weekly" as const,
+    priority: 0.9,
+  }));
 
-    const productRoutes = getPublicApiProductSlugs(locale).map((slug) => ({
-      url: `${SITE_URL}/${locale}/services/${slug}`,
-      lastModified,
-      changeFrequency: "weekly" as const,
-      priority: 0.9,
-    }));
-
-    return [...staticRoutes, ...productRoutes];
-  });
-
-  return [...rootEntry, ...localizedEntries];
+  return [...rootEntries, ...productEntries];
 }

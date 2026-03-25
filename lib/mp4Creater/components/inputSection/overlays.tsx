@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { GenerationStep, WorkflowPromptTemplate } from '../../types';
 import { StepId } from './types';
 import { OverlayModal } from './ui';

@@ -1,11 +1,11 @@
-﻿"use client";
+"use client";
 
 import dynamic from "next/dynamic";
 
 import type { LocaleContent, ProductItem } from "@/lib/i18n/types";
 
 type Props = {
-  locale: string;
+  locale?: string;
   products: ProductItem[];
   initialSlug: string;
   t: LocaleContent;

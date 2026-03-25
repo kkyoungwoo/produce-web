@@ -17,13 +17,13 @@ export default function NotFound() {
 
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <Link
-            href={`/${defaultLocale}/services`}
+            href="/services"
             className="inline-flex min-h-[52px] items-center justify-center rounded-xl bg-blue-600 px-5 py-3 text-base font-extrabold text-white shadow-[0_12px_28px_rgba(37,99,235,0.28)] transition hover:bg-blue-700"
           >
             {copy.primaryCta}
           </Link>
           <Link
-            href={`/${defaultLocale}`}
+            href="/"
             className="inline-flex min-h-[52px] items-center justify-center rounded-xl border border-blue-300 bg-blue-50 px-5 py-3 text-base font-extrabold text-blue-700 transition hover:bg-blue-100"
           >
             {copy.secondaryCta}

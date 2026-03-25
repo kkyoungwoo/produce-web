@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -7,7 +7,7 @@ import WorkbenchCollectorClient from "@/components/workbench-collector-client";
 import type { LocaleContent, ProductItem } from "@/lib/i18n/types";
 
 type Props = {
-  locale: string;
+  locale?: string;
   products: ProductItem[];
   initialSlug: string;
   t: LocaleContent;
@@ -27,6 +27,7 @@ function getVisibleCount(width: number) {
 }
 
 export default function ServiceDetailInteractive({ locale, products, initialSlug, t, kakaoChatUrl }: Props) {
+  void locale;
   const product = useMemo(() => products.find((item) => item.slug === initialSlug) ?? products[0], [products, initialSlug]);
 
   const otherProducts = useMemo(
@@ -205,7 +206,7 @@ export default function ServiceDetailInteractive({ locale, products, initialSlug
                 {otherProducts.map((item) => (
                   <div key={item.slug} className="flex-none px-1.5" style={{ flexBasis: cardBasisValue }}>
                     <Link
-                      href={`/${locale}/services/${item.slug}`}
+                      href={`/services/${item.slug}`}
                       className="group flex h-full flex-col rounded-xl bg-white px-4 py-3 shadow-[inset_0_0_0_1px_rgba(251,191,36,0.35)] transition hover:bg-amber-50 hover:shadow-[inset_0_0_0_1px_rgba(245,158,11,0.6)] active:scale-[0.99]"
                     >
                       <p className="line-clamp-1 text-sm font-bold text-slate-900">{item.title}</p>

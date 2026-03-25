@@ -641,6 +641,18 @@ export interface SavedProject {
     outputMode: ProjectOutputMode;
     elevenLabsModel: string;
     fluxStyle?: string;
+    imageProvider?: 'sample' | 'openrouter' | 'custom';
+    videoProvider?: 'elevenLabs' | 'sample';
+    ttsProvider?: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
+    audioProvider?: 'elevenLabs' | 'qwen3Tts' | 'chatterbox' | 'heygen' | 'sample';
+    qwenVoicePreset?: string | null;
+    chatterboxVoicePreset?: string | null;
+    elevenLabsVoiceId?: string | null;
+    heygenVoiceId?: string | null;
+    backgroundMusicProvider?: 'google' | 'sample';
+    backgroundMusicModel?: string;
+    musicVideoProvider?: 'elevenLabs' | 'sample';
+    musicVideoMode?: 'auto' | 'sample';
   };
   assets: GeneratedAsset[];
   thumbnail: string | null;
@@ -721,7 +733,7 @@ export interface AiRoutingSettings {
   voiceReferenceMimeType?: string | null;
   voiceReferenceName?: string | null;
   qwenStylePreset?: string | null;
-  backgroundMusicProvider?: 'elevenLabs' | 'sample';
+  backgroundMusicProvider?: 'google' | 'sample';
   backgroundMusicStyle?: string;
   musicVideoProvider?: 'elevenLabs' | 'sample';
   musicVideoMode?: 'auto' | 'sample';
