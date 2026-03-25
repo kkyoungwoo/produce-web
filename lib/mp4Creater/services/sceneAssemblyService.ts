@@ -49,6 +49,57 @@ function getContentModeGuide(draft: WorkflowDraft) {
   return '대사 없이 상황과 감정이 읽히는 스토리형 장면';
 }
 
+function isRealPersonStyle(draft: WorkflowDraft) {
+  const selectedStyle = (draft.styleImages || []).find((item) => item.id === draft.selectedStyleImageId) || null;
+  const raw = [
+    draft.selectedCharacterStyleLabel,
+    draft.selectedCharacterStylePrompt,
+    selectedStyle?.label,
+    selectedStyle?.groupLabel,
+    selectedStyle?.prompt,
+    ...(draft.characterImages || []).map((item) => item.label),
+    ...(draft.characterImages || []).map((item) => item.prompt),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  return /(실사|real human|photoreal|photorealistic|live action|realistic portrait|korean presenter)/.test(raw);
+}
+
+function getLanguageLabel(draft: WorkflowDraft) {
+  const language = (draft.customScriptSettings?.language || 'ko').trim().toLowerCase();
+  if (language === 'mute') return 'silent / no spoken language';
+  if (language.startsWith('en')) return 'English';
+  if (language.startsWith('ja')) return 'Japanese';
+  if (language.startsWith('zh')) return 'Chinese';
+  if (language.startsWith('es')) return 'Spanish';
+  if (language.startsWith('fr')) return 'French';
+  if (language.startsWith('de')) return 'German';
+  return language === 'ko' ? 'Korean' : language;
+}
+
+function buildLipSyncGuide(draft: WorkflowDraft) {
+  const languageLabel = getLanguageLabel(draft);
+  if (draft.customScriptSettings?.language === 'mute') {
+    return 'No lip-synced speech. Keep lips neutral and communicate with gaze, gesture, timing, and camera movement only.';
+  }
+  if (draft.contentType === 'music_video') {
+    return `If vocals are present, the visible singer's mouth shapes must follow the sung phonemes in ${languageLabel}. During instrumental or no-vocal sections, avoid fake singing and focus on performance, gesture, and rhythm instead.`;
+  }
+  return `If narration or dialogue is present, the visible speaker's mouth shapes must follow the spoken phonemes in ${languageLabel}. If the moment is silent, keep lips natural and let expression, posture, and action carry the scene.`;
+}
+
+function buildVisualTextureGuide(draft: WorkflowDraft) {
+  if (isRealPersonStyle(draft)) {
+    return 'If the chosen style is photoreal or live action, the character must read as a natural Korean person, with believable skin texture, hair strands, fabric detail, lens depth, and lighting continuity that blends into real video.';
+  }
+  if (draft.contentType === 'music_video') {
+    return 'Keep the selected art style consistent across scenes, with readable silhouettes, animation-friendly motion clarity, clean backgrounds that do not overpower the performer, and texture detail that still feels natural in motion video.';
+  }
+  return 'Keep the selected art style consistent across scenes, with clean silhouette, readable face, stable lighting logic, and texture detail that still feels natural in motion video.';
+}
+
 function buildMuteSceneNarration(draft: WorkflowDraft, index: number, total: number) {
   const topic = draft.topic?.trim() || '새 프로젝트';
   const selections: StorySelectionState = draft.selections || { genre: '', mood: '', endingTone: '', setting: '', protagonist: '', conflict: '' };
@@ -86,6 +137,8 @@ function buildLocalVideoPrompt(narration: string, sceneNumber: number, draft: Wo
     `Use ${direction.shotType}. ${direction.cameraLanguage}`,
     `Movement focus: ${direction.transitionBeat}`,
     `Lighting: ${direction.lightingDirection}. Palette: ${direction.paletteDirection}.`,
+    buildLipSyncGuide(draft),
+    buildVisualTextureGuide(draft),
     'Show one clear action or emotional shift, keep the main subject readable, and avoid subtitle dependence or watermark.',
     'Keep character identity and visual continuity consistent with the previous and next scenes.',
   ].join(' ');
@@ -102,6 +155,7 @@ function buildMuteVideoPrompt(narration: string, sceneNumber: number, draft: Wor
     `Use ${direction.shotType}. ${direction.cameraLanguage}`,
     `Movement focus: ${direction.transitionBeat}`,
     `Lighting: ${direction.lightingDirection}. Palette: ${direction.paletteDirection}.`,
+    buildVisualTextureGuide(draft),
     'The motion must read clearly even on mute, relying on body movement, object interaction, environment change, rhythm, and camera movement only.',
     'No lip-synced speech, no subtitle dependence, no text overlay, keep character identity consistent across scenes.',
   ].join(' ');
@@ -166,13 +220,18 @@ export function buildSelectedPromptContextFromDraft(draft: WorkflowDraft) {
   const characterPromptBlock = selectedCharacters
     .map((character, index) => {
       const pickedImage = (character.generatedImages || []).find((image) => image.id === character.selectedImageId);
-      const appliedPrompt = pickedImage?.prompt || character.prompt || character.description;
+      const appliedPrompt = pickedImage?.prompt || character.prompt || character.description || '';
       const roleLabel =
         character.roleLabel ||
         character.rolePrompt ||
         character.description ||
         (character.role === 'lead' ? '주인공' : `조연 ${index + 1}`);
-      return appliedPrompt ? `- ${character.name} (${roleLabel}): ${appliedPrompt}` : '';
+      if (draft.contentType === 'music_video') {
+        return `- ${character.name} (${roleLabel}): based on reference images. Keep the selected identity consistent and do not rewrite face, hair, or outfit from scratch.${pickedImage?.label ? ` Reference label: ${pickedImage.label}.` : ''}`;
+      }
+      return appliedPrompt
+        ? `- ${character.name} (${roleLabel}): keep the same identity as the selected reference image.${pickedImage?.label ? ` Reference label: ${pickedImage.label}.` : ''} Fallback identity cue: ${appliedPrompt.slice(0, 180)}`
+        : `- ${character.name} (${roleLabel}): based on reference images.`;
     })
     .filter(Boolean)
     .join('\n');
@@ -217,8 +276,9 @@ export function applySelectionPromptsToScenes(scenes: ScriptScene[], draft: Work
         promptContext.storyPrompt ? `[STORY PROMPT]\n${promptContext.storyPrompt}` : '',
         promptContext.scenePrompt ? `[SCENE PROMPT]\n${promptContext.scenePrompt}` : '',
         promptContext.actionPrompt ? `[ACTION PROMPT]\n${promptContext.actionPrompt}` : '',
-        promptContext.characterPromptBlock ? `[SELECTED CHARACTER PROMPTS]\n${promptContext.characterPromptBlock}` : '',
+        promptContext.characterPromptBlock ? `[SELECTED CHARACTER REFERENCES]\n${promptContext.characterPromptBlock}` : '',
         promptContext.stylePrompt ? `[SELECTED STYLE PROMPT]\n${promptContext.stylePrompt}` : '',
+        draft.contentType === 'music_video' ? '[MUSIC VIDEO IMAGE RULE] One image = one key moment. Keep scene order chronological. When a character appears, prefer the phrase based on reference images instead of rewriting appearance in detail. Avoid readable signs, logo-like graphics, and unnecessary background clutter unless the story explicitly needs them.' : '',
         promptContext.styleLabel ? `[STYLE LABEL] ${promptContext.styleLabel}` : '',
         buildFreshIdeaRule('scene'),
         `[SCENE ANGLE] ${direction.narrativeAngle}`,
@@ -229,6 +289,7 @@ export function applySelectionPromptsToScenes(scenes: ScriptScene[], draft: Work
         previousScene?.narration ? `[PREVIOUS SCENE CONTEXT] ${previousScene.narration}` : '',
         nextScene?.narration ? `[NEXT SCENE CONTEXT] ${nextScene.narration}` : '',
         `[SCENE RULE] Scene ${index + 1} must keep the selected character roles, selected prompt template, and selected style prompt consistent, but it must not reuse the exact same framing or visual hook as the previous scene.`,
+        draft.contentType === 'music_video' ? `[MOTION RULE] Motion for scene ${index + 1} should feel like one short, copy-ready action line. Avoid restating clothing, hairstyle, or background details unless absolutely necessary.` : '',
       ]
         .filter(Boolean)
         .join('\n\n'),

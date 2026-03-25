@@ -230,13 +230,14 @@ export async function recommendTopicFromInput(options: {
       messages: [
         {
           role: 'system',
-          content: '한국어 영상 제작용 주제 추천 도우미다. 한 줄 주제만 반환하고 설명은 쓰지 마라. 기존 입력 문장을 그대로 앞뒤로 붙이지 마라.',
+          content: '한국어 영상 제작용 주제 추천 도우미다. 한 줄 주제만 반환하고 설명은 쓰지 마라. 기존 입력 문장을 그대로 앞뒤로 붙이지 마라. 최근 추천이나 샘플 표현을 답습하지 말고 매번 새 관점과 새 훅으로 제안하라.',
         },
         {
           role: 'user',
           content: `콘텐츠 유형: ${contentLabel}
 사용자 입력: ${seedText || '자동 추천'}
 무음 모드 여부: ${options.scriptLanguage === 'mute' ? '예' : '아니오'}
+새 추천 nonce: ${Date.now()}
 이 입력을 바탕으로 바로 사용할 수 있는 새 주제 한 줄만 추천해줘.
 입력이 길면 정보 밀도에 맞춰 조금 더 구체적으로 쓰고, 무음 모드면 화면 전개와 장면 흐름이 떠오르도록 제안해줘.`,
         },
@@ -279,13 +280,14 @@ export async function recommendTopicCandidatesFromInput(options: {
       messages: [
         {
           role: 'system',
-          content: '한국어 영상 제작 주제 추천 도우미다. JSON만 반환한다. key는 topics, value는 한국어 한 줄 주제 배열이다. 각 항목은 줄바꿈 없는 한 줄 문장으로 작성한다. 입력이 짧으면 간결하게, 입력이 길거나 정보가 많으면 그 밀도에 맞춰 조금 더 길고 구체적인 한 줄 문장으로 확장한다. 기존 입력을 그대로 복붙하지 말고 새 관점으로 변형하며, 서로 결이 겹치지 않게 다양하게 제안한다.',
+          content: '한국어 영상 제작 주제 추천 도우미다. JSON만 반환한다. key는 topics, value는 한국어 한 줄 주제 배열이다. 각 항목은 줄바꿈 없는 한 줄 문장으로 작성한다. 입력이 짧으면 간결하게, 입력이 길거나 정보가 많으면 그 밀도에 맞춰 조금 더 길고 구체적인 한 줄 문장으로 확장한다. 기존 입력을 그대로 복붙하지 말고 새 관점으로 변형하며, 서로 결이 겹치지 않게 다양하게 제안한다. 최근 추천 결과나 샘플 표현을 재활용하지 말고 매번 새로 제안한다.',
         },
         {
           role: 'user',
           content: `콘텐츠 유형: ${contentLabel}
 사용자 입력: ${seedText || '자동 추천'}
 무음 모드 여부: ${options.scriptLanguage === 'mute' ? '예' : '아니오'}
+새 추천 nonce: ${Date.now()}
 조건:
 1) 주제 문장을 ${count}개 추천
 2) 각 항목은 줄바꿈 없는 한 줄 문장으로 작성

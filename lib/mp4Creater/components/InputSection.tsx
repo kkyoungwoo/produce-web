@@ -18,6 +18,7 @@ import {
   ScriptSpeechStyle,
 } from '../types';
 import { CHATTERBOX_TTS_PRESET_OPTIONS, CONFIG, IMAGE_MODELS, NO_AI_SCRIPT_MODEL_ID, QWEN_TTS_PRESET_OPTIONS, SCRIPT_MODEL_OPTIONS } from '../config';
+import { STEP3_PROMPT_EDITOR_GUIDE } from '../config/promptEditGuides';
 import { WORKFLOW_CHARACTER_STYLE_OPTIONS, getCharacterSamplePreset, getStyleSamplePreset } from '../samples/presetCatalog';
 import {
   buildSelectableStoryDraft,
@@ -82,6 +83,15 @@ const SCRIPT_DURATION_PRESETS = [1, 3, 5, 8, 10, 15, 20, 25, 30] as const;
 
 const CHARACTER_GENERATION_FAILSAFE_MS = 120000;
 
+const EMPTY_STORY_SELECTIONS: StorySelectionState = {
+  genre: '',
+  mood: '',
+  endingTone: '',
+  setting: '',
+  protagonist: '',
+  conflict: '',
+};
+
 function normalizeScriptDurationPreset(value: number) {
   return Number.isFinite(value) ? Math.max(1, Math.min(30, Math.round(value))) : 1;
 }
@@ -136,7 +146,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const initialPromptPack = buildWorkflowPromptPack({
     contentType: initialContentType,
     topic: initial.topic || '',
-    selections: initialSelections,
+    selections: EMPTY_STORY_SELECTIONS,
     script: initial.script || '',
   });
   const initialTemplates = resolveWorkflowPromptTemplates(initialContentType, initialPromptPack, initial.promptTemplates || []);
@@ -426,10 +436,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const normalizedScript = useMemo(() => normalizeStoryText(storyScript), [storyScript]);
   const sceneCount = useMemo(() => splitStoryIntoParagraphScenes(normalizedScript).length, [normalizedScript]);
 
-  const selections = useMemo(
-    () => ({ genre, mood, endingTone, setting, protagonist, conflict }),
-    [genre, mood, endingTone, setting, protagonist, conflict]
-  );
+  const selections = EMPTY_STORY_SELECTIONS;
 
   const promptPack = useMemo(
     () => buildWorkflowPromptPack({ contentType, topic, selections, script: normalizedScript }),
@@ -643,9 +650,8 @@ const InputSection: React.FC<InputSectionProps> = ({
   const buildScriptReferenceSuggestionSet = () => {
     const base = [
       `${topic || '이번 주제'}의 핵심 메시지가 첫 문단에서 바로 드러나게 해 주세요.`,
-      `${selections.setting} 배경과 ${selections.mood} 분위기를 자연스럽게 반영해 주세요.`,
-      `${selections.protagonist} 관점에서 시작하고 ${selections.endingTone}으로 마무리해 주세요.`,
-      `${selections.conflict}를 초반에 분명히 보여 준 뒤 해결 흐름까지 이어 주세요.`,
+      `${Math.max(1, customScriptDurationMinutes)}분 분량에 맞춰 장면 호흡이 무리 없이 이어지게 해 주세요.`,
+      `${customScriptLanguage === 'mute' ? '무음 영상용이라 대사보다 장면 흐름과 시각 정보 중심으로 구성해 주세요.' : '선택한 언어와 말투가 자연스럽게 들리도록 낭독 대본으로 정리해 주세요.'}`,
       `중간에는 실제 예시나 비유를 넣어 이해가 쉬운 대본으로 정리해 주세요.`,
     ].filter(Boolean);
     return [...base].sort(() => Math.random() - 0.5).slice(0, 3);
@@ -804,20 +810,20 @@ const InputSection: React.FC<InputSectionProps> = ({
   const stepCompleted = useMemo(
     () => ({
       1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
-      2: Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()),
+      2: Boolean(topic.trim()),
       3: isMuteScriptMode
         ? Boolean(selectedCharacterIds.length)
         : Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
       4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
       5: Boolean(selectedStyleImageId),
     }),
-    [hasSelectedContentType, hasSelectedAspectRatio, topic, genre, mood, endingTone, setting, protagonist, conflict, normalizedScript, selectedPromptTemplateId, selectedCharacterIds, selectedCharactersHaveVoiceSelection, selectedCharacters.length, selectedCharacterStyleId, selectedCharactersReady, selectedStyleImageId, styleImages, isMuteScriptMode]
+    [hasSelectedContentType, hasSelectedAspectRatio, topic, normalizedScript, selectedPromptTemplateId, selectedCharacterIds, selectedCharactersHaveVoiceSelection, selectedCharacters.length, selectedCharacterStyleId, selectedCharactersReady, selectedStyleImageId, styleImages, isMuteScriptMode]
   );
 
   const routeStepCompleted = useMemo(
     () => ({
       1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
-      2: Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()),
+      2: Boolean(topic.trim()),
       3: isMuteScriptMode
         ? Boolean(selectedCharacterIds.length)
         : Boolean(normalizedScript.trim() && selectedPromptTemplateId && selectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
@@ -828,12 +834,6 @@ const InputSection: React.FC<InputSectionProps> = ({
       hasSelectedContentType,
       hasSelectedAspectRatio,
       topic,
-      genre,
-      mood,
-      endingTone,
-      setting,
-      protagonist,
-      conflict,
       normalizedScript,
       selectedPromptTemplateId,
       selectedCharacterIds,
@@ -933,7 +933,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     constitutionAnalysis,
     completedSteps: {
       step1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
-      step2: Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()),
+      step2: Boolean(topic.trim()),
       step3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
       step4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
       step5: Boolean(selectedStyleImageId),
@@ -957,7 +957,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       completedSteps: {
         ...payload.completedSteps,
         step1: completedStage >= 1 ? Boolean(hasSelectedContentType && hasSelectedAspectRatio) : payload.completedSteps.step1,
-        step2: completedStage >= 2 ? Boolean(topic.trim() && genre.trim() && mood.trim() && endingTone.trim() && setting.trim() && protagonist.trim() && conflict.trim()) : payload.completedSteps.step2,
+        step2: completedStage >= 2 ? Boolean(topic.trim()) : payload.completedSteps.step2,
         step3: completedStage >= 3 ? Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection) : payload.completedSteps.step3,
         step4: completedStage >= 4 ? Boolean(effectiveSelectedCharacterIds.length && selectedCharacterStyleId && selectedCharactersReady) : payload.completedSteps.step4,
         step5: completedStage >= 5 ? Boolean(selectedStyleImageId) : payload.completedSteps.step5,
@@ -1110,7 +1110,7 @@ const InputSection: React.FC<InputSectionProps> = ({
 
   const applyContentTypeSelection = (nextContentType: ContentType) => {
     const nextSelections = buildDefaultSelectionsForContentType(nextContentType);
-    const nextPromptPack = buildWorkflowPromptPack({ contentType: nextContentType, topic: '', selections: nextSelections, script: '' });
+    const nextPromptPack = buildWorkflowPromptPack({ contentType: nextContentType, topic: '', selections: EMPTY_STORY_SELECTIONS, script: '' });
     const nextTemplates = resolveWorkflowPromptTemplates(nextContentType, nextPromptPack, []);
     const defaultTemplateId = getDefaultWorkflowPromptTemplateId(nextContentType);
 
@@ -1200,7 +1200,7 @@ const InputSection: React.FC<InputSectionProps> = ({
 
     if (stage === 1) {
       const nextSelections = buildDefaultSelectionsForContentType(contentType);
-      const nextPromptPack = buildWorkflowPromptPack({ contentType, topic: '', selections: nextSelections, script: '' });
+      const nextPromptPack = buildWorkflowPromptPack({ contentType, topic: '', selections: EMPTY_STORY_SELECTIONS, script: '' });
       const nextTemplates = resolveWorkflowPromptTemplates(contentType, nextPromptPack, []);
       const defaultTemplateId = getDefaultWorkflowPromptTemplateId(contentType);
       setTopic(getTopicSuggestion(contentType, ''));
@@ -1607,7 +1607,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     if (!isStep3Open) return;
     if (scriptReferenceSuggestions.length) return;
     setScriptReferenceSuggestions(buildScriptReferenceSuggestionSet());
-  }, [routeStep, openStage, topic, genre, mood, endingTone, setting, protagonist, conflict, scriptReferenceSuggestions.length]);
+  }, [routeStep, openStage, topic, customScriptDurationMinutes, customScriptLanguage, scriptReferenceSuggestions.length]);
 
   useEffect(() => {
     if (contentType === 'music_video') return;
@@ -1983,6 +1983,9 @@ const InputSection: React.FC<InputSectionProps> = ({
         contentType,
         model: selectedScriptModel,
         allowAi,
+        styleLabel: selectedStyle?.label || selectedStyle?.groupLabel || selectedCharacterStyle?.label || '',
+        stylePrompt: selectedStyle?.prompt || selectedCharacterStyle?.prompt || '',
+        language: customScriptLanguage,
       });
 
       const normalizedCharacterName = (character: CharacterProfile) => (character.name || '').trim().toLowerCase();
@@ -2338,9 +2341,9 @@ const InputSection: React.FC<InputSectionProps> = ({
     label,
     kind,
     topic,
-    mood,
-    setting,
-    protagonist,
+    mood: '',
+    setting: '',
+    protagonist: '',
     contentType,
     aspectRatio,
   });
@@ -2748,9 +2751,9 @@ const InputSection: React.FC<InputSectionProps> = ({
                 label,
                 kind: mode,
                 topic,
-                mood,
-                setting,
-                protagonist,
+                mood: '',
+                setting: '',
+                protagonist: '',
                 contentType,
                 aspectRatio,
               })).catch(() => buildUploadPrompt(label, mode)).then((basePrompt) => {
@@ -2804,17 +2807,24 @@ const InputSection: React.FC<InputSectionProps> = ({
             sourceMode: 'upload',
           });
           created.visualStyle = selectedCharacterStyle?.label || created.visualStyle;
-          created.selectedImageId = null;
-          created.imageData = null;
+          created.selectedImageId = image.id;
+          created.imageData = image.imageData;
+          created.generatedImages = image.imageData ? [{
+            ...image,
+            imageData: image.imageData,
+          }] : created.generatedImages;
           return created;
         });
+        const uploadedCharacterIds = uploadedCharacters.map((item) => item.id);
         setExtractedCharacters((prev) => [...prev, ...uploadedCharacters]);
+        selectedCharacterIdsRef.current = [...new Set([...selectedCharacterIdsRef.current, ...uploadedCharacterIds])];
+        setSelectedCharacterIds((prev) => [...new Set([...prev, ...uploadedCharacterIds])]);
         setCharacterCarouselIndices((prev) => ({
           ...prev,
           ...Object.fromEntries(uploadedCharacters.map((item) => [item.id, 0])),
         }));
         requestWorkflowDraftSave('action');
-        setNotice('업로드한 이미지를 출연자 캐릭터 카드로 추가했고, 해당 느낌의 프롬프트도 함께 저장했습니다.');
+        setNotice('업로드한 이미지를 출연자 캐릭터 카드로 추가했고, 해당 느낌의 프롬프트와 선택 상태도 함께 저장했습니다.');
       }
     } else {
       setStyleImages((prev) => [...prev, ...images]);
@@ -2922,11 +2932,9 @@ const InputSection: React.FC<InputSectionProps> = ({
   const step2Summary = (
     <>
       <SummaryChip accent="blue">주제 {topic || '미입력'}</SummaryChip>
-      <SummaryChip>{genre}</SummaryChip>
-      <SummaryChip>{mood}</SummaryChip>
-      <SummaryChip>{setting}</SummaryChip>
-      <SummaryChip>{protagonist}</SummaryChip>
-      <SummaryChip>{conflict}</SummaryChip>
+      <SummaryChip>{customScriptDurationMinutes}분</SummaryChip>
+      <SummaryChip>{customScriptSpeechStyle}</SummaryChip>
+      <SummaryChip>{customScriptLanguage}</SummaryChip>
     </>
   );
   const step3Summary = (
@@ -3195,6 +3203,8 @@ const InputSection: React.FC<InputSectionProps> = ({
       <PromptEditorModal
         editingPromptId={editingPromptId}
         prompt={promptEditorForm.prompt}
+        guideTitle={STEP3_PROMPT_EDITOR_GUIDE.title}
+        guideItems={STEP3_PROMPT_EDITOR_GUIDE.items}
         onClose={() => setEditingPromptId(null)}
         onSave={savePromptEditor}
         onPromptChange={(value) => setPromptEditorForm((prev) => ({ ...prev, prompt: value }))}

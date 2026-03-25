@@ -957,6 +957,14 @@ export default function Step3Panel({
                     ? currentVoiceId || CHATTERBOX_VOICE_OPTIONS[0]?.id || 'chatterbox-clear'
                     : CHATTERBOX_VOICE_OPTIONS[0]?.id || 'chatterbox-clear';
                 const selected = selectedCharacterIds.includes(character.id);
+                const positionText =
+                  character.roleLabel ||
+                  character.rolePrompt ||
+                  (character.role === 'lead'
+                    ? '주인공'
+                    : character.role === 'narrator'
+                      ? '내레이터'
+                      : '출연자');
                 return (
                   <div
                     key={character.id}
@@ -984,6 +992,9 @@ export default function Step3Panel({
   <div className="min-w-0">
     <div className="flex items-center gap-2">
       <div className="text-sm font-black text-slate-900">{character.name}</div>
+      <span className="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black text-slate-600">
+        포지션 {positionText}
+      </span>
     </div>
 
     {character.description ? (

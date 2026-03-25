@@ -301,8 +301,33 @@ async function persistProjectMedia(storageDir: string, project: any) {
     }
   };
 
+  const persistWorkflowImageArray = async (items: any[], prefix: string) => {
+    for (let index = 0; index < items.length; index += 1) {
+      const item = items[index];
+      if (!item || typeof item !== 'object') continue;
+      const itemId = sanitizePathSegment(item.id || `${prefix}-${index}`);
+      await persistMediaField(item, 'imageData', 'imageFile', storageDir, `${projectId}/workflow/${prefix}/${itemId}`);
+      if (Array.isArray(item.generatedImages)) {
+        for (let imageIndex = 0; imageIndex < item.generatedImages.length; imageIndex += 1) {
+          const image = item.generatedImages[imageIndex];
+          if (!image || typeof image !== 'object') continue;
+          const imageId = sanitizePathSegment(image.id || `${itemId}-${imageIndex}`);
+          await persistMediaField(image, 'imageData', 'imageFile', storageDir, `${projectId}/workflow/${prefix}/${itemId}/generated/${imageId}`);
+        }
+      }
+    }
+  };
+
   if (Array.isArray(project?.backgroundMusicTracks)) {
     await persistTrackArray(project.backgroundMusicTracks, 'background-music');
+  }
+
+  if (project?.workflowDraft && typeof project.workflowDraft === 'object') {
+    const workflowDraft = project.workflowDraft;
+    await persistWorkflowImageArray(Array.isArray(workflowDraft.extractedCharacters) ? workflowDraft.extractedCharacters : [], 'characters');
+    await persistWorkflowImageArray(Array.isArray(workflowDraft.styleImages) ? workflowDraft.styleImages : [], 'styles');
+    await persistWorkflowImageArray(Array.isArray(workflowDraft.characterImages) ? workflowDraft.characterImages : [], 'character-images');
+    await persistMediaField(workflowDraft, 'voiceReferenceAudioData', 'voiceReferenceAudioFile', storageDir, `${projectId}/workflow/voice-reference`);
   }
 
   const singularMediaFields: Array<[any, string, string, string]> = [
@@ -352,11 +377,32 @@ async function hydrateProjectMedia(storageDir: string, project: any) {
     }
   }
 
+  const hydrateWorkflowImageArray = async (items: any[]) => {
+    for (const item of items) {
+      if (!item || typeof item !== 'object') continue;
+      await hydrateMediaField(item, 'imageData', 'imageFile', storageDir);
+      if (Array.isArray(item.generatedImages)) {
+        for (const image of item.generatedImages) {
+          if (!image || typeof image !== 'object') continue;
+          await hydrateMediaField(image, 'imageData', 'imageFile', storageDir);
+        }
+      }
+    }
+  };
+
   if (Array.isArray(project?.backgroundMusicTracks)) {
     for (const track of project.backgroundMusicTracks) {
       if (!track || typeof track !== 'object') continue;
       await hydrateMediaField(track, 'audioData', 'audioFile', storageDir);
     }
+  }
+
+  if (project?.workflowDraft && typeof project.workflowDraft === 'object') {
+    const workflowDraft = project.workflowDraft;
+    await hydrateWorkflowImageArray(Array.isArray(workflowDraft.extractedCharacters) ? workflowDraft.extractedCharacters : []);
+    await hydrateWorkflowImageArray(Array.isArray(workflowDraft.styleImages) ? workflowDraft.styleImages : []);
+    await hydrateWorkflowImageArray(Array.isArray(workflowDraft.characterImages) ? workflowDraft.characterImages : []);
+    await hydrateMediaField(workflowDraft, 'voiceReferenceAudioData', 'voiceReferenceAudioFile', storageDir);
   }
 
   const singularTargets = [

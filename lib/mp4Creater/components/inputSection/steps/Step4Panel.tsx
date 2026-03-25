@@ -655,10 +655,10 @@ export default function Step4Panel({
                       </div>
                     </div>
 
-                    <div className="mt-4 grid items-stretch gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+                    <div className="mt-4 grid items-center gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
                       <div
                         style={{ width: CHARACTER_CARD_WIDTH, height: CHARACTER_CARD_HEIGHT }}
-                        className="relative z-30 flex shrink-0 items-center justify-center self-stretch justify-self-center overflow-visible pointer-events-auto"
+                        className="relative z-30 flex shrink-0 items-center justify-center self-center justify-self-center overflow-visible pointer-events-auto"
                         onContextMenu={(event) => event.preventDefault()}
                       >
                         <div className="relative flex h-full w-full overflow-hidden rounded-[24px] border border-white/70 bg-white/72 shadow-[0_14px_42px_rgba(148,163,184,0.16)] backdrop-blur-xl">
@@ -701,7 +701,7 @@ export default function Step4Panel({
 
                       <div
                         style={{ minHeight: CHARACTER_CARD_HEIGHT }}
-                        className="relative z-0 min-w-0 overflow-visible"
+                        className="relative z-0 flex min-w-0 items-center overflow-visible"
                       >
                         {stripScrollState[character.id]?.canScrollLeft ? (
                           <button
@@ -734,7 +734,7 @@ export default function Step4Panel({
                           style={{
                             touchAction: 'pan-x',
                             scrollPaddingInline: '0px',
-                            minHeight: CHARACTER_CARD_HEIGHT + 16,
+                            minHeight: CHARACTER_CARD_HEIGHT + 8,
                           }}
                           onScroll={() => syncStripScrollState(character.id)}
                           onContextMenu={(event) => event.preventDefault()}

@@ -6,8 +6,8 @@
 
 import { CONFIG } from '../config';
 import { SavedProject, GeneratedAsset, CostBreakdown, BackgroundMusicTrack, PreviewMixSettings, WorkflowDraft, AudioPreviewAsset, VideoPreviewAsset, ScriptParagraphPlan, ScenePlanItem, TtsFileItem, SubtitlePresetState, YoutubeConnectedAccountInfo, YoutubeUploadStatus } from '../types';
-import { getSelectedImageModel } from './imageService';
-import { compactWorkflowDraftForStorage, createSelectedWorkflowDraftForTransport } from './workflowDraftService';
+import { buildProjectSettingsSnapshot } from './projectSettingsSnapshot';
+import { compactWorkflowDraftForStorage } from './workflowDraftService';
 import { deleteStudioProjects, fetchStudioProjectById, fetchStudioProjects, getCachedStudioState, saveProjectsToStudio, saveStudioProject, summarizeProjectForIndex } from './localFileApi';
 
 const DB_NAME = 'TubeGenAI';
@@ -110,6 +110,18 @@ function normalizeTrack(track: any, index: number): BackgroundMusicTrack {
     volume: typeof track?.volume === 'number' ? track.volume : 0.28,
     sourceMode: track?.sourceMode === 'ai' ? 'ai' : 'sample',
     createdAt: typeof track?.createdAt === 'number' ? track.createdAt : Date.now(),
+    provider: track?.provider === 'google' || track?.provider === 'elevenLabs' ? 'google' : track?.provider === 'qwen3Tts' ? 'qwen3Tts' : track?.provider === 'chatterbox' ? 'chatterbox' : track?.provider === 'heygen' ? 'heygen' : 'sample',
+    mode: track?.mode === 'final' ? 'final' : 'preview',
+    stylePreset: typeof track?.stylePreset === 'string' ? track.stylePreset : undefined,
+    requestedDuration: typeof track?.requestedDuration === 'number' ? track.requestedDuration : (typeof track?.duration === 'number' ? track.duration : null),
+    promptSections: track?.promptSections && typeof track.promptSections === 'object' ? {
+      identity: typeof track.promptSections.identity === 'string' ? track.promptSections.identity : '',
+      mood: typeof track.promptSections.mood === 'string' ? track.promptSections.mood : '',
+      instruments: typeof track.promptSections.instruments === 'string' ? track.promptSections.instruments : '',
+      performance: typeof track.promptSections.performance === 'string' ? track.promptSections.performance : '',
+      production: typeof track.promptSections.production === 'string' ? track.promptSections.production : '',
+    } : null,
+    parentTrackId: typeof track?.parentTrackId === 'string' ? track.parentTrackId : null,
   };
 }
 
@@ -199,6 +211,18 @@ function normalizeProject(raw: any): SavedProject {
         ? rawSettings.elevenLabsModel
         : CONFIG.DEFAULT_ELEVENLABS_MODEL,
       fluxStyle: typeof rawSettings?.fluxStyle === 'string' ? rawSettings.fluxStyle : undefined,
+      imageProvider: rawSettings?.imageProvider === 'openrouter' || rawSettings?.imageProvider === 'custom' ? rawSettings.imageProvider : 'sample',
+      videoProvider: rawSettings?.videoProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
+      ttsProvider: rawSettings?.ttsProvider === 'elevenLabs' || rawSettings?.ttsProvider === 'chatterbox' || rawSettings?.ttsProvider === 'heygen' ? rawSettings.ttsProvider : 'qwen3Tts',
+      audioProvider: rawSettings?.audioProvider === 'elevenLabs' || rawSettings?.audioProvider === 'chatterbox' || rawSettings?.audioProvider === 'heygen' ? rawSettings.audioProvider : 'qwen3Tts',
+      qwenVoicePreset: typeof rawSettings?.qwenVoicePreset === 'string' && rawSettings.qwenVoicePreset ? rawSettings.qwenVoicePreset : 'qwen-default',
+      chatterboxVoicePreset: typeof rawSettings?.chatterboxVoicePreset === 'string' && rawSettings.chatterboxVoicePreset ? rawSettings.chatterboxVoicePreset : 'chatterbox-clear',
+      elevenLabsVoiceId: typeof rawSettings?.elevenLabsVoiceId === 'string' ? rawSettings.elevenLabsVoiceId : null,
+      heygenVoiceId: typeof rawSettings?.heygenVoiceId === 'string' ? rawSettings.heygenVoiceId : null,
+      backgroundMusicProvider: rawSettings?.backgroundMusicProvider === 'google' ? 'google' : 'sample',
+      backgroundMusicModel: typeof rawSettings?.backgroundMusicModel === 'string' && rawSettings.backgroundMusicModel ? rawSettings.backgroundMusicModel : CONFIG.DEFAULT_BGM_MODEL,
+      musicVideoProvider: rawSettings?.musicVideoProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
+      musicVideoMode: rawSettings?.musicVideoMode === 'auto' ? 'auto' : 'sample',
     },
     assets,
     thumbnail: typeof raw?.thumbnail === 'string' ? raw.thumbnail : null,
@@ -216,6 +240,7 @@ function normalizeProject(raw: any): SavedProject {
       videoCount: typeof raw.cost.videoCount === 'number' ? raw.cost.videoCount : assets.filter((a: any) => a.videoData).length,
     } : undefined,
     backgroundMusicTracks: Array.isArray(raw?.backgroundMusicTracks) ? raw.backgroundMusicTracks.map(normalizeTrack) : [],
+    activeBackgroundTrackId: typeof raw?.activeBackgroundTrackId === 'string' ? raw.activeBackgroundTrackId : null,
     previewMix: normalizePreviewMix(raw?.previewMix),
     workflowDraft: raw?.workflowDraft ?? null,
     voicePreviewAsset: normalizeAudioPreview(raw?.voicePreviewAsset),
@@ -265,7 +290,7 @@ function normalizeProject(raw: any): SavedProject {
             id: typeof item.id === 'string' ? item.id : `tts_${Date.now()}_${index}`,
             sceneNumber: item.sceneNumber,
             paragraphId: typeof item.paragraphId === 'string' ? item.paragraphId : null,
-            provider: item.provider === 'elevenLabs' || item.provider === 'qwen3Tts' || item.provider === 'heygen' ? item.provider : 'sample',
+            provider: item.provider === 'elevenLabs' || item.provider === 'qwen3Tts' || item.provider === 'chatterbox' || item.provider === 'heygen' ? item.provider : 'sample',
             voiceId: typeof item.voiceId === 'string' ? item.voiceId : null,
             modelId: typeof item.modelId === 'string' ? item.modelId : null,
             duration: typeof item.duration === 'number' ? item.duration : 0,
@@ -329,34 +354,10 @@ function normalizeProject(raw: any): SavedProject {
 
 function getCurrentSettings() {
   const cachedRouting = getCachedStudioState()?.routing;
-  const elevenLabsModel =
-    cachedRouting?.elevenLabsModelId ||
-    cachedRouting?.audioModel ||
-    localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_MODEL) ||
-    CONFIG.DEFAULT_ELEVENLABS_MODEL;
-  const imageModel =
-    cachedRouting?.imageModel ||
-    getSelectedImageModel();
-  const videoModel =
-    cachedRouting?.videoModel ||
-    CONFIG.DEFAULT_VIDEO_MODEL;
-  const scriptModel =
-    cachedRouting?.scriptModel ||
-    cachedRouting?.textModel ||
-    CONFIG.DEFAULT_SCRIPT_MODEL;
-  const sceneModel =
-    cachedRouting?.sceneModel ||
-    cachedRouting?.imagePromptModel ||
-    cachedRouting?.motionPromptModel ||
-    scriptModel;
-  return {
-    imageModel,
-    videoModel,
-    scriptModel,
-    sceneModel,
-    outputMode: 'video' as const,
-    elevenLabsModel,
-  };
+  return buildProjectSettingsSnapshot({
+    routing: cachedRouting || {},
+    workflowDraft: getCachedStudioState()?.workflowDraft || null,
+  });
 }
 
 
@@ -367,12 +368,13 @@ function resolveNextProjectNumber(projects: Array<Pick<SavedProject, 'projectNum
 }
 
 async function getNextProjectNumber(): Promise<number> {
+  const indexed = await readIndexedProjects();
+  if (indexed.length) return resolveNextProjectNumber(indexed);
+
   const cachedProjects = Array.isArray(getCachedStudioState()?.projects)
     ? getCachedStudioState()!.projects
     : [];
-  if (cachedProjects.length) return resolveNextProjectNumber(cachedProjects as SavedProject[]);
-  const indexed = await readIndexedProjects();
-  return resolveNextProjectNumber(indexed);
+  return resolveNextProjectNumber(cachedProjects as SavedProject[]);
 }
 
 async function persistProjectDetailIfPossible(project: SavedProject): Promise<SavedProject> {
@@ -553,6 +555,7 @@ export async function saveProject(
   extras?: {
     projectId?: string | null;
     backgroundMusicTracks?: BackgroundMusicTrack[];
+    activeBackgroundTrackId?: SavedProject['activeBackgroundTrackId'];
     previewMix?: PreviewMixSettings;
     workflowDraft?: WorkflowDraft | null;
     outputMode?: 'video' | 'image';
@@ -598,7 +601,14 @@ export async function saveProject(
   }
 
   const current = await readIndexedProjects();
-  const nextProjectNumber = await getNextProjectNumber();
+  const existingProjectNumber = extras?.projectId
+    ? current.find((item) => item.id === extras.projectId)?.projectNumber
+    : undefined;
+  const nextProjectNumber = (
+    typeof existingProjectNumber === 'number' && existingProjectNumber > 0
+      ? existingProjectNumber
+      : await getNextProjectNumber()
+  );
 
   const project: SavedProject = {
     id,
@@ -619,6 +629,7 @@ export async function saveProject(
     selectedThumbnailId: null,
     cost,
     backgroundMusicTracks: extras?.backgroundMusicTracks || [],
+    activeBackgroundTrackId: extras?.activeBackgroundTrackId || null,
     previewMix: extras?.previewMix,
     workflowDraft: compactWorkflowDraftForStorage(extras?.workflowDraft) || null,
     voicePreviewAsset: extras?.voicePreviewAsset || null,
@@ -669,6 +680,7 @@ export async function upsertWorkflowProject(options: {
   assets?: GeneratedAsset[];
   cost?: CostBreakdown;
   backgroundMusicTracks?: BackgroundMusicTrack[];
+  activeBackgroundTrackId?: SavedProject['activeBackgroundTrackId'];
   previewMix?: PreviewMixSettings;
   voicePreviewAsset?: AudioPreviewAsset | null;
   scriptPreviewAsset?: AudioPreviewAsset | null;
@@ -708,6 +720,7 @@ export async function upsertWorkflowProject(options: {
     assets: Array.isArray(options.assets) ? options.assets.map((asset) => ({ ...asset })) : [],
     cost: options.cost,
     backgroundMusicTracks: options.backgroundMusicTracks || [],
+    activeBackgroundTrackId: options.activeBackgroundTrackId || null,
     previewMix: options.previewMix,
     workflowDraft: compactWorkflowDraftForStorage(options.workflowDraft) || null,
     voicePreviewAsset: options.voicePreviewAsset || null,
@@ -758,6 +771,7 @@ export async function upsertWorkflowProject(options: {
     {
       projectId: options.projectId || null,
       backgroundMusicTracks: options.backgroundMusicTracks || [],
+      activeBackgroundTrackId: options.activeBackgroundTrackId || null,
       previewMix: options.previewMix,
       workflowDraft: compactWorkflowDraftForStorage(options.workflowDraft) || null,
       outputMode: options.workflowDraft?.outputMode || 'video',
@@ -925,11 +939,66 @@ function cloneValue<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+function isInlineMediaValue(value: unknown): value is string {
+  return typeof value === 'string' && value.startsWith('data:');
+}
+
+function isLocalMediaUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (trimmed.startsWith('blob:')) return true;
+  if (trimmed.startsWith('/api/local-storage/media?')) return true;
+  return /^https?:\/\//.test(trimmed) && trimmed.includes('/api/local-storage/media?');
+}
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('blob-to-data-url-failed'));
+    reader.onerror = () => reject(reader.error || new Error('blob-to-data-url-failed'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function inlineMediaUrl(value: string): Promise<string> {
+  if (!isLocalMediaUrl(value) || typeof fetch !== 'function') return value;
+  try {
+    const response = await fetch(value, { cache: 'no-store' });
+    if (!response.ok) return value;
+    const blob = await response.blob();
+    return await blobToDataUrl(blob);
+  } catch {
+    return value;
+  }
+}
+
+async function inlineStandaloneMedia<T>(value: T, cache = new WeakMap<object, any>()): Promise<T> {
+  if (isInlineMediaValue(value)) return value;
+  if (isLocalMediaUrl(value)) return await inlineMediaUrl(value) as T;
+  if (Array.isArray(value)) {
+    return await Promise.all(value.map((item) => inlineStandaloneMedia(item, cache))) as T;
+  }
+  if (!value || typeof value !== 'object') return value;
+
+  const cached = cache.get(value as object);
+  if (cached) return cached;
+
+  const nextValue: Record<string, any> = {};
+  cache.set(value as object, nextValue);
+  const entries = Object.entries(value as Record<string, any>);
+  for (const [key, entryValue] of entries) {
+    nextValue[key] = await inlineStandaloneMedia(entryValue, cache);
+  }
+  return nextValue as T;
+}
+
 function sanitizeProjectForTransport(project: SavedProject): SavedProject {
   const normalized = normalizeProject(project);
   return normalizeProject({
     ...cloneValue(normalized),
-    workflowDraft: createSelectedWorkflowDraftForTransport(normalized.workflowDraft || null),
+    // export/import는 후보와 선택본을 모두 보존하고, 실제 생성 시점에만 선택본을 좁혀 씁니다.
+    workflowDraft: compactWorkflowDraftForStorage(normalized.workflowDraft || null),
   });
 }
 
@@ -976,8 +1045,13 @@ export async function duplicateProject(id: string): Promise<SavedProject | null>
 
 function buildWorkflowTransferSummary(project: SavedProject) {
   const draft = project.workflowDraft || null;
+  const selectedCharacterIdSet = Array.isArray(draft?.selectedCharacterIds) && draft.selectedCharacterIds.length
+    ? new Set(draft.selectedCharacterIds.filter(Boolean))
+    : null;
   const selectedCharacters = Array.isArray(draft?.extractedCharacters)
-    ? draft.extractedCharacters.map((character) => ({
+    ? draft.extractedCharacters
+      .filter((character) => !selectedCharacterIdSet || selectedCharacterIdSet.has(character.id))
+      .map((character) => ({
         id: character.id,
         name: character.name,
         role: character.role || character.roleLabel || null,
@@ -1034,20 +1108,32 @@ function buildWorkflowTransferSummary(project: SavedProject) {
   };
 }
 
-export function buildProjectsExportPayload(projects: SavedProject[]) {
+export async function buildProjectsExportPayload(projects: SavedProject[]) {
   const normalizedProjects = Array.isArray(projects)
     ? projects.map((project) => sanitizeProjectForTransport(project))
     : [];
 
+  const standaloneProjects = await Promise.all(normalizedProjects.map(async (project) => {
+    const inlined = await inlineStandaloneMedia(project);
+    return {
+      ...inlined,
+      workflowTransferSummary: buildWorkflowTransferSummary(inlined),
+      exportMeta: {
+        standaloneMedia: true,
+        selectedCharacterCount: Array.isArray(inlined.workflowDraft?.selectedCharacterIds) ? inlined.workflowDraft.selectedCharacterIds.length : 0,
+        characterCandidateCount: Array.isArray(inlined.workflowDraft?.extractedCharacters) ? inlined.workflowDraft.extractedCharacters.length : 0,
+        styleCandidateCount: Array.isArray(inlined.workflowDraft?.styleImages) ? inlined.workflowDraft.styleImages.length : 0,
+      },
+    };
+  }));
+
   return {
     format: 'mp4creater-project-export',
-    version: 2,
+    version: 3,
     exportedAt: Date.now(),
-    projectCount: normalizedProjects.length,
-    projects: normalizedProjects.map((project) => ({
-      ...project,
-      workflowTransferSummary: buildWorkflowTransferSummary(project),
-    })),
+    standaloneMedia: true,
+    projectCount: standaloneProjects.length,
+    projects: standaloneProjects,
   };
 }
 

@@ -44,9 +44,10 @@ import {
 import { estimateClipDuration } from './utils/storyHelpers';
 import { createLightweightSceneAssetsFromDraft } from './services/sceneAssemblyService';
 import { createSampleBackgroundTrack, getDefaultPreviewMix } from './services/musicService';
-import { createDefaultWorkflowDraft, createSelectedWorkflowDraftForTransport, ensureWorkflowDraft } from './services/workflowDraftService';
+import { createDefaultWorkflowDraft, ensureWorkflowDraft } from './services/workflowDraftService';
 import { CONFIG } from './config';
 import { readProjectNavigationProject, rememberProjectNavigationProject } from './services/projectNavigationCache';
+import { applyProjectSettingsToRouting, buildProjectSettingsSnapshot } from './services/projectSettingsSnapshot';
 
 function normalizeLoadedAssets(assets: GeneratedAsset[]): GeneratedAsset[] {
   return assets.map((asset) => ({
@@ -101,14 +102,18 @@ function createOptimisticWorkflowProject(options: {
     createdAt: now,
     topic: safeTopic,
     lastSavedAt: now,
-    settings: {
-      imageModel: CONFIG.DEFAULT_IMAGE_MODEL,
-      videoModel: CONFIG.DEFAULT_VIDEO_MODEL,
-      scriptModel: options.workflowDraft?.customScriptSettings?.scriptModel || options.workflowDraft?.openRouterModel || CONFIG.DEFAULT_SCRIPT_MODEL,
-      sceneModel: options.workflowDraft?.customScriptSettings?.scriptModel || options.workflowDraft?.openRouterModel || CONFIG.DEFAULT_SCRIPT_MODEL,
-      outputMode: options.workflowDraft?.outputMode || 'video',
-      elevenLabsModel: CONFIG.DEFAULT_ELEVENLABS_MODEL,
-    },
+    settings: buildProjectSettingsSnapshot({
+      routing: getCachedStudioState()?.routing || createDefaultStudioState().routing,
+      workflowDraft: options.workflowDraft,
+      fallback: {
+        imageModel: CONFIG.DEFAULT_IMAGE_MODEL,
+        videoModel: CONFIG.DEFAULT_VIDEO_MODEL,
+        scriptModel: options.workflowDraft?.customScriptSettings?.scriptModel || options.workflowDraft?.openRouterModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+        sceneModel: options.workflowDraft?.customScriptSettings?.scriptModel || options.workflowDraft?.openRouterModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+        outputMode: options.workflowDraft?.outputMode || 'video',
+        elevenLabsModel: CONFIG.DEFAULT_ELEVENLABS_MODEL,
+      },
+    }),
     assets: Array.isArray(options.assets) ? options.assets.map((asset) => ({ ...asset })) : [],
     thumbnail: null,
     thumbnailTitle: null,
@@ -889,18 +894,9 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     setViewMode('main');
 
     const baseStudioState = studioStateRef.current || createDefaultStudioState();
-    const nextRouting = {
+    const nextRouting = applyProjectSettingsToRouting({
       ...baseStudioState.routing,
-      imageModel: project.settings?.imageModel || baseStudioState.routing.imageModel,
-      videoModel: project.settings?.videoModel || baseStudioState.routing.videoModel,
-      scriptModel: project.settings?.scriptModel || baseStudioState.routing.scriptModel || baseStudioState.routing.textModel,
-      textModel: project.settings?.scriptModel || baseStudioState.routing.textModel || baseStudioState.routing.scriptModel,
-      sceneModel: project.settings?.sceneModel || baseStudioState.routing.sceneModel || baseStudioState.routing.imagePromptModel,
-      imagePromptModel: project.settings?.sceneModel || baseStudioState.routing.imagePromptModel || baseStudioState.routing.sceneModel,
-      motionPromptModel: project.settings?.sceneModel || baseStudioState.routing.motionPromptModel || baseStudioState.routing.sceneModel,
-      elevenLabsModelId: project.settings?.elevenLabsModel || baseStudioState.routing.elevenLabsModelId || baseStudioState.routing.audioModel,
-      audioModel: project.settings?.elevenLabsModel || baseStudioState.routing.audioModel,
-    };
+    }, project.settings || null);
 
     const nextState = {
       ...baseStudioState,
@@ -1008,14 +1004,10 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
     if (currentProjectId && partial.routing) {
       const currentProject = await updateProject(currentProjectId, {
-        settings: {
-          imageModel: partial.routing.imageModel || nextState.routing.imageModel,
-          videoModel: partial.routing.videoModel || nextState.routing.videoModel,
-          scriptModel: partial.routing.scriptModel || partial.routing.textModel || nextState.routing.scriptModel || nextState.routing.textModel,
-          sceneModel: partial.routing.sceneModel || partial.routing.imagePromptModel || partial.routing.motionPromptModel || nextState.routing.sceneModel,
-          outputMode: nextState.workflowDraft?.outputMode || 'video',
-          elevenLabsModel: partial.routing.elevenLabsModelId || partial.routing.audioModel || nextState.routing.elevenLabsModelId || nextState.routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
-        },
+        settings: buildProjectSettingsSnapshot({
+          routing: nextState.routing,
+          workflowDraft: nextState.workflowDraft,
+        }),
       });
       if (currentProject) {
         applyProjectListSnapshot([currentProject, ...savedProjects.filter((item) => item.id !== currentProject.id)]);
@@ -1039,14 +1031,10 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
     if (currentProjectId) {
       const currentProject = await updateProject(currentProjectId, {
-        settings: {
-          imageModel: nextRouting.imageModel || CONFIG.DEFAULT_IMAGE_MODEL,
-          videoModel: nextRouting.videoModel || CONFIG.DEFAULT_VIDEO_MODEL,
-          scriptModel: nextRouting.scriptModel || nextRouting.textModel || CONFIG.DEFAULT_SCRIPT_MODEL,
-          sceneModel: nextRouting.sceneModel || nextRouting.imagePromptModel || nextRouting.motionPromptModel || CONFIG.DEFAULT_SCRIPT_MODEL,
-          outputMode: nextState.workflowDraft?.outputMode || 'video',
-          elevenLabsModel: nextRouting.elevenLabsModelId || nextRouting.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
-        },
+        settings: buildProjectSettingsSnapshot({
+          routing: nextRouting,
+          workflowDraft: nextState.workflowDraft,
+        }),
       });
       if (currentProject) {
         applyProjectListSnapshot([currentProject, ...savedProjects.filter((item) => item.id !== currentProject.id)]);
@@ -1084,6 +1072,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       elevenLabsModelId: nextDraft.elevenLabsModelId,
       heygenVoiceId: nextDraft.heygenVoiceId,
       qwenVoicePreset: nextDraft.qwenVoicePreset,
+      chatterboxVoicePreset: nextDraft.chatterboxVoicePreset,
       qwenStylePreset: nextDraft.qwenStylePreset,
     });
 
@@ -1155,7 +1144,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
       const nextBackgroundTracks = backgroundMusicTracks.length ? backgroundMusicTracks : [createSampleBackgroundTrack(nextDraft)];
       const nextPreviewMix = previewMix || getDefaultPreviewMix();
-      const projectDraftForScene = createSelectedWorkflowDraftForTransport(nextDraft) || nextDraft;
+      // Step6 생성에는 선택본만 참조하지만, 프로젝트 저장본에는 후보/선택 관계 전체를 유지해 재열기와 export/import 재현성을 지킵니다.
+      const projectDraftForScene = nextDraft;
       const optimisticSceneProject = createOptimisticWorkflowProject({
         projectId: currentProjectId,
         topic: nextDraft.topic || '새 프로젝트',

@@ -349,7 +349,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
         })
       );
 
-      const payload = buildProjectsExportPayload(resolvedProjects);
+      const payload = await buildProjectsExportPayload(resolvedProjects);
 
       triggerTextDownload(
         JSON.stringify(payload, null, 2),

@@ -1,4 +1,4 @@
-import { CONFIG } from '../config';
+import { CHATTERBOX_TTS_PRESET_OPTIONS, CONFIG, ELEVENLABS_MODELS, IMAGE_MODELS, QWEN_TTS_PRESET_OPTIONS, SCRIPT_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS } from '../config';
 import {
   SavedProject,
   StudioState,
@@ -12,6 +12,17 @@ import { compactWorkflowDraftForStorage, createDefaultWorkflowDraft } from './wo
 
 export const DEFAULT_STORAGE_DIR = './local-data/tubegen-studio';
 
+const SCRIPT_MODEL_ID_SET = new Set(SCRIPT_MODEL_OPTIONS.map((item) => item.id));
+const IMAGE_MODEL_ID_SET = new Set(IMAGE_MODELS.map((item) => item.id));
+const VIDEO_MODEL_ID_SET = new Set(VIDEO_MODEL_OPTIONS.map((item) => item.id));
+const ELEVENLABS_MODEL_ID_SET = new Set(ELEVENLABS_MODELS.map((item) => item.id));
+const QWEN_TTS_PRESET_ID_SET = new Set(QWEN_TTS_PRESET_OPTIONS.map((item) => item.id));
+const CHATTERBOX_TTS_PRESET_ID_SET = new Set(CHATTERBOX_TTS_PRESET_OPTIONS.map((item) => item.id));
+
+function normalizeAllowedValue(value: string | null | undefined, allowed: Set<string>, fallback: string) {
+  const trimmed = `${value || ''}`.trim();
+  return trimmed && allowed.has(trimmed) ? trimmed : fallback;
+}
 
 function normalizeWorkflowDraftContentType(draft: any): WorkflowDraft | null {
   if (!draft || typeof draft !== 'object') return null;
@@ -153,20 +164,50 @@ function sanitizeRoutingForAvailableProviders(state: StudioState): StudioState {
   const hasElevenLabsKey = Boolean((providers.elevenLabsApiKey || '').trim());
   const hasHeygenKey = Boolean((providers.heygenApiKey || '').trim());
 
+  // 텍스트/이미지/비디오 모델은 설정창 저장값이 오래돼도 항상 실제 지원 목록으로 정규화합니다.
+  routing.scriptModel = normalizeAllowedValue(routing.scriptModel, SCRIPT_MODEL_ID_SET, CONFIG.DEFAULT_SCRIPT_MODEL);
+  routing.textModel = normalizeAllowedValue(routing.textModel || routing.scriptModel, SCRIPT_MODEL_ID_SET, routing.scriptModel);
+  routing.sceneModel = normalizeAllowedValue(routing.sceneModel || routing.imagePromptModel || routing.motionPromptModel, SCRIPT_MODEL_ID_SET, routing.textModel || CONFIG.DEFAULT_SCRIPT_MODEL);
+  routing.imagePromptModel = normalizeAllowedValue(routing.imagePromptModel || routing.sceneModel, SCRIPT_MODEL_ID_SET, routing.sceneModel);
+  routing.motionPromptModel = normalizeAllowedValue(routing.motionPromptModel || routing.sceneModel, SCRIPT_MODEL_ID_SET, routing.sceneModel);
+  routing.imageModel = normalizeAllowedValue(routing.imageModel, IMAGE_MODEL_ID_SET, CONFIG.DEFAULT_IMAGE_MODEL);
+  routing.videoModel = normalizeAllowedValue(routing.videoModel, VIDEO_MODEL_ID_SET, CONFIG.DEFAULT_VIDEO_MODEL);
+  routing.audioModel = normalizeAllowedValue(routing.audioModel || routing.elevenLabsModelId, ELEVENLABS_MODEL_ID_SET, CONFIG.DEFAULT_ELEVENLABS_MODEL);
+  routing.elevenLabsModelId = normalizeAllowedValue(routing.elevenLabsModelId || routing.audioModel, ELEVENLABS_MODEL_ID_SET, routing.audioModel);
+  routing.qwenVoicePreset = normalizeAllowedValue(routing.qwenVoicePreset, QWEN_TTS_PRESET_ID_SET, 'qwen-default');
+  routing.chatterboxVoicePreset = normalizeAllowedValue(routing.chatterboxVoicePreset, CHATTERBOX_TTS_PRESET_ID_SET, 'chatterbox-clear');
+
+  if ((routing.backgroundMusicModel || '') === 'lyria-002' && hasGoogleStyleKey) {
+    routing.backgroundMusicProvider = 'google';
+  }
+
+  if (routing.imageModel === CONFIG.DEFAULT_IMAGE_MODEL) {
+    routing.imageProvider = 'sample';
+  }
+
+  if (routing.videoModel === CONFIG.DEFAULT_VIDEO_MODEL) {
+    routing.videoProvider = 'sample';
+  }
+
   if (!hasGoogleStyleKey) {
     routing.imageProvider = 'sample';
     routing.videoProvider = 'sample';
     routing.musicVideoProvider = 'sample';
     routing.musicVideoMode = 'sample';
-    routing.imageModel = routing.imageModel || CONFIG.DEFAULT_IMAGE_MODEL;
-    routing.videoModel = routing.videoModel || CONFIG.DEFAULT_VIDEO_MODEL;
+    routing.imageModel = CONFIG.DEFAULT_IMAGE_MODEL;
+    routing.videoModel = CONFIG.DEFAULT_VIDEO_MODEL;
   }
 
   if (!hasElevenLabsKey) {
     if (routing.audioProvider === 'elevenLabs') routing.audioProvider = 'qwen3Tts';
     if (routing.ttsProvider === 'elevenLabs') routing.ttsProvider = 'qwen3Tts';
-    if (routing.backgroundMusicProvider === 'elevenLabs') routing.backgroundMusicProvider = 'sample';
-    if ((routing.backgroundMusicModel || '').startsWith('elevenlabs')) routing.backgroundMusicModel = 'sample-ambient-v1';
+    routing.elevenLabsModelId = CONFIG.DEFAULT_ELEVENLABS_MODEL;
+    routing.audioModel = CONFIG.DEFAULT_ELEVENLABS_MODEL;
+  }
+
+  if (!hasGoogleStyleKey) {
+    if (routing.backgroundMusicProvider === 'google') routing.backgroundMusicProvider = 'sample';
+    if ((routing.backgroundMusicModel || '') === 'lyria-002') routing.backgroundMusicModel = 'sample-ambient-v1';
   }
 
   if (!hasHeygenKey) {
@@ -250,6 +291,18 @@ export function summarizeProjectForIndex(project: any): SavedProject {
       sceneModel: CONFIG.DEFAULT_SCRIPT_MODEL,
       outputMode: 'video',
       elevenLabsModel: CONFIG.DEFAULT_ELEVENLABS_MODEL,
+      imageProvider: 'sample',
+      videoProvider: 'sample',
+      ttsProvider: 'qwen3Tts',
+      audioProvider: 'qwen3Tts',
+      qwenVoicePreset: 'qwen-default',
+      chatterboxVoicePreset: 'chatterbox-clear',
+      elevenLabsVoiceId: null,
+      heygenVoiceId: null,
+      backgroundMusicProvider: 'sample',
+      backgroundMusicModel: CONFIG.DEFAULT_BGM_MODEL,
+      musicVideoProvider: 'sample',
+      musicVideoMode: 'sample',
     },
     assets: [],
     thumbnail: typeof project?.thumbnail === 'string' ? project.thumbnail : firstImage,
@@ -259,6 +312,7 @@ export function summarizeProjectForIndex(project: any): SavedProject {
     selectedThumbnailId: typeof project?.selectedThumbnailId === 'string' ? project.selectedThumbnailId : null,
     cost: project?.cost,
     backgroundMusicTracks: [],
+    activeBackgroundTrackId: typeof project?.activeBackgroundTrackId === 'string' ? project.activeBackgroundTrackId : null,
     previewMix: project?.previewMix,
     workflowDraft: project?.workflowDraft ? {
       updatedAt: project.workflowDraft.updatedAt,

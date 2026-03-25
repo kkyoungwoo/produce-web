@@ -29,7 +29,7 @@ type InlineFeedback = { tone: 'success' | 'error' | 'info'; message: string } | 
 
 const cardClass = 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm';
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400';
-const isElevenLabsBgmModel = (modelId?: string | null) => (modelId || '').startsWith('elevenlabs');
+const isGoogleBgmModel = (modelId?: string | null) => (modelId || '').trim() === 'lyria-002';
 const isPaidScriptModel = (modelId?: string | null) => SCRIPT_MODEL_OPTIONS.find((item) => item.id === modelId)?.tier === 'paid';
 const isPaidImageModel = (modelId?: string | null) => IMAGE_MODELS.find((item) => item.id === modelId)?.tier === 'paid';
 const isPaidVideoModel = (modelId?: string | null) => VIDEO_MODEL_OPTIONS.find((item) => item.id === modelId)?.tier === 'paid';
@@ -113,6 +113,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     backgroundMusicStyle: 'ambient',
     musicVideoProvider: 'sample',
     musicVideoMode: 'sample',
+    paidModeEnabled: false,
   });
   const [providerFeedback, setProviderFeedback] = useState<Record<string, { tone: 'success' | 'error' | 'info'; message: string } | null>>({});
   const [isCheckingProviders, setIsCheckingProviders] = useState<Record<string, boolean>>({});
@@ -167,7 +168,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       videoModel: studioState.routing?.videoModel || CONFIG.DEFAULT_VIDEO_MODEL,
       ttsProvider: studioState.routing?.ttsProvider === 'elevenLabs' ? 'elevenLabs' : studioState.routing?.ttsProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
       audioProvider: studioState.routing?.audioProvider === 'elevenLabs' ? 'elevenLabs' : studioState.routing?.audioProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
-      backgroundMusicProvider: studioState.routing?.backgroundMusicProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
+      backgroundMusicProvider: studioState.routing?.backgroundMusicProvider === 'google' || studioState.routing?.backgroundMusicModel === 'lyria-002' ? 'google' : 'sample',
       musicVideoProvider: studioState.routing?.musicVideoProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
       musicVideoMode: studioState.routing?.musicVideoMode || 'sample',
       chatterboxVoicePreset: studioState.routing?.chatterboxVoicePreset || 'chatterbox-clear',
@@ -182,8 +183,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setBgmPreviewMessage('');
     setIsBgmPreviewing(false);
     setIsPaidMode(Boolean(
-      studioState.routing?.ttsProvider === 'elevenLabs'
-      || studioState.routing?.backgroundMusicProvider === 'elevenLabs'
+      studioState.routing?.paidModeEnabled
+      || studioState.routing?.ttsProvider === 'elevenLabs'
+      || studioState.routing?.backgroundMusicProvider === 'google'
+      || studioState.routing?.backgroundMusicModel === 'lyria-002'
       || isPaidScriptModel(studioState.routing?.scriptModel || studioState.routing?.textModel)
       || isPaidScriptModel(studioState.routing?.sceneModel)
       || isPaidImageModel(studioState.routing?.imageModel)
@@ -565,10 +568,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setIsBgmPreviewing(true);
     setBgmPreviewMessage('배경 음악 미리 듣기를 준비 중입니다.');
 
-    const elevenLabsApiKey = providerValues.elevenLabsApiKey.trim();
+    const googleApiKey = providerValues.openRouterApiKey.trim();
     const selectedBgmModel = routing.backgroundMusicModel || 'sample-ambient-v1';
-    const requiresElevenLabsBgm = isElevenLabsBgmModel(selectedBgmModel);
-    if (requiresElevenLabsBgm && !elevenLabsApiKey) {
+    const requiresGoogleBgm = isGoogleBgmModel(selectedBgmModel);
+    if (requiresGoogleBgm && !googleApiKey) {
       setIsBgmPreviewing(false);
       setBgmPreviewMessage('배경 음악 API가 연결되지 않았습니다. API 등록 후 다시 시도해 주세요.');
       return;
@@ -617,7 +620,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       setIsBgmPreviewing(false);
       setBgmPreviewMessage('배경 음악 미리 듣기에 실패했습니다.');
     }
-  }, [isBgmPreviewing, providerValues.elevenLabsApiKey, routing.backgroundMusicModel, routing.backgroundMusicProvider, stopBgmPreview]);
+  }, [isBgmPreviewing, providerValues.openRouterApiKey, routing.backgroundMusicModel, routing.backgroundMusicProvider, stopBgmPreview]);
 
   useEffect(() => {
     if (!open) {
@@ -631,21 +634,22 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     if (isPaidMode) return;
     setRouting((prev) => ({
       ...prev,
-      scriptModel: prev.scriptModel || freeScriptModel,
-      textModel: prev.textModel || prev.scriptModel || freeScriptModel,
-      sceneModel: prev.sceneModel || prev.imagePromptModel || freeScriptModel,
-      imagePromptModel: prev.imagePromptModel || prev.sceneModel || freeScriptModel,
-      motionPromptModel: prev.motionPromptModel || prev.sceneModel || freeScriptModel,
-      imageModel: prev.imageModel || freeImageModel,
+      scriptModel: isPaidScriptModel(prev.scriptModel || prev.textModel) ? freeScriptModel : (prev.scriptModel || freeScriptModel),
+      textModel: isPaidScriptModel(prev.textModel || prev.scriptModel) ? freeScriptModel : (prev.textModel || prev.scriptModel || freeScriptModel),
+      sceneModel: isPaidScriptModel(prev.sceneModel || prev.imagePromptModel) ? freeScriptModel : (prev.sceneModel || prev.imagePromptModel || freeScriptModel),
+      imagePromptModel: isPaidScriptModel(prev.imagePromptModel || prev.sceneModel) ? freeScriptModel : (prev.imagePromptModel || prev.sceneModel || freeScriptModel),
+      motionPromptModel: isPaidScriptModel(prev.motionPromptModel || prev.sceneModel) ? freeScriptModel : (prev.motionPromptModel || prev.sceneModel || freeScriptModel),
+      imageModel: isPaidImageModel(prev.imageModel) ? freeImageModel : (prev.imageModel || freeImageModel),
       imageProvider: 'sample',
       ttsProvider: prev.ttsProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
       audioProvider: prev.audioProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
       backgroundMusicProvider: 'sample',
       videoProvider: 'sample',
-      videoModel: prev.videoModel || freeVideoModel,
+      videoModel: isPaidVideoModel(prev.videoModel) ? freeVideoModel : (prev.videoModel || freeVideoModel),
       musicVideoProvider: 'sample',
       musicVideoMode: 'sample',
-      backgroundMusicModel: prev.backgroundMusicModel.startsWith('elevenlabs') ? 'sample-ambient-v1' : prev.backgroundMusicModel,
+      backgroundMusicModel: prev.backgroundMusicModel === 'lyria-002' ? 'sample-ambient-v1' : prev.backgroundMusicModel,
+      paidModeEnabled: false,
     }));
   }, [isPaidMode]);
 
@@ -1017,7 +1021,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     const nextVideoModel = routing.videoModel || freeVideoModel;
     const wantsElevenTts = isPaidMode && routing.ttsProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
     const wantsChatterboxTts = routing.ttsProvider === 'chatterbox';
-    const wantsElevenBgm = isPaidMode && routing.backgroundMusicProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
+    const wantsGoogleBgm = isPaidMode && routing.backgroundMusicProvider === 'google' && Boolean(googleApiKey);
     const wantsPaidImage = isPaidMode && nextImageModel !== freeImageModel && Boolean(googleApiKey);
     const wantsPaidVideo = isPaidMode && nextVideoModel !== freeVideoModel && Boolean(googleApiKey);
 
@@ -1032,12 +1036,13 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       imageProvider: wantsPaidImage ? 'openrouter' : 'sample',
       ttsProvider: wantsElevenTts ? 'elevenLabs' : wantsChatterboxTts ? 'chatterbox' : 'qwen3Tts',
       audioProvider: wantsElevenTts ? 'elevenLabs' : wantsChatterboxTts ? 'chatterbox' : 'qwen3Tts',
-      backgroundMusicProvider: wantsElevenBgm ? 'elevenLabs' : 'sample',
+      backgroundMusicProvider: wantsGoogleBgm ? 'google' : 'sample',
       videoProvider: wantsPaidVideo ? 'elevenLabs' : 'sample',
       videoModel: nextVideoModel,
       musicVideoProvider: wantsPaidVideo ? 'elevenLabs' : 'sample',
       musicVideoMode: wantsPaidVideo ? 'auto' : 'sample',
-      backgroundMusicModel: wantsElevenBgm ? routing.backgroundMusicModel : (isElevenLabsBgmModel(routing.backgroundMusicModel) ? 'sample-ambient-v1' : routing.backgroundMusicModel),
+      backgroundMusicModel: wantsGoogleBgm ? routing.backgroundMusicModel : (isGoogleBgmModel(routing.backgroundMusicModel) ? 'sample-ambient-v1' : routing.backgroundMusicModel),
+      paidModeEnabled: isPaidMode,
     } as StudioState['routing'];
 
     if (googleClientId || googleClientSecret || youtubeConfigState.source === 'saved') {
@@ -1403,14 +1408,14 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                       setRouting((prev) => ({
                         ...prev,
                         backgroundMusicModel: nextModel,
-                        backgroundMusicProvider: isElevenLabsBgmModel(nextModel) ? 'elevenLabs' : 'sample',
+                        backgroundMusicProvider: isGoogleBgmModel(nextModel) ? 'google' : 'sample',
                       }));
                     }}
                     className={inputClass}
                   >
                     {BGM_MODEL_OPTIONS.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.id.startsWith('elevenlabs') ? item.name : `🆓 ${item.name}`}
+                        {item.id === 'lyria-002' ? `💳 ${item.name}` : `🆓 ${item.name}`}
                       </option>
                     ))}
                   </select>
@@ -1419,8 +1424,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                   {isBgmPreviewing ? '배경 음악 정지' : '배경 음악 재생'}
                 </button>
                 {bgmPreviewMessage ? <p className="mt-2 text-xs text-slate-500">{bgmPreviewMessage}</p> : null}
-                {isElevenLabsBgmModel(routing.backgroundMusicModel) && !providerValues.elevenLabsApiKey.trim() ? (
-                  <p className="mt-2 text-xs text-amber-600">선택한 배경 음악 모델은 API 연결이 필요합니다. API 등록 후 다시 시도해 주세요.</p>
+                {isGoogleBgmModel(routing.backgroundMusicModel) && !providerValues.openRouterApiKey.trim() ? (
+                  <p className="mt-2 text-xs text-amber-600">선택한 배경 음악 모델은 Google 계열 API 연결이 필요합니다. 설정 저장 후 다시 시도해 주세요.</p>
                 ) : null}
               </div>
             </div>

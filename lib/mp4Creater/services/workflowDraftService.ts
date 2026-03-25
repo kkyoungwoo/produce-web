@@ -16,6 +16,7 @@ import {
   getDefaultWorkflowPromptTemplateId,
   resolveWorkflowPromptTemplates,
 } from './workflowPromptBuilder';
+import { buildBackgroundMusicPrompt, buildBackgroundMusicPromptSections, sanitizeBackgroundMusicDuration } from './musicService';
 
 export const DEFAULT_SELECTIONS: Record<ContentType, StorySelectionState> = {
   music_video: {
@@ -114,6 +115,26 @@ export function createDefaultWorkflowDraft(contentType: ContentType = 'story', o
     finalBackgroundMusic: null,
     musicVideoPreview: null,
     finalMusicVideo: null,
+    backgroundMusicScene: {
+      enabled: false,
+      prompt: buildBackgroundMusicPrompt({
+        contentType: normalizedContentType,
+        topic: '',
+        selections,
+        script: '',
+      } as WorkflowDraft, CONFIG.DEFAULT_BGM_MODEL),
+      provider: 'sample',
+      modelId: CONFIG.DEFAULT_BGM_MODEL,
+      title: '',
+      durationSeconds: 20,
+      promptSections: buildBackgroundMusicPromptSections({
+        contentType: normalizedContentType,
+        topic: '',
+        selections,
+        script: '',
+      } as WorkflowDraft),
+      selectedTrackId: null,
+    },
     sampleMode: {
       text: true,
       tts: true,
@@ -223,6 +244,18 @@ export function ensureWorkflowDraft(studioState?: StudioState | null): WorkflowD
     ...DEFAULT_SELECTIONS[contentType],
     ...existing.selections,
   };
+  const backgroundMusicModelId = existing.backgroundMusicScene?.modelId || CONFIG.DEFAULT_BGM_MODEL;
+  const promptSeed = {
+    ...existing,
+    contentType,
+    selections,
+    script: existing.script || '',
+    topic: existing.topic || '',
+    backgroundMusicScene: {
+      ...existing.backgroundMusicScene,
+      modelId: backgroundMusicModelId,
+    },
+  } as WorkflowDraft;
   const promptPack = buildWorkflowPromptPack({
     contentType,
     topic: existing.topic || '',
@@ -276,6 +309,16 @@ export function ensureWorkflowDraft(studioState?: StudioState | null): WorkflowD
     voiceReferenceMimeType: existing.voiceReferenceMimeType || null,
     voiceReferenceName: existing.voiceReferenceName || null,
     qwenStylePreset: existing.qwenStylePreset || 'balanced',
+    backgroundMusicScene: {
+      enabled: Boolean(existing.backgroundMusicScene?.enabled),
+      prompt: existing.backgroundMusicScene?.prompt || buildBackgroundMusicPrompt(promptSeed, backgroundMusicModelId),
+      provider: existing.backgroundMusicScene?.provider === 'google' ? 'google' : 'sample',
+      modelId: backgroundMusicModelId,
+      title: existing.backgroundMusicScene?.title || '',
+      durationSeconds: sanitizeBackgroundMusicDuration(existing.backgroundMusicScene?.durationSeconds, 20),
+      promptSections: buildBackgroundMusicPromptSections(promptSeed, existing.backgroundMusicScene?.promptSections || null),
+      selectedTrackId: typeof existing.backgroundMusicScene?.selectedTrackId === 'string' ? existing.backgroundMusicScene.selectedTrackId : null,
+    },
     sampleMode: {
       text: existing.sampleMode?.text ?? true,
       tts: existing.sampleMode?.tts ?? true,

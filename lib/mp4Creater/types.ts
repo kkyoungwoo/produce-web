@@ -189,6 +189,14 @@ export interface PromptedImageAsset {
   groupLabel?: string;
 }
 
+export interface BackgroundMusicPromptSections {
+  identity: string;
+  mood: string;
+  instruments: string;
+  performance: string;
+  production: string;
+}
+
 export interface BackgroundMusicTrack {
   id: string;
   title: string;
@@ -198,9 +206,23 @@ export interface BackgroundMusicTrack {
   volume: number;
   sourceMode: 'ai' | 'sample';
   createdAt: number;
-  provider?: 'elevenLabs' | 'qwen3Tts' | 'chatterbox' | 'heygen' | 'sample';
+  provider?: 'elevenLabs' | 'qwen3Tts' | 'chatterbox' | 'heygen' | 'sample' | 'google';
   mode?: 'preview' | 'final';
   stylePreset?: string;
+  requestedDuration?: number | null;
+  promptSections?: BackgroundMusicPromptSections | null;
+  parentTrackId?: string | null;
+}
+
+export interface BackgroundMusicSceneConfig {
+  enabled: boolean;
+  prompt: string;
+  provider: 'sample' | 'google';
+  modelId: string;
+  title?: string;
+  durationSeconds?: number;
+  promptSections?: BackgroundMusicPromptSections;
+  selectedTrackId?: string | null;
 }
 
 export interface AudioPreviewAsset {
@@ -328,6 +350,107 @@ export interface CustomScriptSettings {
 }
 
 
+export interface WorkflowPromptStore {
+  commonPrompts: Record<string, string>;
+  stepPrompts: {
+    step1: Record<string, string>;
+    step2: Record<string, string>;
+    step3: Record<string, string>;
+    step4: Record<string, string>;
+    step5: Record<string, string>;
+    step6: Record<string, string>;
+  };
+  finalPrompts: Record<string, string>;
+}
+
+export interface WorkflowScriptGenerationMeta {
+  source: 'ai' | 'sample' | 'manual';
+  intent: 'draft' | 'expand' | 'manual';
+  generatedAt: number;
+  templateId: string | null;
+  templateName: string | null;
+  modelId: string | null;
+  conversationMode: boolean;
+  language: ScriptLanguageOption;
+  speechStyle: ScriptSpeechStyle;
+  expectedDurationMinutes: number;
+  recommendedCharacterCount: number;
+  inputSignature: string;
+  usedSampleFallback: boolean;
+}
+
+export interface WorkflowStepContract {
+  step1: {
+    concept: ContentType;
+    conceptLabel: string;
+    conceptPrompt: string;
+    aspectRatio: AspectRatio;
+    charsPerMinute: number;
+  };
+  step2: {
+    videoDuration: number;
+    isConversational: boolean;
+    scriptLanguage: ScriptLanguageOption;
+    speechStyle: ScriptSpeechStyle;
+    contentTopic: string;
+    selections: StorySelectionState;
+  };
+  step3: {
+    recommendedCharacterCount: number;
+    recommendedParagraphCount: number;
+    script: string;
+    sceneCount: number;
+    imagePrompt: string;
+    videoStoryPrompt: string;
+    castType: string;
+    cast: Array<{ id: string; name: string; role: string | null }>;
+    castAudioMap: Record<string, {
+      characterId: string;
+      characterName: string;
+      provider: string;
+      voiceId: string | null;
+      voiceName: string | null;
+      modelId: string | null;
+    }>;
+    selectedPromptTemplateId: string | null;
+    selectedPromptTemplateName: string | null;
+    usedSampleFallback: boolean;
+    generationMeta: WorkflowScriptGenerationMeta | null;
+    currentInputSignature: string;
+    needsRegeneration: boolean;
+  };
+  step4: {
+    characterMood: string;
+    characterMoodPrompt: string;
+    generatedCharacters: Array<{
+      id: string;
+      name: string;
+      prompt: string;
+      selected: boolean;
+      generatedImageCount: number;
+    }>;
+    selectedCharacters: Array<{ id: string; name: string; prompt: string }>;
+    selectedCharacterPrompt: string;
+    candidateCount: number;
+  };
+  step5: {
+    generatedStyles: Array<{ id: string; label: string; prompt: string; selected: boolean }>;
+    selectedStyle: { id: string; label: string } | null;
+    selectedStylePrompt: string;
+    candidateCount: number;
+    hasSelection: boolean;
+  };
+  step6: {
+    finalScript: string;
+    finalImagePrompt: string;
+    finalVideoPrompt: string;
+    summaryData: Record<string, unknown>;
+    usedInputs: Record<string, unknown>;
+    missingInputs: string[];
+    ready: boolean;
+  };
+}
+
 export interface WorkflowPromptTemplate {
   id: string;
   name: string;
@@ -366,6 +489,9 @@ export interface WorkflowDraft {
   selectedPromptTemplateId: string | null;
   promptAdditions: string[];
   customScriptSettings?: CustomScriptSettings;
+  promptStore?: WorkflowPromptStore;
+  stepContract?: WorkflowStepContract;
+  scriptGenerationMeta?: WorkflowScriptGenerationMeta | null;
   constitutionAnalysis?: ConstitutionAnalysisSummary | null;
   openRouterModel?: string;
   ttsProvider?: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
@@ -385,6 +511,7 @@ export interface WorkflowDraft {
   finalBackgroundMusic?: BackgroundMusicTrack | null;
   musicVideoPreview?: VideoPreviewAsset | null;
   finalMusicVideo?: VideoPreviewAsset | null;
+  backgroundMusicScene?: BackgroundMusicSceneConfig;
   sampleMode?: {
     text: boolean;
     tts: boolean;
@@ -523,6 +650,7 @@ export interface SavedProject {
   selectedThumbnailId?: string | null;
   cost?: CostBreakdown;
   backgroundMusicTracks?: BackgroundMusicTrack[];
+  activeBackgroundTrackId?: string | null;
   previewMix?: PreviewMixSettings;
   workflowDraft?: WorkflowDraft | null;
   voicePreviewAsset?: AudioPreviewAsset | null;
@@ -597,6 +725,7 @@ export interface AiRoutingSettings {
   backgroundMusicStyle?: string;
   musicVideoProvider?: 'elevenLabs' | 'sample';
   musicVideoMode?: 'auto' | 'sample';
+  paidModeEnabled?: boolean;
 }
 
 export type ProviderKind = 'text' | 'image' | 'audio' | 'video';

@@ -138,13 +138,13 @@ export default function Step5Panel({
               onClick={() => handleSelectPreset(preset.id)}
               className={`overflow-hidden rounded-[20px] border text-left shadow-sm transition ${
                 selected
-                  ? 'border-violet-400 ring-2 ring-violet-200'
-                  : 'border-slate-200 hover:-translate-y-0.5 hover:border-violet-200'
+                  ? 'border-sky-300 bg-sky-50 ring-2 ring-sky-100'
+                  : 'border-slate-200 hover:-translate-y-0.5 hover:border-sky-200'
               }`}
             >
               <div className="relative overflow-hidden border-b border-slate-200 bg-slate-100">
                 {selected ? (
-                  <span className="absolute right-2 top-2 z-10 rounded-full bg-violet-600 px-2.5 py-1 text-[10px] font-black text-white shadow-sm">
+                  <span className="absolute right-2 top-2 z-10 rounded-full bg-sky-500 px-2.5 py-1 text-[10px] font-black text-white shadow-sm">
                     선택됨
                   </span>
                 ) : null}

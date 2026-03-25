@@ -188,6 +188,8 @@ interface PromptEditorModalProps {
   onClose: () => void;
   onSave: () => void;
   onPromptChange: (value: string) => void;
+  guideTitle?: string;
+  guideItems?: readonly string[];
 }
 
 export function PromptEditorModal({
@@ -196,6 +198,8 @@ export function PromptEditorModal({
   onClose,
   onSave,
   onPromptChange,
+  guideTitle,
+  guideItems,
 }: PromptEditorModalProps) {
   return (
     <OverlayModal
@@ -214,6 +218,16 @@ export function PromptEditorModal({
         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
           프롬프트 이름/설명은 유지되고, 본문 텍스트만 수정됩니다.
         </div>
+        {Array.isArray(guideItems) && guideItems.length ? (
+          <div className="rounded-2xl border border-violet-200 bg-violet-50/70 px-4 py-3 text-xs leading-5 text-slate-700">
+            <div className="font-black text-violet-700">{guideTitle || '수정 가이드'}</div>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              {guideItems.map((item, index) => (
+                <li key={`${index}-${item.slice(0, 12)}`}>{item}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <textarea value={prompt} onChange={(e) => onPromptChange(e.target.value)} className="min-h-[360px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 outline-none focus:border-violet-400" placeholder="프롬프트 본문" />
       </div>
     </OverlayModal>

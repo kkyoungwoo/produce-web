@@ -14,6 +14,7 @@ import {
 import { fetchStudioState, saveStudioState } from '../services/localFileApi';
 import { ensureWorkflowDraft } from '../services/workflowDraftService';
 import {
+  buildImageAwareUploadPrompt,
   buildStyleRecommendations,
   createPromptVariants,
   extractCharactersFromScript,
@@ -97,6 +98,9 @@ const CharacterStudioPage: React.FC = () => {
         contentType: draft.contentType,
         model: studioState?.routing?.scriptModel,
         allowAi: Boolean(studioState?.providers?.openRouterApiKey),
+        styleLabel: selectedStyle?.label || selectedStyle?.groupLabel || draft.selectedCharacterStyleLabel || '',
+        stylePrompt: selectedStyle?.prompt || draft.selectedCharacterStylePrompt || '',
+        language: draft.customScriptSettings?.language || 'ko',
       });
       const styleImages = draft.styleImages?.length ? draft.styleImages : buildStyleRecommendations(draft.script, draft.contentType);
       const characterImages = characters.flatMap((character) => character.generatedImages || []).slice(0, 16);
@@ -154,47 +158,68 @@ const CharacterStudioPage: React.FC = () => {
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files?.length || !draft) return;
-    const images = await Promise.all(Array.from(files as FileList).slice(0, 4).map((file: File) => new Promise<PromptedImageAsset>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        resolve({
-          id: `upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-          label: file.name.replace(/\.[^.]+$/, ''),
-          prompt: '사용자 업로드 이미지',
-          imageData: String(reader.result),
-          createdAt: Date.now(),
-          kind: 'character',
-          sourceMode: 'upload',
-        });
-      };
-      reader.readAsDataURL(file);
-    })));
+    const images = await Promise.all(
+      Array.from(files as FileList)
+        .slice(0, 4)
+        .map((file: File) => new Promise<PromptedImageAsset>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            const imageData = String(reader.result);
+            const label = file.name.replace(/\.[^.]+$/, '');
+            Promise.resolve(buildImageAwareUploadPrompt({
+              imageData,
+              label,
+              kind: 'character',
+              topic: draft.topic || '',
+              mood: draft.selections?.mood || '',
+              setting: draft.selections?.setting || '',
+              protagonist: draft.selections?.protagonist || '',
+              contentType: draft.contentType,
+              aspectRatio: draft.aspectRatio,
+            }))
+              .catch(() => '사용자 업로드 이미지')
+              .then((prompt) => {
+                resolve({
+                  id: `upload_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                  label,
+                  prompt,
+                  imageData,
+                  createdAt: Date.now(),
+                  kind: 'character',
+                  sourceMode: 'upload',
+                });
+              });
+          };
+          reader.readAsDataURL(file);
+        }))
+    );
 
+    const appendedCharacters = images.map((image, index) => ({
+      id: `manual_char_${Date.now()}_${index}`,
+      name: image.label,
+      description: '사용자 업로드 캐릭터',
+      visualStyle: '사용자 업로드 기반',
+      createdAt: Date.now(),
+      role: 'support' as const,
+      prompt: image.prompt,
+      imageData: image.imageData,
+      generatedImages: [image],
+      selectedImageId: image.id,
+    }));
     const nextCharacters = [
       ...(draft.extractedCharacters || []),
-      ...images.map((image, index) => ({
-        id: `manual_char_${Date.now()}_${index}`,
-        name: image.label,
-        description: '사용자 업로드 캐릭터',
-        visualStyle: '사용자 업로드 기반',
-        createdAt: Date.now(),
-        role: 'support' as const,
-        prompt: image.prompt,
-        imageData: image.imageData,
-        generatedImages: [image],
-        selectedImageId: image.id,
-      })),
+      ...appendedCharacters,
     ];
 
     await persist({
       ...draft,
       extractedCharacters: nextCharacters,
       characterImages: [...draft.characterImages, ...images],
-      selectedCharacterIds: [...draft.selectedCharacterIds, nextCharacters[nextCharacters.length - 1]?.id].filter(Boolean),
+      selectedCharacterIds: [...new Set([...draft.selectedCharacterIds, ...appendedCharacters.map((item) => item.id)])].filter(Boolean),
     }, nextCharacters);
 
     e.target.value = '';
-    setNotice('업로드한 이미지를 캐릭터 라이브러리에 추가했습니다.');
+    setNotice('업로드한 이미지를 분석해 캐릭터 프롬프트까지 함께 저장했습니다.');
   };
 
   if (!studioState || !draft) {

@@ -11,7 +11,7 @@ import { buildVariantSuffix, createCreativeDirection } from '../config/creativeV
 import { STYLE_SAMPLE_PRESETS } from '../samples/presetCatalog';
 import { CONFIG } from '../config';
 
-const BASE_STYLE_TEXT = `Stylized 2D anime character inspired by early 2000s animation aesthetics and nostalgic city pop atmosphere. Balanced, human-like facial proportions with clear animated style. Simple body design with classic anime proportions, relaxed posture, minimal clothing in solid colors, bold clean lineart, soft cel shading, dreamy atmospheric mood, high resolution, full body, full figure, clear silhouette, background removed, no text, non-photorealistic illustration only.`;
+const BASE_STYLE_TEXT = `Stylized character design with human-friendly facial proportions, stable silhouette, full body, full figure, clear silhouette, neutral pose, stable composition, background removed, no text.`;
 
 function getGoogleAiStudioApiKey(): string {
   if (typeof window === 'undefined') return '';
@@ -161,9 +161,61 @@ function extractSupportNames(script: string) {
   return pool.filter((keyword) => script.includes(keyword));
 }
 
-function buildCharacterPrompt(name: string, roleLabel: string, script: string, styleHint: string) {
-  const direction = createCreativeDirection(`${name}:${roleLabel}:${styleHint}:${script}`, 0);
-  return `${name} / ${roleLabel}\n${BASE_STYLE_TEXT}\nunique character design, varied outfit style, clean silhouette, based on the story mood: ${styleHint}. Fresh direction: ${direction.shotType}. ${direction.visualHook} Scene context: ${script.slice(0, 220)}`;
+function getLanguageLabel(language?: string) {
+  const value = `${language || 'ko'}`.trim().toLowerCase();
+  if (value === 'mute') return 'silent / no spoken language';
+  if (value.startsWith('en')) return 'English';
+  if (value.startsWith('ja')) return 'Japanese';
+  if (value.startsWith('zh')) return 'Chinese';
+  if (value.startsWith('es')) return 'Spanish';
+  if (value.startsWith('fr')) return 'French';
+  if (value.startsWith('de')) return 'German';
+  return value === 'ko' ? 'Korean' : value;
+}
+
+function buildCharacterStyleFoundation(options: {
+  contentType: ContentType;
+  styleHint?: string;
+  styleLabel?: string;
+  stylePrompt?: string;
+}) {
+  const source = [options.styleLabel, options.stylePrompt, options.styleHint, options.contentType].filter(Boolean).join(' ').toLowerCase();
+
+  if (/(photoreal|photorealistic|live action|real human|실사)/.test(source)) {
+    return 'Photoreal character reference image, natural Korean young adult face, believable skin texture, detailed hair strands, realistic fabric, clean silhouette, full body, full figure, neutral pose, stable composition, mouth clearly visible for future lip sync, background removed, no text.';
+  }
+
+  if (/(3d|pixar|stylized 3d|3d illustration)/.test(source)) {
+    return 'High-quality stylized 3D character, human-friendly face, polished materials, clean silhouette, full body, full figure, neutral pose, stable composition, mouth clearly visible, background removed, no text.';
+  }
+
+  if (/(retro|city pop|early 2000|90년대|nostalgic|만화 영화|만화책)/.test(source)) {
+    return 'Stylized 2D anime film illustration character inspired by early-2000s animation aesthetics and nostalgic city-pop atmosphere. Balanced human-like facial proportions, classic anime eyes, bold clean lineart, soft cel shading, cinematic light, full body, full figure, clear silhouette, neutral pose, stable composition, background removed, no text, illustration only.';
+  }
+
+  if (/(webtoon|manhwa|anime|만화|cartoon|일본 웹툰)/.test(source)) {
+    return 'Minimalist 2D anime illustration character with medium-weight clean line art, soft cel shading, mature young-adult proportions, simple modern outfit, expressive but stable posture, full body, full figure, clear silhouette, neutral pose, stable composition, background removed, no text, non-photorealistic illustration only.';
+  }
+
+  return `${BASE_STYLE_TEXT} Stylized 2D anime / illustration friendly design, human-like face, modern outfit, readable mouth shape, illustration-friendly silhouette.`;
+}
+
+function buildCharacterPrompt(options: {
+  name: string;
+  roleLabel: string;
+  script: string;
+  styleHint: string;
+  contentType: ContentType;
+  styleLabel?: string;
+  stylePrompt?: string;
+  language?: string;
+}) {
+  const direction = createCreativeDirection(`${options.name}:${options.roleLabel}:${options.styleHint}:${options.styleLabel || ''}:${options.stylePrompt || ''}:${options.script}`, 0, options.contentType);
+  const styleFoundation = buildCharacterStyleFoundation(options);
+  const languageLabel = getLanguageLabel(options.language);
+  const context = options.script.replace(/\s+/g, ' ').slice(0, 220);
+  const visualMood = options.styleHint || 'balanced emotional tone';
+  return `${options.name} / ${options.roleLabel}\n${styleFoundation}\nUnique story character reference image. Human-friendly face only, never grotesque or uncanny, even if the story mentions alien, fantasy, or non-human elements. Keep this character visually distinct, readable in motion, and suitable for ${languageLabel} lip sync and TTS mouth-shape clarity. Based on the story mood: ${visualMood}. Fresh direction: ${direction.shotType}. ${direction.visualHook} Story context: ${context}`;
 }
 
 function makeCharacter(options: {
@@ -173,8 +225,21 @@ function makeCharacter(options: {
   script: string;
   styleHint: string;
   castOrder: number;
+  contentType: ContentType;
+  styleLabel?: string;
+  stylePrompt?: string;
+  language?: string;
 }): CharacterProfile {
-  const prompt = buildCharacterPrompt(options.name, options.roleLabel, options.script, options.styleHint);
+  const prompt = buildCharacterPrompt({
+    name: options.name,
+    roleLabel: options.roleLabel,
+    script: options.script,
+    styleHint: options.styleHint,
+    contentType: options.contentType,
+    styleLabel: options.styleLabel,
+    stylePrompt: options.stylePrompt,
+    language: options.language,
+  });
   const preview = buildPromptPreviewCard({
     label: options.name,
     subtitle: options.roleLabel,
@@ -200,18 +265,29 @@ function makeCharacter(options: {
   };
 }
 
-function fallbackCharacters(script: string, selections: StorySelectionState): CharacterProfile[] {
-  const leadName = selections.protagonist?.trim() || '주인공';
-  const supportKeyword = extractSupportNames(script)[0] || '조연';
+function fallbackCharacters(options: {
+  script: string;
+  selections: StorySelectionState;
+  contentType: ContentType;
+  styleLabel?: string;
+  stylePrompt?: string;
+  language?: string;
+}): CharacterProfile[] {
+  const leadName = options.selections.protagonist?.trim() || '주인공';
+  const supportKeyword = extractSupportNames(options.script)[0] || '조연';
 
   return [
     makeCharacter({
       name: leadName,
       role: 'lead',
       roleLabel: '주인공 / 서사를 이끄는 중심 인물',
-      script,
-      styleHint: selections.mood,
+      script: options.script,
+      styleHint: options.selections.mood,
       castOrder: 1,
+      contentType: options.contentType,
+      styleLabel: options.styleLabel,
+      stylePrompt: options.stylePrompt,
+      language: options.language,
     }),
     makeCharacter({
       name: supportKeyword,
@@ -219,9 +295,13 @@ function fallbackCharacters(script: string, selections: StorySelectionState): Ch
       roleLabel: supportKeyword === '앵커' || supportKeyword === '기자'
         ? `${supportKeyword} / 진행과 설명을 맡는 조연`
         : '조연 / 주인공의 흐름을 받쳐 주는 인물',
-      script,
-      styleHint: selections.mood,
+      script: options.script,
+      styleHint: options.selections.mood,
       castOrder: 2,
+      contentType: options.contentType,
+      styleLabel: options.styleLabel,
+      stylePrompt: options.stylePrompt,
+      language: options.language,
     }),
   ];
 }
@@ -232,8 +312,18 @@ export async function extractCharactersFromScript(options: {
   contentType: ContentType;
   model?: string;
   allowAi?: boolean;
+  styleLabel?: string;
+  stylePrompt?: string;
+  language?: string;
 }): Promise<CharacterProfile[]> {
-  const fallback = fallbackCharacters(options.script, options.selections);
+  const fallback = fallbackCharacters({
+    script: options.script,
+    selections: options.selections,
+    contentType: options.contentType,
+    styleLabel: options.styleLabel,
+    stylePrompt: options.stylePrompt,
+    language: options.language,
+  });
   if (!options.allowAi) return fallback;
 
   try {
@@ -244,7 +334,7 @@ export async function extractCharactersFromScript(options: {
       messages: [
         {
           role: 'system',
-          content: '한국어 스토리에서 주인공과 조연을 추출하는 도우미다. JSON만 반환한다. 키는 characters 이고, 배열 원소는 name, roleType, roleLabel, styleHint 를 가진다. roleType은 lead 또는 support만 사용한다.',
+          content: '한국어 스토리에서 주요 인물을 추출하고 캐릭터 참조 이미지용 기초 정보를 정리하는 도우미다. JSON만 반환한다. 키는 characters 이고, 배열 원소는 name, roleType, roleLabel, styleHint 를 가진다. roleType은 lead 또는 support만 사용한다. 중요 인물만 뽑고, 각 인물은 full body reference가 가능한 고유 캐릭터여야 한다. 외계인/판타지 설정이 있어도 얼굴은 사람처럼 읽히고 불쾌하지 않아야 한다.',
         },
         {
           role: 'user',
@@ -270,6 +360,10 @@ export async function extractCharactersFromScript(options: {
         script: options.script,
         styleHint,
         castOrder: index + 1,
+        contentType: options.contentType,
+        styleLabel: options.styleLabel,
+        stylePrompt: options.stylePrompt,
+        language: options.language,
       });
     });
   } catch {
@@ -284,11 +378,16 @@ export function buildStyleRecommendations(
   limit = 1,
   aspectRatio: AspectRatio = '16:9'
 ): PromptedImageAsset[] {
-  const seed = hashCode(script || contentType);
+  const seed = hashCode(`${script || contentType}:${Date.now()}`);
   const presets = STYLE_SAMPLE_PRESETS.map((item) => ({ ...item }));
   const filtered = presets.filter((item) => !excludeLabels.includes(item.label));
   const fallbackPool = filtered.length ? filtered : presets;
-  const picked = fallbackPool.slice(0, Math.max(1, limit));
+  const shuffledPool = [...fallbackPool].sort((left, right) => {
+    const leftScore = hashCode(`${left.id}:${seed}`);
+    const rightScore = hashCode(`${right.id}:${seed}`);
+    return leftScore - rightScore;
+  });
+  const picked = shuffledPool.slice(0, Math.max(1, limit));
 
   return picked.map((preset, index) => {
     const direction = createCreativeDirection(`${preset.label}:${script}:${contentType}`, index, contentType);
@@ -296,6 +395,7 @@ export function buildStyleRecommendations(
       preset.prompt,
       'Create a cohesive full-scene visual style for the final video.',
       'Keep background direction, composition rhythm, lighting logic, color palette, texture density, and rendering finish consistent across scenes, but make this recommendation feel newly authored.',
+      'Do not mirror the most recent recommendation, previous preset ordering, or earlier sample wording. Build a fresh recommendation each run unless the user explicitly asks for similarity.',
       getAspectRatioPrompt(aspectRatio),
       `Variation seed ${seed + index + excludeLabels.length}.`,
       direction.shotType,
@@ -432,7 +532,7 @@ export function buildUploadDrivenPrompt(options: {
 }): string {
   const safeLabel = options.label.replace(/[_-]+/g, ' ').trim() || (options.kind === 'character' ? '업로드 캐릭터' : '업로드 화풍');
   if (options.kind === 'character') {
-    return `${safeLabel} 기반 캐릭터 디자인. ${BASE_STYLE_TEXT} Keep the identity suggested by the uploaded reference, preserve silhouette and facial mood, adapt to ${options.contentType} content. Topic: ${options.topic || 'untitled project'}. Mood: ${options.mood || 'balanced'}. Setting: ${options.setting || 'cinematic background'}. Main role hint: ${options.protagonist || 'story lead'}.`;
+    return `${safeLabel} 기반 캐릭터 디자인. ${BASE_STYLE_TEXT} Keep the identity suggested by the uploaded reference, preserve full body silhouette, neutral pose, clear mouth shape, and human-friendly face. If photoreal, make the person read as naturally Korean. Adapt to ${options.contentType} content. Topic: ${options.topic || 'untitled project'}. Mood: ${options.mood || 'balanced'}. Setting: ${options.setting || 'cinematic background'}. Main role hint: ${options.protagonist || 'story lead'}.`;
   }
   return `${safeLabel} 기반 화풍 프롬프트. ${getAspectRatioPrompt(options.aspectRatio || '16:9')}, preserve the uploaded image mood, color palette, texture density, lighting rhythm, and overall atmosphere. Adapt for ${options.contentType} content about ${options.topic || 'untitled project'}, with ${options.mood || 'balanced'} emotional tone and ${options.setting || 'cinematic space'} background feeling.`;
 }
