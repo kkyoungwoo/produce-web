@@ -82,6 +82,9 @@ export default function RouteStepView({ vm }: { vm: any }) {
     promptPreviewId,
     promptPreviewDraft,
     updatePromptTemplate,
+    scriptGenerationConfirmOpen,
+    confirmGenerateScriptOverwrite,
+    setScriptGenerationConfirmOpen,
     customScriptDurationMinutes,
     customScriptSpeechStyle,
     customScriptLanguage,
@@ -507,6 +510,48 @@ export default function RouteStepView({ vm }: { vm: any }) {
           className="min-h-[420px] w-full rounded-2xl border border-blue-400 px-4 py-4 text-sm leading-7 text-black outline-none placeholder:text-blue-100"
           placeholder="프롬프트를 불러오는 중입니다."
         />
+      </OverlayModal>
+
+      <OverlayModal
+        open={Boolean(scriptGenerationConfirmOpen)}
+        title="대본을 새로 생성할까요?"
+        description="대본을 생성하면 현재 작성된 대본은 새 결과로 교체됩니다. 영상 길이와 현재 설정을 기준으로 새 대본을 다시 만듭니다."
+        onClose={() => setScriptGenerationConfirmOpen?.(false)}
+        footer={(
+          <>
+            <button
+              type="button"
+              onClick={() => setScriptGenerationConfirmOpen?.(false)}
+              className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50"
+            >
+              취소
+            </button>
+            <button
+              type="button"
+              onClick={confirmGenerateScriptOverwrite}
+              disabled={isGeneratingScript}
+              className="rounded-2xl bg-violet-600 px-5 py-3 text-sm font-black text-white hover:bg-violet-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+            >
+              {isGeneratingScript ? '생성 중...' : '확인하고 생성'}
+            </button>
+          </>
+        )}
+      >
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-[24px] border border-violet-200 bg-violet-50 p-4">
+            <div className="text-sm font-black text-violet-900">새로 생성되는 기준</div>
+            <p className="mt-2 text-sm leading-6 text-violet-800">
+              예상 길이 {customScriptDurationMinutes}분, {selectedPromptTemplate?.name || '현재 프롬프트'}, {selectedScriptGenerationModel} 기준으로
+              글자수 범위에 맞는 새 대본을 만듭니다.
+            </p>
+          </div>
+          <div className="rounded-[24px] border border-amber-200 bg-amber-50 p-4">
+            <div className="text-sm font-black text-amber-900">현재 대본 교체 안내</div>
+            <p className="mt-2 text-sm leading-6 text-amber-800">
+              확인을 누르면 지금 작성된 내용은 유지되지 않고 새 대본으로 덮어써집니다. 생성 결과는 항상 새로운 느낌으로 다시 만듭니다.
+            </p>
+          </div>
+        </div>
       </OverlayModal>
     </div>
   );

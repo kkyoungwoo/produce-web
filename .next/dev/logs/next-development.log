@@ -1,6 +1,37 @@
-[00:00:01.572] Server  LOG     ✓ Ready in 1363ms
-[00:00:04.603] Server  LOG     ○ Compiling /mp4Creater/step-4 ...
-[00:00:05.945] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:00:06.187] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:02:36.245] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:02:36.704] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:02.247] Server  LOG     ✓ Ready in 2s
+[00:00:05.371] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:22:49.895] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:22:49.895] Browser ERROR   uncaughtError: Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: object. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+
+Check the render method of `RouteStepView`.
+[00:22:51.142] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:22:51.317] Browser ERROR   uncaughtError: Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: object. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.
+
+Check the render method of `RouteStepView`.
+[00:22:59.597] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:23:00.623] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:27:58.028] Browser WARN    [Prompt Translation] script composer request translation skipped: {}
+[00:27:59.540] Browser WARN    [Prompt Translation] script composer request translation skipped: {}
+[00:29:32.513] Browser WARN    [Prompt Translation] script composer request translation skipped: {}
+[00:39:53.351] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:39:53.894] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:40:01.596] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:40:01.988] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:40:02.519] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:40:02.718] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:40:02.851] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:40:02.993] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:40:16.516] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:40:17.063] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:40:17.227] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:40:17.471] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:40:24.275] Browser WARN    [Prompt Translation] script composer request translation skipped: {}
+[00:40:57.665] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:41:03.038] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:41:03.391] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:41:03.678] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:41:03.992] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:41:29.860] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:41:29.979] Browser ERROR   uncaughtError: TypeError: onApplyStyleSample is not a function
+[00:50:54.820] Browser WARN    [Prompt Translation] script composer request translation skipped: {}
+[00:57:32.483] Browser WARN    [Prompt Translation] script composer request translation skipped: {}
