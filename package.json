@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@huggingface/transformers": "^3.8.1",
     "framer-motion": "^12.38.0",
     "hangul-js": "^0.2.6",
     "next": "latest",

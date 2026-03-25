@@ -36,6 +36,7 @@ const isPaidVideoModel = (modelId?: string | null) => VIDEO_MODEL_OPTIONS.find((
 const freeScriptModel = SCRIPT_MODEL_OPTIONS.find((item) => item.tier !== 'paid')?.id || CONFIG.DEFAULT_SCRIPT_MODEL;
 const freeImageModel = IMAGE_MODELS.find((item) => item.tier !== 'paid')?.id || CONFIG.DEFAULT_IMAGE_MODEL;
 const freeVideoModel = VIDEO_MODEL_OPTIONS.find((item) => item.tier !== 'paid')?.id || CONFIG.DEFAULT_VIDEO_MODEL;
+const VOICE_SAMPLE_MAX_SECONDS = 15;
 
 const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onClose, onSave }) => {
   const [storageDir, setStorageDir] = useState('');
@@ -120,6 +121,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const [isVoicePreviewing, setIsVoicePreviewing] = useState(false);
   const [voicePreviewMessage, setVoicePreviewMessage] = useState('');
   const [isRecordingVoiceSample, setIsRecordingVoiceSample] = useState(false);
+  const [voiceSampleSecondsLeft, setVoiceSampleSecondsLeft] = useState(VOICE_SAMPLE_MAX_SECONDS);
   const [isBgmPreviewing, setIsBgmPreviewing] = useState(false);
   const [bgmPreviewMessage, setBgmPreviewMessage] = useState('');
   const [isPaidMode, setIsPaidMode] = useState(false);
@@ -131,6 +133,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const voiceRecorderRef = useRef<MediaRecorder | null>(null);
   const voiceRecorderStreamRef = useRef<MediaStream | null>(null);
   const voiceRecorderChunksRef = useRef<Blob[]>([]);
+  const voiceRecorderStopTimerRef = useRef<number | null>(null);
+  const voiceRecorderCountdownRef = useRef<number | null>(null);
   const voicePreviewKeyRef = useRef('');
   const bgmPreviewKeyRef = useRef('');
   const youtubePopupRef = useRef<Window | null>(null);
@@ -302,13 +306,26 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     return `data:${routing.voiceReferenceMimeType};base64,${routing.voiceReferenceAudioData}`;
   }, [routing.voiceReferenceAudioData, routing.voiceReferenceMimeType]);
 
+  const clearVoiceRecorderTimers = useCallback(() => {
+    if (voiceRecorderStopTimerRef.current !== null) {
+      window.clearTimeout(voiceRecorderStopTimerRef.current);
+      voiceRecorderStopTimerRef.current = null;
+    }
+    if (voiceRecorderCountdownRef.current !== null) {
+      window.clearInterval(voiceRecorderCountdownRef.current);
+      voiceRecorderCountdownRef.current = null;
+    }
+    setVoiceSampleSecondsLeft(VOICE_SAMPLE_MAX_SECONDS);
+  }, []);
+
   const stopVoiceRecorderStream = useCallback(() => {
+    clearVoiceRecorderTimers();
     voiceRecorderStreamRef.current?.getTracks().forEach((track) => track.stop());
     voiceRecorderStreamRef.current = null;
     voiceRecorderRef.current = null;
     voiceRecorderChunksRef.current = [];
     setIsRecordingVoiceSample(false);
-  }, []);
+  }, [clearVoiceRecorderTimers]);
 
   const clearRecordedVoiceSample = useCallback(() => {
     setRouting((prev) => ({
@@ -367,7 +384,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     stopVoicePreview();
     voicePreviewKeyRef.current = voicePreviewKey;
     setIsVoicePreviewing(true);
-    setVoicePreviewMessage('선택한 모델로 미리 듣기를 준비 중입니다.');
+    setVoicePreviewMessage('선택한 모델로 실제 음성을 준비 중입니다. 무료 모델은 처음 로드 시 시간이 더 걸릴 수 있습니다.');
 
     const elevenLabsApiKey = providerValues.elevenLabsApiKey.trim();
     if (provider === 'elevenLabs' && !elevenLabsApiKey) {
@@ -377,77 +394,26 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     }
 
     try {
-      if (provider === 'chatterbox' && recordedVoiceSampleUrl) {
-        const audio = new Audio(recordedVoiceSampleUrl);
-        previewAudioRef.current = audio;
-        audio.onended = () => {
-          setIsVoicePreviewing(false);
-          setVoicePreviewMessage('저장된 목소리 샘플 미리 듣기가 끝났습니다.');
-        };
-        audio.onerror = () => {
-          setIsVoicePreviewing(false);
-          setVoicePreviewMessage('저장된 목소리 샘플 재생에 실패했습니다.');
-        };
-        await audio.play();
-        setVoicePreviewMessage(`저장된 목소리 샘플 (${routing.voiceReferenceName || 'recorded-voice.webm'}) 재생 중입니다.`);
-        return;
-      }
-
-      if (provider === 'qwen3Tts' || provider === 'chatterbox') {
-        if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-          setIsVoicePreviewing(false);
-          setVoicePreviewMessage(provider === 'chatterbox' ? '이 브라우저에서는 Chatterbox 무료 미리 듣기를 지원하지 않습니다.' : '이 브라우저에서는 qwen3-tts 미리 듣기를 지원하지 않습니다.');
-          return;
-        }
-
-        const synth = window.speechSynthesis;
-        const utterance = new SpeechSynthesisUtterance('안녕하세요 반갑습니다. 지금 선택한 기본 목소리를 확인합니다.');
-        utterance.lang = 'ko-KR';
-
-        const allVoices = synth.getVoices();
-        const koreanVoices = allVoices.filter((voice) => (voice.lang || '').toLowerCase().startsWith('ko'));
-        const selectedVoice =
-          provider === 'chatterbox'
-            ? ((routing.chatterboxVoicePreset || 'chatterbox-clear') === 'chatterbox-warm'
-                ? koreanVoices.find((voice) => /female|yuna|soyoung|sunhi|sora/i.test(voice.name)) || koreanVoices[0]
-                : koreanVoices.find((voice) => /male|minho|inho|jiyoung|hyun/i.test(voice.name)) || koreanVoices[0])
-            : ((routing.qwenVoicePreset || 'qwen-default') === 'qwen-soft'
-                ? koreanVoices.find((voice) => /female|yuna|soyoung|sunhi|sora/i.test(voice.name)) || koreanVoices[0]
-                : koreanVoices.find((voice) => /male|minho|inho|jiyoung|hyun/i.test(voice.name)) || koreanVoices[0]);
-
-        if (selectedVoice) utterance.voice = selectedVoice;
-        utterance.onend = () => {
-          setIsVoicePreviewing(false);
-          setVoicePreviewMessage(provider === 'chatterbox'
-            ? `Chatterbox (${selectedChatterboxVoice?.name || '기본 프리셋'}) 미리 듣기가 끝났습니다.`
-            : `qwen3-tts (${routing.qwenVoicePreset || 'qwen-default'}) 미리 듣기가 끝났습니다.`);
-          previewUtteranceRef.current = null;
-        };
-        utterance.onerror = () => {
-          setIsVoicePreviewing(false);
-          setVoicePreviewMessage(provider === 'chatterbox' ? 'Chatterbox 무료 미리 듣기에 실패했습니다.' : 'qwen3-tts 미리 듣기에 실패했습니다.');
-          previewUtteranceRef.current = null;
-        };
-        previewUtteranceRef.current = utterance;
-        synth.speak(utterance);
-        setVoicePreviewMessage(provider === 'chatterbox'
-          ? `Chatterbox (${selectedChatterboxVoice?.name || '기본 프리셋'}) 무료 미리 듣기 중입니다.`
-          : `qwen3-tts (${routing.qwenVoicePreset || 'qwen-default'}) 미리 듣기 중입니다.`);
-        return;
-      }
-
       const { asset } = await createTtsPreview({
         provider,
         title: '설정 미리 듣기',
-        text: '안녕하세요 반갑습니다. 지금 선택한 기본 목소리를 확인합니다.',
+        text: '안녕하세요. 지금 선택한 기본 목소리를 확인합니다.',
         mode: 'voice-preview',
         apiKey: elevenLabsApiKey,
-        voiceId: routing.elevenLabsVoiceId || selectedElevenVoice?.voice_id || CONFIG.DEFAULT_VOICE_ID,
+        voiceId: provider === 'elevenLabs'
+          ? (routing.elevenLabsVoiceId || selectedElevenVoice?.voice_id || CONFIG.DEFAULT_VOICE_ID)
+          : provider === 'chatterbox'
+            ? (routing.chatterboxVoicePreset || 'chatterbox-clear')
+            : (routing.qwenVoicePreset || 'qwen-default'),
         modelId: routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
-        qwenPreset: routing.qwenVoicePreset || 'qwen-default',
+        qwenPreset: provider === 'chatterbox' ? (routing.chatterboxVoicePreset || 'chatterbox-clear') : (routing.qwenVoicePreset || 'qwen-default'),
+        locale: 'ko',
+        voiceReferenceAudioData: routing.voiceReferenceAudioData || null,
+        voiceReferenceMimeType: routing.voiceReferenceMimeType || null,
       });
 
-      const audio = new Audio(`data:audio/mpeg;base64,${asset.audioData}`);
+      const audioSrc = asset.audioData?.startsWith('data:') ? asset.audioData : `data:audio/mpeg;base64,${asset.audioData}`;
+      const audio = new Audio(audioSrc);
       previewAudioRef.current = audio;
       audio.onended = () => {
         setIsVoicePreviewing(false);
@@ -455,20 +421,33 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       };
       audio.onerror = () => {
         setIsVoicePreviewing(false);
-        setVoicePreviewMessage('음성 미리 듣기에 실패했습니다.');
+        setVoicePreviewMessage('음성 미리 듣기에 실패했습니다. 브라우저 메모리나 모델 캐시 상태를 확인해 주세요.');
       };
       await audio.play();
+
+      if (provider === 'chatterbox') {
+        setVoicePreviewMessage(routing.voiceReferenceName
+          ? `Chatterbox 고품질 무료 모델로 ${routing.voiceReferenceName} 목소리를 반영한 미리 듣기 중입니다.`
+          : 'Chatterbox 고품질 무료 모델로 한국어 기본 보이스 미리 듣기 중입니다.');
+        return;
+      }
+
+      if (provider === 'qwen3Tts') {
+        setVoicePreviewMessage(routing.voiceReferenceName
+          ? `경량 무료 모델로 ${routing.voiceReferenceName} 목소리를 반영한 미리 듣기 중입니다.`
+          : '경량 무료 모델로 한국어 기본 보이스 미리 듣기 중입니다.');
+        return;
+      }
+
       setVoicePreviewMessage(`ElevenLabs (${selectedElevenVoice?.name || asset.voiceId || '기본 보이스'}) 미리 듣기 중입니다.`);
     } catch {
       setIsVoicePreviewing(false);
-      setVoicePreviewMessage('음성 미리 듣기에 실패했습니다. API 연결 상태를 확인해 주세요.');
+      setVoicePreviewMessage('음성 미리 듣기에 실패했습니다. 무료 모델은 @huggingface/transformers 설치 및 브라우저 리소스를 확인해 주세요.');
     }
   }, [
     isVoicePreviewing,
     providerValues.elevenLabsApiKey,
-    recordedVoiceSampleUrl,
     routing,
-    selectedChatterboxVoice,
     selectedElevenVoice,
     stopVoicePreview,
   ]);
@@ -494,6 +473,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       voiceRecorderStreamRef.current = stream;
       voiceRecorderRef.current = recorder;
       voiceRecorderChunksRef.current = [];
+      clearVoiceRecorderTimers();
 
       recorder.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
@@ -513,7 +493,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
             voiceReferenceMimeType: blob.type || recorder.mimeType || mimeType || 'audio/webm',
             voiceReferenceName: `voice-reference.${(blob.type || recorder.mimeType || mimeType || 'audio/webm').includes('mp4') ? 'm4a' : 'webm'}`,
           }));
-          setVoicePreviewMessage(base64 ? '녹음한 목소리 샘플을 저장했습니다. Chatterbox 기본 목소리로 바로 사용할 수 있습니다.' : '녹음 저장에 실패했습니다. 다시 시도해 주세요.');
+          setVoicePreviewMessage(base64
+            ? '녹음한 목소리 샘플을 저장했습니다. 무료 TTS 생성에 바로 사용할 수 있습니다.'
+            : '녹음 저장에 실패했습니다. 다시 시도해 주세요.');
           stopVoiceRecorderStream();
         };
         reader.readAsDataURL(blob);
@@ -521,12 +503,66 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
 
       recorder.start();
       setIsRecordingVoiceSample(true);
-      setVoicePreviewMessage('녹음 중입니다. 짧게 읽은 뒤 다시 버튼을 눌러 저장하세요.');
+      setVoiceSampleSecondsLeft(VOICE_SAMPLE_MAX_SECONDS);
+      setVoicePreviewMessage('녹음 중입니다. 15초 안에서 또렷하게 읽으면 자동 저장됩니다.');
+
+      voiceRecorderStopTimerRef.current = window.setTimeout(() => {
+        if (voiceRecorderRef.current && voiceRecorderRef.current.state !== 'inactive') {
+          voiceRecorderRef.current.stop();
+        }
+      }, VOICE_SAMPLE_MAX_SECONDS * 1000);
+
+      const startedAt = Date.now();
+      voiceRecorderCountdownRef.current = window.setInterval(() => {
+        const elapsedSeconds = (Date.now() - startedAt) / 1000;
+        const nextLeft = Math.max(0, Math.ceil(VOICE_SAMPLE_MAX_SECONDS - elapsedSeconds));
+        setVoiceSampleSecondsLeft(nextLeft);
+      }, 250);
     } catch {
       stopVoiceRecorderStream();
       setVoicePreviewMessage('마이크 권한을 확인한 뒤 다시 시도해 주세요.');
     }
-  }, [isRecordingVoiceSample, stopVoiceRecorderStream]);
+  }, [clearVoiceRecorderTimers, isRecordingVoiceSample, stopVoiceRecorderStream]);
+
+  const handleVoiceSampleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      const objectUrl = URL.createObjectURL(file);
+      const duration = await new Promise<number>((resolve, reject) => {
+        const audio = document.createElement('audio');
+        audio.preload = 'metadata';
+        audio.onloadedmetadata = () => resolve(Number.isFinite(audio.duration) ? audio.duration : 0);
+        audio.onerror = () => reject(new Error('오디오 길이를 읽지 못했습니다.'));
+        audio.src = objectUrl;
+      });
+      URL.revokeObjectURL(objectUrl);
+
+      if (duration > VOICE_SAMPLE_MAX_SECONDS) {
+        setVoicePreviewMessage(`목소리 파일은 ${VOICE_SAMPLE_MAX_SECONDS}초 이하만 등록할 수 있습니다. 현재 파일은 약 ${Math.ceil(duration)}초입니다.`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = typeof reader.result === 'string' ? reader.result : '';
+        const base64 = result.includes(',') ? result.split(',')[1] || '' : '';
+        setRouting((prev) => ({
+          ...prev,
+          voiceReferenceAudioData: base64 || null,
+          voiceReferenceMimeType: file.type || 'audio/webm',
+          voiceReferenceName: file.name,
+        }));
+        setVoicePreviewMessage(base64 ? `${file.name} 파일을 목소리 샘플로 저장했습니다.` : '목소리 파일 저장에 실패했습니다.');
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setVoicePreviewMessage('목소리 파일을 불러오지 못했습니다. 다른 파일로 다시 시도해 주세요.');
+    }
+  }, []);
+
 
   const playRecordedVoiceSample = useCallback(async () => {
     if (!recordedVoiceSampleUrl) {
@@ -1317,50 +1353,61 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 <label className="mt-2 block">
                   <div className="mb-1 text-xs font-bold text-slate-700">음성 공급자</div>
                   <select value={routing.ttsProvider === 'elevenLabs' && isPaidMode ? 'elevenLabs' : routing.ttsProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts'} onChange={(e) => setRouting((prev) => ({ ...prev, ttsProvider: e.target.value as 'qwen3Tts' | 'chatterbox' | 'elevenLabs', audioProvider: e.target.value as 'qwen3Tts' | 'chatterbox' | 'elevenLabs' }))} className={inputClass}>
-                    <option value="qwen3Tts">🆓 qwen3-tts</option>
-                    <option value="chatterbox">🆓 Chatterbox</option>
+                    <option value="qwen3Tts">🆓 qwen3-tts 경량 모델</option>
+                    <option value="chatterbox">🆓 Chatterbox 고품질 모델</option>
                     <option value="elevenLabs">💳 ElevenLabs</option>
                   </select>
                 </label>
                 {routing.ttsProvider === 'qwen3Tts' ? (
                   <label className="mt-2 block">
-                    <div className="mb-1 text-xs font-bold text-slate-700">qwen3-tts 보이스 프리셋</div>
+                    <div className="mb-1 text-xs font-bold text-slate-700">qwen3-tts 보이스 프리셋 · 경량 무료 모델</div>
                     <select value={routing.qwenVoicePreset || 'qwen-default'} onChange={(e) => setRouting((prev) => ({ ...prev, qwenVoicePreset: e.target.value, ttsNarratorId: e.target.value }))} className={inputClass}>
                       {QWEN_TTS_PRESET_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                     </select>
                   </label>
                 ) : null}
                 {routing.ttsProvider === 'chatterbox' ? (
-                  <>
-                    <label className="mt-2 block">
-                      <div className="mb-1 text-xs font-bold text-slate-700">Chatterbox 프리셋</div>
-                      <select value={routing.chatterboxVoicePreset || 'chatterbox-clear'} onChange={(e) => setRouting((prev) => ({ ...prev, chatterboxVoicePreset: e.target.value, ttsNarratorId: e.target.value }))} className={inputClass}>
-                        {CHATTERBOX_TTS_PRESET_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                      </select>
-                    </label>
-                    <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-3">
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                          <div className="text-xs font-black text-slate-900">목소리 샘플 녹음</div>
-                          <p className="mt-1 text-[11px] leading-5 text-slate-500">10초 안팎으로 또렷하게 읽은 샘플을 저장해 두면 무료 기본 목소리 확인용으로 바로 재생할 수 있습니다.</p>
-                        </div>
-                        <button type="button" onClick={() => void handleToggleVoiceSampleRecording()} className={`rounded-xl px-3 py-2 text-xs font-black ${isRecordingVoiceSample ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
-                          {isRecordingVoiceSample ? '녹음 저장' : '목소리 녹음 시작'}
-                        </button>
+                  <label className="mt-2 block">
+                    <div className="mb-1 text-xs font-bold text-slate-700">Chatterbox 프리셋 · 고품질 무료 모델</div>
+                    <select value={routing.chatterboxVoicePreset || 'chatterbox-clear'} onChange={(e) => setRouting((prev) => ({ ...prev, chatterboxVoicePreset: e.target.value, ttsNarratorId: e.target.value }))} className={inputClass}>
+                      {CHATTERBOX_TTS_PRESET_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    </select>
+                  </label>
+                ) : null}
+                {(routing.ttsProvider === 'qwen3Tts' || routing.ttsProvider === 'chatterbox') ? (
+                  <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <div className="text-xs font-black text-slate-900">목소리 등록 · 녹음 또는 파일 업로드</div>
+                        <p className="mt-1 text-[11px] leading-5 text-slate-500">무료 TTS는 긴 문장을 문단 단위로 잘라 생성합니다. 목소리 샘플은 15초 이하, 또렷한 단일 화자 음성으로 등록해 주세요.</p>
                       </div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <button type="button" onClick={() => void playRecordedVoiceSample()} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400">
-                          저장된 샘플 듣기
-                        </button>
-                        <button type="button" onClick={clearRecordedVoiceSample} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:border-slate-200 disabled:text-slate-400">
-                          샘플 삭제
-                        </button>
-                      </div>
-                      <div className="mt-2 text-[11px] leading-5 text-slate-500">
-                        {recordedVoiceSampleUrl ? `저장된 파일: ${routing.voiceReferenceName || 'recorded-voice.webm'}` : '아직 저장된 목소리 샘플이 없습니다.'}
-                      </div>
+                      <button type="button" onClick={() => void handleToggleVoiceSampleRecording()} className={`rounded-xl px-3 py-2 text-xs font-black ${isRecordingVoiceSample ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
+                        {isRecordingVoiceSample ? `녹음 저장 (${voiceSampleSecondsLeft}s)` : '목소리 녹음 시작'}
+                      </button>
                     </div>
-                  </>
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-[11px] leading-5 text-slate-600">
+                      <div className="font-black text-slate-900">녹음 예시 문장</div>
+                      <div className="mt-1">안녕하세요. 저는 또렷하고 자연스럽게 말합니다. 오늘은 제 목소리 샘플을 등록합니다. 짧고 안정적인 속도로 읽겠습니다.</div>
+                      <div className="mt-2">15초 안에서 숨소리와 배경 소음을 줄이고, 한국어를 기본으로 읽어 주세요. 실제 생성은 step2에서 선택한 언어 문장을 그대로 따릅니다.</div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <label className="inline-flex cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100">
+                        목소리 파일 등록
+                        <input type="file" accept="audio/*" className="hidden" onChange={(e) => void handleVoiceSampleFileChange(e)} />
+                      </label>
+                      <button type="button" onClick={() => void playRecordedVoiceSample()} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400">
+                        저장된 샘플 듣기
+                      </button>
+                      <button type="button" onClick={clearRecordedVoiceSample} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:border-slate-200 disabled:text-slate-400">
+                        샘플 삭제
+                      </button>
+                    </div>
+                    <div className="mt-2 text-[11px] leading-5 text-slate-500">
+                      {recordedVoiceSampleUrl
+                        ? `저장된 파일: ${routing.voiceReferenceName || 'recorded-voice.webm'} · 무료 TTS 생성에 바로 사용됩니다.`
+                        : '저장된 목소리가 없어 한국어 기본 보이스로 생성됩니다. step2 언어를 선택하면 해당 언어 문장으로 생성됩니다.'}
+                    </div>
+                  </div>
                 ) : null}
                 {routing.ttsProvider === 'elevenLabs' ? (
                   <>
@@ -1382,8 +1429,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                   {routing.ttsProvider === 'elevenLabs'
                     ? `현재 기본 보이스: ${selectedElevenVoice?.name || 'ElevenLabs 기본 보이스'}${selectedElevenVoice?.labels?.gender ? ` · ${selectedElevenVoice.labels.gender}` : ''}`
                     : routing.ttsProvider === 'chatterbox'
-                      ? `현재 기본 보이스: ${selectedChatterboxVoice?.name || 'Chatterbox 클리어'}${routing.voiceReferenceName ? ` · 녹음 샘플 ${routing.voiceReferenceName}` : ''}`
-                      : `현재 기본 보이스: ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'}`}
+                      ? `현재 기본 보이스: ${selectedChatterboxVoice?.name || 'Chatterbox 클리어'} · 고품질 무료 모델${routing.voiceReferenceName ? ` · 등록 샘플 ${routing.voiceReferenceName}` : ''}`
+                      : `현재 기본 보이스: ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'} · 경량 무료 모델${routing.voiceReferenceName ? ` · 등록 샘플 ${routing.voiceReferenceName}` : ''}`}
                 </div>
                 <button type="button" onClick={() => void playVoicePreview()} className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
                   {isVoicePreviewing ? '음성 정지' : '음성 재생'}
@@ -1392,7 +1439,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 {routing.ttsProvider === 'elevenLabs' && !providerValues.elevenLabsApiKey.trim() ? (
                   <p className="mt-2 text-xs text-amber-600">선택한 음성 모델은 API 연결이 필요합니다. API 등록 후 다시 시도해 주세요.</p>
                 ) : routing.ttsProvider === 'chatterbox' ? (
-                  <p className="mt-2 text-xs text-emerald-600">Chatterbox는 무료 기본 모드로 저장됩니다. 녹음한 샘플은 설정에 함께 저장됩니다.</p>
+                  <p className="mt-2 text-xs text-emerald-600">무료 모델은 브라우저에서 직접 생성됩니다. qwen3-tts는 경량, Chatterbox는 고품질 모드로 저장되며 녹음/업로드한 샘플은 함께 저장됩니다.</p>
                 ) : null}
                 {isLoadingVoices ? <p className="mt-2 text-xs text-slate-500">보이스 목록을 불러오는 중입니다.</p> : null}
               </div>

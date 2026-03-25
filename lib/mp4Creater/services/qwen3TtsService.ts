@@ -32,7 +32,8 @@ function wavFromSamples(samples: Float32Array, sampleRate: number): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
   for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
-  return typeof window !== 'undefined' ? btoa(binary) : (globalThis as any).Buffer.from(buffer).toString('base64');
+  const base64 = typeof window !== 'undefined' ? btoa(binary) : (globalThis as any).Buffer.from(buffer).toString('base64');
+  return `data:audio/wav;base64,${base64}`;
 }
 
 function createSampleVoice(text: string, preset: string) {

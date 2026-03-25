@@ -9,6 +9,7 @@ import {
   WorkflowStepContract,
 } from '../types';
 import { createLightweightSceneAssetsFromDraft } from './sceneAssemblyService';
+import { DEFAULT_SELECTIONS } from './workflowDraftService';
 import { splitStoryIntoParagraphScenes } from '../utils/storyHelpers';
 
 export const SCRIPT_CHARS_PER_MINUTE_BY_CONTENT_TYPE: Record<ContentType, number> = {
@@ -33,6 +34,35 @@ function normalizeParagraphRecommendation(contentType: ContentType, minutes: num
 function countScenesFromScript(script: string) {
   const scenes = splitStoryIntoParagraphScenes(script || '');
   return scenes.length;
+}
+
+function normalizeText(value?: string | null) {
+  return (value || '').trim();
+}
+
+function getSafeSelections(draft: WorkflowDraft) {
+  const fallback = DEFAULT_SELECTIONS[draft.contentType] || DEFAULT_SELECTIONS.story;
+  return {
+    genre: normalizeText(draft.selections?.genre) || fallback.genre || '',
+    mood: normalizeText(draft.selections?.mood) || fallback.mood || '',
+    endingTone: normalizeText(draft.selections?.endingTone) || fallback.endingTone || '',
+    setting: normalizeText(draft.selections?.setting) || fallback.setting || '',
+    protagonist: normalizeText(draft.selections?.protagonist) || fallback.protagonist || '',
+    conflict: normalizeText(draft.selections?.conflict) || fallback.conflict || '',
+  };
+}
+
+function joinUniqueBlocks(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  return values
+    .flatMap((value) => (value || '').split(/\n\s*\n/g).map((block) => block.trim()).filter(Boolean))
+    .filter((block) => {
+      const key = block.replace(/\s+/g, ' ').trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .join('\n\n');
 }
 
 function resolveSelectedTemplate(draft: WorkflowDraft) {
@@ -89,18 +119,12 @@ export function buildWorkflowInputSignature(draft: Pick<WorkflowDraft,
   | 'promptTemplates'
 >) {
   const selectedTemplate = resolveSelectedTemplate(draft as WorkflowDraft);
+  const safeSelections = getSafeSelections(draft as WorkflowDraft);
   return JSON.stringify({
     contentType: draft.contentType,
     aspectRatio: draft.aspectRatio,
-    topic: (draft.topic || '').trim(),
-    selections: {
-      genre: draft.selections?.genre || '',
-      mood: draft.selections?.mood || '',
-      endingTone: draft.selections?.endingTone || '',
-      setting: draft.selections?.setting || '',
-      protagonist: draft.selections?.protagonist || '',
-      conflict: draft.selections?.conflict || '',
-    },
+    topic: normalizeText(draft.topic) || '샘플 주제',
+    selections: safeSelections,
     selectedPromptTemplateId: draft.selectedPromptTemplateId || null,
     selectedPromptTemplatePrompt: selectedTemplate?.prompt || '',
     selectedCharacterIds: Array.isArray(draft.selectedCharacterIds) ? [...draft.selectedCharacterIds].sort() : [],
@@ -186,12 +210,14 @@ export function buildWorkflowPromptStore(options: {
   const selectedTemplate = resolveSelectedTemplate(draft);
   const selectedStyle = resolveSelectedStyle(draft);
 
-  const finalImagePrompt = projectPrompts?.imagePrompt
-    || assets.map((item) => item.imagePrompt || item.visualPrompt).filter(Boolean).join('\n\n')
-    || '';
-  const finalVideoPrompt = projectPrompts?.videoPrompt
-    || assets.map((item) => item.videoPrompt).filter(Boolean).join('\n\n')
-    || '';
+  const finalImagePrompt = joinUniqueBlocks([
+    projectPrompts?.imagePrompt,
+    ...assets.map((item) => item.imagePrompt || item.visualPrompt),
+  ]);
+  const finalVideoPrompt = joinUniqueBlocks([
+    projectPrompts?.videoPrompt,
+    ...assets.map((item) => item.videoPrompt),
+  ]);
   const finalScript = draft.script || assets.map((item) => item.narration).filter(Boolean).join('\n\n') || '';
 
   return {
@@ -257,6 +283,8 @@ export function buildWorkflowStepContract(options: {
   const selectedTemplate = resolveSelectedTemplate(draft);
   const selectedStyle = resolveSelectedStyle(draft);
   const selectedCharacters = resolveSelectedCharacters(draft);
+  const safeSelections = getSafeSelections(draft);
+  const resolvedTopic = normalizeText(draft.topic) || '샘플 주제';
   const assets = createAssetsForSummary(draft, options.assets);
   const promptStore = buildWorkflowPromptStore({ draft, assets, projectPrompts: options.projectPrompts });
   const generationMeta = options.generationMeta || null;
@@ -270,7 +298,7 @@ export function buildWorkflowStepContract(options: {
   const missingInputs = [
     !draft.hasSelectedContentType && !draft.completedSteps?.step1 ? 'step1.contentType' : '',
     !draft.hasSelectedAspectRatio && !draft.completedSteps?.step1 ? 'step1.aspectRatio' : '',
-    !draft.topic?.trim() ? 'step2.topic' : '',
+    !resolvedTopic ? 'step2.topic' : '',
     !selectedTemplate ? 'step3.selectedPromptTemplate' : '',
     !draft.script?.trim() && !finalScript.trim() && draft.customScriptSettings?.language !== 'mute' ? 'step3.script' : '',
     !selectedCharacters.length ? 'step4.selectedCharacters' : '',
@@ -290,15 +318,8 @@ export function buildWorkflowStepContract(options: {
       isConversational: selectedTemplate?.mode === 'dialogue',
       scriptLanguage: (draft.customScriptSettings?.language || 'ko') as ScriptLanguageOption,
       speechStyle: (draft.customScriptSettings?.speechStyle || 'default') as ScriptSpeechStyle,
-      contentTopic: draft.topic || '',
-      selections: {
-        genre: draft.selections?.genre || '',
-        mood: draft.selections?.mood || '',
-        endingTone: draft.selections?.endingTone || '',
-        setting: draft.selections?.setting || '',
-        protagonist: draft.selections?.protagonist || '',
-        conflict: draft.selections?.conflict || '',
-      },
+      contentTopic: resolvedTopic,
+      selections: safeSelections,
     },
     step3: {
       recommendedCharacterCount,
@@ -370,16 +391,19 @@ export function buildWorkflowStepContract(options: {
           aspectRatio: draft.aspectRatio,
         },
         step2: {
-          topic: draft.topic || '',
+          topic: resolvedTopic,
+          resolvedTopic,
           duration: expectedDurationMinutes,
           language: draft.customScriptSettings?.language || 'ko',
           speechStyle: draft.customScriptSettings?.speechStyle || 'default',
+          selections: safeSelections,
         },
         step3: {
           promptTemplateId: selectedTemplate?.id || null,
           promptTemplateName: selectedTemplate?.name || null,
           castIds: selectedCharacters.map((character) => character.id),
           usedSampleFallback: Boolean(generationMeta?.usedSampleFallback),
+          generationSource: generationMeta?.source || (draft.script?.trim() ? 'manual' : 'sample'),
         },
         step4: {
           selectedCharacterIds: selectedCharacters.map((character) => character.id),

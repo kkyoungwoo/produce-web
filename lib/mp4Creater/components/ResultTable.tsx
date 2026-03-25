@@ -44,6 +44,7 @@ interface ResultTableProps {
   data: GeneratedAsset[];
   onRegenerateImage?: (index: number) => void;
   onRegenerateAudio?: (index: number) => void;
+  onDeleteAllAudio?: () => void;
   onExportVideo?: (options: { enableSubtitles: boolean; qualityMode: 'preview' | 'final' }) => void;
   onGenerateAnimation?: (index: number, options?: { sourceImageData?: string | null }) => void | Promise<void>;
   onNarrationChange?: (index: number, narration: string) => void;
@@ -52,6 +53,7 @@ interface ResultTableProps {
   onSelectedVisualTypeChange?: (index: number, mode: 'image' | 'video') => void;
   onDurationChange?: (index: number, duration: number) => void;
   onAddParagraphScene?: () => void;
+  onDeleteParagraphScene?: (index: number) => void;
   onOpenSettings?: () => void;
   onRequestProviderSetup?: (kind: 'text' | 'audio' | 'video') => void;
   isExporting?: boolean;
@@ -111,7 +113,9 @@ const getAdjustedAudioDuration = (audioDuration?: number | null, silenceTrim?: n
 };
 
 const getSceneCutDuration = (row: GeneratedAsset, silenceTrim?: number | null) => {
-  return Math.max(3, Math.min(row.targetDuration || 3, getAdjustedAudioDuration(row.audioDuration, silenceTrim) || row.targetDuration || 3));
+  const audioDuration = getAdjustedAudioDuration(row.audioDuration, silenceTrim);
+  const preferredDuration = audioDuration || row.targetDuration || row.videoDuration || 0;
+  return Math.max(0, Math.min(MAX_SCENE_DURATION, Number(preferredDuration.toFixed(1))));
 };
 
 const resolveImageSrc = (value?: string | null) => {
@@ -276,6 +280,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   data,
   onRegenerateImage,
   onRegenerateAudio,
+  onDeleteAllAudio,
   onExportVideo,
   onGenerateAnimation,
   onNarrationChange,
@@ -284,6 +289,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   onSelectedVisualTypeChange,
   onDurationChange,
   onAddParagraphScene,
+  onDeleteParagraphScene,
   onOpenSettings,
   onRequestProviderSetup,
   isExporting,
@@ -885,8 +891,12 @@ const ResultTable: React.FC<ResultTableProps> = ({
     event.preventDefault();
   };
 
-  const openPreviewAtScene = (index: number, autoplay: boolean = true) => {
+  const openPreviewModal = async () => {
     setPreviewOpen(true);
+  };
+
+  const openPreviewAtScene = (index: number, autoplay: boolean = true) => {
+    void openPreviewModal();
     setSequenceSceneIndex(index);
     if (!autoplay) return;
     window.setTimeout(() => {
@@ -1092,10 +1102,20 @@ const ResultTable: React.FC<ResultTableProps> = ({
               <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
                 <span className="rounded-full bg-slate-100 px-3 py-2">씬 {data.length}</span>
                 <span className="rounded-full bg-slate-100 px-3 py-2">이미지 {summary.imageCount}</span>
+                <span className="rounded-full bg-slate-100 px-3 py-2">오디오 {summary.audioCount}</span>
                 <span className="rounded-full bg-slate-100 px-3 py-2">영상 {summary.videoCount}</span>
                 <span className="rounded-full bg-slate-100 px-3 py-2">총 {formatSeconds(totalDuration)}</span>
               </div>
             </div>
+            {onDeleteAllAudio ? (
+              <button
+                type="button"
+                onClick={onDeleteAllAudio}
+                className="rounded-2xl border border-rose-200 bg-white px-4 py-3 text-sm font-black text-rose-600 hover:bg-rose-50"
+              >
+                생성된 오디오 전체 삭제
+              </button>
+            ) : null}
           </div>
         {false && (
           <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${isGenerating || activeOverallProgress !== null ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
@@ -1695,7 +1715,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                             <span>컷 길이</span>
                             <span>{formatSeconds(row.targetDuration)}</span>
                           </div>
-                          <input type="range" min="3" max={MAX_SCENE_DURATION} step="0.5" value={Math.min(MAX_SCENE_DURATION, row.targetDuration || 5)} onChange={(e) => onDurationChange?.(index, Number(e.target.value))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
+                          <input type="range" min="0" max={MAX_SCENE_DURATION} step="0.5" value={Math.min(MAX_SCENE_DURATION, Math.max(0, row.targetDuration || 0))} onChange={(e) => onDurationChange?.(index, Number(e.target.value))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
                           <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">Step1 비율은 유지하고 컷 길이만 조절합니다.</div>
                         </div>
                         {!isMuteMode ? (
@@ -1723,7 +1743,19 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 </div>
 
                 <div className="border-t border-slate-200 bg-slate-50 p-3 xl:border-l xl:border-t-0">
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">생성 작업</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">생성 작업</div>
+                    {onDeleteParagraphScene ? (
+                      <button
+                        type="button"
+                        onMouseDown={preventButtonFocusScroll}
+                        onClick={() => onDeleteParagraphScene(index)}
+                        className="rounded-full border border-rose-200 bg-white px-2.5 py-1 text-[11px] font-black text-rose-600 transition hover:bg-rose-50"
+                      >
+                        삭제
+                      </button>
+                    ) : null}
+                  </div>
                   <div className="mt-2 space-y-2.5">
                                         {!isMuteMode && onRegenerateAudio && (
                       <div className="space-y-2">
@@ -1827,14 +1859,16 @@ const ResultTable: React.FC<ResultTableProps> = ({
                       </div>
                     )}
 
-                    <button
-                      type="button"
-                      onMouseDown={preventButtonFocusScroll}
-                      onClick={() => { setActiveModelPicker(null); setSceneInlineSettingsOpen((prev) => ({ ...prev, [index]: !prev[index] })); }}
-                      className={`w-full rounded-2xl border px-3 py-3 text-sm font-bold transition ${sceneInlineSettingsOpen[index] ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-                    >
-                      {sceneInlineSettingsOpen[index] ? '문단 설정 닫기' : '문단 설정 열기'}
-                    </button>
+                    {hasRenderableVideo(row) && (
+                      <button
+                        type="button"
+                        onMouseDown={preventButtonFocusScroll}
+                        onClick={() => { setActiveModelPicker(null); setSceneInlineSettingsOpen((prev) => ({ ...prev, [index]: !prev[index] })); }}
+                        className={`w-full rounded-2xl border px-3 py-3 text-sm font-bold transition ${sceneInlineSettingsOpen[index] ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                      >
+                        {sceneInlineSettingsOpen[index] ? '문단 설정 닫기' : '문단 설정 열기'}
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2060,7 +2094,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
             <button
               type="button"
               onClick={() => {
-                setPreviewOpen(true);
+                void openPreviewModal();
               }}
               className="min-w-[140px] rounded-full bg-slate-900 px-6 py-3 text-sm font-black text-white transition hover:bg-slate-800"
             >

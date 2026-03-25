@@ -1,2 +1,70 @@
-[00:00:01.627] Server  LOG     ✓ Ready in 1403ms
-[00:01:52.656] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:01.731] Server  LOG     ✓ Ready in 1508ms
+[00:00:01.753] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:00:01.771] Server  WARN    ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[00:00:04.968] Server  LOG     ○ Compiling /mp4Creater/step-6 ...
+[00:00:05.678] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:00:05.752] Server  WARN    ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[00:00:06.511] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:06.625] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:04:35.098] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:04:46.475] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:04:46.896] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:04:47.275] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:04:47.702] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:04:48.081] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:06:07.604] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:06:08.035] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:06:08.466] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:06:08.885] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:06:09.286] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:11:07.177] Browser LOG     [Video] 총 5개 씬 중 5개 렌더링, 자막: 비활성화
+[00:11:07.177] Browser WARN    [Video] 씬 1: Image load failed, 플레이스홀더 사용
+[00:11:07.177] Browser LOG     [Video] 씬 1 오디오 없음, 기본 3초 사용
+[00:11:07.177] Browser WARN    [Video] 씬 2: Image load failed, 플레이스홀더 사용
+[00:11:07.177] Browser LOG     [Video] 씬 2 오디오 없음, 기본 3초 사용
+[00:11:07.177] Browser WARN    [Video] 씬 3: Image load failed, 플레이스홀더 사용
+[00:11:07.177] Browser LOG     [Video] 씬 3 오디오 없음, 기본 3초 사용
+[00:11:07.177] Browser WARN    [Video] 씬 4: Image load failed, 플레이스홀더 사용
+[00:11:07.177] Browser LOG     [Video] 씬 4 오디오 없음, 기본 3초 사용
+[00:11:07.177] Browser WARN    [Video] 씬 5: Image load failed, 플레이스홀더 사용
+[00:11:07.177] Browser LOG     [Video] 씬 5 오디오 없음, 기본 3초 사용
+[00:20:55.416] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:20:55.833] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:20:56.246] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:20:56.672] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:20:57.019] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:31:19.316] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:31:19.979] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:31:20.113] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:31:57.366] Browser LOG     [Video] 총 3개 씬 중 3개 렌더링, 자막: 비활성화
+[00:31:57.366] Browser WARN    [Video] 씬 1: Image load failed, 플레이스홀더 사용
+[00:31:57.366] Browser LOG     [Video] 씬 1 오디오 없음, 기본 3초 사용
+[00:31:57.366] Browser WARN    [Video] 씬 2: Image load failed, 플레이스홀더 사용
+[00:31:57.366] Browser LOG     [Video] 씬 2 오디오 없음, 기본 3초 사용
+[00:31:57.366] Browser WARN    [Video] 씬 3: Image load failed, 플레이스홀더 사용
+[00:31:57.366] Browser LOG     [Video] 씬 3 오디오 없음, 기본 3초 사용
+[00:33:48.882] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:33:49.847] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:33:49.980] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:33:50.173] Browser LOG     [Video] 총 3개 씬 중 3개 렌더링, 자막: 비활성화
+[00:33:50.174] Browser WARN    [Video] 씬 1: Image load failed, 플레이스홀더 사용
+[00:33:50.174] Browser LOG     [Video] 씬 1 오디오 없음, 기본 3초 사용
+[00:33:50.174] Browser WARN    [Video] 씬 2: Image load failed, 플레이스홀더 사용
+[00:33:50.174] Browser LOG     [Video] 씬 2 오디오 없음, 기본 3초 사용
+[00:33:50.174] Browser WARN    [Video] 씬 3: Image load failed, 플레이스홀더 사용
+[00:33:50.174] Browser LOG     [Video] 씬 3 오디오 없음, 기본 3초 사용
+[00:38:18.797] Browser LOG     [Video] 총 3개 씬 중 3개 렌더링, 자막: 비활성화
+[00:38:18.797] Browser WARN    [Video] 씬 1: Image load failed, 플레이스홀더 사용
+[00:38:18.797] Browser LOG     [Video] 씬 1 오디오 없음, 기본 3초 사용
+[00:38:18.797] Browser WARN    [Video] 씬 2: Image load failed, 플레이스홀더 사용
+[00:38:18.797] Browser LOG     [Video] 씬 2 오디오 없음, 기본 3초 사용
+[00:38:18.797] Browser WARN    [Video] 씬 3: Image load failed, 플레이스홀더 사용
+[00:38:18.797] Browser LOG     [Video] 씬 3 오디오 없음, 기본 3초 사용
+[00:38:31.051] Browser LOG     [Video] 총 3개 씬 중 3개 렌더링, 자막: 비활성화
+[00:38:31.051] Browser WARN    [Video] 씬 1: Image load failed, 플레이스홀더 사용
+[00:38:31.051] Browser LOG     [Video] 씬 1 오디오 없음, 기본 3초 사용
+[00:38:31.051] Browser WARN    [Video] 씬 2: Image load failed, 플레이스홀더 사용
+[00:38:31.051] Browser LOG     [Video] 씬 2 오디오 없음, 기본 3초 사용
+[00:38:31.051] Browser WARN    [Video] 씬 3: Image load failed, 플레이스홀더 사용
+[00:38:31.052] Browser LOG     [Video] 씬 3 오디오 없음, 기본 3초 사용
+[00:39:56.436] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}

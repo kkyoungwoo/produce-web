@@ -115,9 +115,9 @@ function createAmbientTrack(seedText: string, seconds = 20, mood = 'ambient') {
 }
 
 function buildMusicVideoReference(draft: WorkflowDraft) {
-  const story = (draft.script || '').trim().replace(/\s+/g, ' ');
-  const excerpt = story ? story.slice(0, 120) : `${draft.topic || '프로젝트 주제'}를 따라가는 장면 흐름`;
-  return `뮤직비디오 콘셉트이며 대본 흐름은 "${excerpt}"입니다.`;
+  const lyrics = (draft.script || '').trim().replace(/\s+/g, ' ');
+  const excerpt = lyrics ? lyrics.slice(0, 140) : `${draft.topic || '프로젝트 주제'}를 따라가는 장면 흐름`;
+  return `뮤직비디오 콘셉트이며 step3에서 작성한 가사를 그대로 lyric reference로 사용합니다. 현재 가사/대본 흐름은 "${excerpt}"이며, step6 배경음악은 이 가사의 훅, 리듬, 보컬 호흡을 우선 반영해야 합니다.`;
 }
 
 export function buildBackgroundMusicPromptSections(
@@ -139,7 +139,7 @@ export function buildBackgroundMusicPromptSections(
     ? `보컬 성별은 자유 선택, 장르는 ${genre} 결의 감성 팝, 시네마틱 팝, 혹은 밝은 팝/댄스와 친밀한 시티팝/Lo-Fi 대화형 톤 사이에서 프로젝트 무드에 맞게 결정합니다. 프로젝트 주제는 ${topic}, 배경 무드는 ${setting}이며 ${protagonist}의 감정선과 ${conflict} 흐름이 음악 정체성에 자연스럽게 스며들어야 합니다.`
     : `보컬은 필요 시 최소화하고, 장르는 ${genre} 결의 인스트루멘털 중심 cinematic background로 설정합니다. 프로젝트 주제 ${topic}, 주요 배경 ${setting}, 주인공 ${protagonist}, 핵심 변화 ${conflict}를 방해하지 않는 배경음 정체성을 유지합니다.`;
   const moodBase = draft.contentType === 'music_video'
-    ? `${mood} 감정선, 미디엄 템포 ${bpm} BPM, ${key}, ${buildMusicVideoReference(draft)} 선택 언어는 ${languageLabel} 기준으로 자연스럽게 들려야 하고, 보컬이 들어가면 음절이 너무 뭉개지지 않게 또렷한 발음과 립싱크 친화적인 프레이징을 유지합니다. 후렴이나 반복 구간이 떠오를 수 있는 리듬 포인트를 분명하게 둡니다.`
+    ? `${mood} 감정선, 미디엄 템포 ${bpm} BPM, ${key}, ${buildMusicVideoReference(draft)} 선택 언어는 ${languageLabel} 기준으로 자연스럽게 들려야 하고, 보컬이 들어가면 step3 가사 줄바꿈과 문장 호흡을 최대한 유지한 채 음절이 너무 뭉개지지 않도록 또렷한 발음과 립싱크 친화적인 프레이징을 유지합니다. 후렴이나 반복 구간이 떠오를 수 있는 리듬 포인트를 분명하게 둡니다.`
     : `${mood} 분위기, 설명을 방해하지 않는 안정적인 템포 ${bpm} BPM, ${key}, 프롬프트 분위기에 맞게 전개합니다. 선택 언어가 ${languageLabel}라면 허밍이나 짧은 보컬 텍스처도 해당 언어권 발화 흐름과 어긋나지 않게 유지합니다.`;
   const instrumentsBase = draft.contentType === 'music_video'
     ? 'electric piano plays a warm motif, synth bass drives the low-end pulse, soft drums support the groove, guitar accents emotional peaks, airy pads widen the chorus, and subtle transition fx help scene cuts land on musical timing.'

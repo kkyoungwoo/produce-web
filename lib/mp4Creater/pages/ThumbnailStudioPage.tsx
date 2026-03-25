@@ -65,12 +65,16 @@ function buildReferenceImages(project: SavedProject, leadCharacterId: string | n
   const styleImages = Array.isArray(draft.styleImages) ? draft.styleImages : [];
   const lead = selectedCharacters.find((item) => item.id === leadCharacterId) || selectedCharacters[0];
   const selectedStyle = styleImages.find((item) => item.id === draft.selectedStyleImageId) || styleImages[0];
+  const sceneImageRefs = (project.assets || [])
+    .map((item) => item.imageData)
+    .filter((item): item is string => Boolean(item))
+    .slice(0, 4);
 
   return {
     character: [lead, ...selectedCharacters]
       .map((item) => getCharacterSelectedImage(item))
       .filter(Boolean) as string[],
-    style: selectedStyle?.imageData ? [selectedStyle.imageData] : [],
+    style: [selectedStyle?.imageData, ...sceneImageRefs].filter(Boolean) as string[],
     characterStrength: draft.referenceImages?.characterStrength || 70,
     styleStrength: draft.referenceImages?.styleStrength || 70,
   };
@@ -97,6 +101,20 @@ function buildRecommendedThumbnailDescription(project: SavedProject, item: Promp
   const mood = draft?.selections?.mood?.trim();
   const direction = (item.note || item.prompt || '').replace(/\s+/g, ' ').trim();
   return `${lead} 중심 구성의 ${selectedStyle?.groupLabel || selectedStyle?.label || '선택 화풍'} 추천 문구입니다.${mood ? ` 분위기는 ${mood}.` : ''}${direction ? ` 핵심 방향: ${direction.slice(0, 140)}.` : ''}`;
+}
+
+function buildAutoThumbnailHeadline(project: SavedProject) {
+  const topic = (project.topic || project.name || '프로젝트').trim();
+  const firstScene = (project.assets?.[0]?.narration || project.workflowDraft?.script || '').replace(/\s+/g, ' ').trim();
+  const lead = getSelectedCharacters(project)[0]?.name?.trim();
+  const base = lead ? `${topic} | ${lead}` : topic;
+  const candidate = firstScene ? `${base} ${firstScene.slice(0, 18)}` : base;
+  return candidate.length > 28 ? `${candidate.slice(0, 28)}…` : candidate;
+}
+
+function buildAutoThumbnailSupportText(project: SavedProject) {
+  const source = (project.assets?.[0]?.narration || project.workflowDraft?.script || project.topic || project.name || '프로젝트 장면').replace(/\s+/g, ' ').trim();
+  return source.length > 44 ? `${source.slice(0, 44)}…` : source;
 }
 
 async function copyTextToClipboard(text: string) {
@@ -139,6 +157,7 @@ export default function ThumbnailStudioPage() {
   const [isSavingSelection, setIsSavingSelection] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [statusMessage, setStatusMessage] = useState('');
+  const [thumbnailHeadline, setThumbnailHeadline] = useState('');
   const [promptText, setPromptText] = useState('');
   const [history, setHistory] = useState<PromptedImageAsset[]>([]);
   const [selectedThumbnailId, setSelectedThumbnailId] = useState<string | null>(null);
@@ -154,6 +173,7 @@ export default function ThumbnailStudioPage() {
   const stripRef = useRef<HTMLDivElement | null>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const copyFeedbackTimerRef = useRef<number | null>(null);
+  const hydratedProjectIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!projectId) {
@@ -166,10 +186,15 @@ export default function ThumbnailStudioPage() {
     const cached = readProjectNavigationProject(projectId);
     if (cached) {
       setProject(cached);
+      setThumbnailHeadline(cached.thumbnailTitle || '');
       setPromptText(cached.thumbnailPrompt || '');
       setHistory(Array.isArray(cached.thumbnailHistory) ? cached.thumbnailHistory : []);
       setSelectedThumbnailId(cached.selectedThumbnailId || null);
       setActiveThumbnailId(cached.selectedThumbnailId || cached.thumbnailHistory?.[cached.thumbnailHistory.length - 1]?.id || null);
+      setYoutubeTitle(cached.youtubeTitle || '');
+      setYoutubeDescription(cached.youtubeDescription || '');
+      setYoutubeTagsInput(Array.isArray(cached.youtubeTags) ? cached.youtubeTags.join(', ') : '');
+      hydratedProjectIdRef.current = cached.id;
       setIsLoading(false);
     }
 
@@ -186,10 +211,17 @@ export default function ThumbnailStudioPage() {
         return;
       }
       setProject(loaded);
+      setThumbnailHeadline((prev) => prev || loaded.thumbnailTitle || '');
       setPromptText((prev) => prev || loaded.thumbnailPrompt || '');
       setHistory(Array.isArray(loaded.thumbnailHistory) ? loaded.thumbnailHistory : []);
       setSelectedThumbnailId(loaded.selectedThumbnailId || null);
       setActiveThumbnailId((current) => current || loaded.selectedThumbnailId || loaded.thumbnailHistory?.[loaded.thumbnailHistory.length - 1]?.id || null);
+      if (hydratedProjectIdRef.current !== loaded.id) {
+        setYoutubeTitle(loaded.youtubeTitle || '');
+        setYoutubeDescription(loaded.youtubeDescription || '');
+        setYoutubeTagsInput(Array.isArray(loaded.youtubeTags) ? loaded.youtubeTags.join(', ') : '');
+        hydratedProjectIdRef.current = loaded.id;
+      }
       rememberProjectNavigationProject(loaded);
       setIsLoading(false);
     })();
@@ -211,41 +243,16 @@ export default function ThumbnailStudioPage() {
     try {
       const status = await fetchYoutubeConnectionStatus();
       setYoutubeStatus(status);
-      if (project?.id) {
-        const updated = await updateProject(project.id, {
-          youtubeConnectedAccount: status.connected ? {
-            email: status.email || null,
-            channelId: status.channelId || null,
-            channelTitle: status.channelTitle || null,
-          } : null,
-          youtubeChannelTitle: status.channelTitle || null,
-        });
-        if (updated) {
-          setProject(updated);
-          rememberProjectNavigationProject(updated);
-        }
-      }
     } catch (error) {
       console.error('[ThumbnailStudio] youtube status failed', error);
     } finally {
       setIsYoutubeLoading(false);
     }
-  }, [project]);
+  }, []);
 
   useEffect(() => {
     void refreshYoutubeStatus();
   }, [refreshYoutubeStatus]);
-
-  useEffect(() => {
-    if (!project) return;
-    const meta = buildYoutubeMeta(project, {
-      aspectRatio: project.workflowDraft?.aspectRatio || project.assets?.[0]?.aspectRatio || '16:9',
-      durationSeconds: project.ttsDuration || project.sceneDuration || 0,
-    });
-    setYoutubeTitle(project.youtubeTitle || meta.title);
-    setYoutubeDescription(project.youtubeDescription || meta.description);
-    setYoutubeTagsInput((project.youtubeTags && project.youtubeTags.length ? project.youtubeTags : meta.tags).join(', '));
-  }, [project]);
 
   const activeThumbnail = useMemo(
     () => history.find((item) => item.id === activeThumbnailId) || null,
@@ -305,7 +312,7 @@ export default function ThumbnailStudioPage() {
     if (!project?.id) return;
     const updated = await updateProject(project.id, {
       thumbnailHistory: nextHistory,
-      thumbnailTitle: project.thumbnailTitle || project.topic || project.name,
+      thumbnailTitle: thumbnailHeadline.trim() || project.thumbnailTitle || project.topic || project.name,
       thumbnailPrompt: promptText.trim(),
       selectedThumbnailId,
     });
@@ -313,13 +320,51 @@ export default function ThumbnailStudioPage() {
       setProject(updated);
       rememberProjectNavigationProject(updated);
     }
-  }, [project, promptText, selectedThumbnailId]);
+  }, [project, promptText, selectedThumbnailId, thumbnailHeadline]);
+
+  const handleSaveThumbnailPrompt = useCallback(async () => {
+    if (!project?.id) return;
+    const updated = await updateProject(project.id, {
+      thumbnailTitle: thumbnailHeadline.trim() || null,
+      thumbnailPrompt: promptText.trim() || null,
+    });
+    if (updated) {
+      setProject(updated);
+      rememberProjectNavigationProject(updated);
+      setStatusMessage('썸네일 문구와 디자인 프롬프트를 현재 프로젝트 기준으로 저장했습니다.');
+    }
+  }, [project, promptText, thumbnailHeadline]);
+
+  const handleAutoFillThumbnailText = useCallback(async () => {
+    if (!project) return;
+    const nextHeadline = buildAutoThumbnailHeadline(project);
+    const nextPrompt = promptText.trim() || '선택된 프로젝트 이미지 기반, 큰 한글 제목 타이포, 강한 대비, 깔끔한 유튜브 썸네일 디자인, 클릭 유도형 배치';
+    setThumbnailHeadline(nextHeadline);
+    setPromptText(nextPrompt);
+    setStatusMessage('현재 프로젝트 대본과 캐릭터 기준으로 썸네일 문구와 기본 디자인 프롬프트를 채웠습니다.');
+  }, [project, promptText]);
+
+  const handleAutoFillYoutubeMeta = useCallback(() => {
+    if (!project) return;
+    const meta = buildYoutubeMeta(project, {
+      aspectRatio: project.workflowDraft?.aspectRatio || project.assets?.[0]?.aspectRatio || '16:9',
+      durationSeconds: project.ttsDuration || project.sceneDuration || 0,
+    });
+    setYoutubeTitle(meta.title);
+    setYoutubeDescription(meta.description);
+    setYoutubeTagsInput(meta.tags.join(', '));
+    setStatusMessage('대본 느낌과 영상 비율을 바탕으로 제목, 설명, 태그를 자동 제안했습니다.');
+  }, [project]);
 
   const handleGenerateThumbnail = useCallback(async (similarTarget?: PromptedImageAsset | null) => {
     if (!project || isGenerating) return;
 
     const trimmedPrompt = promptText.trim();
+    const resolvedHeadline = thumbnailHeadline.trim() || buildAutoThumbnailHeadline(project);
+    const resolvedSubtitle = buildAutoThumbnailSupportText(project);
     const options = {
+      titleText: resolvedHeadline,
+      subtitleText: resolvedSubtitle,
       customPrompt: trimmedPrompt,
       similarPrompt: similarTarget?.prompt || '',
     };
@@ -341,7 +386,7 @@ export default function ThumbnailStudioPage() {
 
       const entry: PromptedImageAsset = {
         id: `thumbnail_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        label: buildThumbnailLabel(project, trimmedPrompt),
+        label: buildThumbnailLabel(project, resolvedHeadline || trimmedPrompt),
         prompt,
         imageData: generated || sample.dataUrl,
         createdAt: Date.now(),
@@ -367,7 +412,7 @@ export default function ThumbnailStudioPage() {
     } finally {
       setIsGenerating(false);
     }
-  }, [history, isGenerating, persistDraftHistory, project, promptText, scrollToCard]);
+  }, [history, isGenerating, persistDraftHistory, project, promptText, scrollToCard, thumbnailHeadline]);
 
   const handleSelectFinalThumbnail = useCallback(async (targetThumbnail?: PromptedImageAsset | null) => {
     const resolvedThumbnail = targetThumbnail || activeThumbnail;
@@ -383,7 +428,7 @@ export default function ThumbnailStudioPage() {
         thumbnail: resolvedThumbnail.imageData,
         thumbnailHistory: normalizedHistory,
         selectedThumbnailId: resolvedThumbnail.id,
-        thumbnailTitle: resolvedThumbnail.label || project.topic || project.name,
+        thumbnailTitle: thumbnailHeadline.trim() || resolvedThumbnail.label || project.topic || project.name,
         thumbnailPrompt: promptText.trim(),
       });
       if (!updated) throw new Error('save failed');
@@ -399,7 +444,7 @@ export default function ThumbnailStudioPage() {
     } finally {
       setIsSavingSelection(false);
     }
-  }, [activeThumbnail, history, isSavingSelection, project, promptText]);
+  }, [activeThumbnail, history, isSavingSelection, project, promptText, thumbnailHeadline]);
 
   const handleDisconnectYoutube = useCallback(async () => {
     try {
@@ -572,29 +617,61 @@ export default function ThumbnailStudioPage() {
             <section className="space-y-6">
               <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">썸네일 프롬프트</div>
-                <h2 className="mt-2 text-xl font-black text-slate-900">프롬프트를 입력하면 현재 작업 내용을 함께 반영해 생성합니다</h2>
+                <h2 className="mt-2 text-xl font-black text-slate-900">문구는 직접, 디자인은 프롬프트로 관리하고 생성은 버튼으로만 실행합니다</h2>
                 <div className="mt-5 grid gap-4">
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
+                    <label className="block">
+                      <div className="mb-2 text-sm font-black text-slate-800">썸네일 메인 문구</div>
+                      <input
+                        value={thumbnailHeadline}
+                        onChange={(e) => setThumbnailHeadline(e.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100"
+                        placeholder="예: 클릭을 부르는 한 줄 제목"
+                      />
+                    </label>
+                    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4 text-xs leading-6 text-slate-600">
+                      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">자동 보조 문구</div>
+                      <div className="mt-2 font-bold text-slate-800">{buildAutoThumbnailSupportText(project)}</div>
+                      <div className="mt-2">현재 프로젝트 첫 장면과 대본을 바탕으로 보조 문구를 자동 반영합니다. 메인 문구만 바꿔도 샘플 썸네일과 AI 프롬프트에 함께 들어갑니다.</div>
+                    </div>
+                  </div>
                   <label className="block">
-                    <div className="mb-2 text-sm font-black text-slate-800">프롬프트 입력</div>
+                    <div className="mb-2 text-sm font-black text-slate-800">디자인 프롬프트</div>
                     <textarea
                       value={promptText}
                       onChange={(e) => setPromptText(e.target.value)}
-                      rows={8}
+                      rows={7}
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100"
-                      placeholder="예: 강한 시선의 주인공 클로즈업, 큰 제목 타이포, 클릭을 부르는 대비, 긴장감 있는 유튜브 썸네일"
+                      placeholder="예: 프로젝트 장면 이미지를 배경 레퍼런스로 활용, 주인공 클로즈업, 큰 한글 제목 타이포, 강한 대비, 클릭을 부르는 유튜브 썸네일"
                     />
                   </label>
                   <div className="rounded-[24px] border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-6 text-slate-600">
-                    입력한 프롬프트에 현재 프로젝트의 대본, 선택된 캐릭터 이미지, 화풍을 함께 반영해 썸네일을 생성합니다.
+                    현재 프로젝트 캐릭터 이미지, 선택 화풍, 생성된 씬 이미지까지 함께 참고해서 썸네일을 만듭니다. 자동 채우기는 버튼을 눌렀을 때만 실행되고, 생성도 버튼을 눌렀을 때만 시작됩니다.
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleGenerateThumbnail(null)}
-                    disabled={isGenerating || !project}
-                    className="rounded-2xl bg-fuchsia-600 px-4 py-3 text-sm font-black text-white transition hover:bg-fuchsia-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
-                  >
-                    {isGenerating ? '썸네일 생성 중...' : '썸네일 만들기'}
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => void handleAutoFillThumbnailText()}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                    >
+                      문구 / 프롬프트 자동 채우기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleSaveThumbnailPrompt()}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                    >
+                      현재 프롬프트 저장
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleGenerateThumbnail(null)}
+                      disabled={isGenerating || !project}
+                      className="rounded-2xl bg-fuchsia-600 px-4 py-3 text-sm font-black text-white transition hover:bg-fuchsia-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
+                    >
+                      {isGenerating ? '썸네일 생성 중...' : '썸네일 만들기'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -652,6 +729,19 @@ export default function ThumbnailStudioPage() {
                     </div>
                   </div>
 
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAutoFillYoutubeMeta()}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                    >
+                      제목 / 설명 자동 만들기
+                    </button>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs font-bold leading-6 text-slate-600">
+                      자동 채우기는 버튼을 눌렀을 때만 실행됩니다.
+                    </div>
+                  </div>
+
                   <div className="grid gap-4">
                     <label className="block">
                       <div className="mb-2 text-sm font-black text-slate-800">영상 제목</div>
@@ -690,6 +780,49 @@ export default function ThumbnailStudioPage() {
             </section>
 
             <section className="space-y-6">
+              <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-[0.2em] text-sky-600">현재 선택 미리보기</div>
+                    <h2 className="mt-2 text-xl font-black text-slate-900">한 화면에서 현재 후보와 추천 문구를 바로 확인</h2>
+                  </div>
+                  {activeThumbnail ? (
+                    <button
+                      type="button"
+                      onClick={() => setPreviewThumbnailId(activeThumbnail.id)}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50"
+                    >
+                      크게 보기
+                    </button>
+                  ) : null}
+                </div>
+                <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.85fr)]">
+                  <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-slate-100">
+                    {activeThumbnail ? (
+                      <img src={resolveImageSrc(activeThumbnail.imageData)} alt={activeThumbnail.label} className="aspect-video w-full object-cover" />
+                    ) : (
+                      <div className="flex aspect-video items-center justify-center px-6 text-center text-sm font-bold text-slate-500">
+                        아직 생성된 썸네일이 없습니다. 왼쪽에서 문구와 프롬프트를 정한 뒤 썸네일 만들기 버튼을 눌러 주세요.
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">현재 메인 문구</div>
+                      <div className="mt-2 text-lg font-black leading-7 text-slate-900">{thumbnailHeadline.trim() || buildAutoThumbnailHeadline(project)}</div>
+                    </div>
+                    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">추천 제목</div>
+                      <div className="mt-2 text-sm font-black leading-6 text-slate-900">{activeThumbnail ? buildRecommendedThumbnailTitle(project, activeThumbnail) : '후보 생성 후 자동 추천됩니다.'}</div>
+                    </div>
+                    <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">추천 설명</div>
+                      <p className="mt-2 text-sm leading-6 text-slate-700">{activeThumbnail ? buildRecommendedThumbnailDescription(project, activeThumbnail) : '후보 생성 후 설명 문구도 함께 제안됩니다.'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>

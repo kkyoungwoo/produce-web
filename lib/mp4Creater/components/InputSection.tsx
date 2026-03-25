@@ -436,11 +436,25 @@ const InputSection: React.FC<InputSectionProps> = ({
   const normalizedScript = useMemo(() => normalizeStoryText(storyScript), [storyScript]);
   const sceneCount = useMemo(() => splitStoryIntoParagraphScenes(normalizedScript).length, [normalizedScript]);
 
-  const selections = EMPTY_STORY_SELECTIONS;
+  const selections = useMemo<StorySelectionState>(() => {
+    const fallback = FIELD_OPTIONS_BY_TYPE[contentType];
+    return {
+      genre: genre.trim() || fallback.genre[0] || '',
+      mood: mood.trim() || fallback.mood[0] || '',
+      endingTone: endingTone.trim() || fallback.endingTone[0] || '',
+      setting: setting.trim() || fallback.setting[0] || '',
+      protagonist: protagonist.trim() || fallback.protagonist[0] || '',
+      conflict: conflict.trim() || fallback.conflict[0] || '',
+    };
+  }, [conflict, contentType, endingTone, genre, mood, protagonist, setting]);
+
+  const effectiveTopic = useMemo(() => (
+    topic.trim() || getTopicSuggestion(contentType, selections.genre) || getTopicSuggestion(contentType, '') || '샘플 주제'
+  ), [contentType, selections.genre, topic]);
 
   const promptPack = useMemo(
-    () => buildWorkflowPromptPack({ contentType, topic, selections, script: normalizedScript }),
-    [contentType, topic, selections, normalizedScript]
+    () => buildWorkflowPromptPack({ contentType, topic: effectiveTopic, selections, script: normalizedScript }),
+    [contentType, effectiveTopic, selections, normalizedScript]
   );
 
   const syncedPromptTemplates = useMemo(
@@ -894,7 +908,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const buildDraftPayload = () => ({
     contentType,
     aspectRatio,
-    topic,
+    topic: effectiveTopic,
     script: normalizedScript,
     activeStage,
     selections,
@@ -933,7 +947,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     constitutionAnalysis,
     completedSteps: {
       step1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
-      step2: Boolean(topic.trim()),
+      step2: Boolean(effectiveTopic.trim()),
       step3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
       step4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
       step5: Boolean(selectedStyleImageId),
@@ -957,7 +971,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       completedSteps: {
         ...payload.completedSteps,
         step1: completedStage >= 1 ? Boolean(hasSelectedContentType && hasSelectedAspectRatio) : payload.completedSteps.step1,
-        step2: completedStage >= 2 ? Boolean(topic.trim()) : payload.completedSteps.step2,
+        step2: completedStage >= 2 ? Boolean(effectiveTopic.trim()) : payload.completedSteps.step2,
         step3: completedStage >= 3 ? Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection) : payload.completedSteps.step3,
         step4: completedStage >= 4 ? Boolean(effectiveSelectedCharacterIds.length && selectedCharacterStyleId && selectedCharactersReady) : payload.completedSteps.step4,
         step5: completedStage >= 5 ? Boolean(selectedStyleImageId) : payload.completedSteps.step5,
@@ -1660,7 +1674,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const createDraftFromSelections = () => {
-    const draft = buildSelectableStoryDraft({ contentType, topic, ...selections });
+    const draft = buildSelectableStoryDraft({ contentType, topic: effectiveTopic, ...selections });
     applyGeneratedStoryScript(draft);
     setNotice(contentType === 'music_video' ? '선택값으로 가사형 샘플을 만들었습니다.' : '선택값으로 대본 초안을 만들었습니다.');
     openStageWithIntent(3, false);
@@ -1788,7 +1802,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     try {
       const result = await composeScriptDraft({
         contentType,
-        topic,
+        topic: effectiveTopic,
         selections,
         template: targetTemplate,
         currentScript: normalizedScript,
@@ -1892,7 +1906,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     };
     const sampleDraft = buildSampleScriptDraft({
       contentType,
-      topic,
+      topic: effectiveTopic,
       selections,
       template,
       currentScript: '',
@@ -1932,7 +1946,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     try {
       const result = await composeScriptDraft({
         contentType,
-        topic,
+        topic: effectiveTopic,
         selections,
         template,
         currentScript: '',
@@ -2628,55 +2642,15 @@ const InputSection: React.FC<InputSectionProps> = ({
       }
 
       if (effectiveProvider === 'qwen3Tts' || effectiveProvider === 'chatterbox') {
-        if (effectiveProvider === 'chatterbox' && studioState?.routing?.voiceReferenceAudioData && studioState?.routing?.voiceReferenceMimeType) {
-          const audio = new Audio(`data:${studioState.routing.voiceReferenceMimeType};base64,${studioState.routing.voiceReferenceAudioData}`);
-          characterVoiceAudioRef.current = audio;
-          audio.onended = () => {
-            setVoicePreviewCharacterId(null);
-            setVoicePreviewMessage(`${character.name} · ${resolved.voiceName} 샘플 재생이 끝났습니다.`);
-          };
-          audio.onerror = () => {
-            setVoicePreviewCharacterId(null);
-            setVoicePreviewMessage('저장된 녹음 샘플 재생에 실패했습니다. 다시 녹음해 주세요.');
-          };
-          await audio.play();
-          setVoicePreviewMessage(`${character.name} · ${resolved.voiceName} 저장 샘플을 재생 중입니다.`);
-          return;
-        }
-        if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
-          setVoicePreviewCharacterId(null);
-          setVoicePreviewMessage(effectiveProvider === 'chatterbox' ? '이 브라우저에서는 Chatterbox 무료 미리 듣기를 지원하지 않습니다.' : '이 브라우저에서는 qwen3-tts 미리 듣기를 지원하지 않습니다.');
-          return;
-        }
-        const synth = window.speechSynthesis;
-        const utterance = new SpeechSynthesisUtterance(`${character.name}입니다. 지금 선택한 목소리를 확인합니다.`);
-        utterance.lang = 'ko-KR';
-        const koreanVoices = synth.getVoices().filter((voice) => (voice.lang || '').toLowerCase().startsWith('ko'));
-        const selectedVoice =
-          resolved.voiceId === 'qwen-soft' || resolved.voiceId === 'chatterbox-warm'
-            ? koreanVoices.find((voice) => /female|yuna|soyoung|sunhi|sora/i.test(voice.name)) || koreanVoices[0]
-            : koreanVoices.find((voice) => /male|minho|inho|hyun|jiyoung/i.test(voice.name)) || koreanVoices[0];
-        if (selectedVoice) utterance.voice = selectedVoice;
-        utterance.onend = () => {
-          setVoicePreviewCharacterId(null);
-          setVoicePreviewMessage(`${character.name} · ${resolved.voiceName} 미리 듣기가 끝났습니다.`);
-          characterVoiceUtteranceRef.current = null;
-        };
-        utterance.onerror = () => {
-          setVoicePreviewCharacterId(null);
-          setVoicePreviewMessage('보이스 미리 듣기에 실패했습니다.');
-          characterVoiceUtteranceRef.current = null;
-        };
-        characterVoiceUtteranceRef.current = utterance;
-        synth.speak(utterance);
-        setVoicePreviewMessage(`${character.name} · ${resolved.voiceName} 미리 듣기 중입니다.`);
-        return;
+        setVoicePreviewMessage(`${character.name} · ${resolved.voiceName} 실제 무료 TTS 미리 듣기를 준비 중입니다.`);
       }
 
       const providerApiKey = effectiveProvider === 'elevenLabs'
         ? (studioState?.providers?.elevenLabsApiKey || '')
-        : (studioState?.providers?.heygenApiKey || '');
-      if (!providerApiKey) {
+        : effectiveProvider === 'heygen'
+          ? (studioState?.providers?.heygenApiKey || '')
+          : '';
+      if ((effectiveProvider === 'elevenLabs' || effectiveProvider === 'heygen') && !providerApiKey) {
         setVoicePreviewCharacterId(null);
         if (onOpenApiModal) {
           void onOpenApiModal({
@@ -2699,9 +2673,11 @@ const InputSection: React.FC<InputSectionProps> = ({
         modelId: studioState?.routing?.elevenLabsModelId || studioState?.routing?.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
         qwenPreset: resolved.voiceId || studioState?.routing?.qwenVoicePreset || 'qwen-default',
         locale: resolved.locale || undefined,
+        voiceReferenceAudioData: studioState?.routing?.voiceReferenceAudioData || undefined,
+        voiceReferenceMimeType: studioState?.routing?.voiceReferenceMimeType || undefined,
       });
-      const mimeType = asset.provider === 'qwen3Tts' || asset.provider === 'chatterbox' ? 'audio/wav' : 'audio/mpeg';
-      const audio = new Audio(`data:${mimeType};base64,${asset.audioData}`);
+      const audioSrc = asset.audioData?.startsWith('data:') ? asset.audioData : `data:audio/mpeg;base64,${asset.audioData}`;
+      const audio = new Audio(audioSrc);
       characterVoiceAudioRef.current = audio;
       audio.onended = () => {
         setVoicePreviewCharacterId(null);
