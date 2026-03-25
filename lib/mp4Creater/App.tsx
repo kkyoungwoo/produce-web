@@ -1263,6 +1263,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
           onLoad={handleLoadProject}
           basePath={basePath}
           onCreateNewProject={(name) => handleStartNewProject('story', name, true)}
+          onOpenSettings={() => setShowSettings(true)}
         />
       )}
 

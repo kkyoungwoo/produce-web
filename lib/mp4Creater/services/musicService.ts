@@ -142,14 +142,14 @@ export function buildBackgroundMusicPromptSections(
     ? `${mood} 감정선, 미디엄 템포 ${bpm} BPM, ${key}, ${buildMusicVideoReference(draft)} 선택 언어는 ${languageLabel} 기준으로 자연스럽게 들려야 하고, 보컬이 들어가면 step3 가사 줄바꿈과 문장 호흡을 최대한 유지한 채 음절이 너무 뭉개지지 않도록 또렷한 발음과 립싱크 친화적인 프레이징을 유지합니다. 후렴이나 반복 구간이 떠오를 수 있는 리듬 포인트를 분명하게 둡니다.`
     : `${mood} 분위기, 설명을 방해하지 않는 안정적인 템포 ${bpm} BPM, ${key}, 프롬프트 분위기에 맞게 전개합니다. 선택 언어가 ${languageLabel}라면 허밍이나 짧은 보컬 텍스처도 해당 언어권 발화 흐름과 어긋나지 않게 유지합니다.`;
   const instrumentsBase = draft.contentType === 'music_video'
-    ? 'electric piano plays a warm motif, synth bass drives the low-end pulse, soft drums support the groove, guitar accents emotional peaks, airy pads widen the chorus, and subtle transition fx help scene cuts land on musical timing.'
-    : 'piano plays a clean motif, soft bass supports the foundation, light percussion drives a gentle pulse, strings accent transitions, ambient pads layer depth behind narration, and short risers only appear where scene timing needs support.';
+    ? '일렉트릭 피아노가 따뜻한 메인 모티프를 연주하고, 신스 베이스가 저역 리듬을 밀어주며, 부드러운 드럼이 그루브를 받치고, 기타 포인트가 감정 고조 구간을 강조하고, 에어리 패드가 후렴 공간을 넓혀 주며, 장면 전환에는 과하지 않은 전환 효과를 짧게 넣습니다.'
+    : '피아노가 깔끔한 메인 모티프를 연주하고, 소프트 베이스가 바닥을 받치며, 가벼운 퍼커션이 안정적인 박을 유지하고, 스트링이 전환 지점을 살짝 강조하고, 앰비언트 패드가 내레이션 뒤 공간감을 채우며, 필요한 순간에만 짧은 라이저를 넣습니다.';
   const performanceBase = draft.contentType === 'music_video'
     ? `보컬은 숨결이 살짝 섞인 질감으로, 감정을 밀어 올리되 과장하지 않고, 중음역 중심의 선명한 프레이징으로 전달합니다. 필요하면 두 보컬이 질문-대답처럼 주고받는 구조도 허용하되, 화면 인물이 노래할 수 있도록 입모양이 읽히는 길이의 가사 호흡을 유지하고, 후렴은 따라 부르기 쉬운 훅으로 정리합니다.`
     : `보컬은 선택 사항이며, 사용 시 낮은 존재감의 허밍 또는 짧은 코러스처럼 배치하고, 핵심은 내레이션을 비우는 절제된 전달로 둡니다. 일반 영상에서는 대본 TTS를 침범하지 않도록 보컬 존재감과 주파수 밀도를 관리합니다.`;
   const productionBase = draft.contentType === 'music_video'
-    ? '스테레오는 넓고, 공간감은 중간 이상, 리버브는 부드럽게 길게, 보컬은 센터보다 살짝 뒤, 킥과 베이스는 컷 전환 타이밍을 받쳐 주게 정리하고, 전체 텍스처는 warm and cinematic하게 유지합니다.'
-    : '스테레오는 넓지만 중앙 정보는 비워 두고, 공간 깊이는 중간, 리버브는 얕고 깔끔하게, 보컬은 뒤로 배치하고, 내레이션/TTS 선명도를 가리지 않도록 전체 텍스처는 clean and warm하게 유지합니다.';
+    ? '스테레오는 넓게, 공간감은 중간 이상, 리버브는 부드럽고 길게, 보컬은 센터보다 살짝 뒤로 배치하고, 킥과 베이스는 컷 전환 타이밍을 받쳐 주도록 정리하며, 전체 텍스처는 따뜻하고 시네마틱하게 유지합니다.'
+    : '스테레오는 넓지만 중앙 정보는 비워 두고, 공간 깊이는 중간 정도로 맞추고, 리버브는 얕고 깔끔하게 유지하며, 보컬은 뒤로 배치하고, 내레이션/TTS 선명도를 가리지 않도록 전체 텍스처는 깨끗하고 따뜻하게 유지합니다.';
 
   return {
     identity: overrides?.identity?.trim() || identityBase,
@@ -163,13 +163,13 @@ export function buildBackgroundMusicPromptSections(
 export function combineBackgroundMusicPromptSections(sections: BackgroundMusicPromptSections, durationSeconds?: number | null) {
   const safeDuration = sanitizeBackgroundMusicDuration(durationSeconds, 20);
   return [
-    'Sections:',
-    `1. Identity: ${sections.identity}`,
-    `2. Mood: ${sections.mood}`,
-    `3. Instruments: ${sections.instruments}`,
-    `4. Performance: ${sections.performance}`,
-    `5. Production: ${sections.production}`,
-    `Duration: ${safeDuration}초`,
+    '섹션 구성:',
+    `1. 정체성: ${sections.identity}`,
+    `2. 분위기: ${sections.mood}`,
+    `3. 악기 구성: ${sections.instruments}`,
+    `4. 퍼포먼스: ${sections.performance}`,
+    `5. 프로덕션: ${sections.production}`,
+    `길이: ${safeDuration}초`,
   ].join('\n');
 }
 
@@ -182,8 +182,14 @@ export function buildBackgroundMusicPrompt(
   const sections = buildBackgroundMusicPromptSections({
     ...draft,
     backgroundMusicScene: {
-      ...draft.backgroundMusicScene,
+      enabled: Boolean(draft.backgroundMusicScene?.enabled),
+      prompt: draft.backgroundMusicScene?.prompt || '',
+      provider: draft.backgroundMusicScene?.provider === 'google' ? 'google' : 'sample',
       modelId,
+      title: draft.backgroundMusicScene?.title,
+      durationSeconds: draft.backgroundMusicScene?.durationSeconds,
+      promptSections: draft.backgroundMusicScene?.promptSections,
+      selectedTrackId: draft.backgroundMusicScene?.selectedTrackId || null,
     },
   }, sectionsOverride);
   return combineBackgroundMusicPromptSections(sections, durationSeconds || draft.backgroundMusicScene?.durationSeconds || 20);
@@ -208,7 +214,7 @@ export function createSampleBackgroundTrack(
   const prompt = options?.prompt?.trim() || combineBackgroundMusicPromptSections(promptSections, requestedDuration);
   const stylePreset = inferStylePreset(modelId, draft.contentType);
   const selections = getSafeSelections(draft);
-  const provider = options?.provider || (modelId === 'lyria-002' ? 'google' : 'sample');
+  const provider = options?.provider === 'google' ? 'google' : 'sample';
   return {
     id: `bgm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     title: options?.title?.trim() || `${draft.topic || '프로젝트'} 배경음 ${requestedDuration}초`,
@@ -248,7 +254,7 @@ export async function createBackgroundMusicTrack(options: {
 
 export function getDefaultPreviewMix() {
   return {
-    narrationVolume: 1,
-    backgroundMusicVolume: 0.28,
+    narrationVolume: 0.5,
+    backgroundMusicVolume: 0.5,
   };
 }

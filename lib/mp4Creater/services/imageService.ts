@@ -2,6 +2,7 @@ import { CONFIG, ImageModelId } from '../config';
 import { ScriptScene, ReferenceImages } from '../types';
 import { makeScenePlaceholderImage } from '../utils/storyHelpers';
 import { getPrimaryFreeImageForScene } from './freeMediaService';
+import { translatePromptToEnglish } from './promptTranslationService';
 
 function getGoogleAiStudioApiKey(): string {
   if (typeof window === 'undefined') return '';
@@ -35,7 +36,13 @@ export function getGeminiStylePrompt(): string {
   return '';
 }
 
-function buildImagePrompt(scene: ScriptScene, referenceImages: ReferenceImages) {
+function hasDialogueCue(text?: string | null) {
+  const normalized = `${text || ''}`.replace(/\s+/g, ' ').trim();
+  if (!normalized) return false;
+  return /["“”'‘’「」『』]|[:：]|\b(dialogue|speaks|says|asks|replies|whispers|shouts)\b|말하|묻|답하|대답|속삭|외치|소리치|대화/u.test(normalized);
+}
+
+async function buildImagePrompt(scene: ScriptScene, referenceImages: ReferenceImages) {
   const referenceHint = [
     referenceImages.character.length ? `Keep a consistent main character identity based on ${referenceImages.character.length} selected reference image(s).` : '',
     referenceImages.style.length ? `Preserve the selected visual style from ${referenceImages.style.length} style reference image(s).` : '',
@@ -43,16 +50,30 @@ function buildImagePrompt(scene: ScriptScene, referenceImages: ReferenceImages) 
     .filter(Boolean)
     .join(' ');
 
-  return [
-    'Create a single production-ready storyboard image for a short-form video scene.',
+  const scenePrompt = (scene.imagePrompt || scene.visualPrompt || '').trim();
+  const normalizedNarration = (scene.narration || '').replace(/\s+/g, ' ').trim();
+  const normalizedScenePrompt = scenePrompt.replace(/\s+/g, ' ').trim();
+  const shouldAppendScriptLine = Boolean(normalizedNarration) && !normalizedScenePrompt.includes(normalizedNarration);
+
+  const rawPrompt = [
+    'Create a single production-ready storyboard image for one short-form video scene.',
     `Scene ${scene.sceneNumber}.`,
-    scene.imagePrompt || scene.visualPrompt || '',
-    scene.narration ? `Narration context: ${scene.narration}` : '',
+    scenePrompt,
+    shouldAppendScriptLine ? `[SCRIPT LINE] ${scene.narration}` : '',
+    hasDialogueCue(scene.narration)
+      ? '[DIALOGUE TIMING] If dialogue starts in this scene, prefer the frame right before the first spoken word or the exact instant the first line lands, so the cut feels motivated by conversation timing.'
+      : '',
     referenceHint,
-    'No captions, subtitles, UI, watermark, logo, or split layout.',
+    'Focus on one decisive frame. Keep continuity with the selected character and style references. No captions, subtitles, UI, watermark, logo, or split layout.',
   ]
     .filter(Boolean)
-    .join('\n');
+    .join('\n\n');
+
+  return translatePromptToEnglish(rawPrompt, {
+    label: 'scene image prompt',
+    preserveLineBreaks: true,
+    maxChars: 9000,
+  }).catch(() => rawPrompt);
 }
 
 function extractInlineImage(json: any): string | null {
@@ -76,7 +97,6 @@ export async function generateImage(
   options?: { qualityMode?: 'draft' | 'final' }
 ): Promise<string | null> {
   const modelId = getSelectedImageModel();
-  const prompt = buildImagePrompt(scene, referenceImages);
   const fallback = makeScenePlaceholderImage(scene.sceneNumber, scene.imagePrompt || scene.visualPrompt || scene.narration || 'scene', scene.aspectRatio || '16:9');
   const apiKey = getGoogleAiStudioApiKey();
 
@@ -86,6 +106,7 @@ export async function generateImage(
   }
 
   try {
+    const prompt = await buildImagePrompt(scene, referenceImages);
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`, {
       method: 'POST',
       headers: {

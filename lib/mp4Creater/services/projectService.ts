@@ -250,6 +250,9 @@ function normalizeProject(raw: any): SavedProject {
     finalBackgroundMusic: raw?.finalBackgroundMusic ? normalizeTrack(raw?.finalBackgroundMusic, 0) : null,
     musicVideoPreview: normalizeVideoPreview(raw?.musicVideoPreview),
     finalMusicVideo: normalizeVideoPreview(raw?.finalMusicVideo),
+    sceneStudioPreviewVideo: normalizeVideoPreview(raw?.sceneStudioPreviewVideo),
+    sceneStudioPreviewStatus: raw?.sceneStudioPreviewStatus === 'loading' || raw?.sceneStudioPreviewStatus === 'ready' || raw?.sceneStudioPreviewStatus === 'fallback' || raw?.sceneStudioPreviewStatus === 'error' || raw?.sceneStudioPreviewStatus === 'idle' ? raw.sceneStudioPreviewStatus : null,
+    sceneStudioPreviewMessage: typeof raw?.sceneStudioPreviewMessage === 'string' ? raw.sceneStudioPreviewMessage : null,
     script: typeof raw?.script === 'string' ? raw.script : null,
     scriptParagraphs: Array.isArray(raw?.scriptParagraphs)
       ? raw.scriptParagraphs
@@ -362,9 +365,15 @@ function getCurrentSettings() {
 
 
 function resolveNextProjectNumber(projects: Array<Pick<SavedProject, 'projectNumber'>> = []) {
-  return projects.reduce((max, project) => (
-    typeof project?.projectNumber === 'number' && project.projectNumber > max ? project.projectNumber : max
-  ), 0) + 1;
+  const usedNumbers = new Set(
+    projects
+      .map((project) => (typeof project?.projectNumber === 'number' ? project.projectNumber : null))
+      .filter((value): value is number => value !== null && Number.isFinite(value) && value > 0)
+  );
+
+  let next = 1;
+  while (usedNumbers.has(next)) next += 1;
+  return next;
 }
 
 async function getNextProjectNumber(): Promise<number> {
@@ -1164,9 +1173,7 @@ export async function importProjectsFromFile(file: File): Promise<SavedProject[]
   }
 
   const current = await readProjectsForMutation();
-  let nextProjectNumber = current.reduce((max, project) => (
-    typeof project.projectNumber === 'number' && project.projectNumber > max ? project.projectNumber : max
-  ), 0) + 1;
+  let nextProjectNumber = resolveNextProjectNumber(current);
   let timestampCursor = Date.now();
 
   const prepared = importedProjects.map((project) => {

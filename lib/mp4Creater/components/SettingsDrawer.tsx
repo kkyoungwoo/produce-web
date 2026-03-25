@@ -20,9 +20,10 @@ import { fetchElevenLabsVoices } from '../services/elevenLabsService';
 
 interface SettingsDrawerProps {
   open: boolean;
-  studioState: StudioState | null;
+  studioState: StudioState;
   onClose: () => void;
-  onSave: (nextState: Partial<StudioState>) => void | Promise<void>;
+  onSave: (partial: Partial<StudioState>) => Promise<StudioState> | StudioState;
+  youtubeSectionVariant?: 'default' | 'collapsed-bottom';
 }
 
 type InlineFeedback = { tone: 'success' | 'error' | 'info'; message: string } | null;
@@ -38,7 +39,7 @@ const freeImageModel = IMAGE_MODELS.find((item) => item.tier !== 'paid')?.id || 
 const freeVideoModel = VIDEO_MODEL_OPTIONS.find((item) => item.tier !== 'paid')?.id || CONFIG.DEFAULT_VIDEO_MODEL;
 const VOICE_SAMPLE_MAX_SECONDS = 15;
 
-const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onClose, onSave }) => {
+const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onClose, onSave, youtubeSectionVariant = 'default' }) => {
   const [storageDir, setStorageDir] = useState('');
   const [pickedFolderLabel, setPickedFolderLabel] = useState('');
   const [providerValues, setProviderValues] = useState({
@@ -84,6 +85,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     tone: 'info',
     message: '',
   });
+  const [isYoutubeSectionOpen, setIsYoutubeSectionOpen] = useState(youtubeSectionVariant !== 'collapsed-bottom');
   const [routing, setRouting] = useState<StudioState['routing']>({
     scriptModel: CONFIG.DEFAULT_SCRIPT_MODEL,
     sceneModel: CONFIG.DEFAULT_SCRIPT_MODEL,
@@ -121,6 +123,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const [isVoicePreviewing, setIsVoicePreviewing] = useState(false);
   const [voicePreviewMessage, setVoicePreviewMessage] = useState('');
   const [isRecordingVoiceSample, setIsRecordingVoiceSample] = useState(false);
+  const [voiceSampleModalOpen, setVoiceSampleModalOpen] = useState(false);
   const [voiceSampleSecondsLeft, setVoiceSampleSecondsLeft] = useState(VOICE_SAMPLE_MAX_SECONDS);
   const [isBgmPreviewing, setIsBgmPreviewing] = useState(false);
   const [bgmPreviewMessage, setBgmPreviewMessage] = useState('');
@@ -184,13 +187,12 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setVoicePreviewMessage('');
     setIsVoicePreviewing(false);
     setIsRecordingVoiceSample(false);
+    setVoiceSampleModalOpen(false);
     setBgmPreviewMessage('');
     setIsBgmPreviewing(false);
     setIsPaidMode(Boolean(
       studioState.routing?.paidModeEnabled
       || studioState.routing?.ttsProvider === 'elevenLabs'
-      || studioState.routing?.backgroundMusicProvider === 'google'
-      || studioState.routing?.backgroundMusicModel === 'lyria-002'
       || isPaidScriptModel(studioState.routing?.scriptModel || studioState.routing?.textModel)
       || isPaidScriptModel(studioState.routing?.sceneModel)
       || isPaidImageModel(studioState.routing?.imageModel)
@@ -201,6 +203,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setYoutubeConnectionState(null);
     setYoutubeFieldFeedback({ googleClientId: null, googleClientSecret: null });
     setYoutubeConnectOverlay({ active: false, tone: 'info', message: '' });
+    setIsYoutubeSectionOpen(youtubeSectionVariant !== 'collapsed-bottom');
     setShowSecrets({
       openRouterApiKey: false,
       elevenLabsApiKey: false,
@@ -604,14 +607,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setIsBgmPreviewing(true);
     setBgmPreviewMessage('배경 음악 미리 듣기를 준비 중입니다.');
 
-    const googleApiKey = providerValues.openRouterApiKey.trim();
     const selectedBgmModel = routing.backgroundMusicModel || 'sample-ambient-v1';
-    const requiresGoogleBgm = isGoogleBgmModel(selectedBgmModel);
-    if (requiresGoogleBgm && !googleApiKey) {
-      setIsBgmPreviewing(false);
-      setBgmPreviewMessage('배경 음악 API가 연결되지 않았습니다. API 등록 후 다시 시도해 주세요.');
-      return;
-    }
 
     try {
       const previewTrack = createSampleBackgroundTrack({
@@ -656,7 +652,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       setIsBgmPreviewing(false);
       setBgmPreviewMessage('배경 음악 미리 듣기에 실패했습니다.');
     }
-  }, [isBgmPreviewing, providerValues.openRouterApiKey, routing.backgroundMusicModel, routing.backgroundMusicProvider, stopBgmPreview]);
+  }, [isBgmPreviewing, routing.backgroundMusicModel, routing.backgroundMusicProvider, stopBgmPreview]);
 
   useEffect(() => {
     if (!open) {
@@ -720,6 +716,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     stopVoicePreview();
     stopBgmPreview();
     stopVoiceRecorderStream();
+    setVoiceSampleModalOpen(false);
     if (typeof document !== 'undefined') {
       const active = document.activeElement as HTMLElement | null;
       active?.blur?.();
@@ -1057,7 +1054,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     const nextVideoModel = routing.videoModel || freeVideoModel;
     const wantsElevenTts = isPaidMode && routing.ttsProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
     const wantsChatterboxTts = routing.ttsProvider === 'chatterbox';
-    const wantsGoogleBgm = isPaidMode && routing.backgroundMusicProvider === 'google' && Boolean(googleApiKey);
+    const wantsGoogleBgm = false;
     const wantsPaidImage = isPaidMode && nextImageModel !== freeImageModel && Boolean(googleApiKey);
     const wantsPaidVideo = isPaidMode && nextVideoModel !== freeVideoModel && Boolean(googleApiKey);
 
@@ -1108,6 +1105,151 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   };
 
   if (!open || !studioState) return null;
+
+  const youtubeOAuthSection = (
+    <section className={cardClass}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-base font-black text-slate-900">유튜브 업로드 OAuth</h3>
+          <p className="mt-1 text-xs text-slate-600">썸네일 화면에서 유튜브 자동 업로드를 사용하려면 Google OAuth Client ID / Client Secret을 입력해 주세요. 값은 서버 전용 설정 파일에 저장됩니다.</p>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
+            {youtubeConfigState.isLoading ? '불러오는 중...' : youtubeConfigState.source === 'env' ? '환경변수 사용 중' : youtubeConfigState.source === 'saved' ? '설정 저장됨' : '미설정'}
+          </div>
+          {youtubeSectionVariant === 'collapsed-bottom' ? (
+            <button
+              type="button"
+              onClick={() => setIsYoutubeSectionOpen((prev) => !prev)}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
+              aria-expanded={isYoutubeSectionOpen}
+            >
+              {isYoutubeSectionOpen ? '닫기' : '열기'}
+            </button>
+          ) : null}
+        </div>
+      </div>
+
+      {youtubeSectionVariant !== 'collapsed-bottom' || isYoutubeSectionOpen ? (
+        <>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="text-xs font-black text-slate-900">Google Client ID</div>
+              <div className="mt-1 text-[11px] text-slate-500">OAuth 동의 화면과 YouTube Data API가 연결된 웹 클라이언트 ID를 입력합니다.</div>
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  type={showSecrets.googleClientId ? 'text' : 'password'}
+                  value={youtubeOAuthValues.googleClientId}
+                  onChange={(e) => setYoutubeOAuthValues((prev) => ({ ...prev, googleClientId: e.target.value }))}
+                  className={inputClass}
+                  placeholder="1234567890-xxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSecrets((prev) => ({ ...prev, googleClientId: !prev.googleClientId }))}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                  aria-label={showSecrets.googleClientId ? 'Client ID 숨기기' : 'Client ID 보기'}
+                  title={showSecrets.googleClientId ? '숨기기' : '보기'}
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M1 12c2.8-4.5 6.5-7 11-7s8.2 2.5 11 7c-2.8 4.5-6.5 7-11 7s-8.2-2.5-11-7z" />
+                    <circle cx="12" cy="12" r="3" />
+                    {showSecrets.googleClientId ? <path d="M3 3l18 18" /> : null}
+                  </svg>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => void runYoutubeFieldCheck('googleClientId')}
+                disabled={isCheckingYoutubeFields.googleClientId}
+                className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                {isCheckingYoutubeFields.googleClientId ? '확인 중...' : '연결 확인'}
+              </button>
+              {youtubeFieldFeedback.googleClientId?.message ? (
+                <p className={`mt-2 text-xs ${youtubeFieldFeedback.googleClientId.tone === 'success' ? 'text-emerald-600' : youtubeFieldFeedback.googleClientId.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+                  {youtubeFieldFeedback.googleClientId.message}
+                </p>
+              ) : null}
+            </div>
+
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="text-xs font-black text-slate-900">Google Client Secret</div>
+              <div className="mt-1 text-[11px] text-slate-500">저장된 Secret이 있으면 비워둬도 유지됩니다.</div>
+              <div className="mt-3 flex items-center gap-2">
+                <input
+                  type={showSecrets.googleClientSecret ? 'text' : 'password'}
+                  value={youtubeOAuthValues.googleClientSecret}
+                  onChange={(e) => setYoutubeOAuthValues((prev) => ({ ...prev, googleClientSecret: e.target.value }))}
+                  className={inputClass}
+                  placeholder={youtubeConfigState.hasStoredSecret ? `${youtubeConfigState.secretMask || '저장된 Secret 유지 중'} (새 값 입력 시 교체)` : 'GOCSPX-...'}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowSecrets((prev) => ({ ...prev, googleClientSecret: !prev.googleClientSecret }))}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
+                  aria-label={showSecrets.googleClientSecret ? 'Client Secret 숨기기' : 'Client Secret 보기'}
+                  title={showSecrets.googleClientSecret ? '숨기기' : '보기'}
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                    <path d="M1 12c2.8-4.5 6.5-7 11-7s8.2 2.5 11 7c-2.8 4.5-6.5 7-11 7s-8.2-2.5-11-7z" />
+                    <circle cx="12" cy="12" r="3" />
+                    {showSecrets.googleClientSecret ? <path d="M3 3l18 18" /> : null}
+                  </svg>
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => void runYoutubeFieldCheck('googleClientSecret')}
+                disabled={isCheckingYoutubeFields.googleClientSecret}
+                className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400"
+              >
+                {isCheckingYoutubeFields.googleClientSecret ? '확인 중...' : '연결 확인'}
+              </button>
+              {youtubeFieldFeedback.googleClientSecret?.message ? (
+                <p className={`mt-2 text-xs ${youtubeFieldFeedback.googleClientSecret.tone === 'success' ? 'text-emerald-600' : youtubeFieldFeedback.googleClientSecret.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+                  {youtubeFieldFeedback.googleClientSecret.message}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => void handleCheckYoutubeConnection()}
+              disabled={youtubeConnectionState?.isChecking || youtubeConnectOverlay.active}
+              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              {youtubeConnectionState?.isChecking ? '확인 중...' : '유튜브 연결 확인'}
+            </button>
+            <button
+              type="button"
+              onMouseDown={(event) => event.preventDefault()}
+              onClick={() => void handleStartYoutubeConnect()}
+              disabled={youtubeConnectOverlay.active}
+              className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white hover:bg-red-500 disabled:bg-slate-300 disabled:text-slate-500"
+            >
+              유튜브 연결 시작
+            </button>
+          </div>
+          {youtubeConnectionState?.message ? (
+            <p className={`mt-2 text-xs ${youtubeConnectionState.tone === 'success' ? 'text-emerald-600' : youtubeConnectionState.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+              {youtubeConnectionState.message}
+            </p>
+          ) : null}
+
+          <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-3 text-[11px] leading-5 text-slate-600">
+            <div><span className="font-black text-slate-900">Redirect URI</span> · {youtubeConfigState.redirectUri || 'http://localhost:3000/api/mp4Creater/youtube/callback'}</div>
+            <div className="mt-1">Google Cloud Console의 승인된 리디렉션 URI에 위 주소를 그대로 등록해야 연결이 정상 동작합니다.</div>
+          </div>
+        </>
+      ) : (
+        <p className="mt-3 text-xs leading-5 text-slate-500">필요할 때만 열어 Google OAuth Client ID / Secret과 연결 상태를 확인할 수 있습니다.</p>
+      )}
+    </section>
+  );
 
   return (
     <div
@@ -1207,130 +1349,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
             </div>
           </section>
 
-          <section className={cardClass}>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-black text-slate-900">유튜브 업로드 OAuth</h3>
-                <p className="mt-1 text-xs text-slate-600">썸네일 화면에서 유튜브 자동 업로드를 사용하려면 Google OAuth Client ID / Client Secret을 입력해 주세요. 값은 서버 전용 설정 파일에 저장됩니다.</p>
-              </div>
-              <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-black text-slate-600">
-                {youtubeConfigState.isLoading ? '불러오는 중...' : youtubeConfigState.source === 'env' ? '환경변수 사용 중' : youtubeConfigState.source === 'saved' ? '설정 저장됨' : '미설정'}
-              </div>
-            </div>
-
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-black text-slate-900">Google Client ID</div>
-                <div className="mt-1 text-[11px] text-slate-500">OAuth 동의 화면과 YouTube Data API가 연결된 웹 클라이언트 ID를 입력합니다.</div>
-                <div className="mt-3 flex items-center gap-2">
-                  <input
-                    type={showSecrets.googleClientId ? 'text' : 'password'}
-                    value={youtubeOAuthValues.googleClientId}
-                    onChange={(e) => setYoutubeOAuthValues((prev) => ({ ...prev, googleClientId: e.target.value }))}
-                    className={inputClass}
-                    placeholder="1234567890-xxxxxxxxxxxxxxxx.apps.googleusercontent.com"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSecrets((prev) => ({ ...prev, googleClientId: !prev.googleClientId }))}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
-                    aria-label={showSecrets.googleClientId ? 'Client ID 숨기기' : 'Client ID 보기'}
-                    title={showSecrets.googleClientId ? '숨기기' : '보기'}
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                      <path d="M1 12c2.8-4.5 6.5-7 11-7s8.2 2.5 11 7c-2.8 4.5-6.5 7-11 7s-8.2-2.5-11-7z" />
-                      <circle cx="12" cy="12" r="3" />
-                      {showSecrets.googleClientId ? <path d="M3 3l18 18" /> : null}
-                    </svg>
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void runYoutubeFieldCheck('googleClientId')}
-                  disabled={isCheckingYoutubeFields.googleClientId}
-                  className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                  {isCheckingYoutubeFields.googleClientId ? '확인 중...' : '연결 확인'}
-                </button>
-                {youtubeFieldFeedback.googleClientId?.message ? (
-                  <p className={`mt-2 text-xs ${youtubeFieldFeedback.googleClientId.tone === 'success' ? 'text-emerald-600' : youtubeFieldFeedback.googleClientId.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
-                    {youtubeFieldFeedback.googleClientId.message}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-black text-slate-900">Google Client Secret</div>
-                <div className="mt-1 text-[11px] text-slate-500">저장된 Secret이 있으면 비워둬도 유지됩니다.</div>
-                <div className="mt-3 flex items-center gap-2">
-                  <input
-                    type={showSecrets.googleClientSecret ? 'text' : 'password'}
-                    value={youtubeOAuthValues.googleClientSecret}
-                    onChange={(e) => setYoutubeOAuthValues((prev) => ({ ...prev, googleClientSecret: e.target.value }))}
-                    className={inputClass}
-                    placeholder={youtubeConfigState.hasStoredSecret ? `${youtubeConfigState.secretMask || '저장된 Secret 유지 중'} (새 값 입력 시 교체)` : 'GOCSPX-...'}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowSecrets((prev) => ({ ...prev, googleClientSecret: !prev.googleClientSecret }))}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100"
-                    aria-label={showSecrets.googleClientSecret ? 'Client Secret 숨기기' : 'Client Secret 보기'}
-                    title={showSecrets.googleClientSecret ? '숨기기' : '보기'}
-                  >
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-                      <path d="M1 12c2.8-4.5 6.5-7 11-7s8.2 2.5 11 7c-2.8 4.5-6.5 7-11 7s-8.2-2.5-11-7z" />
-                      <circle cx="12" cy="12" r="3" />
-                      {showSecrets.googleClientSecret ? <path d="M3 3l18 18" /> : null}
-                    </svg>
-                  </button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void runYoutubeFieldCheck('googleClientSecret')}
-                  disabled={isCheckingYoutubeFields.googleClientSecret}
-                  className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400"
-                >
-                  {isCheckingYoutubeFields.googleClientSecret ? '확인 중...' : '연결 확인'}
-                </button>
-                {youtubeFieldFeedback.googleClientSecret?.message ? (
-                  <p className={`mt-2 text-xs ${youtubeFieldFeedback.googleClientSecret.tone === 'success' ? 'text-emerald-600' : youtubeFieldFeedback.googleClientSecret.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
-                    {youtubeFieldFeedback.googleClientSecret.message}
-                  </p>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => void handleCheckYoutubeConnection()}
-                disabled={youtubeConnectionState?.isChecking || youtubeConnectOverlay.active}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400"
-              >
-                {youtubeConnectionState?.isChecking ? '확인 중...' : '유튜브 연결 확인'}
-              </button>
-              <button
-                type="button"
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => void handleStartYoutubeConnect()}
-                disabled={youtubeConnectOverlay.active}
-                className="rounded-xl bg-red-600 px-3 py-2 text-xs font-black text-white hover:bg-red-500 disabled:bg-slate-300 disabled:text-slate-500"
-              >
-                유튜브 연결 시작
-              </button>
-            </div>
-            {youtubeConnectionState?.message ? (
-              <p className={`mt-2 text-xs ${youtubeConnectionState.tone === 'success' ? 'text-emerald-600' : youtubeConnectionState.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
-                {youtubeConnectionState.message}
-              </p>
-            ) : null}
-
-            <div className="mt-3 rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-3 text-[11px] leading-5 text-slate-600">
-              <div><span className="font-black text-slate-900">Redirect URI</span> · {youtubeConfigState.redirectUri || 'http://localhost:3000/api/mp4Creater/youtube/callback'}</div>
-              <div className="mt-1">Google Cloud Console의 승인된 리디렉션 URI에 위 주소를 그대로 등록해야 연결이 정상 동작합니다.</div>
-            </div>
-          </section>
+          {youtubeSectionVariant === 'default' ? youtubeOAuthSection : null}
 
           <section className={cardClass}>
             <div className="flex items-center justify-between gap-3">
@@ -1376,36 +1395,19 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 ) : null}
                 {(routing.ttsProvider === 'qwen3Tts' || routing.ttsProvider === 'chatterbox') ? (
                   <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <div className="text-xs font-black text-slate-900">목소리 등록 · 녹음 또는 파일 업로드</div>
-                        <p className="mt-1 text-[11px] leading-5 text-slate-500">무료 TTS는 긴 문장을 문단 단위로 잘라 생성합니다. 목소리 샘플은 15초 이하, 또렷한 단일 화자 음성으로 등록해 주세요.</p>
+                        <div className="text-xs font-black text-slate-900">목소리 등록</div>
+                        <p className="mt-1 text-[11px] leading-5 text-slate-500">녹음 예시 문장, 녹음 등록, 저장 샘플 재생/삭제는 팝업에서 한 번에 관리합니다.</p>
                       </div>
-                      <button type="button" onClick={() => void handleToggleVoiceSampleRecording()} className={`rounded-xl px-3 py-2 text-xs font-black ${isRecordingVoiceSample ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
-                        {isRecordingVoiceSample ? `녹음 저장 (${voiceSampleSecondsLeft}s)` : '목소리 녹음 시작'}
+                      <button type="button" onClick={() => setVoiceSampleModalOpen(true)} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
+                        목소리 녹음하기
                       </button>
                     </div>
-                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-[11px] leading-5 text-slate-600">
-                      <div className="font-black text-slate-900">녹음 예시 문장</div>
-                      <div className="mt-1">안녕하세요. 저는 또렷하고 자연스럽게 말합니다. 오늘은 제 목소리 샘플을 등록합니다. 짧고 안정적인 속도로 읽겠습니다.</div>
-                      <div className="mt-2">15초 안에서 숨소리와 배경 소음을 줄이고, 한국어를 기본으로 읽어 주세요. 실제 생성은 step2에서 선택한 언어 문장을 그대로 따릅니다.</div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <label className="inline-flex cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100">
-                        목소리 파일 등록
-                        <input type="file" accept="audio/*" className="hidden" onChange={(e) => void handleVoiceSampleFileChange(e)} />
-                      </label>
-                      <button type="button" onClick={() => void playRecordedVoiceSample()} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400">
-                        저장된 샘플 듣기
-                      </button>
-                      <button type="button" onClick={clearRecordedVoiceSample} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:border-slate-200 disabled:text-slate-400">
-                        샘플 삭제
-                      </button>
-                    </div>
-                    <div className="mt-2 text-[11px] leading-5 text-slate-500">
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
                       {recordedVoiceSampleUrl
                         ? `저장된 파일: ${routing.voiceReferenceName || 'recorded-voice.webm'} · 무료 TTS 생성에 바로 사용됩니다.`
-                        : '저장된 목소리가 없어 한국어 기본 보이스로 생성됩니다. step2 언어를 선택하면 해당 언어 문장으로 생성됩니다.'}
+                        : '아직 저장된 샘플이 없습니다. 버튼을 눌러 녹음하거나 파일을 등록해 주세요.'}
                     </div>
                   </div>
                 ) : null}
@@ -1462,7 +1464,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                   >
                     {BGM_MODEL_OPTIONS.map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.id === 'lyria-002' ? `💳 ${item.name}` : `🆓 ${item.name}`}
+                        {`🆓 ${item.name}`}
                       </option>
                     ))}
                   </select>
@@ -1471,8 +1473,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                   {isBgmPreviewing ? '배경 음악 정지' : '배경 음악 재생'}
                 </button>
                 {bgmPreviewMessage ? <p className="mt-2 text-xs text-slate-500">{bgmPreviewMessage}</p> : null}
-                {isGoogleBgmModel(routing.backgroundMusicModel) && !providerValues.openRouterApiKey.trim() ? (
-                  <p className="mt-2 text-xs text-amber-600">선택한 배경 음악 모델은 Google 계열 API 연결이 필요합니다. 설정 저장 후 다시 시도해 주세요.</p>
+                {isGoogleBgmModel(routing.backgroundMusicModel) ? (
+                  <p className="mt-2 text-xs text-amber-600">이전 Google Lyria 설정은 현재 샘플 배경음으로 미리 듣기/저장됩니다.</p>
                 ) : null}
               </div>
             </div>
@@ -1556,7 +1558,60 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
               </div>
             </div>
           </section>
+          {youtubeSectionVariant === 'collapsed-bottom' ? youtubeOAuthSection : null}
         </div>
+
+        {voiceSampleModalOpen ? (
+          <div
+            className="fixed inset-0 z-[115] flex items-center justify-center bg-slate-950/45 px-5"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) {
+                stopVoiceRecorderStream();
+                setVoiceSampleModalOpen(false);
+              }
+            }}
+          >
+            <div className="w-full max-w-xl rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-600">목소리 샘플</div>
+                  <h3 className="mt-2 text-xl font-black text-slate-900">녹음 예시문장과 샘플 관리</h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">15초 이하, 또렷한 단일 화자 음성으로 등록해 주세요. 무료 TTS 생성에 바로 연결됩니다.</p>
+                </div>
+                <button type="button" onClick={() => { stopVoiceRecorderStream(); setVoiceSampleModalOpen(false); }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">닫기</button>
+              </div>
+
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-[13px] leading-6 text-slate-700">
+                <div className="font-black text-slate-900">녹음 예시 문장</div>
+                <div className="mt-2">안녕하세요. 저는 또렷하고 자연스럽게 말합니다. 오늘은 제 목소리 샘플을 등록합니다. 짧고 안정적인 속도로 읽겠습니다.</div>
+                <div className="mt-2 text-xs leading-5 text-slate-500">숨소리와 배경 소음을 줄이고, 한국어를 기본으로 읽어 주세요. 실제 생성 문장은 Step2에서 선택한 언어를 그대로 따릅니다.</div>
+              </div>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button type="button" onClick={() => void handleToggleVoiceSampleRecording()} className={`rounded-xl px-3 py-2 text-xs font-black ${isRecordingVoiceSample ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
+                  {isRecordingVoiceSample ? `녹음 저장 (${voiceSampleSecondsLeft}s)` : '녹음 시작'}
+                </button>
+                <label className="inline-flex cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100">
+                  파일 등록
+                  <input type="file" accept="audio/*" className="hidden" onChange={(e) => void handleVoiceSampleFileChange(e)} />
+                </label>
+                <button type="button" onClick={() => void playRecordedVoiceSample()} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400">
+                  저장된 샘플 듣기
+                </button>
+                <button type="button" onClick={clearRecordedVoiceSample} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:border-slate-200 disabled:text-slate-400">
+                  샘플 삭제
+                </button>
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-[11px] leading-5 text-slate-500">
+                {recordedVoiceSampleUrl
+                  ? `저장된 파일: ${routing.voiceReferenceName || 'recorded-voice.webm'} · 무료 TTS 생성에 바로 사용됩니다.`
+                  : '저장된 샘플이 없으면 한국어 기본 보이스로 생성됩니다.'}
+              </div>
+              {voicePreviewMessage ? <p className="mt-3 text-xs text-slate-500">{voicePreviewMessage}</p> : null}
+            </div>
+          </div>
+        ) : null}
 
         {youtubeConnectOverlay.active ? (
           <div className="absolute inset-0 z-[120] flex items-center justify-center bg-slate-900/35 px-5">

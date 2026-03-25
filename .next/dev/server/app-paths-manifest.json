@@ -1,13 +1,9 @@
 {
-  "/api/mp4Creater/youtube/config/route": "app/api/mp4Creater/youtube/config/route.js",
+  "/api/mp4Creater/free-media/search/route": "app/api/mp4Creater/free-media/search/route.js",
   "/api/local-storage/state/route": "app/api/local-storage/state/route.js",
+  "/api/mp4Creater/youtube/status/route": "app/api/mp4Creater/youtube/status/route.js",
   "/api/local-storage/project/route": "app/api/local-storage/project/route.js",
-  "/mp4Creater/step-3/page": "app/mp4Creater/step-3/page.js",
-  "/mp4Creater/step-4/page": "app/mp4Creater/step-4/page.js",
-  "/mp4Creater/step-6/page": "app/mp4Creater/step-6/page.js",
-  "/mp4Creater/page": "app/mp4Creater/page.js",
   "/mp4Creater/thumbnail-studio/page": "app/mp4Creater/thumbnail-studio/page.js",
-  "/mp4Creater/step-1/page": "app/mp4Creater/step-1/page.js",
-  "/mp4Creater/step-2/page": "app/mp4Creater/step-2/page.js",
-  "/mp4Creater/step-5/page": "app/mp4Creater/step-5/page.js"
+  "/mp4Creater/page": "app/mp4Creater/page.js",
+  "/mp4Creater/step-6/page": "app/mp4Creater/step-6/page.js"
 }

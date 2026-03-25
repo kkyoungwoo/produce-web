@@ -1,6 +1,7 @@
 import { parseDataUrl } from '../utils/downloadHelpers';
 
 import { AspectRatio, BackgroundMusicTrack, GeneratedAsset, PreviewMixSettings, SubtitleData, SubtitleConfig, DEFAULT_SUBTITLE_CONFIG } from '../types';
+import { resolveAssetPlaybackDuration } from './projectEnhancementService';
 
 /**
  * 고정밀 오디오 디코딩: ElevenLabs(MP3)와 Gemini(PCM) 통합 처리
@@ -449,13 +450,16 @@ export const generateVideo = async (
     }
 
     let audioBuffer: AudioBuffer | null = null;
-    let duration = DEFAULT_DURATION;
+    let duration = resolveAssetPlaybackDuration(asset, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true });
 
     // 오디오가 있으면 디코딩, 없으면 기본 시간 사용
     if (asset.audioData) {
       try {
         audioBuffer = await decodeAudio(asset.audioData, audioCtx);
-        duration = audioBuffer.duration;
+        duration = resolveAssetPlaybackDuration({
+          ...asset,
+          audioDuration: Math.max(audioBuffer.duration || 0, asset.audioDuration || 0),
+        }, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true });
       } catch (e) {
         console.warn(`[Video] 씬 ${i + 1} 오디오 디코딩 실패, 기본 ${DEFAULT_DURATION}초 사용`);
       }

@@ -82,43 +82,70 @@ function getCharacterSelectedImage(character?: CharacterProfile | null) {
   return character.generatedImages?.find((item) => item.imageData)?.imageData || '';
 }
 
+function buildThumbnailStoryBeat(project: SavedProject) {
+  const candidates = [
+    ...(project.assets || []).map((item) => item.narration || ''),
+    project.workflowDraft?.script || '',
+    project.topic || '',
+  ]
+    .map((item) => item.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+
+  const joined = candidates.slice(0, 3).join(' / ');
+  return joined.slice(0, 320);
+}
+
 export function buildThumbnailPrompt(project: SavedProject, variantSeed = 0, options: ThumbnailComposerOptions = {}) {
   const lead = pickLeadCharacter(project, options);
   const style = pickSelectedStyle(project);
   const draft = project.workflowDraft;
   const customPrompt = options.customPrompt?.trim();
-  const title = buildTitleFromTopic(project.topic || project.name || '프로젝트 썸네일', options.titleText || customPrompt || undefined);
+  const title = buildTitleFromTopic(project.topic || project.name || '프로젝트 썸네일', options.titleText || undefined);
   const subtitle = buildSceneSnippet(project, options.subtitleText);
-  const firstScene = project.assets?.[0]?.narration || project.workflowDraft?.script || '';
-  const backgroundHint = options.backgroundText?.trim() || draft?.selections?.setting || 'cinematic background';
-  const mood = draft?.selections?.mood || 'clear dramatic mood';
-  const leadPrompt = options.leadDirectionText?.trim() || lead?.prompt || lead?.description || 'human lead character close-up';
-  const stylePrompt = style?.prompt || 'clean click-worthy thumbnail art direction';
+  const storyBeat = buildThumbnailStoryBeat(project);
+  const backgroundHint = options.backgroundText?.trim() || draft?.selections?.setting || '핵심 사건이 벌어지는 공간';
+  const mood = draft?.selections?.mood || '선명하고 강한 감정';
+  const leadPrompt = options.leadDirectionText?.trim() || lead?.prompt || lead?.description || '핵심 감정을 보여주는 주인공 상반신 클로즈업';
+  const stylePrompt = style?.prompt || '깔끔하고 클릭을 부르는 유튜브 썸네일 아트 디렉션';
   const extraDirection = options.extraDirectionText?.trim();
   const similarDirection = options.similarPrompt?.trim();
   const selectedTemplate = draft?.promptTemplates?.find((item) => item.id === draft?.selectedPromptTemplateId) || draft?.promptTemplates?.[0] || null;
   const selectionSummary = [
-    `Content type: ${draft?.contentType || 'story'}`,
-    `Aspect ratio: ${draft?.aspectRatio || '16:9'}`,
-    `Genre: ${draft?.selections?.genre || ''}`,
-    `Mood: ${draft?.selections?.mood || ''}`,
-    `Background: ${draft?.selections?.setting || ''}`,
-    `Lead: ${draft?.selections?.protagonist || lead?.name || ''}`,
-    `Conflict: ${draft?.selections?.conflict || ''}`,
-    `Ending tone: ${draft?.selections?.endingTone || ''}`,
-  ].filter(Boolean).join('. ');
+    `콘텐츠 타입 ${draft?.contentType || 'story'}`,
+    `비율 ${draft?.aspectRatio || '16:9'}`,
+    draft?.selections?.genre ? `장르 ${draft.selections.genre}` : '',
+    draft?.selections?.mood ? `분위기 ${draft.selections.mood}` : '',
+    draft?.selections?.setting ? `배경 ${draft.selections.setting}` : '',
+    draft?.selections?.protagonist || lead?.name ? `주인공 ${draft?.selections?.protagonist || lead?.name}` : '',
+    draft?.selections?.conflict ? `갈등 ${draft.selections.conflict}` : '',
+    draft?.selections?.endingTone ? `엔딩 톤 ${draft.selections.endingTone}` : '',
+  ].filter(Boolean).join(' · ');
   const packSummary = [
-    draft?.promptPack?.storyPrompt ? `Story prompt: ${draft.promptPack.storyPrompt}` : '',
-    draft?.promptPack?.scenePrompt ? `Scene prompt: ${draft.promptPack.scenePrompt}` : '',
-    draft?.promptPack?.actionPrompt ? `Action prompt: ${draft.promptPack.actionPrompt}` : '',
-    selectedTemplate?.prompt ? `Selected template prompt: ${selectedTemplate.prompt}` : '',
+    draft?.promptPack?.storyPrompt ? `스토리 프롬프트 ${draft.promptPack.storyPrompt}` : '',
+    draft?.promptPack?.scenePrompt ? `씬 프롬프트 ${draft.promptPack.scenePrompt}` : '',
+    draft?.promptPack?.actionPrompt ? `액션 프롬프트 ${draft.promptPack.actionPrompt}` : '',
+    selectedTemplate?.prompt ? `선택 템플릿 ${selectedTemplate.prompt}` : '',
+  ].filter(Boolean).join(' · ');
+
+  return [
+    '한국어 유튜브 썸네일 생성용 아트 디렉션.',
+    '개발단 기본 규칙: 대본과 같은 맥락, 같은 감정선, 같은 인물 관계가 한눈에 보여야 한다.',
+    `프로젝트 제목: ${project.topic || project.name || '프로젝트'}.`,
+    `메인 문구: ${title}. 너무 길게 넣지 말고 크게, 즉시 읽히게 배치한다.`,
+    `보조 문구 힌트: ${subtitle}.`,
+    `스토리 핵심: ${storyBeat || '첫 장면과 핵심 대사 기준'}.`,
+    `선택값 요약: ${selectionSummary || '기본 스토리 구성'}.`,
+    `주인공/표정/포즈: ${lead?.name || '주인공'} / ${leadPrompt}.`,
+    `배경/공간 힌트: ${backgroundHint}.`,
+    `분위기: ${mood}.`,
+    `스타일 힌트: ${stylePrompt}.`,
+    packSummary ? `워크플로우 프롬프트 팩: ${packSummary}.` : '',
+    customPrompt ? `사용자 추가 요청: ${customPrompt}. 이 요청은 기본 연출 위에 자연스럽게 덧입힌다.` : '사용자 추가 요청이 없으면 기본 연출만으로 완성도 높게 구성한다.',
+    extraDirection ? `추가 연출: ${extraDirection}.` : '',
+    similarDirection ? `직전 후보의 결 유지: ${similarDirection.slice(0, 220)}.` : '',
+    '16:9 비율, 고대비, 클릭을 부르는 집중 구도, 인물과 사건이 즉시 이해되는 썸네일, 워터마크와 과한 군더더기 금지.',
+    `썸네일 변형 ${variantSeed + 1}.`,
   ].filter(Boolean).join(' ');
-
-  if (customPrompt) {
-    return `한국어 유튜브 썸네일 생성. 사용자 프롬프트: ${customPrompt}. 프로젝트 제목: ${project.topic || project.name || '프로젝트'}. 스토리 단서: ${firstScene.slice(0, 220)}. 선택값 직접 반영: ${selectionSummary}. 선택된 주인공: ${lead?.name || '주인공'}. Character prompt: ${lead?.prompt || leadPrompt}. Style prompt: ${stylePrompt}. Workflow prompt pack: ${packSummary || 'none'}. Background hint: ${backgroundHint}. Mood: ${mood}. Subtitle reference: ${subtitle}. ${extraDirection ? `Extra direction: ${extraDirection}. ` : ''}${similarDirection ? `Regenerate with a highly similar feeling to this earlier thumbnail direction: ${similarDirection.slice(0, 220)}. ` : ''}16:9 thumbnail composition, strong focal contrast, large readable typography, stylish YouTube thumbnail design, no watermark. Thumbnail variation ${variantSeed + 1}.`;
-  }
-
-  return `${title} 한국어 썸네일. 프로젝트 선택값 직접 반영: ${selectionSummary}. 배경은 ${backgroundHint}, 전경은 ${lead?.name || '주인공'} 클로즈업. 표정과 포즈는 ${leadPrompt}. Korean thumbnail title text included. Main hook: ${title}. Subtitle text: ${subtitle}. Story clue: ${firstScene.slice(0, 160)}. Character prompt: ${lead?.prompt || leadPrompt}. Style prompt: ${stylePrompt}. Workflow prompt pack: ${packSummary || 'none'}. Mood: ${mood}. ${extraDirection ? `Extra direction: ${extraDirection}. ` : ''}${similarDirection ? `Regenerate with a highly similar feeling to this earlier thumbnail direction: ${similarDirection.slice(0, 220)}. ` : ''}Thumbnail variation ${variantSeed + 1}. 16:9 thumbnail composition, strong focal contrast, large readable typography, stylish YouTube thumbnail design, no watermark.`;
 }
 
 export function createSampleThumbnail(project: SavedProject, variantSeed = 0, options: ThumbnailComposerOptions = {}): { dataUrl: string; title: string; prompt: string } {

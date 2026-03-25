@@ -74,6 +74,20 @@ function fallbackSplit(text: string, maxChars: number): string[] {
   return chunks.length ? chunks : [text];
 }
 
+function extractMotionAnchor(visualPrompt: string, maxChars = 420): string {
+  const normalized = (visualPrompt || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+
+  const taggedLines = (visualPrompt || '')
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => /^(\[(IMAGE MOMENT|VISUAL HOOK|DIALOGUE TRANSITION|SCENE ANGLE|SHOT TYPE|LIGHTING \/ PALETTE|MOTION RULE)\])/u.test(line));
+
+  const anchor = (taggedLines.length ? taggedLines.join(' ') : normalized).replace(/\s+/g, ' ').trim();
+  return anchor.slice(0, maxChars);
+}
+
 export const findTrendingTopics = async (category: string, usedTopics: string[]) => {
   await wait(80);
   const base = [
@@ -204,17 +218,18 @@ export const generateMotionPrompt = async (
   visualPrompt: string
 ): Promise<string> => {
   await wait(60);
-  const trimmedNarration = narration.replace(/\s+/g, ' ').trim().slice(0, 120);
-  const trimmedVisual = visualPrompt.replace(/\s+/g, ' ').trim().slice(0, 180);
+  const trimmedNarration = narration.replace(/\s+/g, ' ').trim().slice(0, 220);
+  const trimmedVisual = extractMotionAnchor(visualPrompt, 420);
   const direction = createCreativeDirection(`${trimmedNarration}:${trimmedVisual}`, 0);
   return [
     'Create a fresh motion treatment unless the user explicitly requested something similar.',
-    `Motion style: ${direction.transitionBeat}` ,
+    'Start from one precise scene beat instead of summarizing the whole sequence.',
+    `Motion style: ${direction.transitionBeat}`,
     `Camera language: ${direction.cameraLanguage}`,
     `Lighting continuity: ${direction.lightingDirection}.`,
     'Keep the character identity and selected art style consistent, but avoid a copy-paste motion loop.',
     trimmedNarration ? `Emotion cue: ${trimmedNarration}.` : '',
-    trimmedVisual ? `Visual anchor: ${trimmedVisual}.` : '',
+    trimmedVisual ? `Scene anchor: ${trimmedVisual}.` : '',
   ]
     .filter(Boolean)
     .join(' ');

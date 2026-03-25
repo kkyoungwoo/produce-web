@@ -112,12 +112,29 @@ async function ensureSafeDefaultStorageDirReady(storageDir?: string) {
 
   if (path.normalize(legacyDir) === path.normalize(safeDir)) return;
 
-  const legacyExists = await pathExists(legacyDir);
   const safeExists = await pathExists(safeDir);
 
-  if (!legacyExists || safeExists) return;
+  if (safeExists) return;
 
   await fs.mkdir(path.dirname(safeDir), { recursive: true });
+
+  const legacyStatePath = path.join(legacyDir, STUDIO_STATE_FILENAME);
+  const legacyStateExists = await pathExists(legacyStatePath);
+
+  if (!legacyStateExists) {
+    await fs.mkdir(safeDir, { recursive: true });
+    return;
+  }
+
+  const legacyRaw = await fs.readFile(legacyStatePath, 'utf-8').catch(() => '');
+  const legacyState = safeJsonParse<StudioState | null>(legacyRaw, null);
+  const hasBundledProjects = Array.isArray(legacyState?.projectIndex) && legacyState!.projectIndex.length > 0;
+
+  if (hasBundledProjects) {
+    await fs.mkdir(safeDir, { recursive: true });
+    return;
+  }
+
   await fs.cp(legacyDir, safeDir, { recursive: true });
 }
 

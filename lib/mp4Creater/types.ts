@@ -672,6 +672,9 @@ export interface SavedProject {
   finalBackgroundMusic?: BackgroundMusicTrack | null;
   musicVideoPreview?: VideoPreviewAsset | null;
   finalMusicVideo?: VideoPreviewAsset | null;
+  sceneStudioPreviewVideo?: VideoPreviewAsset | null;
+  sceneStudioPreviewStatus?: 'idle' | 'loading' | 'ready' | 'fallback' | 'error' | null;
+  sceneStudioPreviewMessage?: string | null;
   script?: string | null;
   scriptParagraphs?: ScriptParagraphPlan[];
   sceneList?: ScenePlanItem[];

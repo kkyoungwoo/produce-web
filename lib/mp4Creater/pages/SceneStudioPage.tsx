@@ -34,7 +34,7 @@ import { generateMotionPrompt, generateScript } from '../services/geminiService'
 import { generateVideo } from '../services/videoService';
 import { generateVideoFromImage, getFalApiKey } from '../services/falService';
 import { getProjectById, getSavedProjects, updateProject, upsertWorkflowProject } from '../services/projectService';
-import { buildDefaultSubtitlePreset, buildScenePlanItems, buildScriptParagraphPlans, buildTtsFileItems, inferGenerationMode, inferSceneSourceType, sumSceneDuration, sumTtsDuration } from '../services/projectEnhancementService';
+import { buildDefaultSubtitlePreset, buildScenePlanItems, buildScriptParagraphPlans, buildTtsFileItems, inferGenerationMode, inferSceneSourceType, resolveAssetPlaybackDuration, sumSceneDuration, sumTtsDuration } from '../services/projectEnhancementService';
 import { renderVideoWithFfmpeg } from '../services/serverRenderService';
 import { CHATTERBOX_TTS_PRESET_OPTIONS, CONFIG, ELEVENLABS_MODELS, IMAGE_MODELS, PRICING, QWEN_TTS_PRESET_OPTIONS, VIDEO_MODEL_OPTIONS } from '../config';
 import { clearProjectNavigationProject, readProjectNavigationProject, rememberProjectNavigationProject } from '../services/projectNavigationCache';
@@ -55,6 +55,56 @@ const MAX_SCENE_DURATION = 6;
 const MAX_GENERATION_QUEUE = 4;
 const clampSceneDuration = (value?: number | null) => Math.min(MAX_SCENE_DURATION, Math.max(0, Number((value || 0).toFixed(1))));
 
+function revokePreviewVideoUrl(value?: string | null) {
+  if (value && value.startsWith('blob:')) {
+    try {
+      URL.revokeObjectURL(value);
+    } catch {}
+  }
+}
+
+async function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('preview-video-data-url-failed'));
+    reader.onerror = () => reject(reader.error || new Error('preview-video-data-url-failed'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function measureRenderedVideoDuration(blob: Blob): Promise<number | null> {
+  if (typeof window === 'undefined' || !blob.size) return null;
+
+  return new Promise((resolve) => {
+    const objectUrl = URL.createObjectURL(blob);
+    const video = document.createElement('video');
+    let settled = false;
+
+    const finish = (value: number | null) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      video.pause();
+      video.removeAttribute('src');
+      video.load();
+      URL.revokeObjectURL(objectUrl);
+      resolve(value);
+    };
+
+    const timeoutId = window.setTimeout(() => finish(null), 5000);
+
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    video.onloadedmetadata = () => {
+      const duration = Number(video.duration);
+      finish(Number.isFinite(duration) && duration > 0.1 ? Number(duration.toFixed(2)) : null);
+    };
+    video.onerror = () => finish(null);
+    video.src = objectUrl;
+  });
+}
+
 function resolveStep2VideoDurationSeconds(draft: WorkflowDraft) {
   const durationMinutes = Number(draft.stepContract?.step2?.videoDuration || draft.customScriptSettings?.expectedDurationMinutes || 0);
   if (!Number.isFinite(durationMinutes) || durationMinutes <= 0) return 20;
@@ -62,7 +112,7 @@ function resolveStep2VideoDurationSeconds(draft: WorkflowDraft) {
 }
 
 function resolveCurrentVideoDurationSeconds(draft: WorkflowDraft, assets: GeneratedAsset[] = []) {
-  const assetTotal = Number(assets.reduce((sum, asset) => sum + (asset.targetDuration || asset.audioDuration || asset.videoDuration || 0), 0).toFixed(1));
+  const assetTotal = Number(assets.reduce((sum, asset) => sum + resolveAssetPlaybackDuration(asset, { fallbackNarrationEstimate: true }), 0).toFixed(1));
   if (assetTotal > 0) return Math.max(10, Math.round(assetTotal));
   return resolveStep2VideoDurationSeconds(draft);
 }
@@ -85,6 +135,17 @@ function buildNextBackgroundTrackTitle(baseTitle: string, tracks: BackgroundMusi
     return Number.isFinite(numeric) && numeric > max ? numeric : max;
   }, 0);
   return `${normalizedBase} (${maxVersion + 1})`;
+}
+
+function hasDialogueCue(narration: string) {
+  const normalized = narration.replace(/\s+/g, ' ').trim();
+  if (!normalized) return false;
+  return /["“”'‘’「」『』]|[:：]|\b(dialogue|speaks|says|asks|replies|whispers|shouts)\b|말하|묻|답하|대답|속삭|외치|소리치|대화/u.test(normalized);
+}
+
+function buildDialogueStartMotionGuide(narration: string) {
+  if (!hasDialogueCue(narration)) return '';
+  return 'When spoken dialogue begins, open with a brief reaction or establishing micro-beat and then land on the speaker exactly as the first line starts. Keep the transition motivated by the conversation timing and preserve clean eyeline continuity.';
 }
 
 function buildLipSyncDirection(contentType: WorkflowDraft['contentType'], narration: string) {
@@ -265,6 +326,8 @@ const SceneStudioPage: React.FC = () => {
   const generationQueueRef = useRef(Promise.resolve());
   const generationQueueSizeRef = useRef(0);
   const step6VisitSyncRef = useRef('');
+  const finalPreviewPersistedRef = useRef(false);
+  const previewRenderNonceRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -340,7 +403,7 @@ const SceneStudioPage: React.FC = () => {
       percent: Math.round((count / 4) * 100),
       text: `워크플로우 ${count}/4 단계 완료`,
     };
-  }, [draft, invalidateFinalPreview]);
+  }, [draft]);
 
   const currentProjectSummary = useMemo(() => (studioState?.projects || []).find((item) => item.id === currentProjectId) || null, [studioState?.projects, currentProjectId]);
   const backgroundTrackBaseTitle = useMemo(
@@ -354,7 +417,8 @@ const SceneStudioPage: React.FC = () => {
   const buildSceneMotionPrompt = useCallback(async (asset: GeneratedAsset) => {
     const basePrompt = (asset.videoPrompt || '').trim() || await generateMotionPrompt(asset.narration, asset.imagePrompt || asset.visualPrompt);
     const lipSyncDirection = buildLipSyncDirection(draft.contentType, asset.narration || '');
-    return lipSyncDirection ? `${basePrompt} ${lipSyncDirection}` : basePrompt;
+    const dialogueStartGuide = buildDialogueStartMotionGuide(asset.narration || '');
+    return [basePrompt, lipSyncDirection, dialogueStartGuide].filter(Boolean).join(' ');
   }, [draft.contentType]);
   const summaryCharacterIds = useMemo(() => (
     draft.selectedCharacterIds.length ? draft.selectedCharacterIds : draft.extractedCharacters.map((item) => item.id)
@@ -366,7 +430,7 @@ const SceneStudioPage: React.FC = () => {
     const scriptSceneCount = splitStoryIntoParagraphScenes(draft.script).length;
     if (scriptSceneCount) return scriptSceneCount;
     return createLightweightSceneAssetsFromDraft(draft).length;
-  }, [draft, invalidateFinalPreview]);
+  }, [draft]);
   const summarySections = useMemo(() => ([
     { id: 'step1' as const, label: '1단계 기본', description: '콘텐츠 유형과 화면 비율 등 시작 설정' },
     { id: 'step2' as const, label: '2단계 기획', description: '주제와 장르, 분위기, 배경 설정' },
@@ -499,7 +563,7 @@ const SceneStudioPage: React.FC = () => {
         },
         subtitle: {
           hasSubtitle: Boolean(asset.subtitleData?.fullText),
-          segmentCount: Array.isArray(asset.subtitleData?.segments) ? asset.subtitleData?.segments.length : 0,
+          segmentCount: Array.isArray(asset.subtitleData?.meaningChunks) ? asset.subtitleData?.meaningChunks.length : Array.isArray(asset.subtitleData?.words) ? asset.subtitleData.words.length : 0,
           fullTextLength: asset.subtitleData?.fullText?.length || 0,
         },
         image: {
@@ -1176,14 +1240,25 @@ const SceneStudioPage: React.FC = () => {
   }, []);
 
   const invalidateFinalPreview = useCallback((message?: string) => {
+    const nextMessage = message || '씬 구성이 바뀌어 합본 영상을 다시 렌더링해야 합니다.';
+    previewRenderNonceRef.current += 1;
     setFinalVideoUrl((previous) => {
-      if (previous) URL.revokeObjectURL(previous);
+      revokePreviewVideoUrl(previous);
       return null;
     });
     setFinalVideoTitle('');
     setPreviewVideoStatus('idle');
-    setPreviewVideoMessage(message || '씬 구성이 바뀌어 합본 영상을 다시 렌더링해야 합니다.');
-  }, []);
+    setPreviewVideoMessage(nextMessage);
+
+    if (currentProjectId && finalPreviewPersistedRef.current) {
+      finalPreviewPersistedRef.current = false;
+      void updateProject(currentProjectId, {
+        sceneStudioPreviewVideo: null,
+        sceneStudioPreviewStatus: 'idle',
+        sceneStudioPreviewMessage: nextMessage,
+      });
+    }
+  }, [currentProjectId]);
 
   const setSceneProgress = useCallback((index: number, percent: number, label: string) => {
     setSceneProgressMap((prev) => ({
@@ -1225,11 +1300,20 @@ const SceneStudioPage: React.FC = () => {
     currentCostRef.current = project.cost || { images: 0, tts: 0, videos: 0, total: 0, imageCount: 0, ttsCharacters: 0, videoCount: 0 };
     setStep(safeAssets.length ? GenerationStep.COMPLETED : GenerationStep.IDLE);
     setIsPreparingPreviewVideo(false);
+
+    const persistedPreviewVideo = project.sceneStudioPreviewVideo?.videoData || null;
+    const persistedPreviewStatus = project.sceneStudioPreviewStatus === 'ready' || project.sceneStudioPreviewStatus === 'fallback'
+      ? project.sceneStudioPreviewStatus
+      : 'idle';
+
+    finalPreviewPersistedRef.current = Boolean(persistedPreviewVideo && persistedPreviewStatus !== 'idle');
     setFinalVideoUrl((previous) => {
-      if (previous) URL.revokeObjectURL(previous);
-      return null;
+      revokePreviewVideoUrl(previous);
+      return persistedPreviewVideo;
     });
-    setFinalVideoTitle('');
+    setFinalVideoTitle(project.sceneStudioPreviewVideo?.title || '');
+    setPreviewVideoStatus(persistedPreviewStatus);
+    setPreviewVideoMessage(project.sceneStudioPreviewMessage || '합본 영상을 렌더링해 주세요.');
     setStep4Open(false);
     setProgressMessage(options?.message || `"${project.name}" 프로젝트를 열었습니다. 씬 카드는 먼저 가볍게 보여 주고, 실제 AI 생성은 생성 버튼을 눌렀을 때만 시작합니다.`);
     rememberProjectNavigationProject(project);
@@ -1351,6 +1435,18 @@ const SceneStudioPage: React.FC = () => {
     persistBackgroundMusicSnapshot(backgroundMusicTracks, trackId, { enabled: true, selectedTrackId: trackId });
   }, [backgroundMusicTracks, persistBackgroundMusicSnapshot, updateBackgroundMusicScene]);
 
+  const handleAutoFillBackgroundMusicMood = useCallback(() => {
+    const suggestedMood = buildBackgroundMusicPromptSections(draft, backgroundMusicSceneConfig.promptSections).mood;
+    updateBackgroundMusicScene({
+      enabled: true,
+      promptSections: {
+        ...(backgroundMusicSceneConfig.promptSections || {}),
+        mood: suggestedMood,
+      },
+    });
+    setProgressMessage('현재 프로젝트 흐름을 바탕으로 배경음 느낌 문장을 자동으로 채웠습니다. 필요하면 바로 수정해서 다시 생성하면 됩니다.');
+  }, [backgroundMusicSceneConfig.promptSections, draft, updateBackgroundMusicScene]);
+
   const createAnotherBackgroundTrack = useCallback(() => {
     const nextDuration = resolveCurrentVideoDurationSeconds(draft, assetsRef.current);
     const nextTrack = createSampleBackgroundTrack(
@@ -1365,7 +1461,7 @@ const SceneStudioPage: React.FC = () => {
         durationSeconds: nextDuration,
       },
     );
-    const nextTracks = [nextTrack, ...backgroundMusicTracks];
+    const nextTracks = [...backgroundMusicTracks, nextTrack];
     setBackgroundMusicTracks(nextTracks);
     setActiveBackgroundTrackId(nextTrack.id);
     updateBackgroundMusicScene({ enabled: true, selectedTrackId: nextTrack.id, durationSeconds: nextDuration });
@@ -1405,7 +1501,7 @@ const SceneStudioPage: React.FC = () => {
         parentTrackId: sourceTrack.id,
       },
     );
-    const nextTracks = [nextTrack, ...backgroundMusicTracks];
+    const nextTracks = [...backgroundMusicTracks, nextTrack];
     setBackgroundMusicTracks(nextTracks);
     setActiveBackgroundTrackId(nextTrack.id);
     updateBackgroundMusicScene({ enabled: true, selectedTrackId: nextTrack.id, durationSeconds: nextDuration });
@@ -1699,7 +1795,7 @@ const SceneStudioPage: React.FC = () => {
 
   useEffect(() => {
     return () => {
-      if (finalVideoUrl) URL.revokeObjectURL(finalVideoUrl);
+      revokePreviewVideoUrl(finalVideoUrl);
     };
   }, [finalVideoUrl]);
 
@@ -1902,15 +1998,48 @@ const SceneStudioPage: React.FC = () => {
         return null;
       }
 
+      const expectedDuration = Number(renderableAssets.reduce((sum, asset) => sum + resolveAssetPlaybackDuration(asset, { minimum: 3, fallbackNarrationEstimate: true }), 0).toFixed(2));
+      const measuredDuration = await measureRenderedVideoDuration(result.videoBlob);
+
+      if (!usedFfmpeg && (!measuredDuration || measuredDuration < 0.2)) {
+        usedFfmpeg = true;
+        usedFallback = true;
+        usedSceneVideos = false;
+        setTaskProgressPercent(42);
+        const invalidDurationMessage = '브라우저 합본 결과 길이를 확인하지 못해 서버 ffmpeg 인코딩으로 다시 만듭니다.';
+        setPreviewVideoStatus('loading');
+        setPreviewVideoMessage(invalidDurationMessage);
+        setProgressMessage(invalidDurationMessage);
+
+        result = await renderVideoWithFfmpeg({
+          assets: assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
+          backgroundTracks: effectiveBackgroundTracks,
+          previewMix,
+          aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
+          qualityMode,
+          enableSubtitles,
+          subtitlePreset: buildDefaultSubtitlePreset(),
+          title: renderTitle('ffmpeg'),
+        });
+      }
+
+      const safeMeasuredDuration = await measureRenderedVideoDuration(result.videoBlob);
+      const normalizedExpectedDuration = safeMeasuredDuration && safeMeasuredDuration > 0.1
+        ? safeMeasuredDuration
+        : expectedDuration;
+
       const suffix = enableSubtitles ? 'sub' : 'nosub';
+      const previewUrl = URL.createObjectURL(result.videoBlob);
       setFinalVideoUrl((previous) => {
-        if (previous) URL.revokeObjectURL(previous);
-        return URL.createObjectURL(result.videoBlob);
+        revokePreviewVideoUrl(previous);
+        return previewUrl;
       });
-      setFinalVideoTitle(renderTitle(usedFallback ? '안전 모드' : undefined));
+      const nextFinalVideoTitle = renderTitle(usedFallback ? '안전 모드' : undefined);
+      setFinalVideoTitle(nextFinalVideoTitle);
 
       if (downloadFile) {
-        triggerBlobDownload(result.videoBlob, `mp4Creater_${suffix}_${Date.now()}.mp4`);
+        const outputExtension = result.videoBlob.type.includes('webm') ? 'webm' : 'mp4';
+        triggerBlobDownload(result.videoBlob, `mp4Creater_${suffix}_${Date.now()}.${outputExtension}`);
       }
 
       const successMessage = usedFfmpeg
@@ -1921,15 +2050,44 @@ const SceneStudioPage: React.FC = () => {
             ? `씬 영상 ${sceneVideoCount}개를 반영한 합본 영상이 준비되었습니다.`
             : 'AI 씬 영상 없이도 이미지 기반 합본 영상이 준비되었습니다.';
 
-      setPreviewVideoStatus(usedFallback || usedFfmpeg || !usedSceneVideos ? 'fallback' : 'ready');
-      setPreviewVideoMessage(successMessage);
+      const durationMessage = normalizedExpectedDuration > 0
+        ? ` 총 길이 ${normalizedExpectedDuration.toFixed(1)}초 기준으로 맞췄습니다.`
+        : '';
+
+      const nextPreviewStatus = usedFallback || usedFfmpeg || !usedSceneVideos ? 'fallback' : 'ready';
+      setPreviewVideoStatus(nextPreviewStatus);
+      setPreviewVideoMessage(`${successMessage}${durationMessage}`);
       setProgressMessage(downloadFile ? '합본 영상 저장이 완료되었습니다.' : '합본 영상 미리보기가 준비되었습니다.');
       setTaskProgressPercent(100);
 
       if (currentProjectId) {
-        void updateProject(currentProjectId, buildProjectEnhancementPatch(assetsRef.current, {
-          encodingMode: usedFfmpeg ? 'ffmpeg' : 'browser',
-        }));
+        const renderNonce = previewRenderNonceRef.current;
+        finalPreviewPersistedRef.current = true;
+        try {
+          const previewVideoData = await blobToDataUrl(result.videoBlob);
+          if (renderNonce === previewRenderNonceRef.current) {
+            await updateProject(currentProjectId, {
+              ...buildProjectEnhancementPatch(assetsRef.current, {
+                encodingMode: usedFfmpeg ? 'ffmpeg' : 'browser',
+              }),
+              sceneStudioPreviewVideo: {
+                id: `scene_preview_${Date.now()}`,
+                title: nextFinalVideoTitle,
+                prompt: successMessage,
+                videoData: previewVideoData,
+                provider: 'sample',
+                mode: 'preview',
+                sourceMode: usedSceneVideos && !usedFallback && !usedFfmpeg ? 'ai' : 'sample',
+                createdAt: Date.now(),
+              },
+              sceneStudioPreviewStatus: nextPreviewStatus,
+              sceneStudioPreviewMessage: `${successMessage}${durationMessage}`,
+            });
+          }
+        } catch (persistError) {
+          finalPreviewPersistedRef.current = false;
+          console.error('[SceneStudioPage] preview persist failed', persistError);
+        }
       }
 
       return result;
@@ -2036,7 +2194,7 @@ const SceneStudioPage: React.FC = () => {
 
   const handleDeleteAllGeneratedAudio = useCallback(async () => {
     const clearedAssets = assetsRef.current.map((asset) => {
-      const nextStatus = asset.status === 'error' ? 'error' : 'completed';
+      const nextStatus: GeneratedAsset['status'] = asset.status === 'error' ? 'error' : 'completed';
       return {
         ...asset,
         audioData: null,
@@ -2201,6 +2359,22 @@ const SceneStudioPage: React.FC = () => {
       });
     } catch {}
   }, [draft.topic, enqueueGenerationTask, isPreparingPreviewVideo, isVideoGenerating, renderMergedVideo]);
+
+  const handlePreviewMixChange = useCallback((nextMix: PreviewMixSettings) => {
+    setPreviewMix((prev) => {
+      const currentMix = prev || getDefaultPreviewMix();
+      const nextNarrationVolume = typeof nextMix.narrationVolume === 'number' ? nextMix.narrationVolume : currentMix.narrationVolume;
+      const nextBackgroundMusicVolume = typeof nextMix.backgroundMusicVolume === 'number' ? nextMix.backgroundMusicVolume : currentMix.backgroundMusicVolume;
+      const hasChanged = currentMix.narrationVolume !== nextNarrationVolume || currentMix.backgroundMusicVolume !== nextBackgroundMusicVolume;
+      if (hasChanged) {
+        invalidateFinalPreview('볼륨 설정이 바뀌어 합본 영상을 다시 렌더링해야 합니다.');
+      }
+      return {
+        narrationVolume: nextNarrationVolume,
+        backgroundMusicVolume: nextBackgroundMusicVolume,
+      };
+    });
+  }, [invalidateFinalPreview]);
 
   const handleNarrationChange = (index: number, narration: string) => {
     invalidateFinalPreview();
@@ -2476,8 +2650,8 @@ const SceneStudioPage: React.FC = () => {
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">씬 제작으로 넘기는 핵심 값</div>
           <div className="mt-3 space-y-3 text-sm leading-6 text-slate-700">
-            <div><span className="font-black text-slate-900">기본:</span> {getContentTypeLabel(draft.contentType)} · {draft.aspectRatio} · 주제 {persistedStepContract.step6.usedInputs.step2.resolvedTopic || '미입력'}</div>
-            <div><span className="font-black text-slate-900">2단계 입력:</span> 장르 {persistedStepContract.step6.usedInputs.step2.selections?.genre || '미입력'} · 분위기 {persistedStepContract.step6.usedInputs.step2.selections?.mood || '미입력'} · 배경 {persistedStepContract.step6.usedInputs.step2.selections?.setting || '미입력'} · 주인공 {persistedStepContract.step6.usedInputs.step2.selections?.protagonist || '미입력'} · 갈등 {persistedStepContract.step6.usedInputs.step2.selections?.conflict || '미입력'} · 결말 {persistedStepContract.step6.usedInputs.step2.selections?.endingTone || '미입력'}</div>
+            <div><span className="font-black text-slate-900">기본:</span> {getContentTypeLabel(draft.contentType)} · {draft.aspectRatio} · 주제 {summaryJsonBySection.step6.usedInputs.step2.resolvedTopic || '미입력'}</div>
+            <div><span className="font-black text-slate-900">2단계 입력:</span> 장르 {summaryJsonBySection.step6.usedInputs.step2.selections?.genre || '미입력'} · 분위기 {summaryJsonBySection.step6.usedInputs.step2.selections?.mood || '미입력'} · 배경 {summaryJsonBySection.step6.usedInputs.step2.selections?.setting || '미입력'} · 주인공 {summaryJsonBySection.step6.usedInputs.step2.selections?.protagonist || '미입력'} · 갈등 {summaryJsonBySection.step6.usedInputs.step2.selections?.conflict || '미입력'} · 결말 {summaryJsonBySection.step6.usedInputs.step2.selections?.endingTone || '미입력'}</div>
             <div><span className="font-black text-slate-900">대본 소스:</span> {draft.scriptGenerationMeta?.source === 'ai' ? 'AI 생성' : draft.scriptGenerationMeta?.source === 'sample' ? '샘플 생성' : draft.script?.trim() ? '직접 입력 / 수정' : '미생성'} · 프롬프트 카드 {summaryPromptTransfer.selectedPromptTemplateName || '없음'}</div>
             <div><span className="font-black text-slate-900">선택 출연자:</span> {summaryCharacters.map((item) => item.name).join(', ') || '없음'}</div>
             <div><span className="font-black text-slate-900">캐릭터 스타일:</span> {draft.selectedCharacterStyleLabel || '미선택'}</div>
@@ -2592,9 +2766,10 @@ const SceneStudioPage: React.FC = () => {
           onExtendBackgroundTrack={handleExtendBackgroundTrack}
           backgroundMusicSceneConfig={backgroundMusicSceneConfig}
           onBackgroundMusicSceneChange={updateBackgroundMusicScene}
+          onAutoFillBackgroundMusicMood={handleAutoFillBackgroundMusicMood}
           isMuteMode={isMuteProject}
           previewMix={previewMix}
-          onPreviewMixChange={setPreviewMix}
+          onPreviewMixChange={handlePreviewMixChange}
           currentTopic={draft.topic}
           totalCost={currentCost || undefined}
           isGenerating={isGeneratingScenes}

@@ -60,8 +60,34 @@ export function buildTtsFileItems(assets: GeneratedAsset[], defaultProvider: Tts
     }));
 }
 
+export function resolveAssetPlaybackDuration(
+  asset?: Pick<GeneratedAsset, 'audioDuration' | 'targetDuration' | 'videoDuration' | 'narration'> | null,
+  options?: { minimum?: number; maximum?: number; fallbackNarrationEstimate?: boolean }
+) {
+  const minimum = typeof options?.minimum === 'number' ? options.minimum : 0;
+  const maximum = typeof options?.maximum === 'number' ? options.maximum : undefined;
+  const candidates = [asset?.audioDuration, asset?.targetDuration, asset?.videoDuration]
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0);
+
+  let resolved = candidates.length ? Math.max(...candidates) : 0;
+
+  if ((!resolved || resolved <= 0) && options?.fallbackNarrationEstimate !== false) {
+    resolved = estimateClipDuration(asset?.narration || '');
+  }
+
+  if (!Number.isFinite(resolved) || resolved < minimum) {
+    resolved = minimum;
+  }
+
+  if (typeof maximum === 'number') {
+    resolved = Math.min(maximum, resolved);
+  }
+
+  return Number(resolved.toFixed(2));
+}
+
 export function sumSceneDuration(assets: GeneratedAsset[]): number {
-  return Number(assets.reduce((total, asset) => total + (typeof asset.targetDuration === 'number' ? asset.targetDuration : estimateClipDuration(asset.narration || '')), 0).toFixed(2));
+  return Number(assets.reduce((total, asset) => total + resolveAssetPlaybackDuration(asset, { fallbackNarrationEstimate: true }), 0).toFixed(2));
 }
 
 export function sumTtsDuration(assets: GeneratedAsset[]): number {
@@ -75,7 +101,6 @@ export function inferGenerationMode(studioState?: StudioState | null): Generatio
       routing.imageProvider !== 'sample'
       || routing.videoProvider !== 'sample'
       || (routing.audioProvider !== 'qwen3Tts' && routing.audioProvider !== 'chatterbox')
-      || routing.backgroundMusicProvider === 'elevenLabs'
     )
   );
   return isPremium ? 'premium' : 'free';

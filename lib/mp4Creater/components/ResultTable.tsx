@@ -10,6 +10,7 @@ import { exportAssetsToZip } from '../services/exportService';
 import { downloadProjectZip } from '../utils/csvHelper';
 import { downloadSrt } from '../services/srtService';
 import { prepareDavinciResolveImport, saveDavinciResolvePackageZip } from '../services/davinciResolveService';
+import { resolveAssetPlaybackDuration } from '../services/projectEnhancementService';
 import HelpTip from './HelpTip';
 import SceneStudioPreviewPage from './scene-studio/SceneStudioPreviewPage';
 import { blobFromDataValue, extensionFromMime, triggerSequentialDownloads } from '../utils/downloadHelpers';
@@ -68,6 +69,7 @@ interface ResultTableProps {
   onExtendBackgroundTrack?: (trackId: string) => void;
   backgroundMusicSceneConfig?: BackgroundMusicSceneConfig | null;
   onBackgroundMusicSceneChange?: (patch: Partial<BackgroundMusicSceneConfig>) => void;
+  onAutoFillBackgroundMusicMood?: () => void;
   isMuteMode?: boolean;
   currentTopic?: string;
   totalCost?: CostBreakdown;
@@ -100,6 +102,8 @@ interface ResultTableProps {
 
 const formatSeconds = (value?: number | null) => (typeof value === 'number' ? `${value.toFixed(1)}초` : '-');
 const MAX_SCENE_DURATION = 6;
+const DEFAULT_SCENE_NARRATION_VOLUME = 0.5;
+const DEFAULT_SCENE_VIDEO_AUDIO_VOLUME = 0.5;
 const clampMediaVolume = (value?: number | null) => {
   if (typeof value !== 'number' || Number.isNaN(value)) return 1;
   return Math.max(0, Math.min(1, value));
@@ -304,6 +308,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   onExtendBackgroundTrack,
   backgroundMusicSceneConfig,
   onBackgroundMusicSceneChange,
+  onAutoFillBackgroundMusicMood,
   isMuteMode = false,
   currentTopic,
   totalCost,
@@ -383,13 +388,12 @@ const ResultTable: React.FC<ResultTableProps> = ({
     return { imageCount, audioCount, videoCount };
   }, [data]);
 
-  const totalDuration = useMemo(() => data.reduce((sum, item) => sum + (item.targetDuration || item.audioDuration || 0), 0), [data]);
+  const totalDuration = useMemo(() => Number(data.reduce((sum, item) => sum + resolveAssetPlaybackDuration(item, { minimum: 3, fallbackNarrationEstimate: true }), 0).toFixed(2)), [data]);
 
   const mainBgm = useMemo(() => {
     if (!backgroundMusicTracks.length) return null;
     return backgroundMusicTracks.find((item) => item.id === activeBackgroundTrackId) || backgroundMusicTracks[0];
   }, [backgroundMusicTracks, activeBackgroundTrackId]);
-  const backgroundMusicProviderLabel = backgroundMusicSceneConfig?.provider === 'google' ? 'Google Lyria 구조 · 샘플 폴백' : '무료 샘플';
   const backgroundMusicModelOptions = BGM_MODEL_OPTIONS.map((item) => ({ value: item.id, label: item.name }));
 
   const handlePrepareDavinciImport = async () => {
@@ -432,7 +436,13 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
   const sequenceScene = data[sequenceSceneIndex] || null;
   const sequenceSceneAudioRate = sceneAudioRates[sequenceSceneIndex] || 1;
-  const sequenceSceneDuration = Math.max((sequenceScene?.audioDuration || 0) / sequenceSceneAudioRate, sequenceScene?.targetDuration || 0, 3);
+  const sequenceSceneDuration = sequenceScene
+    ? Number(Math.max(
+        ((sequenceScene.audioDuration || 0) / sequenceSceneAudioRate) || 0,
+        resolveAssetPlaybackDuration(sequenceScene, { minimum: 3, fallbackNarrationEstimate: true }),
+        3,
+      ).toFixed(2))
+    : 3;
 
   const stopSequencePlayback = () => {
     setSequencePlaying(false);
@@ -747,8 +757,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
     element.defaultPlaybackRate = rate;
   };
 
-  const getSceneNarrationVolume = (index: number) => sceneNarrationVolumes[index] ?? 1;
-  const getSceneVideoAudioVolume = (index: number) => sceneVideoAudioVolumes[index] ?? 1;
+  const getSceneNarrationVolume = (index: number) => sceneNarrationVolumes[index] ?? DEFAULT_SCENE_NARRATION_VOLUME;
+  const getSceneVideoAudioVolume = (index: number) => sceneVideoAudioVolumes[index] ?? DEFAULT_SCENE_VIDEO_AUDIO_VOLUME;
   const getSceneSilenceTrim = (index: number) => sceneSilenceTrim[index] ?? 0;
 
   const applySceneNarrationState = (index: number, element: HTMLAudioElement | null) => {
@@ -1235,15 +1245,14 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
       <div className="mt-4 space-y-4">
         {backgroundMusicSceneConfig?.enabled ? (
-          <div className="rounded-[28px] border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-4 shadow-sm">
+          <div className="rounded-[26px] border border-violet-200 bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-4 shadow-sm">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div className="text-[11px] font-black uppercase tracking-[0.2em] text-violet-600">배경음 전용 씬</div>
                 <h3 className="mt-2 text-lg font-black text-slate-900">전체 영상용 배경음 카드</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">프롬프트는 5개 섹션으로 저장하고, 생성 이력은 고정 폭 카드 안에서 가로 스크롤로 관리합니다. 새로 만든 배경음은 자동 선택되어 해당 위치로 포커스됩니다.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">프롬프트는 5개 섹션으로 저장하고, 새로 만든 배경음은 오른쪽 끝 이력 카드에 쌓인 뒤 자동 선택되어 해당 위치로 스크롤됩니다.</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <span className="rounded-full border border-violet-200 bg-white px-3 py-1 text-xs font-black text-violet-700">{backgroundMusicProviderLabel}</span>
                 <button
                   type="button"
                   onClick={() => onBackgroundMusicSceneChange?.({ enabled: false })}
@@ -1254,7 +1263,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
               </div>
             </div>
 
-            <div className="mt-4 grid gap-4 xl:grid-cols-[1.02fr_1.18fr]">
+            <div className="mt-4 grid gap-4 xl:grid-cols-[0.98fr_1.02fr]">
               <div className="min-w-0 rounded-[24px] border border-violet-200 bg-white p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
@@ -1274,15 +1283,13 @@ const ResultTable: React.FC<ResultTableProps> = ({
                       onChange={(event) => {
                         const nextProvider: BackgroundMusicSceneConfig['provider'] = event.target.value === 'google' ? 'google' : 'sample';
                         const currentModelId = backgroundMusicSceneConfig.modelId || '';
-                        const nextModelId = nextProvider === 'google'
-                          ? (currentModelId === 'lyria-002' ? currentModelId : 'lyria-002')
-                          : (currentModelId === 'lyria-002' ? 'sample-ambient-v1' : currentModelId);
+                        const nextModelId = currentModelId === 'lyria-002' ? 'sample-ambient-v1' : currentModelId;
                         onBackgroundMusicSceneChange?.({ provider: nextProvider, modelId: nextModelId });
                       }}
                       className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 outline-none focus:border-violet-400"
                     >
                       <option value="sample">무료 샘플</option>
-                      <option value="google">Google Lyria 구조</option>
+                      <option value="google">Google 연동용 설정 보존 (현재 샘플 생성)</option>
                     </select>
                   </label>
                   <label className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left">
@@ -1298,27 +1305,50 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     </select>
                   </label>
                 </div>
-                <div className="mt-4 grid gap-3">
+                <div className="mt-4 rounded-[22px] border border-violet-100 bg-violet-50/70 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-black text-slate-900">배경음 느낌</div>
+                      <div className="mt-1 text-[11px] leading-5 text-slate-500">프로젝트 분위기를 한 줄로 적거나 자동으로 채운 뒤 생성하면 됩니다.</div>
+                    </div>
+                    {onAutoFillBackgroundMusicMood ? (
+                      <button
+                        type="button"
+                        onClick={onAutoFillBackgroundMusicMood}
+                        className="rounded-xl border border-violet-200 bg-white px-3 py-2 text-xs font-black text-violet-700 hover:bg-violet-50"
+                      >
+                        프로젝트 느낌 자동 생성
+                      </button>
+                    ) : null}
+                  </div>
+                  <textarea
+                    value={(backgroundMusicSceneConfig.promptSections as any)?.mood || ''}
+                    placeholder="예: 몽환적이지만 너무 무겁지 않고, 서서히 감정이 올라오는 따뜻한 분위기"
+                    onChange={(event) => onBackgroundMusicSceneChange?.({ promptSections: { ...(backgroundMusicSceneConfig.promptSections || {}), mood: event.target.value } as any })}
+                    className="mt-3 h-[72px] w-full resize-none rounded-2xl border border-violet-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400"
+                  />
+                </div>
+                <div className="mt-3 grid gap-2.5">
                   {[
-                    ['identity', '1. Identity', '보컬 성별 + 장르를 한 문장으로 적어 주세요.'],
-                    ['mood', '2. Mood', '감정선, 템포, BPM, Key(Major/Minor)를 적어 주세요.'],
-                    ['instruments', '3. Instruments', '악기명과 연주 동사를 함께 적어 주세요.'],
-                    ['performance', '4. Performance', '보컬 질감, 전달 방식, 음역, 프레이징을 적어 주세요.'],
-                    ['production', '5. Production', '스테레오 폭, 공간감, 리버브, 보컬 위치, 사운드 질감을 적어 주세요.'],
-                  ].map(([key, title, helper]) => (
-                    <label key={key} className="rounded-[20px] border border-slate-200 bg-slate-50 p-3 text-left">
+                    ['identity', '1. 정체성', '보컬 성별 + 장르를 한 문장으로 적어 주세요.', '예: 여성 보컬이 스며든 감성 팝 기반 배경음'],
+                    ['instruments', '2. 악기 구성', '악기명과 연주 동사를 함께 적어 주세요.', '예: 피아노가 잔잔하게 시작하고 스트링이 뒤에서 부드럽게 받쳐 줍니다.'],
+                    ['performance', '3. 퍼포먼스', '보컬 질감, 전달 방식, 음역, 프레이징을 적어 주세요.', '예: 보컬은 속삭이듯 가볍게, 중음역 중심으로 또렷하게 흘러갑니다.'],
+                    ['production', '4. 프로덕션', '스테레오 폭, 공간감, 리버브, 보컬 위치, 사운드 질감을 적어 주세요.', '예: 공간감은 넓지만 과하지 않고, 전체 텍스처는 따뜻하고 깨끗하게 유지합니다.'],
+                  ].map(([key, title, helper, placeholder]) => (
+                    <label key={key} className="rounded-[18px] border border-slate-200 bg-slate-50 p-3 text-left">
                       <div className="text-sm font-black text-slate-900">{title}</div>
                       <div className="mt-1 text-xs leading-5 text-slate-500">{helper}</div>
                       <textarea
                         value={(backgroundMusicSceneConfig.promptSections as any)?.[key] || ''}
+                        placeholder={placeholder}
                         onChange={(event) => onBackgroundMusicSceneChange?.({ promptSections: { ...(backgroundMusicSceneConfig.promptSections || {}), [key]: event.target.value } as any })}
-                        className="mt-3 h-[82px] w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400"
+                        className="mt-2 h-[64px] w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-violet-400"
                       />
                     </label>
                   ))}
                 </div>
-                <div className="mt-4 rounded-2xl border border-dashed border-violet-200 bg-violet-50/60 p-4 text-sm leading-6 text-slate-600">
-                  뮤직비디오면 현재 가사/보컬 흐름을 따라가고, 일반 영상이면 대본과 음성 흐름을 기준으로 입모양 싱크까지 고려하는 방향으로 씬 영상 프롬프트가 이어집니다.
+                <div className="mt-3 rounded-2xl border border-dashed border-violet-200 bg-violet-50/60 p-3 text-sm leading-6 text-slate-600">
+                  뮤직비디오면 현재 가사와 보컬 흐름을 따라가고, 일반 영상이면 대본과 음성 흐름을 기준으로 장면을 방해하지 않는 배경음 방향으로 이어집니다.
                 </div>
               </div>
 
@@ -1326,7 +1356,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">생성 이력</div>
-                    <div className="mt-2 text-sm font-bold text-slate-700">배경음 생성과 타이밍 조절은 모두 이력으로만 쌓이고, 각 카드에서 바로 음악을 재생할 수 있습니다.</div>
+                    <div className="mt-2 text-sm font-bold text-slate-700">배경음 생성과 타이밍 조절은 모두 이력으로만 쌓이고, 새 음악은 오른쪽 끝에 추가됩니다.</div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black text-slate-600">총 {backgroundMusicTracks.length}개 트랙</span>
@@ -1346,7 +1376,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <div className="text-sm font-black text-slate-900">생성 이력</div>
-                      <div className="mt-1 text-xs text-slate-500">고정 폭 카드 안에서 좌우로만 넘깁니다. 카드가 많아져도 다른 영역 너비는 줄어들지 않습니다.</div>
+                      <div className="mt-1 text-xs text-slate-500">가로 스크롤 스트립으로만 관리하며, 새로 만든 음악은 선택 후 해당 카드까지 이동합니다.</div>
                     </div>
                     {backgroundMusicTracks.length > 1 ? (
                       <div className="flex items-center gap-2">
@@ -1480,6 +1510,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
           const narrationVolume = getSceneNarrationVolume(index);
           const videoAudioVolume = getSceneVideoAudioVolume(index);
           const silenceTrim = getSceneSilenceTrim(index);
+          const hasNarrationControl = Boolean(audioEntry?.data || row.audioData);
+          const canAdjustSilenceTrim = !isMuteMode && hasNarrationControl;
+          const canAdjustNarrationVolume = !isMuteMode && hasNarrationControl;
+          const canAdjustVideoAudio = Boolean(videoEntry?.data || row.videoData);
           const canGenerateVideo = Boolean(imageEntry?.data || row.imageData || imageEntries.length);
 
           return (
@@ -1708,7 +1742,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                       </div>
                     </div>
 
-                    <div className={`overflow-hidden transition-all duration-300 ease-out ${sceneInlineSettingsOpen[index] ? 'max-h-[228px] translate-y-0 opacity-100' : 'max-h-0 translate-y-1 opacity-0 pointer-events-none'}`}>
+                    <div className={`overflow-hidden transition-all duration-300 ease-out ${sceneInlineSettingsOpen[index] ? 'max-h-[320px] translate-y-0 opacity-100' : 'max-h-0 translate-y-1 opacity-0 pointer-events-none'}`}>
                       <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-4 auto-rows-fr">
                         <div className="flex min-h-[112px] flex-col rounded-[22px] border border-slate-200 bg-slate-50 px-3 py-3">
                           <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600">
@@ -1720,23 +1754,26 @@ const ResultTable: React.FC<ResultTableProps> = ({
                         </div>
                         {!isMuteMode ? (
                           <>
-                            <div className="flex min-h-[112px] flex-col rounded-[22px] border border-slate-200 bg-slate-50 px-3 py-3">
+                            <div className={`flex min-h-[112px] flex-col rounded-[22px] border px-3 py-3 ${canAdjustSilenceTrim ? 'border-slate-200 bg-slate-50' : 'border-slate-200 bg-slate-100/90'}`}>
                               <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600"><span>공백 제거</span><span>{silenceTrim}%</span></div>
-                              <input type="range" min="0" max="100" step="5" value={silenceTrim} onChange={(e) => setSceneSilenceTrim((prev) => ({ ...prev, [index]: Number(e.target.value) }))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-emerald-600" />
-                              <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">다음 오디오 생성 전에 무음 구간을 얼마나 줄일지 정합니다.</div>
+                              <input type="range" min="0" max="100" step="5" value={silenceTrim} disabled={!canAdjustSilenceTrim} onChange={(e) => setSceneSilenceTrim((prev) => ({ ...prev, [index]: Number(e.target.value) }))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-emerald-600 disabled:cursor-not-allowed disabled:opacity-45" />
+                              <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">{canAdjustSilenceTrim ? '다음 오디오 생성 전에 무음 구간을 얼마나 줄일지 정합니다.' : '오디오가 만들어진 뒤에만 조절할 수 있습니다.'}</div>
                             </div>
-                            <div className="flex min-h-[112px] flex-col rounded-[22px] border border-slate-200 bg-slate-50 px-3 py-3">
+                            <div className={`flex min-h-[112px] flex-col rounded-[22px] border px-3 py-3 ${canAdjustNarrationVolume ? 'border-slate-200 bg-slate-50' : 'border-slate-200 bg-slate-100/90'}`}>
                               <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600"><span>TTS 볼륨</span><span>{Math.round(narrationVolume * 100)}%</span></div>
-                              <input type="range" min="0" max="1.6" step="0.05" value={narrationVolume} onChange={(e) => setSceneNarrationVolumes((prev) => ({ ...prev, [index]: Number(e.target.value) }))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
-                              <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">오디오 확인과 팝업 재생에 바로 반영됩니다.</div>
+                              <input type="range" min="0" max="1.6" step="0.05" value={narrationVolume} disabled={!canAdjustNarrationVolume} onChange={(e) => setSceneNarrationVolumes((prev) => ({ ...prev, [index]: Number(e.target.value) }))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600 disabled:cursor-not-allowed disabled:opacity-45" />
+                              <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">{canAdjustNarrationVolume ? '오디오 확인과 팝업 재생에 바로 반영됩니다. 기본값은 50%입니다.' : '오디오가 만들어져야 볼륨 조절이 열립니다.'}</div>
                             </div>
                           </>
                         ) : null}
-                        <div className="flex min-h-[112px] flex-col rounded-[22px] border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div className={`flex min-h-[112px] flex-col rounded-[22px] border px-3 py-3 ${canAdjustVideoAudio ? 'border-slate-200 bg-slate-50' : 'border-slate-200 bg-slate-100/90'}`}>
                           <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600"><span>동영상 오디오</span><span>{Math.round(videoAudioVolume * 100)}%</span></div>
-                          <input type="range" min="0" max="1" step="0.05" value={videoAudioVolume} onChange={(e) => setSceneVideoAudioVolumes((prev) => ({ ...prev, [index]: Number(e.target.value) }))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-violet-600" />
-                          <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">영상 원본 오디오가 있을 때만 따로 맞춥니다.</div>
+                          <input type="range" min="0" max="1" step="0.05" value={videoAudioVolume} disabled={!canAdjustVideoAudio} onChange={(e) => setSceneVideoAudioVolumes((prev) => ({ ...prev, [index]: Number(e.target.value) }))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-violet-600 disabled:cursor-not-allowed disabled:opacity-45" />
+                          <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">{canAdjustVideoAudio ? '영상 원본 오디오가 있을 때만 따로 맞춥니다. 기본값은 50%입니다.' : '영상이 생성된 뒤에만 조절할 수 있습니다.'}</div>
                         </div>
+                      </div>
+                      <div className="mt-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
+                        회색으로 잠긴 항목은 아직 조절할 대상이 준비되지 않은 상태입니다. 문단 설정은 미리 열어둘 수 있고, 생성이 끝나면 바로 활성화됩니다.
                       </div>
                     </div>
                   </div>
@@ -1859,16 +1896,14 @@ const ResultTable: React.FC<ResultTableProps> = ({
                       </div>
                     )}
 
-                    {hasRenderableVideo(row) && (
-                      <button
-                        type="button"
-                        onMouseDown={preventButtonFocusScroll}
-                        onClick={() => { setActiveModelPicker(null); setSceneInlineSettingsOpen((prev) => ({ ...prev, [index]: !prev[index] })); }}
-                        className={`w-full rounded-2xl border px-3 py-3 text-sm font-bold transition ${sceneInlineSettingsOpen[index] ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
-                      >
-                        {sceneInlineSettingsOpen[index] ? '문단 설정 닫기' : '문단 설정 열기'}
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      onMouseDown={preventButtonFocusScroll}
+                      onClick={() => { setActiveModelPicker(null); setSceneInlineSettingsOpen((prev) => ({ ...prev, [index]: !prev[index] })); }}
+                      className={`w-full rounded-2xl border px-3 py-3 text-sm font-bold transition ${sceneInlineSettingsOpen[index] ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}
+                    >
+                      {sceneInlineSettingsOpen[index] ? '문단 설정 닫기' : '문단 설정 열기'}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1991,9 +2026,14 @@ const ResultTable: React.FC<ResultTableProps> = ({
             </div>
             <div className="flex max-h-[78vh] items-center justify-center overflow-hidden rounded-[24px] border border-slate-200 bg-slate-50 p-3">
               {mediaLightbox.kind === 'video' ? (
-                <video className={`${getAspectRatioClass(mediaLightbox.aspectRatio || '16:9')} mx-auto max-h-[74vh] max-w-full rounded-2xl object-contain`} controls playsInline preload="metadata">
-                  <source src={mediaLightbox.src} type="video/mp4" />
-                </video>
+                <video
+                  key={mediaLightbox.src}
+                  src={mediaLightbox.src}
+                  className={`${getAspectRatioClass(mediaLightbox.aspectRatio || '16:9')} mx-auto max-h-[74vh] max-w-full rounded-2xl object-contain`}
+                  controls
+                  playsInline
+                  preload="metadata"
+                />
               ) : mediaLightbox.kind === 'audio' ? (
                 <audio className="w-full max-w-xl" controls>
                   <source src={mediaLightbox.src} type="audio/mpeg" />

@@ -127,6 +127,20 @@ function buildMuteSceneNarration(draft: WorkflowDraft, index: number, total: num
   return `${endingTone} 여운으로 마무리하는 장면이다. 해결보다 잔상과 다음 상상을 남기는 구도로 정리하고, ${topic}를 상징하는 마지막 화면 요소가 또렷하게 남게 만든다.`;
 }
 
+function hasDialogueBeat(text?: string | null) {
+  const normalized = `${text || ''}`.replace(/\s+/g, ' ').trim();
+  if (!normalized) return false;
+  return /["“”'‘’「」『』]|[:：]|\b(dialogue|speaks|says|asks|replies|whispers|shouts)\b|말하|묻|답하|대답|속삭|외치|소리치|대화/u.test(normalized);
+}
+
+function buildDialogueTransitionGuide(currentNarration: string, previousNarration?: string | null) {
+  if (!hasDialogueBeat(currentNarration)) return '';
+  if (hasDialogueBeat(previousNarration)) {
+    return 'Dialogue is already in motion. Continue the conversation coverage with a motivated cut, keep eyeline continuity stable, and let the next spoken beat lead the transition timing.';
+  }
+  return 'This scene begins the spoken exchange. Open with a short reaction or establishing micro-beat, then transition onto the speaker exactly as the first line starts so the cut feels motivated by the dialogue timing.';
+}
+
 function buildLocalVideoPrompt(narration: string, sceneNumber: number, draft: WorkflowDraft, targetDuration: number) {
   const direction = createCreativeDirection(`${draft.contentType}:local-motion:${sceneNumber}:${narration}`, sceneNumber, draft.contentType);
   const contentGuide = getContentModeGuide(draft);
@@ -266,33 +280,65 @@ export function applySelectionPromptsToScenes(scenes: ScriptScene[], draft: Work
     const previousScene = scenes[index - 1];
     const nextScene = scenes[index + 1];
     const direction = createCreativeDirection(`${draft.contentType}:${scene.sceneNumber}:${scene.narration}`, index, draft.contentType);
+    const dialogueTransitionGuide = buildDialogueTransitionGuide(scene.narration, previousScene?.narration);
+    const visualPrompt = [
+      scene.imagePrompt || scene.visualPrompt,
+      '[SCENE CORE] Treat the exact instant, emotion, and action in this narration as the top priority. Focus on one decisive beat instead of summarizing the whole project.',
+      promptContext.characterPromptBlock ? `[CHARACTER CONTINUITY]
+${promptContext.characterPromptBlock}` : '',
+      promptContext.stylePrompt ? `[STYLE CONTINUITY]
+${promptContext.stylePrompt}` : '',
+      selectionSummary,
+      promptContext.promptTemplateName ? `[SELECTED SCRIPT TEMPLATE] ${promptContext.promptTemplateName}` : '',
+      promptContext.scenePrompt ? `[SCENE PROMPT]
+${promptContext.scenePrompt}` : '',
+      promptContext.actionPrompt ? `[ACTION HINT]
+${promptContext.actionPrompt}` : '',
+      !promptContext.scenePrompt && promptContext.storyPrompt ? `[STORY PROMPT]
+${promptContext.storyPrompt}` : '',
+      draft.contentType === 'music_video' ? '[MUSIC VIDEO IMAGE RULE] One image = one key moment. Keep scene order chronological. When a character appears, prefer the phrase based on reference images instead of rewriting appearance in detail. Avoid readable signs, logo-like graphics, and unnecessary background clutter unless the story explicitly needs them.' : '',
+      promptContext.styleLabel ? `[STYLE LABEL] ${promptContext.styleLabel}` : '',
+      buildFreshIdeaRule('scene'),
+      `[SCENE ANGLE] ${direction.narrativeAngle}`,
+      `[SHOT TYPE] ${direction.shotType}`,
+      `[LIGHTING / PALETTE] ${direction.lightingDirection} / ${direction.paletteDirection}`,
+      `[VISUAL HOOK] ${direction.visualHook}`,
+      previousScene?.narration ? `[PREVIOUS SCENE CONTEXT] ${previousScene.narration}` : '',
+      nextScene?.narration ? `[NEXT SCENE CONTEXT] ${nextScene.narration}` : '',
+      dialogueTransitionGuide ? `[DIALOGUE TRANSITION] ${dialogueTransitionGuide}` : '',
+      `[SCENE RULE] Scene ${index + 1} must keep the selected character roles, selected prompt template, and selected style prompt consistent, but it must not reuse the exact same framing or visual hook as the previous scene.`,
+      '[SCRIPT ALIGNMENT] Match the exact script beat, emotion, and moment order from the narration. Do not invent a different event or unrelated action.',
+      draft.contentType === 'music_video' ? `[MOTION RULE] Motion for scene ${index + 1} should feel like one short, copy-ready action line. Avoid restating clothing, hairstyle, or background details unless absolutely necessary.` : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const imagePrompt = [
+      visualPrompt,
+      '[IMAGE MOMENT] Build the frame around the strongest visual beat from this exact narration, while keeping the selected tone and story flow intact.',
+      dialogueTransitionGuide ? '[IMAGE DIALOGUE RULE] If speech starts here, prefer a frame that feels like the breath right before the first spoken word or the exact instant the first line lands.' : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const videoPrompt = [
+      scene.videoPrompt || '',
+      promptContext.actionPrompt ? `[ACTION PROMPT]\n${promptContext.actionPrompt}` : '',
+      promptContext.characterPromptBlock ? `[CHARACTER CONTINUITY]\n${promptContext.characterPromptBlock}` : '',
+      promptContext.stylePrompt ? `[STYLE CONTINUITY]\n${promptContext.stylePrompt}` : '',
+      previousScene?.narration ? `[PREVIOUS SCENE CONTEXT] ${previousScene.narration}` : '',
+      nextScene?.narration ? `[NEXT SCENE CONTEXT] ${nextScene.narration}` : '',
+      dialogueTransitionGuide ? `[DIALOGUE TRANSITION] ${dialogueTransitionGuide}` : '',
+      '[VIDEO ALIGNMENT] Keep motion, screen transition timing, and emotional emphasis locked to this script beat. Transitions must feel motivated by narration or dialogue timing, not random movement.',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
     return {
       ...scene,
-      visualPrompt: [
-        scene.imagePrompt || scene.visualPrompt,
-        selectionSummary,
-        promptContext.promptTemplateName ? `[SELECTED SCRIPT TEMPLATE] ${promptContext.promptTemplateName}` : '',
-        promptContext.promptTemplatePrompt ? `[SELECTED TEMPLATE PROMPT]\n${promptContext.promptTemplatePrompt}` : '',
-        promptContext.storyPrompt ? `[STORY PROMPT]\n${promptContext.storyPrompt}` : '',
-        promptContext.scenePrompt ? `[SCENE PROMPT]\n${promptContext.scenePrompt}` : '',
-        promptContext.actionPrompt ? `[ACTION PROMPT]\n${promptContext.actionPrompt}` : '',
-        promptContext.characterPromptBlock ? `[SELECTED CHARACTER REFERENCES]\n${promptContext.characterPromptBlock}` : '',
-        promptContext.stylePrompt ? `[SELECTED STYLE PROMPT]\n${promptContext.stylePrompt}` : '',
-        draft.contentType === 'music_video' ? '[MUSIC VIDEO IMAGE RULE] One image = one key moment. Keep scene order chronological. When a character appears, prefer the phrase based on reference images instead of rewriting appearance in detail. Avoid readable signs, logo-like graphics, and unnecessary background clutter unless the story explicitly needs them.' : '',
-        promptContext.styleLabel ? `[STYLE LABEL] ${promptContext.styleLabel}` : '',
-        buildFreshIdeaRule('scene'),
-        `[SCENE ANGLE] ${direction.narrativeAngle}`,
-        `[SHOT TYPE] ${direction.shotType}`,
-        `[LIGHTING / PALETTE] ${direction.lightingDirection} / ${direction.paletteDirection}`,
-        `[VISUAL HOOK] ${direction.visualHook}`,
-        `[SUBTITLE RHYTHM] ${direction.subtitleTone}`,
-        previousScene?.narration ? `[PREVIOUS SCENE CONTEXT] ${previousScene.narration}` : '',
-        nextScene?.narration ? `[NEXT SCENE CONTEXT] ${nextScene.narration}` : '',
-        `[SCENE RULE] Scene ${index + 1} must keep the selected character roles, selected prompt template, and selected style prompt consistent, but it must not reuse the exact same framing or visual hook as the previous scene.`,
-        draft.contentType === 'music_video' ? `[MOTION RULE] Motion for scene ${index + 1} should feel like one short, copy-ready action line. Avoid restating clothing, hairstyle, or background details unless absolutely necessary.` : '',
-      ]
-        .filter(Boolean)
-        .join('\n\n'),
+      visualPrompt,
+      imagePrompt,
+      videoPrompt,
     };
   });
 }

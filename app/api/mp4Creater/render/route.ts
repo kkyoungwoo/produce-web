@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { NextRequest, NextResponse } from 'next/server';
+import { resolveAssetPlaybackDuration } from '../../../../lib/mp4Creater/services/projectEnhancementService';
 
 export const runtime = 'nodejs';
 
@@ -13,6 +14,7 @@ type RenderAsset = {
   audioData?: string | null;
   audioDuration?: number | null;
   targetDuration?: number | null;
+  videoDuration?: number | null;
   narration?: string;
   subtitleData?: {
     fullText?: string;
@@ -143,7 +145,7 @@ export async function POST(request: NextRequest) {
 
     for (let index = 0; index < assets.length; index += 1) {
       const asset = assets[index];
-      const duration = Math.max(2, Number((asset.audioDuration || asset.targetDuration || 5).toFixed(2)));
+      const duration = resolveAssetPlaybackDuration(asset, { minimum: 2, fallbackNarrationEstimate: true });
       const imagePath = path.join(tempDir, `scene_${index + 1}.png`);
       const audioPath = path.join(tempDir, `scene_${index + 1}.wav`);
       const scenePath = path.join(tempDir, `scene_${index + 1}.mp4`);

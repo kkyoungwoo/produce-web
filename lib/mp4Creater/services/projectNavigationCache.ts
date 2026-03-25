@@ -58,6 +58,12 @@ function stripProjectBinary(project: SavedProject): SavedProject {
           audioData: null,
         }))
       : [],
+    sceneStudioPreviewVideo: project.sceneStudioPreviewVideo
+      ? {
+          ...project.sceneStudioPreviewVideo,
+          videoData: null,
+        }
+      : null,
     workflowDraft: cloneWorkflowDraftForNavigation(project.workflowDraft) as any,
   };
 }

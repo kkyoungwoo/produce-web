@@ -19,6 +19,7 @@ interface ProjectGalleryProps {
   onLoad?: (project: SavedProject) => void;
   basePath: string;
   onCreateNewProject?: (name: string) => void | Promise<void>;
+  onOpenSettings?: () => void;
 }
 
 const HANGUL_NAME_REGEX = /[ㄱ-ㅎㅏ-ㅣ가-힣]/;

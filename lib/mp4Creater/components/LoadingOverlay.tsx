@@ -54,7 +54,7 @@ export function LoadingOverlay({
               <span>{safeProgress}%</span>
             </div>
             <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
-              <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${safeProgress}%` }} />
+              <div suppressHydrationWarning className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${safeProgress}%` }} />
             </div>
           </div>
         )}
@@ -101,7 +101,7 @@ export function StudioPageSkeleton({
               <span>{safeProgress}%</span>
             </div>
             <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-white">
-              <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${safeProgress}%` }} />
+              <div suppressHydrationWarning className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${safeProgress}%` }} />
             </div>
           </div>
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
