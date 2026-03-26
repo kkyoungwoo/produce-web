@@ -9,6 +9,7 @@ import { SavedProject, GeneratedAsset, CostBreakdown, BackgroundMusicTrack, Prev
 import { buildProjectSettingsSnapshot } from './projectSettingsSnapshot';
 import { compactWorkflowDraftForStorage } from './workflowDraftService';
 import { deleteStudioProjects, fetchStudioProjectById, fetchStudioProjects, getCachedStudioState, saveProjectsToStudio, saveStudioProject, summarizeProjectForIndex } from './localFileApi';
+import { buildSceneStudioSnapshotPayload, writeSceneStudioSnapshot } from './sceneStudioSnapshotCache';
 
 const DB_NAME = 'TubeGenAI';
 const DB_VERSION = 1;
@@ -941,11 +942,17 @@ export async function getProjectById(id: string, options?: { forceSync?: boolean
   if (direct && !options?.forceSync && hasDirectDetail) return direct;
   if (options?.localOnly) return hasDirectDetail ? direct : null;
 
-  const remoteDetail = await fetchStudioProjectById(id);
-  if (remoteDetail) {
-    const normalized = normalizeProject(remoteDetail);
-    await writeIndexedProject(normalized);
-    return normalized;
+  try {
+    const remoteDetail = await fetchStudioProjectById(id);
+    if (remoteDetail) {
+      const normalized = normalizeProject(remoteDetail);
+      await writeIndexedProject(normalized);
+      return normalized;
+    }
+  } catch {}
+
+  if (hasDirectDetail) {
+    return direct;
   }
 
   const projects = await getSavedProjects(options);
@@ -1226,6 +1233,17 @@ export async function importProjectsFromFile(file: File): Promise<SavedProject[]
 
   const next = [...prepared, ...current].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   await syncProjectsAcrossStorage(next, { immediateStudioSync: true, changedProjects: prepared });
+  prepared.forEach((project) => {
+    writeSceneStudioSnapshot(buildSceneStudioSnapshotPayload({
+      projectId: project.id,
+      assets: Array.isArray(project.assets) ? project.assets : [],
+      backgroundMusicTracks: Array.isArray(project.backgroundMusicTracks) ? project.backgroundMusicTracks : [],
+      activeBackgroundTrackId: project.activeBackgroundTrackId || null,
+      previewMix: project.previewMix || null,
+      workflowDraft: project.workflowDraft || null,
+      cost: project.cost || null,
+    }));
+  });
   return prepared;
 }
 

@@ -1,50 +1,1842 @@
-[00:00:01.694] Server  LOG     ✓ Ready in 1460ms
-[00:00:07.168] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:01:05.548] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
-[00:01:06.124] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
-[00:01:12.275] Browser LOG     [Video] 총 2개 씬 중 2개 렌더링, 자막: 비활성화
-[00:01:12.275] Browser LOG     [Video] 씬 1: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:01:12.275] Browser LOG     [Video] 씬 2: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:01:49.970] Browser LOG     [Video] 총 5개 씬 중 5개 렌더링, 자막: 비활성화
-[00:01:49.970] Browser LOG     [Video] 씬 1: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:01:49.970] Browser LOG     [Video] 씬 1 오디오 없음, 기본 1초 사용
-[00:01:49.970] Browser LOG     [Video] 씬 2: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:01:49.970] Browser LOG     [Video] 씬 2 오디오 없음, 기본 1초 사용
-[00:01:49.970] Browser LOG     [Video] 씬 3: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:01:49.970] Browser LOG     [Video] 씬 3 오디오 없음, 기본 1초 사용
-[00:01:49.970] Browser LOG     [Video] 씬 4: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:01:49.970] Browser LOG     [Video] 씬 4 오디오 없음, 기본 1초 사용
-[00:01:49.970] Browser LOG     [Video] 씬 5: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:01:49.970] Browser LOG     [Video] 씬 5 오디오 없음, 기본 1초 사용
-[00:02:32.153] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:04:30.613] Browser LOG     [Video] 총 5개 씬 중 5개 렌더링, 자막: 비활성화
-[00:04:30.613] Browser LOG     [Video] 씬 1: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:04:30.613] Browser LOG     [Video] 씬 1 오디오 없음, 기본 1초 사용
-[00:04:30.613] Browser LOG     [Video] 씬 2: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:04:30.613] Browser LOG     [Video] 씬 2 오디오 없음, 기본 1초 사용
-[00:04:30.613] Browser LOG     [Video] 씬 3: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:04:30.613] Browser LOG     [Video] 씬 3 오디오 없음, 기본 1초 사용
-[00:04:30.613] Browser LOG     [Video] 씬 4: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:04:30.613] Browser LOG     [Video] 씬 4 오디오 없음, 기본 1초 사용
-[00:04:30.613] Browser LOG     [Video] 씬 5: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[00:04:30.613] Browser LOG     [Video] 씬 5 오디오 없음, 기본 1초 사용
-[00:34:10.642] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:34:15.950] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:40:14.788] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:40:16.603] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:40:24.129] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:40:48.273] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:42:08.037] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:42:12.523] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:47:19.339] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:48:10.361] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:52:19.970] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:07:07.158] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:07:11.129] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:07:18.706] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
-[01:07:22.064] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
-[01:07:25.484] Browser LOG     [Video] 총 3개 씬 중 3개 렌더링, 자막: 비활성화
-[01:07:25.484] Browser LOG     [Video] 씬 1: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[01:07:25.484] Browser LOG     [Video] 씬 1 오디오 없음, 기본 1초 사용
-[01:07:25.484] Browser LOG     [Video] 씬 2: 이미지 또는 플레이스홀더 준비 완료 (960x960)
-[01:07:25.484] Browser LOG     [Video] 씬 3: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:00:01.562] Server  LOG     ✓ Ready in 1343ms
+[00:00:07.406] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:13.950] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:00:14.058] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:00:14.198] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:00:15.619] Server  LOG     ○ Compiling /api/local-storage/project ...
+[00:01:12.424] Browser ERROR   [ffmpegExportService] mp4 normalize failed ErrnoError: FS error
+[00:02:05.955] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:06.076] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:08.808] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:08.935] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:09.488] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:09.596] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:27.286] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:28.103] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:28.196] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:28.345] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:54.008] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:54.087] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:02:54.197] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:03:00.904] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:03:00.994] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:03:01.099] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:03:10.496] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:03:10.695] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:03:10.797] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:03:31.752] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:03:31.867] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:04:32.690] Browser ERROR   [ffmpegExportService] mp4 normalize failed ErrnoError: FS error
+[00:05:26.163] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:05:26.457] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:05:26.572] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:05:30.566] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:05:30.679] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:05:39.844] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:05:39.845] Browser ERROR   In HTML, %s cannot be a descendant of <%s>.
+This will cause a hydration error.%s <button> button 
+
+  ...
+    <InnerLayoutRouter url="/mp4Create..." tree={[...]} params={{}} cacheNode={{rsc:Promise, ...}} segmentPath={[...]} ...>
+      <SegmentViewNode type="page" pagePath="mp4Creater...">
+        <SegmentTrieNode>
+        <Page>
+          <ThumbnailStudioPage>
+            <div className="min-h-scre...">
+              <Header>
+              <main className="mx-auto ma...">
+                <section>
+                <div className="mt-4 grid ...">
+                  <section>
+                  <section className="overflow-h...">
+                    <div className="flex h-ful...">
+                      <div>
+                      <div className="mt-4 flex ...">
+                        <div className="flex min-h...">
+                          <div>
+                          <div ref={{...}} onWheel={function ThumbnailStudioPage.useCallback[handleStripWheel]} ...>
+                            <div ref={function ref} onClick={function onClick} className="w-[360px] ...">
+>                             <button
+>                               type="button"
+>                               onClick={function onClick}
+>                               className="block w-full overflow-hidden border-b border-slate-200 bg-slate-100"
+>                             >
+                                <span>
+>                               <button
+>                                 type="button"
+>                                 onClick={function onClick}
+>                                 className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg..."
+>                               >
+                                ...
+                              ...
+              ...
+      ...
+
+[00:05:40.026] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:05:40.131] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:11:54.158] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:11:54.288] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:12:08.352] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:12:08.776] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:12:08.852] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:12:09.009] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:13:06.223] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 1 failed ErrnoError: FS error
+[00:13:06.442] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 2 failed ErrnoError: FS error
+[00:13:06.442] Browser ERROR   [ffmpegExportService] mp4 normalize failed ErrnoError: FS error
+[00:14:19.981] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:20.152] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:22.006] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:22.298] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:22.404] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:22.584] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:22.844] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:22.946] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:23.259] Browser ERROR   uncaughtError: ReferenceError: canScrollLeft is not defined
+[00:14:26.894] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:14:26.895] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:27.236] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:27.331] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:27.506] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:27.923] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:14:28.087] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[00:14:28.087] Browser ERROR   In HTML, %s cannot be a descendant of <%s>.
+This will cause a hydration error.%s <button> button 
+
+  ...
+    <InnerLayoutRouter url="/mp4Create..." tree={[...]} params={{}} cacheNode={{rsc:<Fragment>, ...}} segmentPath={[...]} ...>
+      <SegmentViewNode type="page" pagePath="mp4Creater...">
+        <SegmentTrieNode>
+        <Page>
+          <ThumbnailStudioPage>
+            <div className="min-h-scre...">
+              <Header>
+              <main className="mx-auto ma...">
+                <section>
+                <div className="mt-4 grid ...">
+                  <section>
+                  <section className="overflow-h...">
+                    <div className="flex h-ful...">
+                      <div>
+                      <div className="mt-4 flex ...">
+                        <div className="flex min-h...">
+                          <div>
+                          <div ref={{current:null}} onWheel={function ThumbnailStudioPage.useCallback[handleStripWheel]} ...>
+                            <div ref={function ref} onClick={function onClick} className="w-[360px] ...">
+>                             <button
+>                               type="button"
+>                               onClick={function onClick}
+>                               className="block w-full overflow-hidden border-b border-slate-200 bg-slate-100"
+>                             >
+                                <span>
+>                               <button
+>                                 type="button"
+>                                 onClick={function onClick}
+>                                 className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg..."
+>                               >
+                                ...
+                              ...
+              ...
+      ...
+
+[00:14:33.744] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:14:33.744] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:33.744] Browser ERROR   uncaughtError: ReferenceError: canScrollLeft is not defined
+[00:14:34.082] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:34.186] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:34.340] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:34.769] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:14:34.926] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[00:14:34.926] Browser ERROR   uncaughtError: ReferenceError: canScrollLeft is not defined
+[00:14:35.219] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:14:35.219] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:35.537] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:35.602] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:35.768] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:36.131] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:14:36.288] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[00:14:36.288] Browser ERROR   In HTML, %s cannot be a descendant of <%s>.
+This will cause a hydration error.%s <button> button 
+
+  ...
+    <InnerLayoutRouter url="/mp4Create..." tree={[...]} params={{}} cacheNode={{rsc:<Fragment>, ...}} segmentPath={[...]} ...>
+      <SegmentViewNode type="page" pagePath="mp4Creater...">
+        <SegmentTrieNode>
+        <Page>
+          <ThumbnailStudioPage>
+            <div className="min-h-scre...">
+              <Header>
+              <main className="mx-auto ma...">
+                <section>
+                <div className="mt-4 grid ...">
+                  <section>
+                  <section className="overflow-h...">
+                    <div className="flex h-ful...">
+                      <div>
+                      <div className="mt-4 flex ...">
+                        <div className="flex min-h...">
+                          <div>
+                          <div ref={{current:null}} onWheel={function ThumbnailStudioPage.useCallback[handleStripWheel]} ...>
+                            <div ref={function ref} onClick={function onClick} className="w-[360px] ...">
+>                             <button
+>                               type="button"
+>                               onClick={function onClick}
+>                               className="block w-full overflow-hidden border-b border-slate-200 bg-slate-100"
+>                             >
+                                <span>
+>                               <button
+>                                 type="button"
+>                                 onClick={function onClick}
+>                                 className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg..."
+>                               >
+                                ...
+                              ...
+              ...
+      ...
+
+[00:14:40.948] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:41.157] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:14:41.268] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:17:15.352] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:17:15.751] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:17:15.839] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:17:16.003] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:17:29.317] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:17:29.617] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:17:29.725] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:17:30.129] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:17:30.418] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:17:30.539] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:18:46.057] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:18:46.592] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:18:46.763] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:19:45.068] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 1 failed {}
+[00:19:45.069] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 2 failed {}
+[00:19:45.069] Browser ERROR   [ffmpegExportService] mp4 normalize failed {}
+[00:21:19.005] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:21:19.388] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:21:19.516] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:21:22.445] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:21:22.675] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:21:22.789] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:33:42.288] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:33:42.573] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:33:43.279] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:33:43.279] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:33:47.982] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:33:48.089] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:33:51.920] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:33:52.059] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[00:34:06.552] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:34:06.745] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:34:06.858] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:34:07.126] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:34:07.426] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:34:07.533] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:35:08.718] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 1 failed ErrnoError: FS error
+[00:35:08.918] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 2 failed ErrnoError: FS error
+[00:35:08.918] Browser ERROR   [ffmpegExportService] mp4 normalize failed ErrnoError: FS error
+[00:42:15.109] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:15.299] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:15.487] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:15.592] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:17.622] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:42:17.688] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:17.737] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[00:42:17.947] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:18.052] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:19.373] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:19.560] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:19.624] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:19.662] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:20.236] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:20.385] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:22.771] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:23.219] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:23.461] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:23.601] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:23.737] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:26.015] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:26.450] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:26.711] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:26.868] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:26.981] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:28.591] Browser WARN    [Prompt Translation] script composer request translation skipped: {}
+[00:42:31.656] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:32.222] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:32.560] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:32.714] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:32.817] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:37.087] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:38.233] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:38.454] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:38.589] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:43:12.729] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 1 failed {}
+[00:43:12.864] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 2 failed {}
+[00:43:12.864] Browser ERROR   [ffmpegExportService] mp4 normalize failed {}
+[00:43:42.549] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:43:42.665] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[00:50:21.049] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:50:21.433] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:50:21.630] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:50:21.973] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:50:22.132] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:50:22.132] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:50:22.353] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:50:22.612] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:50:22.695] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:50:23.228] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:50:23.357] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[00:50:25.425] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:50:25.562] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[00:50:56.419] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 1 failed {}
+[00:50:56.419] Browser ERROR   [SceneStudioPage] merged render failed {}
+[01:04:37.770] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:04:37.910] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:04:38.087] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:04:38.160] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:04:38.293] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:04:38.664] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:04:38.764] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:04:38.905] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:04:39.661] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:04:39.787] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[01:06:21.694] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:06:22.519] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:06:22.640] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:06:45.562] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:06:45.695] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[01:19:01.075] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:19:01.500] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:19:01.659] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:19:01.866] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:19:02.207] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:19:02.293] Server  ERROR   ⨯ Error: aborted
+[01:19:02.581] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:19:02.708] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[01:19:02.719] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:19:03.108] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:19:03.258] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:19:03.370] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:34.056] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:34.584] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
+
+Previous: %s
+Incoming: %s useEffect [blob:http://localhost:3000/ca7bf052-0169-498f-b425-553a096e7405] [28.23, blob:http://localhost:3000/ca7bf052-0169-498f-b425-553a096e7405]
+[01:26:34.799] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:34.933] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:35.597] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:35.914] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:35.997] Server  ERROR   ⨯ Error: aborted
+[01:26:36.607] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:26:36.740] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[01:26:36.756] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:37.212] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:37.381] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:37.486] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:44.463] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:26:44.588] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[01:26:49.222] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:26:49.341] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+[01:26:50.166] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:50.649] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:26:50.779] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
+Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
+
+Import trace for requested module:
+./node_modules/@huggingface/transformers/dist/transformers.web.js
+./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
+./lib/mp4Creater/services/ttsService.ts
+./lib/mp4Creater/components/SettingsDrawer.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[01:42:54.090] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

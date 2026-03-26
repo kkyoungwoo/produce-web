@@ -156,10 +156,10 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
   const backgroundMusicVolume = safePreviewMix.backgroundMusicVolume ?? 0.5;
   const previewAspectRatio = sequenceScene?.aspectRatio || data[0]?.aspectRatio || '16:9';
   const hasPreviewRenderStarted = previewVideoStatus !== 'idle' || Boolean(isPreparingPreviewVideo);
-  const canShowRenderedPreview = Boolean(finalVideoUrl) && (previewVideoStatus === 'ready' || previewVideoStatus === 'fallback');
+  const canShowRenderedPreview = Boolean(finalVideoUrl);
   const showFinalRenderButton = Boolean(onPreparePreviewVideo && !isPreparingPreviewVideo);
   const showFinalOutputButton = Boolean(canShowRenderedPreview && onExportVideo);
-  const showPreviewMixControls = Boolean(!canShowRenderedPreview && previewVideoStatus !== 'loading' && !isPreparingPreviewVideo && onPreviewMixChange);
+  const showPreviewMixControls = Boolean(!finalVideoUrl && previewVideoStatus !== 'loading' && !isPreparingPreviewVideo && onPreviewMixChange);
   const mergedPreviewShellClass = previewAspectRatio === '9:16'
     ? 'mx-auto w-full max-w-[240px] sm:max-w-[280px]'
     : previewAspectRatio === '1:1'

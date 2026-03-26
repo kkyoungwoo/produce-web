@@ -73,9 +73,9 @@ function countScriptCharacters(text: string) {
 
 function getTtsOnlyRule(contentType: ContentType) {
   if (contentType === 'music_video') {
-    return '결과는 TTS나 노래 보이스로 바로 읽거나 부를 수 있는 가사 본문만 작성한다. [Intro], [Verse], [Chorus], Scene, 장면, 화자 이름, 괄호 설명, 지문, 카메라 설명, 효과음 표기 없이 가사 줄만 남긴다.';
+    return '결과는 TTS나 노래 보이스로 바로 읽거나 부를 수 있는 가사 본문만 작성한다. [Intro], [Verse], [Chorus], Scene, 장면, 화자 이름, 괄호 설명, 지문, 카메라 설명, 효과음 표기, 특정 상황을 해설하는 산문형 문장을 모두 금지하고 실제로 부를 가사 줄만 남긴다.';
   }
-  return '결과는 TTS로 바로 읽을 목소리 대본만 작성한다. Scene, 장면, 컷, 화자 이름, 대사 라벨, 괄호 설명, 카메라 지시, 행동 지문, 효과음 표기, 메타 설명 없이 낭독할 본문만 남긴다.';
+  return '결과는 TTS로 바로 읽을 목소리 대본만 작성한다. Scene, 장면, 컷, 화자 이름, 대사 라벨, 괄호 설명, 카메라 지시, 행동 지문, 효과음 표기, 메타 설명 없이 낭독할 본문만 남긴다. 영상 제작 지시문이나 상황 설명서가 아니라 실제로 읽을 대본 문장만 출력한다.';
 }
 
 function buildVoiceOnlySample(contentType: ContentType, topic: string, selections: StorySelectionState) {
@@ -427,7 +427,7 @@ function buildGenerationIntentGuide(options: ScriptComposerOptions) {
 
 function buildOutputFormatReminder(options: ScriptComposerOptions) {
   if (options.contentType === 'music_video') {
-    return '출력 형식: 4~6개의 짧은 가사 문단으로 쓰고 줄바꿈으로만 리듬을 만든다. 블록 제목, 괄호, 설명문 없이 실제로 부를 가사 줄만 남긴다.';
+    return '출력 형식: 4~6개의 짧은 가사 문단으로 쓰고 줄바꿈으로만 리듬을 만든다. 블록 제목, 괄호, 설명문, 장면 해설 없이 실제로 부를 가사 줄만 남긴다. 특정 사건을 줄거리처럼 설명하지 말고 노래 가사 자체로 감정과 훅을 만든다.';
   }
 
   if (options.contentType === 'info_delivery') {
@@ -435,15 +435,15 @@ function buildOutputFormatReminder(options: ScriptComposerOptions) {
   }
 
   if (options.contentType === 'cinematic') {
-    return '출력 형식: 4~6개의 시네마틱 낭독 문단으로 쓰되 화면 설명이 아니라 목소리로 읽힐 문장만 남긴다. 대본 본문만 출력하고 장면 제목, 카메라 지시, 메타 문구는 본문에 쓰지 않는다.';
+    return '출력 형식: 4~6개의 시네마틱 낭독 문단으로 쓰되 화면 설명이 아니라 목소리로 읽힐 문장만 남긴다. 대본 본문만 출력하고 장면 제목, 카메라 지시, 메타 문구는 본문에 쓰지 않는다. 특정 상황 설명서가 아니라 낭독 가능한 본문만 남긴다.';
   }
 
-  return '출력 형식: 4~6개의 이야기형 낭독 문단으로 쓰고 각 문단이 감정과 사건을 함께 전진시켜야 한다. 대본 본문만 출력하고 장면 설명, 목표, 주제, 장르, 메모 같은 메타 문구는 본문에 쓰지 않는다.';
+  return '출력 형식: 4~6개의 이야기형 낭독 문단으로 쓰고 각 문단이 감정과 사건을 함께 전진시켜야 한다. 대본 본문만 출력하고 장면 설명, 목표, 주제, 장르, 메모 같은 메타 문구는 본문에 쓰지 않는다. 영상 연출 지시가 아니라 실제 낭독 대본 문장만 남긴다.';
 }
 
 function buildConceptLockGuide(options: ScriptComposerOptions) {
   if (options.contentType === 'music_video') {
-    return 'Step 1 concept lock: music video. The final body must stay as singable lyrics with visible rhythm and chorus lift.';
+    return 'Step 1 concept lock: music video. The final body must stay as singable lyrics only, with visible rhythm and chorus lift. Do not switch into scene explanation, screenplay prose, or narrative situation summary.';
   }
 
   if (options.contentType === 'cinematic') {
@@ -454,7 +454,7 @@ function buildConceptLockGuide(options: ScriptComposerOptions) {
     return 'Step 1 concept lock: explainer / information-delivery. The final body must teach clearly through order, example, comparison, or numbers.';
   }
 
-  return 'Step 1 concept lock: narrative storytelling. The final body must move through emotion, action, and scene progression.';
+  return 'Step 1 concept lock: narrative storytelling. The final body must move through emotion, action, and scene progression while staying as readable voice script sentences, not production notes.';
 }
 
 function buildParagraphCountGuide(options: ScriptComposerOptions) {
@@ -1111,7 +1111,7 @@ ${additionBlock.map((item, index) => `${index + 1}. ${item}`).join('\n')}`
       : requestPayload;
 
     const result = await runTextAi({
-      system: `${bundle.system} Step 1 콘셉트 고정 규칙을 끝까지 유지하고, 선택된 프롬프트의 출력 형식과 예시를 우선 규칙으로 따른다. 최종 출력에는 목표, 주제, 장르, 메모 같은 메타 문구를 섞지 말고, 현재 초안이 있으면 지우지 말고 이어서 확장한다. 사용자가 비슷한 결과를 직접 원하지 않는 한 방금 전 시도와 비슷한 문장, 후킹 방식, 이미지 은유, 장면 배치를 반복하지 않는다.`,
+      system: `${bundle.system} Step 1 콘셉트 고정 규칙을 끝까지 유지하고, 선택된 프롬프트의 출력 형식과 예시를 우선 규칙으로 따른다. 최종 출력에는 목표, 주제, 장르, 메모 같은 메타 문구를 섞지 말고, 현재 초안이 있으면 지우지 말고 이어서 확장한다. 뮤직비디오면 가사만 쓰고 줄거리 설명이나 상황 해설을 금지한다. 그 외 유형은 실제로 읽을 대본 본문만 쓰고 제작 지시문이나 화면 설명서를 금지한다. 사용자가 비슷한 결과를 직접 원하지 않는 한 방금 전 시도와 비슷한 문장, 후킹 방식, 이미지 은유, 장면 배치를 반복하지 않는다.`,
       user: mergedPayload,
       model: options.model || options.customSettings?.scriptModel || 'openrouter/auto',
       temperature: options.conversationMode || options.template.mode === 'dialogue' ? 0.98 : 0.9,

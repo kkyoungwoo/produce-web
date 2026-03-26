@@ -442,6 +442,7 @@ const SceneStudioPage: React.FC = () => {
   const [isGeneratingScenes, setIsGeneratingScenes] = useState(false);
   const [finalVideoUrl, setFinalVideoUrl] = useState<string | null>(null);
   const [finalVideoTitle, setFinalVideoTitle] = useState('');
+  const [finalVideoDuration, setFinalVideoDuration] = useState<number | null>(null);
   const [navigationOverlay, setNavigationOverlay] = useState<{ title: string; description: string } | null>(null);
   const [isThumbnailGenerating, setIsThumbnailGenerating] = useState(false);
   const [isGeneratingAllVideos, setIsGeneratingAllVideos] = useState(false);
@@ -1374,6 +1375,22 @@ const SceneStudioPage: React.FC = () => {
     }));
   }, [activeBackgroundTrackId, backgroundMusicTracks, buildSceneStudioWorkflowDraft, draft, previewMix]);
 
+  const rememberSceneStudioWorkingProject = useCallback((projectId: string) => {
+    if (!projectId) return;
+    const fallbackProject = pickLatestSceneStudioProject(
+      currentProjectSummary,
+      readProjectNavigationProject(projectId),
+    );
+    const workingProject = createSceneStudioSnapshotFallbackProject(
+      projectId,
+      readSceneStudioSnapshot(projectId),
+      fallbackProject || null,
+    );
+    if (workingProject) {
+      rememberProjectNavigationProject(workingProject);
+    }
+  }, [currentProjectSummary]);
+
   const syncSceneStudioWorkingCopy = useCallback((assetsOverride?: GeneratedAsset[]) => {
     if (!resolvedProjectId) return;
     if (autosaveTimerRef.current) {
@@ -1391,7 +1408,8 @@ const SceneStudioPage: React.FC = () => {
       workflowDraft: buildSceneStudioWorkflowDraft(draft, nextAssets),
       cost: currentCostRef.current,
     });
-  }, [activeBackgroundTrackId, backgroundMusicTracks, buildSceneStudioWorkflowDraft, draft, previewMix, resolvedProjectId, writeSceneStudioLocalSnapshot]);
+    rememberSceneStudioWorkingProject(resolvedProjectId);
+  }, [activeBackgroundTrackId, backgroundMusicTracks, buildSceneStudioWorkflowDraft, draft, previewMix, rememberSceneStudioWorkingProject, resolvedProjectId, writeSceneStudioLocalSnapshot]);
 
   const persistSceneStudioSnapshot = useCallback(async (projectId: string, patch?: Partial<SavedProject>) => {
     if (!projectId) return null;
@@ -1414,6 +1432,7 @@ const SceneStudioPage: React.FC = () => {
       workflowDraft: nextWorkflowDraft,
       cost: nextCost,
     });
+    rememberSceneStudioWorkingProject(projectId);
 
     const savedProject = await updateProject(projectId, {
       ...patch,
@@ -1429,7 +1448,7 @@ const SceneStudioPage: React.FC = () => {
       sceneStudioDirtyRef.current = false;
     }
     return savedProject;
-  }, [activeBackgroundTrackId, backgroundMusicTracks, buildSceneStudioWorkflowDraft, draft, previewMix, writeSceneStudioLocalSnapshot]);
+  }, [activeBackgroundTrackId, backgroundMusicTracks, buildSceneStudioWorkflowDraft, draft, previewMix, rememberSceneStudioWorkingProject, writeSceneStudioLocalSnapshot]);
 
   const flushPendingSceneStudioSave = useCallback(async (patch?: Partial<SavedProject>) => {
     const projectId = resolvedProjectId;
@@ -1488,6 +1507,7 @@ const SceneStudioPage: React.FC = () => {
       return null;
     });
     setFinalVideoTitle('');
+    setFinalVideoDuration(null);
     setPreviewVideoStatus('idle');
     setPreviewVideoMessage(nextMessage);
 
@@ -1557,6 +1577,7 @@ const SceneStudioPage: React.FC = () => {
       return persistedPreviewVideo;
     });
     setFinalVideoTitle(hydratedProject.sceneStudioPreviewVideo?.title || '');
+    setFinalVideoDuration(hydratedProject.sceneStudioPreviewVideo?.duration || null);
     setPreviewVideoStatus(persistedPreviewStatus);
     setPreviewVideoMessage(hydratedProject.sceneStudioPreviewMessage || '합본 영상을 렌더링해 주세요.');
     setStep4Open(false);
@@ -2105,9 +2126,20 @@ const SceneStudioPage: React.FC = () => {
       sceneCount: generatedData.length,
       sceneStatus: generatedData.map((item) => ({
         sceneNumber: item.sceneNumber,
+        narration: item.narration,
+        imagePrompt: item.imagePrompt,
+        videoPrompt: item.videoPrompt,
+        visualPrompt: item.visualPrompt,
+        selectedVisualType: item.selectedVisualType,
         hasImage: Boolean(item.imageData),
         hasAudio: Boolean(item.audioData),
         hasVideo: Boolean(item.videoData),
+        imageDataSize: item.imageData?.length || 0,
+        audioDataSize: item.audioData?.length || 0,
+        videoDataSize: item.videoData?.length || 0,
+        audioDuration: item.audioDuration || null,
+        videoDuration: item.videoDuration || null,
+        subtitleSize: item.subtitleData?.fullText?.length || 0,
         imageHistoryCount: Array.isArray(item.imageHistory) ? item.imageHistory.length : 0,
         videoHistoryCount: Array.isArray(item.videoHistory) ? item.videoHistory.length : 0,
         targetDuration: item.targetDuration,
@@ -2119,6 +2151,15 @@ const SceneStudioPage: React.FC = () => {
       draftUpdatedAt: draft.updatedAt,
       selectedStyleImageId: draft.selectedStyleImageId,
       selectedCharacterIds: draft.selectedCharacterIds,
+      cost: currentCost ? {
+        images: currentCost.images,
+        tts: currentCost.tts,
+        videos: currentCost.videos,
+        total: currentCost.total,
+        imageCount: currentCost.imageCount,
+        ttsCharacters: currentCost.ttsCharacters,
+        videoCount: currentCost.videoCount,
+      } : null,
     });
     if (autosaveSignatureRef.current === signature) return;
     autosaveSignatureRef.current = signature;
@@ -2147,7 +2188,7 @@ const SceneStudioPage: React.FC = () => {
     return () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
-  }, [activeBackgroundTrackId, animatingIndices, backgroundMusicTracks, buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, generatedData, isGeneratingAllVideos, isGeneratingScenes, isThumbnailGenerating, isVideoGenerating, persistSceneStudioSnapshot, previewMix, resolvedProjectId, writeSceneStudioLocalSnapshot]);
+  }, [activeBackgroundTrackId, animatingIndices, backgroundMusicTracks, buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, currentCost, draft, generatedData, isGeneratingAllVideos, isGeneratingScenes, isThumbnailGenerating, isVideoGenerating, persistSceneStudioSnapshot, previewMix, resolvedProjectId, writeSceneStudioLocalSnapshot]);
 
   useEffect(() => {
     if (!resolvedProjectId || !studioState) return;
@@ -2174,6 +2215,9 @@ const SceneStudioPage: React.FC = () => {
 
     const renderableAssets = [...assetsRef.current];
     const sceneVideoCount = renderableAssets.filter((asset) => Boolean(asset.videoData)).length;
+    const hasSceneOutputs = renderableAssets.some((asset) => Boolean(asset.imageData || asset.videoData || asset.audioData));
+    const hasBackgroundOutputs = effectiveBackgroundTracks.some((track) => Boolean(track?.audioData));
+    const shouldStartWithStaticFallback = !hasSceneOutputs && !hasBackgroundOutputs;
 
     if (!renderableAssets.length) {
       const message = '합칠 씬이 아직 없어 결과 미리보기를 만들 수 없습니다.';
@@ -2222,35 +2266,53 @@ const SceneStudioPage: React.FC = () => {
           if (previous) URL.revokeObjectURL(previous);
           return null;
         });
+        setFinalVideoDuration(null);
       }
       setTaskProgressPercent(8);
       setPreviewVideoStatus('loading');
 
-      const primaryMessage = sceneVideoCount > 0
-        ? `준비된 씬 영상 ${sceneVideoCount}개와 이미지를 함께 합쳐 합본 영상을 만드는 중입니다.`
-        : 'AI 씬 영상이 없어도 이미지 기반 합본 영상을 만드는 중입니다.';
+      const primaryMessage = shouldStartWithStaticFallback
+        ? '이미지, 영상, 오디오가 없어도 각 씬 길이만큼 검정 화면으로 합본 영상을 만드는 중입니다.'
+        : sceneVideoCount > 0
+          ? `준비된 씬 영상 ${sceneVideoCount}개와 이미지를 함께 합쳐 합본 영상을 만드는 중입니다.`
+          : 'AI 씬 영상이 없어도 현재 씬 이미지와 오디오를 기준으로 합본 영상을 만드는 중입니다.';
       setPreviewVideoMessage(primaryMessage);
       setProgressMessage(primaryMessage);
 
       let result = null;
-      let usedFallback = false;
-      let usedSceneVideos = sceneVideoCount > 0;
-      let usedSafeFallback = false;
+      let usedFallback = shouldStartWithStaticFallback;
+      let usedSceneVideos = sceneVideoCount > 0 && !shouldStartWithStaticFallback;
+      let usedSafeFallback = shouldStartWithStaticFallback;
 
       try {
-        result = await generateVideo(
-          assetsRef.current,
-          progressHandler,
-          isAbortedRef,
-          {
-            enableSubtitles,
-            qualityMode,
-            backgroundTracks: effectiveBackgroundTracks,
-            previewMix,
-            aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
-            useSceneVideos: usedSceneVideos,
-          }
-        );
+        if (shouldStartWithStaticFallback) {
+          result = await generateVideoStaticFallback(
+            assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
+            progressHandler,
+            isAbortedRef,
+            {
+              enableSubtitles,
+              qualityMode,
+              backgroundTracks: effectiveBackgroundTracks,
+              previewMix,
+              aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
+            }
+          );
+        } else {
+          result = await generateVideo(
+            assetsRef.current,
+            progressHandler,
+            isAbortedRef,
+            {
+              enableSubtitles,
+              qualityMode,
+              backgroundTracks: effectiveBackgroundTracks,
+              previewMix,
+              aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
+              useSceneVideos: usedSceneVideos,
+            }
+          );
+        }
       } catch (primaryError) {
         console.error('[SceneStudioPage] primary merged render failed', primaryError);
         usedFallback = true;
@@ -2307,7 +2369,7 @@ const SceneStudioPage: React.FC = () => {
         return null;
       }
 
-      const finalResult = result;
+      let finalResult = result;
 
       const expectedDuration = Number(renderableAssets.reduce((sum, asset) => sum + resolveScenePlaybackDuration(asset), 0).toFixed(2));
       const measuredDuration = await measureRenderedVideoDuration(finalResult.videoBlob);
@@ -2322,7 +2384,7 @@ const SceneStudioPage: React.FC = () => {
         setPreviewVideoMessage(invalidDurationMessage);
         setProgressMessage(invalidDurationMessage);
 
-        result = await generateVideoStaticFallback(
+        finalResult = await generateVideoStaticFallback(
           assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
           progressHandler,
           isAbortedRef,
@@ -2349,6 +2411,7 @@ const SceneStudioPage: React.FC = () => {
       });
       const nextFinalVideoTitle = renderTitle(usedFallback ? '안전 모드' : undefined);
       setFinalVideoTitle(nextFinalVideoTitle);
+      setFinalVideoDuration(normalizedExpectedDuration > 0 ? normalizedExpectedDuration : null);
 
       if (downloadFile) {
         const outputExtension = finalResult.videoBlob.type.includes('webm') ? 'webm' : 'mp4';
@@ -2404,13 +2467,14 @@ const SceneStudioPage: React.FC = () => {
         }
       }
 
-      return result;
+      return finalResult;
     } catch (error) {
       console.error('[SceneStudioPage] merged render failed', error);
       const failureMessage = '브라우저에서 합본 영상을 만드는 중 문제가 발생했습니다. 다시 시도하거나 씬 수를 줄여 확인해 주세요.';
       setPreviewVideoStatus('error');
       setPreviewVideoMessage(failureMessage);
       setProgressMessage(failureMessage);
+      setFinalVideoDuration(null);
       return null;
     } finally {
       setIsVideoGenerating(false);
@@ -3156,6 +3220,7 @@ const SceneStudioPage: React.FC = () => {
           sceneProgressMap={sceneProgressMap}
           finalVideoUrl={finalVideoUrl}
           finalVideoTitle={finalVideoTitle}
+          finalVideoDuration={finalVideoDuration}
           previewVideoStatus={previewVideoStatus}
           previewVideoMessage={previewVideoMessage}
           onPreparePreviewVideo={handlePreparePreviewVideo}

@@ -42,9 +42,12 @@
 - Video prompt continuity must continue to reference the current image and previous/next scenes so the cut flow stays natural.
 - Do not move Step6 prompt assembly away from the current path unless the new path is documented here and in `STEP6.md`.
 - Step6 save/reopen logic is now part of prompt safety because stale payload restore can break the real paragraph order seen by prompt generation.
+- Step6 autosave comparison must include narration/image prompt/video prompt edits so prompt text shown in UI, saved project JSON, and import/export payload stay identical.
+- Step5 -> Step6 reopen must preserve existing Step6 prompt-bearing assets instead of recreating blank draft scenes when a saved Step6 project already exists.
 
 ## Step6 Related Save Paths
 - Route handoff into Step6: `lib/mp4Creater/App.tsx`
 - Step6 working copy + hydrate logic: `lib/mp4Creater/pages/SceneStudioPage.tsx`
 - Snapshot persistence: `lib/mp4Creater/services/sceneStudioSnapshotCache.ts`
 - Navigation handoff cache: `lib/mp4Creater/services/projectNavigationCache.ts`
+- Project import snapshot rebuild: `lib/mp4Creater/services/projectService.ts`

@@ -220,25 +220,27 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
     );
   };
 
-  const openProjectScene = (project: SavedProject) => {
+  const openProjectScene = async (project: SavedProject) => {
     if (isInteractionLocked) return;
-    rememberProjectNavigationProject(project);
-    onLoad?.(project);
+    const detailedProject = await getProjectById(project.id, { localOnly: true }) || await getProjectById(project.id) || project;
+    rememberProjectNavigationProject(detailedProject);
+    onLoad?.(detailedProject);
     try {
       window.scrollTo({ top: 0, behavior: 'auto' });
     } catch {}
-    const targetStep = resolveLastWorkedStep(project);
-    router.push(`${basePath}/step-${targetStep}?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+    const targetStep = resolveLastWorkedStep(detailedProject);
+    router.push(`${basePath}/step-${targetStep}?projectId=${encodeURIComponent(detailedProject.id)}`, { scroll: false });
   };
 
-  const openProjectThumbnailStudio = (project: SavedProject) => {
+  const openProjectThumbnailStudio = async (project: SavedProject) => {
     if (isInteractionLocked) return;
-    rememberProjectNavigationProject(project);
-    onLoad?.(project);
+    const detailedProject = await getProjectById(project.id, { localOnly: true }) || await getProjectById(project.id) || project;
+    rememberProjectNavigationProject(detailedProject);
+    onLoad?.(detailedProject);
     try {
       window.scrollTo({ top: 0, behavior: 'auto' });
     } catch {}
-    router.push(`${basePath}/thumbnail-studio?projectId=${encodeURIComponent(project.id)}`, { scroll: false });
+    router.push(`${basePath}/thumbnail-studio?projectId=${encodeURIComponent(detailedProject.id)}`, { scroll: false });
   };
 
   const openCreateProject = () => {
@@ -513,7 +515,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
               whileHover={{ y: -1 }}
               whileTap={{ scale: 0.99 }}
               disabled={isInteractionLocked}
-              onClick={() => openProjectScene(project)}
+              onClick={() => { void openProjectScene(project); }}
               className="col-span-2 rounded-[18px] border border-sky-200 bg-gradient-to-r from-white via-sky-50 to-blue-100 px-2 py-2 text-[11px] font-black text-sky-700 shadow-[0_8px_20px_rgba(140,190,235,0.18)] backdrop-blur-md transition-all duration-300 hover:shadow-[0_10px_24px_rgba(140,190,235,0.22)] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
             >
               제작하기
@@ -524,7 +526,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
               whileHover={{ y: -1 }}
               whileTap={{ scale: 0.99 }}
               disabled={isInteractionLocked}
-              onClick={() => openProjectThumbnailStudio(project)}
+              onClick={() => { void openProjectThumbnailStudio(project); }}
               className="rounded-xl border border-sky-100 bg-white/80 px-2 py-2 text-[10px] font-black text-slate-700 shadow-sm backdrop-blur-md transition-all duration-300 hover:bg-white sm:text-[11px] disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
             >
               썸네일 제작

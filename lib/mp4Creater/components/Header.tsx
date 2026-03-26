@@ -107,7 +107,14 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </Link>
 
+
           <div className="flex flex-wrap items-center gap-2">
+            {formattedLiveApiCost ? (
+              <div className="mp4-glass-pill inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black text-emerald-700">
+                <span>실시간 API 예상요금</span>
+                <span className="text-sm text-emerald-900">{formattedLiveApiCost}</span>
+              </div>
+            ) : null}
             <NavAction
               active={isGalleryActive}
               onClick={onGoGallery}
@@ -115,13 +122,6 @@ const Header: React.FC<HeaderProps> = ({
             >
               프로젝트 {projectCount > 0 ? `(${projectCount})` : ''}
             </NavAction>
-
-            {formattedLiveApiCost ? (
-              <div className="mp4-glass-pill inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
-                <span>실시간 API 예상요금</span>
-                <span className="text-sm text-emerald-900">{formattedLiveApiCost}</span>
-              </div>
-            ) : null}
 
             <button
               type="button"

@@ -133,46 +133,15 @@ function wrapPlaceholderText(value: string, maxChars = 24, maxLines = 4): string
   return chunks.filter(Boolean);
 }
 
-function buildScenePlaceholderDataUrl(asset: GeneratedAsset, sceneIndex: number, width: number, height: number): string {
+function buildScenePlaceholderDataUrl(_asset: GeneratedAsset, _sceneIndex: number, width: number, height: number): string {
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(320, width);
   canvas.height = Math.max(320, height);
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { alpha: false });
   if (!ctx) return '';
 
-  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, '#0f172a');
-  gradient.addColorStop(0.55, '#1e293b');
-  gradient.addColorStop(1, '#111827');
-  ctx.fillStyle = gradient;
+  ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.fillRect(canvas.width * 0.08, canvas.height * 0.12, canvas.width * 0.84, canvas.height * 0.76);
-
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = '#ffffff';
-  ctx.font = `700 ${Math.max(26, Math.round(canvas.width * 0.026))}px sans-serif`;
-  ctx.fillText(`씬 ${asset.sceneNumber || sceneIndex + 1}`, canvas.width / 2, canvas.height * 0.28);
-
-  const bodyLines = wrapPlaceholderText(
-    asset.narration || asset.imagePrompt || asset.visualPrompt || asset.videoPrompt || '이미지가 없어도 이 문단은 최종 합본에 포함됩니다.',
-    Math.max(16, Math.round(canvas.width / 32)),
-    4,
-  );
-
-  ctx.font = `600 ${Math.max(18, Math.round(canvas.width * 0.018))}px sans-serif`;
-  const lineHeight = Math.max(28, Math.round(canvas.height * 0.055));
-  const startY = canvas.height * 0.46 - ((bodyLines.length - 1) * lineHeight) / 2;
-  bodyLines.forEach((line, idx) => {
-    ctx.fillText(line, canvas.width / 2, startY + idx * lineHeight);
-  });
-
-  ctx.font = `500 ${Math.max(14, Math.round(canvas.width * 0.013))}px sans-serif`;
-  ctx.fillStyle = 'rgba(255,255,255,0.72)';
-  ctx.fillText('이미지 미등록 씬 자동 플레이스홀더', canvas.width / 2, canvas.height * 0.78);
-
   return canvas.toDataURL('image/png');
 }
 
@@ -197,6 +166,26 @@ async function prepareSceneImage(
       img.src = placeholder;
     });
   }
+}
+
+function attachSilentAudioBed(
+  audioCtx: AudioContext,
+  destination: MediaStreamAudioDestinationNode,
+  totalDuration: number,
+) {
+  const oscillator = audioCtx.createOscillator();
+  const gainNode = audioCtx.createGain();
+  oscillator.type = 'sine';
+  oscillator.frequency.value = 220;
+  gainNode.gain.value = 0.00001;
+  oscillator.connect(gainNode);
+  gainNode.connect(destination);
+  return {
+    start(startAt: number) {
+      oscillator.start(startAt);
+      oscillator.stop(startAt + Math.max(1, totalDuration) + 0.6);
+    },
+  };
 }
 
 /**
@@ -562,8 +551,13 @@ export const generateVideoStaticFallback = async (
           text: lastRecordedChunkText,
         });
       }
+      const videoBlob = new Blob(chunks, { type: mimeType });
+      if (!videoBlob.size) {
+        reject(new Error('empty-video-blob'));
+        return;
+      }
       resolve({
-        videoBlob: new Blob(chunks, { type: mimeType }),
+        videoBlob,
         recordedSubtitles,
       });
     };
@@ -610,7 +604,7 @@ export const generateVideoStaticFallback = async (
       }
     }
 
-    recorder.start();
+    attachSilentAudioBed(audioCtx, destination, totalDuration).start(masterStartTime);
 
     const drawScene = (scene: PreparedScene, elapsed: number) => {
       ctx.fillStyle = '#000';
@@ -648,6 +642,16 @@ export const generateVideoStaticFallback = async (
         }
       }
     };
+
+    const firstScene = preparedScenes[0];
+    if (firstScene) {
+      drawScene(firstScene, 0);
+    } else {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    recorder.start(250);
 
     const renderLoop = (now: number = performance.now()) => {
       if (isFinished) return;
@@ -858,8 +862,14 @@ export const generateVideo = async (
         });
       }
 
+      const videoBlob = new Blob(chunks, { type: mimeType });
+      if (!videoBlob.size) {
+        reject(new Error('empty-video-blob'));
+        return;
+      }
+
       resolve({
-        videoBlob: new Blob(chunks, { type: mimeType }),
+        videoBlob,
         recordedSubtitles
       });
     };
@@ -904,6 +914,8 @@ export const generateVideo = async (
       }
     }
 
+    attachSilentAudioBed(audioCtx, destination, totalDuration).start(masterStartTime);
+
     // 애니메이션 영상 재생 스케줄링
     preparedScenes.forEach((scene, idx) => {
       if (scene.isAnimated && scene.video) {
@@ -917,7 +929,17 @@ export const generateVideo = async (
       }
     });
 
-    recorder.start();
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const initialScene = preparedScenes[0];
+    if (initialScene?.img?.width && initialScene.img.height) {
+      const ratio = Math.min(canvas.width / initialScene.img.width, canvas.height / initialScene.img.height);
+      const nw = initialScene.img.width * ratio;
+      const nh = initialScene.img.height * ratio;
+      ctx.drawImage(initialScene.img, (canvas.width - nw) / 2, (canvas.height - nh) / 2, nw, nh);
+    }
+
+    recorder.start(250);
 
     // 4. 고정밀 프레임 루프 (Master Clock Tracking)
     const minFrameInterval = 1000 / renderProfile.fps;

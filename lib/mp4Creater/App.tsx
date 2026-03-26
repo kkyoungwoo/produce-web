@@ -83,6 +83,20 @@ const resolveAppViewMode = (params: ReturnType<typeof useSearchParams>) => {
   return 'gallery' as const;
 };
 
+function hasDetailedSceneStudioProject(project?: SavedProject | null) {
+  if (!project) return false;
+  return Boolean(
+    (Array.isArray(project.assets) && project.assets.length)
+    || (Array.isArray(project.backgroundMusicTracks) && project.backgroundMusicTracks.length)
+    || project.previewMix
+    || project.cost
+    || project.sceneStudioPreviewVideo
+    || (Array.isArray(project.sceneList) && project.sceneList.length)
+    || (Array.isArray(project.scriptParagraphs) && project.scriptParagraphs.length)
+    || (Array.isArray(project.ttsFiles) && project.ttsFiles.length)
+  );
+}
+
 function createOptimisticProjectId() {
   return `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -293,6 +307,10 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
   const storageReady = Boolean(studioState?.isStorageConfigured && studioState?.storageDir?.trim());
   const requestedProjectId = searchParams?.get('projectId') || '';
+  const galleryLiveApiCostTotal = useMemo(
+    () => savedProjects.reduce((sum, project) => sum + (typeof project?.cost?.total === 'number' ? project.cost.total : 0), 0),
+    [savedProjects],
+  );
 
   const buildNavigationSnapshotProject = useCallback((workflowDraftOverride?: WorkflowDraft | null) => {
     const targetProjectId = currentProjectId || requestedProjectId;
@@ -1134,29 +1152,55 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     } catch {}
 
     try {
+      const targetProjectId = currentProjectId || requestedProjectId || null;
+      const cachedSceneProject = targetProjectId ? readProjectNavigationProject(targetProjectId) : null;
+      const storedSceneProject = targetProjectId ? await getProjectById(targetProjectId, { localOnly: true }) : null;
+      const existingSceneProject = hasDetailedSceneStudioProject(storedSceneProject)
+        ? storedSceneProject
+        : hasDetailedSceneStudioProject(cachedSceneProject)
+          ? cachedSceneProject
+          : storedSceneProject || cachedSceneProject;
+      const initialSceneAssets = existingSceneProject?.assets?.length
+        ? normalizeLoadedAssets(existingSceneProject.assets)
+        : nextDraft.script?.trim()
+          ? createEmptySceneAssetsFromDraft(nextDraft)
+          : generatedData;
+
+      const nextBackgroundTracks = backgroundMusicTracks.length
+        ? backgroundMusicTracks
+        : existingSceneProject?.backgroundMusicTracks?.length
+          ? existingSceneProject.backgroundMusicTracks
+          : [createSampleBackgroundTrack(nextDraft)];
+      const nextActiveBackgroundTrackId = existingSceneProject?.activeBackgroundTrackId
+        || nextDraft.backgroundMusicScene?.selectedTrackId
+        || nextBackgroundTracks[0]?.id
+        || null;
+      const nextPreviewMix = previewMix || existingSceneProject?.previewMix || getDefaultPreviewMix();
+      const nextCost = currentCost || existingSceneProject?.cost || null;
+      // Step6 생성에는 선택본만 참조하지만, 프로젝트 저장본에는 후보/선택 관계 전체를 유지해 재열기와 export/import 재현성을 지킵니다.
+      const projectDraftForScene = mergeLoadedWorkflowDraft(existingSceneProject?.workflowDraft || null, nextDraft) || nextDraft;
       setStudioState((prev) => ({
         ...(prev || currentState),
-        workflowDraft: nextDraft,
-        lastContentType: nextDraft.contentType || currentState.lastContentType || 'story',
+        workflowDraft: projectDraftForScene,
+        lastContentType: projectDraftForScene.contentType || currentState.lastContentType || 'story',
         updatedAt: Date.now(),
       }));
-
-      const initialSceneAssets = nextDraft.script?.trim()
-        ? createEmptySceneAssetsFromDraft(nextDraft)
-        : generatedData;
-
-      const nextBackgroundTracks = backgroundMusicTracks.length ? backgroundMusicTracks : [createSampleBackgroundTrack(nextDraft)];
-      const nextPreviewMix = previewMix || getDefaultPreviewMix();
-      // Step6 생성에는 선택본만 참조하지만, 프로젝트 저장본에는 후보/선택 관계 전체를 유지해 재열기와 export/import 재현성을 지킵니다.
-      const projectDraftForScene = nextDraft;
-      const optimisticSceneProject = createOptimisticWorkflowProject({
-        projectId: currentProjectId,
+      const optimisticSceneProjectBase = createOptimisticWorkflowProject({
+        projectId: targetProjectId,
         topic: nextDraft.topic || '새 프로젝트',
         workflowDraft: projectDraftForScene,
         assets: initialSceneAssets,
         backgroundMusicTracks: nextBackgroundTracks,
         previewMix: nextPreviewMix,
       });
+      const optimisticSceneProject = {
+        ...optimisticSceneProjectBase,
+        cost: nextCost,
+        activeBackgroundTrackId: nextActiveBackgroundTrackId,
+        sceneStudioPreviewVideo: existingSceneProject?.sceneStudioPreviewVideo || null,
+        sceneStudioPreviewStatus: existingSceneProject?.sceneStudioPreviewStatus || null,
+        sceneStudioPreviewMessage: existingSceneProject?.sceneStudioPreviewMessage || null,
+      } as SavedProject;
 
       setGeneratedData(normalizeLoadedAssets(initialSceneAssets));
       setBackgroundMusicTracks(nextBackgroundTracks);
@@ -1167,10 +1211,10 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         projectId: optimisticSceneProject.id,
         assets: initialSceneAssets,
         backgroundMusicTracks: nextBackgroundTracks,
-        activeBackgroundTrackId: nextBackgroundTracks[0]?.id || null,
+        activeBackgroundTrackId: nextActiveBackgroundTrackId,
         previewMix: nextPreviewMix,
         workflowDraft: projectDraftForScene,
-        cost: currentCost || null,
+        cost: nextCost,
       }));
 
       try {
@@ -1183,8 +1227,9 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         topic: nextDraft.topic || '새 프로젝트',
         workflowDraft: projectDraftForScene,
         assets: initialSceneAssets,
-        cost: currentCost || undefined,
+        cost: nextCost || undefined,
         backgroundMusicTracks: nextBackgroundTracks,
+        activeBackgroundTrackId: nextActiveBackgroundTrackId,
         previewMix: nextPreviewMix,
       })
         .then((project) => {
@@ -1202,7 +1247,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       setNavigationOverlay(null);
       setProgressMessage('씬 제작 페이지를 여는 중 문제가 생겼습니다. 입력값을 다시 확인해 주세요.');
     }
-  }, [backgroundMusicTracks, basePath, currentCost, currentProjectId, ensureRuntimeStorageReady, generatedData, previewMix, promptStorageSelection, refreshProjects, router]);
+  }, [backgroundMusicTracks, basePath, currentCost, currentProjectId, ensureRuntimeStorageReady, generatedData, previewMix, promptStorageSelection, refreshProjects, requestedProjectId, router]);
 
   const handleNarrationChange = (index: number, narration: string) => {
     requestProjectSave('input');
@@ -1230,7 +1275,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         projectCount={savedProjects.length}
         selectedCharacterName={selectedCharacterName}
         storageDir={studioState?.storageDir}
-        liveApiCostTotal={currentCost?.total ?? null}
+        liveApiCostTotal={viewMode === 'gallery' ? galleryLiveApiCostTotal : currentCost?.total ?? null}
         onOpenSettings={() => setShowSettings(true)}
         onGoGallery={() => { router.push(`${basePath}?view=gallery`, { scroll: false }); }}
         viewMode={viewMode}

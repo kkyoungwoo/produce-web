@@ -93,6 +93,57 @@ async function validateGoogleAiStudio(apiKey: string): Promise<ProviderValidatio
   };
 }
 
+
+async function validateHeyGen(apiKey: string): Promise<ProviderValidationResult> {
+  const response = await fetchWithTimeout('/api/mp4Creater/heygen/voices', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ apiKey, limit: 3 }),
+  });
+
+  if (!response.ok) {
+    const detail = (await response.text().catch(() => '')).slice(0, 200);
+    return {
+      ok: false,
+      tone: 'error',
+      message: buildFailureMessage(response.status, 'HeyGen', detail),
+    };
+  }
+
+  const json = await response.json().catch(() => ({}));
+  const voices = Array.isArray(json?.voices) ? json.voices : [];
+  if (!voices.length) {
+    return {
+      ok: false,
+      tone: 'error',
+      message: 'HeyGen 응답은 받았지만 사용할 수 있는 보이스 목록을 확인하지 못했습니다. 키 권한과 계정 상태를 확인해 주세요.',
+    };
+  }
+
+  return {
+    ok: true,
+    tone: 'success',
+    message: `HeyGen 실호출 검증 완료 (voices ${voices.length}개 확인).`,
+  };
+}
+
+async function validateFal(apiKey: string): Promise<ProviderValidationResult> {
+  const base = await validateGoogleAiStudio(apiKey);
+  if (!base.ok) {
+    return {
+      ...base,
+      message: base.message.replace('Google AI Studio', 'Google AI Studio (이미지/영상)'),
+    };
+  }
+  return {
+    ok: true,
+    tone: 'success',
+    message: 'Google AI Studio 이미지/영상용 키 검증 완료. 현재 mp4Creater의 장면 이미지/영상 호출에 바로 사용할 수 있습니다.',
+  };
+}
+
 async function validateElevenLabs(apiKey: string): Promise<ProviderValidationResult> {
   const response = await fetchWithTimeout(`https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(ELEVENLABS_VALIDATION_VOICE_ID)}?output_format=mp3_22050_32`, {
     method: 'POST',
@@ -160,6 +211,8 @@ export async function validateProviderConnection(
   try {
     if (kind === 'openRouter') return await validateGoogleAiStudio(trimmed);
     if (kind === 'elevenLabs') return await validateElevenLabs(trimmed);
+    if (kind === 'heygen') return await validateHeyGen(trimmed);
+    if (kind === 'fal') return await validateFal(trimmed);
 
     return {
       ok: true,

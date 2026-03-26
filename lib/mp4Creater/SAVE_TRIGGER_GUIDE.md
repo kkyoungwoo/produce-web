@@ -35,12 +35,16 @@
 ## Step6 specific
 - `lib/mp4Creater/pages/SceneStudioPage.tsx`
   - paragraph narration/imagePrompt/videoPrompt/visual type/duration edits: immediate snapshot write + debounced project JSON save
+  - autosave signature must include paragraph text/prompt changes, selected visual mode, media duration/url changes, and current cost so JSON/export/import stay aligned with the visible Step6 cards
   - paragraph add/delete and audio-clear actions: immediate snapshot write + project JSON sync
   - preview/final render: must call `flushPendingSceneStudioSave(...)` before merging/exporting
   - existing project reopen: block draft-based scene bootstrap until saved Step6 assets finish hydrating
   - existing project reopen: show progress percent and use latest Step6 snapshot as fallback while detailed project JSON is still loading
 - `lib/mp4Creater/App.tsx`
   - Step5 -> Step6 transition: write the latest Step6 snapshot before route push so the first Step6 load can restore draft cards even before JSON re-fetch finishes
+  - when reopening Step6 for an existing project, reuse the saved Step6 assets/background music/cost/preview state instead of rebuilding empty scene cards from Step5 draft
+- `lib/mp4Creater/services/projectService.ts`
+  - project import must recreate the Step6 snapshot cache from imported project JSON so imported Step6 cards can reopen immediately with the same latest structure
 - Refresh/re-entry/import/export should use the latest Step6 state by comparing project `lastSavedAt` with snapshot `savedAt`.
 - Keep `lib/mp4Creater/App.tsx` Step5 -> Step6 handoff writing the newest Step6 snapshot before route transition.
 - Keep `lib/mp4Creater/pages/SceneStudioPage.tsx` showing cached Step6 cards immediately when `generatedData` already exists, even if hydration is still in progress.

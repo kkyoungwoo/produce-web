@@ -31,10 +31,13 @@
 ## Step6 Latest Stable Flow
 - Step5 -> Step6 handoff must stay centered on `lib/mp4Creater/App.tsx` `handleOpenSceneStudio`.
 - Before route push, the latest `workflowDraft`, initial scene cards, background tracks, and preview mix must be written to both `projectNavigationCache` and `sceneStudioSnapshotCache`.
+- If the target project already has saved Step6 payload, reopen must reuse that payload first instead of recreating empty scene cards from the Step5 draft.
 - Step6 first paint must prefer the newest source among navigation cache, scene snapshot, and saved project JSON.
 - If `generatedData` already exists, Step6 must keep the result panel visible even while project hydration is still running.
 - Reopen logic must not recreate draft placeholder scenes before saved Step6 payload hydration finishes.
 - Latest Step6 state is decided by comparing project `lastSavedAt` and snapshot `savedAt`.
+- Step6 autosave must track text/prompt edits, media generation results, paragraph add/delete, and cost changes so refresh/back/import/export all reuse the same latest working copy.
+- Imported projects must recreate Step6 snapshot cache immediately from imported JSON.
 
 ## Prompt Path Preserve Rules
 - Step1~5 prompt chain: `lib/mp4Creater/services/workflowPromptBuilder.ts`

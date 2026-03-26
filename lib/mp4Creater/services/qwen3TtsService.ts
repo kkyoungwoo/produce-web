@@ -59,21 +59,24 @@ export async function createQwenTtsAsset(options: {
   title: string;
   text: string;
   preset?: string | null;
+  provider?: 'qwen3Tts' | 'chatterbox';
   mode: AudioPreviewAsset['mode'];
 }): Promise<AudioPreviewAsset> {
   const preset = options.preset || 'qwen-default';
   const sample = createSampleVoice(options.text, preset);
+  const requestedProvider = options.provider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts';
+  const fallbackModelId = requestedProvider === 'chatterbox' ? 'sample-tone-fallback/chatterbox' : 'sample-tone-fallback/qwen3';
   return {
     id: `qwen_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     title: options.title,
     text: options.text,
     audioData: sample.audioData,
     duration: sample.duration,
-    provider: 'qwen3Tts',
+    provider: requestedProvider,
     mode: options.mode,
     sourceMode: 'sample',
     voiceId: preset,
-    modelId: 'qwen3-tts',
+    modelId: fallbackModelId,
     createdAt: Date.now(),
   };
 }

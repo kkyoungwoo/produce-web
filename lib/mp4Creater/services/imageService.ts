@@ -6,9 +6,11 @@ import { translatePromptToEnglish } from './promptTranslationService';
 import { buildCreativeDirectionBlock, buildGenerationSignature } from '../config/creativeVariance';
 
 function getGoogleAiStudioApiKey(): string {
-  if (typeof window === 'undefined') return '';
-  return localStorage.getItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY)
-    || process.env.NEXT_PUBLIC_GEMINI_API_KEY
+  if (typeof window === 'undefined') {
+    return process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || '';
+  }
+  return process.env.NEXT_PUBLIC_GEMINI_API_KEY
+    || localStorage.getItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY)
     || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY
     || '';
 }
@@ -37,6 +39,40 @@ export function getGeminiStylePrompt(): string {
   return '';
 }
 
+
+function extractInlineImagePart(dataUrl: string): { inlineData: { mimeType: string; data: string } } | null {
+  const match = `${dataUrl || ''}`.trim().match(/^data:([^;]+);base64,(.+)$/);
+  if (!match) return null;
+  return {
+    inlineData: {
+      mimeType: match[1] || 'image/png',
+      data: match[2] || '',
+    },
+  };
+}
+
+function buildReferenceImageParts(referenceImages: ReferenceImages) {
+  const parts: Array<{ text: string } | { inlineData: { mimeType: string; data: string } }> = [];
+  const characterImages = referenceImages.character.slice(0, 2);
+  const styleImages = referenceImages.style.slice(0, 1);
+
+  characterImages.forEach((image, index) => {
+    const inline = extractInlineImagePart(image);
+    if (!inline) return;
+    parts.push({ text: `[CHARACTER_REFERENCE_${index + 1}] Preserve the same identity, face structure, hair silhouette, wardrobe cues, and recognisable features. Character reference strength: ${referenceImages.characterStrength} / 100.` });
+    parts.push(inline);
+  });
+
+  styleImages.forEach((image, index) => {
+    const inline = extractInlineImagePart(image);
+    if (!inline) return;
+    parts.push({ text: `[STYLE_REFERENCE_${index + 1}] Preserve the same palette logic, texture density, lighting rhythm, rendering finish, and atmosphere. Style reference strength: ${referenceImages.styleStrength} / 100.` });
+    parts.push(inline);
+  });
+
+  return parts;
+}
+
 function hasDialogueCue(text?: string | null) {
   const normalized = `${text || ''}`.replace(/\s+/g, ' ').trim();
   if (!normalized) return false;
@@ -45,8 +81,8 @@ function hasDialogueCue(text?: string | null) {
 
 async function buildImagePrompt(scene: ScriptScene, referenceImages: ReferenceImages) {
   const referenceHint = [
-    referenceImages.character.length ? `Keep a consistent main character identity based on ${referenceImages.character.length} selected reference image(s).` : '',
-    referenceImages.style.length ? `Preserve the selected visual style from ${referenceImages.style.length} style reference image(s).` : '',
+    referenceImages.character.length ? `Keep a consistent main character identity based on ${referenceImages.character.length} selected reference image(s). Character consistency priority: ${referenceImages.characterStrength}/100.` : '',
+    referenceImages.style.length ? `Preserve the selected visual style from ${referenceImages.style.length} style reference image(s). Style consistency priority: ${referenceImages.styleStrength}/100.` : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -121,6 +157,7 @@ export async function generateImage(
 
   try {
     const prompt = await buildImagePrompt(scene, referenceImages);
+    const referenceParts = buildReferenceImageParts(referenceImages);
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`, {
       method: 'POST',
       headers: {
@@ -129,7 +166,8 @@ export async function generateImage(
       },
       body: JSON.stringify({
         contents: [{
-          parts: [{ text: prompt }],
+          role: 'user',
+          parts: [{ text: prompt }, ...referenceParts],
         }],
         generationConfig: {
           responseModalities: ['Image'],
