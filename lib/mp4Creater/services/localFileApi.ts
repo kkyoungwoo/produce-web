@@ -86,6 +86,8 @@ export const DEFAULT_ROUTING: AiRoutingSettings = {
 let studioStateMemoryCache: StudioState | null = null;
 let studioStateSaveFailureCount = 0;
 let studioStateSaveCooldownUntil = 0;
+const STUDIO_STATE_CACHE_MAX_PROJECTS = 80;
+const STUDIO_STATE_CACHE_SOFT_LIMIT = 1_800_000;
 
 function shouldBypassStudioStateSaveRequest() {
   return typeof window !== 'undefined' && Date.now() < studioStateSaveCooldownUntil;
@@ -262,13 +264,67 @@ function stripBinaryPayloadFromCharacter(character: any) {
   };
 }
 
+function stripBinaryPayloadFromAudioPreviewAsset(asset: any) {
+  if (!asset || typeof asset !== 'object') return asset;
+  return {
+    ...asset,
+    audioData: undefined,
+  };
+}
+
+function stripBinaryPayloadFromVideoPreviewAsset(asset: any) {
+  if (!asset || typeof asset !== 'object') return asset;
+  return {
+    ...asset,
+    videoData: undefined,
+  };
+}
+
+function stripBinaryPayloadFromBackgroundTrack(track: any) {
+  if (!track || typeof track !== 'object') return track;
+  return {
+    ...track,
+    audioData: undefined,
+  };
+}
+
+function trimCachedProjects(projects: any[] | undefined | null) {
+  return Array.isArray(projects) ? projects.slice(0, STUDIO_STATE_CACHE_MAX_PROJECTS) : [];
+}
+
+function stripBinaryPayloadFromProjectSummary(project: any) {
+  if (!project || typeof project !== 'object') return project;
+  const thumbnail = typeof project.thumbnail === 'string' && project.thumbnail.startsWith('data:') ? null : project.thumbnail;
+  return {
+    ...project,
+    thumbnail,
+    thumbnailHistory: [],
+    backgroundMusicTracks: [],
+    workflowDraft: project.workflowDraft ? {
+      ...project.workflowDraft,
+      script: typeof project.workflowDraft.script === 'string' ? project.workflowDraft.script.slice(0, 180) : '',
+    } : null,
+  };
+}
+
 function createLightweightWorkflowDraft(draft: any) {
   if (!draft || typeof draft !== 'object') return draft;
   return {
     ...draft,
+    script: typeof draft.script === 'string' ? draft.script.slice(0, 2400) : '',
     styleImages: Array.isArray(draft.styleImages) ? draft.styleImages.map(stripBinaryPayloadFromImage) : [],
     thumbnailHistory: Array.isArray(draft.thumbnailHistory) ? draft.thumbnailHistory.map(stripBinaryPayloadFromImage) : [],
     extractedCharacters: Array.isArray(draft.extractedCharacters) ? draft.extractedCharacters.map(stripBinaryPayloadFromCharacter) : [],
+    characterImages: [],
+    promptTemplates: [],
+    promptAdditions: Array.isArray(draft.promptAdditions) ? draft.promptAdditions.slice(0, 20) : [],
+    voicePreviewAsset: stripBinaryPayloadFromAudioPreviewAsset(draft.voicePreviewAsset),
+    scriptPreviewAsset: stripBinaryPayloadFromAudioPreviewAsset(draft.scriptPreviewAsset),
+    finalVoiceAsset: stripBinaryPayloadFromAudioPreviewAsset(draft.finalVoiceAsset),
+    backgroundMusicPreview: stripBinaryPayloadFromBackgroundTrack(draft.backgroundMusicPreview),
+    finalBackgroundMusic: stripBinaryPayloadFromBackgroundTrack(draft.finalBackgroundMusic),
+    musicVideoPreview: stripBinaryPayloadFromVideoPreviewAsset(draft.musicVideoPreview),
+    finalMusicVideo: stripBinaryPayloadFromVideoPreviewAsset(draft.finalMusicVideo),
   };
 }
 
@@ -321,7 +377,7 @@ export function summarizeProjectForIndex(project: any): SavedProject {
       contentType: normalizeContentType(project.workflowDraft.contentType),
       outputMode: project.workflowDraft.outputMode,
       completedSteps: project.workflowDraft.completedSteps,
-      script: typeof project.workflowDraft.script === 'string' ? project.workflowDraft.script.slice(0, 800) : '',
+      script: typeof project.workflowDraft.script === 'string' ? project.workflowDraft.script.slice(0, 240) : '',
       topic: project.workflowDraft.topic || project.topic || '',
       selectedStyleImageId: project.workflowDraft.selectedStyleImageId,
       selectedCharacterIds: project.workflowDraft.selectedCharacterIds || [],
@@ -336,14 +392,14 @@ export function summarizeProjectForIndex(project: any): SavedProject {
 }
 
 function createLightweightStudioState(state: StudioState): StudioState {
-  const projectIndex = Array.isArray((state as any).projectIndex)
-    ? (state as any).projectIndex.map(summarizeProjectForIndex)
-    : [];
+  const summarizedProjects = trimCachedProjects(
+    Array.isArray(state.projects) ? state.projects.map(summarizeProjectForIndex) : (Array.isArray((state as any).projectIndex) ? (state as any).projectIndex.map(summarizeProjectForIndex) : []),
+  ).map(stripBinaryPayloadFromProjectSummary);
 
   return {
     ...state,
-    projects: Array.isArray(state.projects) ? state.projects.map(summarizeProjectForIndex) : projectIndex,
-    projectIndex,
+    projects: summarizedProjects,
+    projectIndex: [],
     characters: Array.isArray(state.characters) ? state.characters.map(stripBinaryPayloadFromCharacter) : [],
     workflowDraft: createLightweightWorkflowDraft(compactWorkflowDraftForStorage(state.workflowDraft)),
   };
@@ -376,12 +432,17 @@ function syncStudioStateToLocalCache(state: StudioState) {
   if (typeof window === 'undefined') return;
 
   const lightState = createLightweightStudioState(normalizedState);
+  const writeCache = (payload: unknown) => localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE, JSON.stringify(payload));
 
   try {
-    localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE, JSON.stringify(lightState));
-  } catch (error) {
-    console.warn('[mp4Creater] lightweight studio cache write failed', error);
+    const serializedLightState = JSON.stringify(lightState);
+    if (serializedLightState.length > STUDIO_STATE_CACHE_SOFT_LIMIT) {
+      throw new Error('studio cache payload too large');
+    }
+    localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE, serializedLightState);
+  } catch {
     try {
+      const summarizedProjects = trimCachedProjects(Array.isArray(lightState.projects) ? lightState.projects.map(summarizeProjectForIndex) : []).map(stripBinaryPayloadFromProjectSummary);
       const emergencyState: Partial<StudioState> = {
         version: lightState.version,
         storageDir: lightState.storageDir,
@@ -391,13 +452,26 @@ function syncStudioStateToLocalCache(state: StudioState) {
         selectedCharacterId: lightState.selectedCharacterId,
         routing: lightState.routing,
         providers: lightState.providers,
-        workflowDraft: lightState.workflowDraft,
+        workflowDraft: lightState.workflowDraft ? {
+          id: lightState.workflowDraft.id,
+          contentType: lightState.workflowDraft.contentType,
+          aspectRatio: lightState.workflowDraft.aspectRatio,
+          topic: lightState.workflowDraft.topic,
+          outputMode: lightState.workflowDraft.outputMode,
+          selections: lightState.workflowDraft.selections,
+          script: typeof lightState.workflowDraft.script === 'string' ? lightState.workflowDraft.script.slice(0, 600) : '',
+          activeStage: lightState.workflowDraft.activeStage,
+          selectedCharacterIds: lightState.workflowDraft.selectedCharacterIds,
+          selectedStyleImageId: lightState.workflowDraft.selectedStyleImageId,
+          completedSteps: lightState.workflowDraft.completedSteps,
+          updatedAt: lightState.workflowDraft.updatedAt,
+        } as any : null,
         lastContentType: lightState.lastContentType,
-        projects: Array.isArray(lightState.projects) ? lightState.projects.map(summarizeProjectForIndex) : [],
-        projectIndex: Array.isArray((lightState as any).projectIndex) ? (lightState as any).projectIndex.map(summarizeProjectForIndex) : [],
+        projects: summarizedProjects,
+        projectIndex: [],
         characters: [],
       };
-      localStorage.setItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE, JSON.stringify(emergencyState));
+      writeCache(emergencyState);
     } catch {
       localStorage.removeItem(CONFIG.STORAGE_KEYS.STUDIO_STATE_CACHE);
     }

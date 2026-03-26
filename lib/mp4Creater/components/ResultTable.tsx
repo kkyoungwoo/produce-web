@@ -9,7 +9,6 @@ import { handleHorizontalWheel, scrollContainerBy, scrollElementIntoView } from 
 import { exportAssetsToZip } from '../services/exportService';
 import { downloadProjectZip } from '../utils/csvHelper';
 import { downloadSrt } from '../services/srtService';
-import { prepareDavinciResolveImport, saveDavinciResolvePackageZip } from '../services/davinciResolveService';
 import { resolveAssetPlaybackDuration } from '../services/projectEnhancementService';
 import HelpTip from './HelpTip';
 import SceneStudioPreviewPage from './scene-studio/SceneStudioPreviewPage';
@@ -348,10 +347,6 @@ const ResultTable: React.FC<ResultTableProps> = ({
   audioModelSelector,
 }) => {
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [davinciStatusMessage, setDavinciStatusMessage] = useState('');
-  const [davinciPackagePath, setDavinciPackagePath] = useState<string | null>(null);
-  const [davinciLaunchUri, setDavinciLaunchUri] = useState<string | null>(null);
-  const [isDavinciPreparing, setIsDavinciPreparing] = useState(false);
   const downloadQuality: 'preview' | 'final' = 'final';
   const [sequenceSceneIndex, setSequenceSceneIndex] = useState(0);
   const [sequencePlaying, setSequencePlaying] = useState(false);
@@ -404,44 +399,6 @@ const ResultTable: React.FC<ResultTableProps> = ({
     return backgroundMusicTracks.find((item) => item.id === activeBackgroundTrackId) || backgroundMusicTracks[0];
   }, [backgroundMusicTracks, activeBackgroundTrackId]);
   const backgroundMusicModelOptions = BGM_MODEL_OPTIONS.map((item) => ({ value: item.id, label: item.name }));
-
-  const handlePrepareDavinciImport = async () => {
-    setIsDavinciPreparing(true);
-    setDavinciPackagePath(null);
-    setDavinciLaunchUri(null);
-    setDavinciStatusMessage(storageDir?.trim() ? '다빈치 리졸브용 패키지를 로컬 폴더로 정리하고 자동 Import를 시도하는 중입니다.' : '저장 위치가 없어 자동 Import 대신 정리된 ZIP 패키지를 준비합니다.');
-    try {
-      const result = await prepareDavinciResolveImport({ assets: resolvedSceneData, topic: currentTopic || 'mp4Creater', backgroundTracks: backgroundMusicTracks, previewMix, storageDir, projectId, projectNumber });
-      setDavinciPackagePath(result.packagePath || null);
-      setDavinciLaunchUri(result.launchUri || null);
-      if (result.mode === 'zip') {
-        setDavinciStatusMessage(`자동 Import에 필요한 로컬 저장 위치가 없거나 패키지가 커서, ${result.downloadFilename || '다빈치 패키지 ZIP'}을 바로 저장했습니다. 압축을 풀고 번호 순서대로 media / audio / subtitles를 드래그하면 됩니다.`);
-        return;
-      }
-      if (result.launchSucceeded) {
-        setDavinciStatusMessage(`다빈치 리졸브 자동 Import 신호를 보냈습니다. 패키지 경로는 ${result.packagePath || '로컬 exports 폴더'}입니다.`);
-        return;
-      }
-      setDavinciStatusMessage(`패키지는 준비됐지만 mp4Creater 다빈치 브리지를 찾지 못했습니다. ${result.packagePath || 'exports/davinci-resolve'} 폴더를 다빈치로 드래그하거나, open_with_mp4creater_bridge 파일을 나중에 다시 실행해 주세요.`);
-    } catch (error) {
-      setDavinciStatusMessage(error instanceof Error ? error.message : '다빈치 리졸브 패키지 준비에 실패했습니다.');
-      setDavinciPackagePath(null);
-      setDavinciLaunchUri(null);
-    } finally { setIsDavinciPreparing(false); }
-  };
-
-  const handleDownloadDavinciPackage = async () => {
-    setIsDavinciPreparing(true);
-    setDavinciStatusMessage('정리된 다빈치 리졸브 ZIP 패키지를 만드는 중입니다.');
-    setDavinciPackagePath(null);
-    setDavinciLaunchUri(null);
-    try {
-      const result = await saveDavinciResolvePackageZip({ assets: resolvedSceneData, topic: currentTopic || 'mp4Creater', backgroundTracks: backgroundMusicTracks, previewMix, storageDir, projectId, projectNumber });
-      setDavinciStatusMessage(`${result.downloadFilename || '다빈치 패키지 ZIP'} 저장을 시작했습니다. 압축을 풀면 번호 순서가 맞춰진 media / audio / subtitles 폴더가 들어 있습니다.`);
-    } catch (error) {
-      setDavinciStatusMessage(error instanceof Error ? error.message : '다빈치 패키지 ZIP 저장에 실패했습니다.');
-    } finally { setIsDavinciPreparing(false); }
-  };
 
   const sequenceScene = data[sequenceSceneIndex] || null;
   const sequenceSceneAudioRate = sceneAudioRates[sequenceSceneIndex] || 1;
@@ -2095,12 +2052,6 @@ const ResultTable: React.FC<ResultTableProps> = ({
         finalVideoDuration={finalVideoDuration}
         onPreparePreviewVideo={onPreparePreviewVideo}
         isPreparingPreviewVideo={isPreparingPreviewVideo}
-        handlePrepareDavinciImport={handlePrepareDavinciImport}
-        handleDownloadDavinciPackage={handleDownloadDavinciPackage}
-        isDavinciPreparing={isDavinciPreparing}
-        davinciStatusMessage={davinciStatusMessage}
-        davinciPackagePath={davinciPackagePath}
-        davinciLaunchUri={davinciLaunchUri}
         onExportVideo={onExportVideo}
         downloadQuality={downloadQuality}
         isExporting={isExporting}

@@ -47,6 +47,21 @@ interface RenderProfile {
   bitrate: number;
 }
 
+const FALLBACK_SCENE_STYLE_IMAGES = [
+  '/mp4Creater/samples/styles/cold_rational_architecture.png',
+  '/mp4Creater/samples/styles/dawn_of_recovery.png',
+  '/mp4Creater/samples/styles/dynamic_road_sprint.png',
+  '/mp4Creater/samples/styles/ethereal_dreamscape_fog.png',
+  '/mp4Creater/samples/styles/minimal_purity_void.png',
+  '/mp4Creater/samples/styles/mysterious_night_cityscape.png',
+  '/mp4Creater/samples/styles/nostalgic_film_fragments.png',
+  '/mp4Creater/samples/styles/radiant_nature_bliss.png',
+  '/mp4Creater/samples/styles/soft_pastel_first_blush.png',
+  '/mp4Creater/samples/styles/still_moment_dust.png',
+  '/mp4Creater/samples/styles/unyielding_landscape_grit.png',
+  '/mp4Creater/samples/styles/vibrant_festival_lights.png',
+] as const;
+
 function getRecorderStopDelayMs(fps: number) {
   const frameIntervalMs = Math.max(16, Math.ceil(1000 / Math.max(1, fps)));
   return Math.max(80, frameIntervalMs * 2);
@@ -73,6 +88,53 @@ function resolvePreferredImageSources(value: string): string[] {
   }
 
   return Array.from(new Set(candidates));
+}
+
+function hashSceneFallbackSeed(value: string): number {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash * 31) + value.charCodeAt(index)) >>> 0;
+  }
+  return hash;
+}
+
+function decodeInlineSvg(value: string) {
+  const match = value.match(/^data:image\/svg\+xml;base64,(.*)$/);
+  if (!match?.[1]) return '';
+  try {
+    return atob(match[1]);
+  } catch {
+    return '';
+  }
+}
+
+function isLikelyPlaceholderSceneImage(value?: string | null) {
+  const trimmed = `${value || ''}`.trim();
+  if (!trimmed) return true;
+  if (!trimmed.startsWith('data:image/svg+xml;base64,')) return false;
+  const decoded = decodeInlineSvg(trimmed);
+  return /sample scene|샘플|placeholder/i.test(decoded);
+}
+
+function pickFallbackSceneImageSource(asset: GeneratedAsset, sceneIndex: number) {
+  const seed = `${asset.sceneNumber || sceneIndex + 1}:${asset.narration || ''}:${asset.imagePrompt || asset.visualPrompt || ''}`;
+  return FALLBACK_SCENE_STYLE_IMAGES[hashSceneFallbackSeed(seed) % FALLBACK_SCENE_STYLE_IMAGES.length];
+}
+
+function buildFallbackSubtitleText(value: string, config: SubtitleConfig) {
+  const normalized = (value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  const words = normalized.split(' ');
+  const lines: string[] = [];
+  const wordsPerLine = Math.max(1, config.wordsPerLine || 4);
+  const maxLines = Math.max(1, config.maxLines || 2);
+  for (let index = 0; index < words.length && lines.length < maxLines; index += wordsPerLine) {
+    lines.push(words.slice(index, index + wordsPerLine).join(' '));
+  }
+  if (words.length > wordsPerLine * maxLines && lines.length) {
+    lines[maxLines - 1] = `${lines[maxLines - 1]}...`;
+  }
+  return lines.join('\n').trim();
 }
 
 async function loadSceneImage(img: HTMLImageElement, asset: GeneratedAsset, sceneIndex: number): Promise<void> {
@@ -139,6 +201,8 @@ function wrapPlaceholderText(value: string, maxChars = 24, maxLines = 4): string
 }
 
 function buildScenePlaceholderDataUrl(_asset: GeneratedAsset, _sceneIndex: number, width: number, height: number): string {
+  const fallbackImage = pickFallbackSceneImageSource(_asset, _sceneIndex);
+  if (fallbackImage) return fallbackImage;
   const canvas = document.createElement('canvas');
   canvas.width = Math.max(320, width);
   canvas.height = Math.max(320, height);
@@ -154,6 +218,11 @@ function isRenderableSceneAsset(asset: GeneratedAsset | null | undefined): asset
   return Boolean(asset);
 }
 
+function shouldForceFallbackSceneImage(asset: GeneratedAsset) {
+  const hasVideo = Boolean(asset.videoData && asset.selectedVisualType !== 'image');
+  return !hasVideo && isLikelyPlaceholderSceneImage(asset.imageData);
+}
+
 async function prepareSceneImage(
   img: HTMLImageElement,
   asset: GeneratedAsset,
@@ -162,7 +231,7 @@ async function prepareSceneImage(
 ): Promise<void> {
   const placeholder = buildScenePlaceholderDataUrl(asset, sceneIndex, renderProfile.width, renderProfile.height);
   try {
-    if (!asset.imageData) throw new Error('Image source missing');
+    if (!asset.imageData || shouldForceFallbackSceneImage(asset)) throw new Error('Image source missing');
     await loadSceneImage(img, asset, sceneIndex);
   } catch {
     await new Promise<void>((resolve, reject) => {
@@ -262,10 +331,18 @@ interface PreparedScene {
  */
 function createSubtitleChunks(
   subtitleData: SubtitleData | null,
-  config: SubtitleConfig
+  config: SubtitleConfig,
+  fallbackText = '',
+  fallbackDuration = 0,
 ): SubtitleChunk[] {
   if (!subtitleData || subtitleData.words.length === 0) {
-    return [];
+    const text = buildFallbackSubtitleText(fallbackText, config);
+    if (!text || fallbackDuration <= 0) return [];
+    return [{
+      text,
+      startTime: 0,
+      endTime: fallbackDuration,
+    }];
   }
 
   // AI 의미 단위 청크가 있으면 우선 사용
@@ -494,7 +571,9 @@ export const generateVideoStaticFallback = async (
 
     const startTime = Number(timelinePointer.toFixed(2));
     const endTime = Number((timelinePointer + duration).toFixed(2));
-    const subtitleChunks = enableSubtitles ? createSubtitleChunks(asset.subtitleData || null, config) : [];
+    const subtitleChunks = enableSubtitles
+      ? createSubtitleChunks(asset.subtitleData || null, config, asset.narration || '', duration)
+      : [];
 
     preparedScenes.push({
       img,
@@ -800,7 +879,9 @@ export const generateVideo = async (
     }
 
     // 자막 청크 미리 계산 (자막 비활성화시 빈 배열)
-    const subtitleChunks = enableSubtitles ? createSubtitleChunks(asset.subtitleData, config) : [];
+    const subtitleChunks = enableSubtitles
+      ? createSubtitleChunks(asset.subtitleData, config, asset.narration || '', duration)
+      : [];
     if (subtitleChunks.length > 0) {
       console.log(`[Video] 씬 ${i + 1}: ${subtitleChunks.length}개 자막 청크 생성`);
     }

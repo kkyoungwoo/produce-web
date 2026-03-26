@@ -6,6 +6,7 @@
 # Next build outputs
 /.next
 /out
+/ffmpeg/bin
 
 # misc
 /coverage

@@ -44,6 +44,39 @@
 - Step6 preview render must stay visible after reopen until the user explicitly renders again; scene edits may mark the preview stale, but must not silently delete the last rendered preview video.
 - Same-session Step6 reopen should prefer the in-memory navigation cache when available so a rendered preview video does not disappear during route re-entry.
 - Final MP4 export must use the ffmpeg render route and return a faststart MP4 instead of the browser `MediaRecorder` blob path.
+- Final MP4 download headers must stay ASCII-safe in `Content-Disposition` and carry the UTF-8 filename through `filename*`, otherwise Korean project names can break the render response before download starts.
+- Step6 result preview must also be rendered through the ffmpeg route so the visible preview video and the downloaded MP4 come from the same renderer.
+- When a Step6 preview MP4 already exists, the download action should reuse that exact current preview MP4 instead of building a different video behind the scenes.
+- The ffmpeg render route must prefer the project-level `ffmpeg/bin` copy prepared from `ffmpeg-static` so Vercel/server deploys do not depend on a machine-level ffmpeg install; `FFMPEG_PATH` remains the manual override.
+- `scripts/ensure-ffmpeg-binary.mjs` must keep copying the installed `ffmpeg-static` binary into `ffmpeg/bin` during `postinstall`.
+- `next.config.ts` must keep `outputFileTracingIncludes['/api/mp4Creater/render']` pointing at `ffmpeg/bin/**/*` and `node_modules/ffmpeg-static/**/*` so the deployed route bundle keeps the ffmpeg binary.
+- Step6 result preview no longer offers DaVinci auto-import or DaVinci package ZIP actions; the supported delivery path is the finalized MP4 export plus XLSX / CSV-ZIP / SRT.
+- Local studio cache must stay lightweight by stripping large inline media payloads and data-URL thumbnails before writing `tubegen_studio_state_cache`, or Step6 autosave can hit browser storage quota and interrupt export flows.
+- Step6 preview/export should render only the media actually prepared in Step6: scene image/video, scene audio, and selected background music. Narration text must not be auto-burned in as subtitles.
+- If a scene has no real image or video yet, preview/export should fall back to a black frame only. Do not swap in random sample style backgrounds.
+
+## Step6 Result Preview Logic
+- Result preview is the canonical current render product for Step6.
+- The preview player in the UI and the downloaded final MP4 must stay visually identical.
+- If a current preview MP4 already exists, download must reuse that same preview MP4 instead of creating a different render behind the scenes.
+- If a new render is required, preview and download must use the same ffmpeg render input.
+- Allowed render inputs are only the current Step6 state:
+- current scene order
+- current selected visual type per scene
+- current scene image or current scene video
+- current scene audio
+- current selected background music
+- current preview mix
+- current aspect ratio
+- Disallowed preview/export inputs:
+- random sample backgrounds
+- placeholder SVG scene cards treated as real visuals
+- narration text automatically burned into subtitles
+- any media not present in the current visible Step6 working state
+- If a scene has no real visual media, render a black frame for that scene duration.
+- If a scene has no audio, keep the scene duration and render silence instead of changing the timeline.
+- After a successful preview render, reopen must keep showing that last preview until the user explicitly renders again.
+- Scene edits may mark preview stale, but must not silently replace the last successful preview video with another output.
 
 ## Prompt Path Preserve Rules
 - Step1~5 prompt chain: `lib/mp4Creater/services/workflowPromptBuilder.ts`

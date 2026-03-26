@@ -2,7 +2,7 @@ import { GeneratedAsset, PreviewMixSettings, SubtitlePresetState, BackgroundMusi
 
 export function isFfmpegUnavailableError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error || '');
-  return /ffmpeg executable not found|spawn ffmpeg enoent|ffmpeg 실행 파일을 찾지 못했습니다/i.test(message);
+  return /ffmpeg executable not found|spawn ffmpeg enoent|ffmpeg.+찾지 못했습니다/i.test(message);
 }
 
 export async function renderVideoWithFfmpeg(options: {
@@ -35,7 +35,7 @@ export async function renderVideoWithFfmpeg(options: {
     }
 
     if (/ffmpeg executable not found|spawn ffmpeg enoent/i.test(message)) {
-      throw new Error('서버에서 ffmpeg 실행 파일을 찾지 못했습니다. ffmpeg를 설치하거나 FFMPEG_PATH 환경변수에 ffmpeg.exe 경로를 넣어주세요.');
+      throw new Error('서버에서 ffmpeg 실행 파일을 찾지 못했습니다. 기본 번들 ffmpeg도 준비되지 않았으니 배포 로그를 확인하거나 FFMPEG_PATH 환경변수에 ffmpeg 실행 경로를 넣어주세요.');
     }
 
     throw new Error(message || `ffmpeg render failed (${response.status})`);

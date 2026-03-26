@@ -46,7 +46,7 @@ import {
   createLightweightSceneAssetsFromDraft,
   createLocalScenesFromDraft,
 } from '../services/sceneAssemblyService';
-import { triggerBlobDownload } from '../utils/downloadHelpers';
+import { blobFromDataValue, extensionFromMime, triggerBlobDownload } from '../utils/downloadHelpers';
 import SceneStudioHeaderPanel from '../components/scene-studio/SceneStudioHeaderPanel';
 import { buildWorkflowPromptStore, buildWorkflowStepContract } from '../services/workflowStepContractService';
 import SceneStudioResultPanel from '../components/scene-studio/SceneStudioResultPanel';
@@ -195,6 +195,21 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
     reader.onerror = () => reject(reader.error || new Error('preview-video-data-url-failed'));
     reader.readAsDataURL(blob);
   });
+}
+
+async function resolvePreviewVideoBlob(value?: string | null): Promise<Blob | null> {
+  if (!value?.trim()) return null;
+  if (value.startsWith('data:')) {
+    return blobFromDataValue(value, 'video/mp4');
+  }
+  if (!value.startsWith('blob:')) return null;
+  try {
+    const response = await fetch(value);
+    if (!response.ok) return null;
+    return await response.blob();
+  } catch {
+    return null;
+  }
 }
 
 async function measureRenderedVideoDuration(blob: Blob): Promise<number | null> {
@@ -1104,6 +1119,8 @@ const SceneStudioPage: React.FC = () => {
         }),
       });
     }
+
+    return nextState;
   }, [currentProjectId, studioState]);
 
   const updateQuickRouting = useCallback(async (routingPatch: Partial<StudioState['routing']>, draftPatch?: Partial<WorkflowDraft>) => {
@@ -2584,6 +2601,179 @@ const SceneStudioPage: React.FC = () => {
     }
   }, [buildProjectEnhancementPatch, currentProjectSummary?.subtitlePreset, draft.aspectRatio, draft.topic, effectiveBackgroundTracks, finalVideoUrl, isVideoGenerating, openApiModal, persistSceneStudioSnapshot, previewMix, previewVideoMessage, previewVideoStatus, resolvedProjectId]);
 
+  const renderSceneStudioVideoWithFfmpeg = useCallback(async (options: {
+    enableSubtitles: boolean;
+    qualityMode: 'preview' | 'final';
+    downloadFile?: boolean;
+    customTitle?: string;
+  }) => {
+    const { enableSubtitles, qualityMode, downloadFile = false, customTitle } = options;
+    if (isVideoGenerating) return null;
+
+    const renderableAssets = [...assetsRef.current];
+    const hasVisualOutputs = renderableAssets.some((asset) => Boolean(asset.imageData || asset.videoData));
+    const hasNarrationOutputs = renderableAssets.some((asset) => Boolean(asset.audioData));
+    const hasBackgroundOutputs = effectiveBackgroundTracks.some((track) => Boolean(track?.audioData));
+    const sceneVideoCount = renderableAssets.filter((asset) => Boolean(asset.videoData && asset.selectedVisualType !== 'image')).length;
+    const subtitlePreset = currentProjectSummary?.subtitlePreset || buildDefaultSubtitlePreset();
+    const safeEnableSubtitles = Boolean(enableSubtitles);
+
+    if (!renderableAssets.length) {
+      const message = '합칠 씬이 아직 없어 결과 영상을 만들 수 없습니다.';
+      setProgressMessage(message);
+      setPreviewVideoStatus('error');
+      setPreviewVideoMessage(message);
+      return null;
+    }
+
+    const renderTitle = customTitle
+      || (downloadFile ? `${draft.topic || '프로젝트'} 최종 출력` : `${draft.topic || '프로젝트'} 결과 미리보기`);
+
+    try {
+      setIsVideoGenerating(true);
+
+      if (downloadFile) {
+        const currentPreviewBlob = await resolvePreviewVideoBlob(finalVideoUrl);
+        const isReusablePreviewMp4 = Boolean(currentPreviewBlob && (currentPreviewBlob.type || 'video/mp4').includes('mp4'));
+        if (isReusablePreviewMp4 && (previewVideoStatus === 'ready' || previewVideoStatus === 'fallback')) {
+          const downloadTitle = finalVideoTitle || renderTitle;
+          triggerBlobDownload(currentPreviewBlob!, `${downloadTitle}.mp4`);
+          setTaskProgressPercent(100);
+          setProgressMessage('결과 미리보기와 같은 MP4 저장이 완료되었습니다.');
+          return {
+            videoBlob: currentPreviewBlob!,
+            recordedSubtitles: [],
+          };
+        }
+        setTaskProgressPercent(18);
+        setProgressMessage('현재 Step6 미리보기와 같은 MP4를 새로 만드는 중입니다.');
+      } else {
+        setIsPreparingPreviewVideo(true);
+        setTaskProgressPercent(18);
+        setPreviewVideoStatus('loading');
+        const primaryMessage = sceneVideoCount > 0
+          ? `준비된 씬 영상 ${sceneVideoCount}개와 현재 Step6 이미지, 음성, 배경음을 기준으로 결과 영상을 렌더링하는 중입니다.`
+          : hasVisualOutputs
+            ? '현재 Step6 이미지, 음성, 배경음을 기준으로 결과 영상을 렌더링하는 중입니다.'
+            : hasNarrationOutputs || hasBackgroundOutputs
+              ? '현재 Step6 음성과 배경음만 반영해 결과 영상을 렌더링하는 중입니다.'
+              : '현재 Step6 상태 그대로 결과 영상을 렌더링하는 중입니다.';
+        setPreviewVideoMessage(primaryMessage);
+        setProgressMessage(primaryMessage);
+      }
+
+      const finalResult = await renderVideoWithFfmpeg({
+        assets: assetsRef.current,
+        backgroundTracks: effectiveBackgroundTracks,
+        previewMix,
+        aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
+        qualityMode,
+        enableSubtitles: safeEnableSubtitles,
+        subtitlePreset,
+        title: renderTitle,
+      });
+
+      setTaskProgressPercent(downloadFile ? 92 : 82);
+      const expectedDuration = Number(renderableAssets.reduce((sum, asset) => sum + resolveScenePlaybackDuration(asset), 0).toFixed(2));
+      const measuredDuration = await measureRenderedVideoDuration(finalResult.videoBlob);
+      const normalizedExpectedDuration = measuredDuration && measuredDuration > 0.1
+        ? measuredDuration
+        : expectedDuration;
+
+      const previewUrl = URL.createObjectURL(finalResult.videoBlob);
+      setFinalVideoUrl((previous) => {
+        revokePreviewVideoUrl(previous);
+        return previewUrl;
+      });
+      setFinalVideoTitle(renderTitle);
+      setFinalVideoDuration(normalizedExpectedDuration > 0 ? normalizedExpectedDuration : null);
+
+      if (downloadFile) {
+        const outputExtension = extensionFromMime(finalResult.videoBlob.type || 'video/mp4', 'mp4');
+        triggerBlobDownload(finalResult.videoBlob, `${renderTitle}.${outputExtension}`);
+      }
+
+      const successMessage = sceneVideoCount > 0
+        ? `씬 영상 ${sceneVideoCount}개와 현재 Step6 미디어를 반영한 결과 영상이 준비되었습니다.`
+        : hasVisualOutputs
+          ? '현재 Step6 이미지와 음성, 배경음을 그대로 반영한 결과 영상이 준비되었습니다.'
+          : hasNarrationOutputs || hasBackgroundOutputs
+            ? '현재 Step6 음성과 배경음만 반영한 결과 영상이 준비되었습니다.'
+            : '현재 Step6 상태 그대로 결과 영상이 준비되었습니다.';
+      const durationMessage = normalizedExpectedDuration > 0
+        ? ` 총 길이 ${normalizedExpectedDuration.toFixed(1)}초 기준으로 맞췄습니다.`
+        : '';
+      const nextPreviewStatus = hasVisualOutputs || hasNarrationOutputs || hasBackgroundOutputs ? 'ready' : 'fallback';
+
+      setPreviewVideoStatus(nextPreviewStatus);
+      setPreviewVideoMessage(`${successMessage}${durationMessage}`);
+      setProgressMessage(downloadFile ? '현재 결과 미리보기와 같은 MP4 저장이 완료되었습니다.' : '결과 영상 미리보기가 준비되었습니다.');
+      setTaskProgressPercent(100);
+
+      if (resolvedProjectId) {
+        const renderNonce = previewRenderNonceRef.current;
+        finalPreviewPersistedRef.current = true;
+        try {
+          const previewVideoData = await blobToDataUrl(finalResult.videoBlob);
+          if (renderNonce === previewRenderNonceRef.current) {
+            await persistSceneStudioSnapshot(resolvedProjectId, {
+              ...buildProjectEnhancementPatch(assetsRef.current, {
+                encodingMode: 'ffmpeg',
+              }),
+              sceneStudioPreviewVideo: {
+                id: `scene_preview_${Date.now()}`,
+                title: renderTitle,
+                prompt: successMessage,
+                videoData: previewVideoData,
+                provider: 'sample',
+                mode: qualityMode === 'final' ? 'final' : 'preview',
+                sourceMode: hasVisualOutputs || hasNarrationOutputs || hasBackgroundOutputs ? 'ai' : 'sample',
+                createdAt: Date.now(),
+                duration: normalizedExpectedDuration,
+              },
+              sceneStudioPreviewStatus: nextPreviewStatus,
+              sceneStudioPreviewMessage: `${successMessage}${durationMessage}`,
+            });
+          }
+        } catch (persistError) {
+          finalPreviewPersistedRef.current = false;
+          console.error('[SceneStudioPage] preview persist failed', persistError);
+        }
+      }
+
+      return {
+        videoBlob: finalResult.videoBlob,
+        recordedSubtitles: [],
+      };
+    } catch (error) {
+      console.error('[SceneStudioPage] ffmpeg scene render failed', error);
+      const resolvedFailureMessage = downloadFile
+        ? (isFfmpegUnavailableError(error)
+          ? '완성형 MP4 출력에 필요한 ffmpeg를 찾지 못했습니다. ffmpeg 설치 또는 FFMPEG_PATH 설정이 필요합니다.'
+          : error instanceof Error && error.message
+            ? error.message
+            : '완성형 MP4 출력 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.')
+        : '결과 영상을 만드는 중 문제가 발생했습니다. 다시 시도하거나 씬 상태를 확인해 주세요.';
+
+      if (downloadFile) {
+        setProgressMessage(resolvedFailureMessage);
+        setPreviewVideoMessage(resolvedFailureMessage);
+      } else if (finalVideoUrl && (previewVideoStatus === 'ready' || previewVideoStatus === 'fallback')) {
+        setProgressMessage(resolvedFailureMessage);
+      } else {
+        setPreviewVideoStatus('error');
+        setPreviewVideoMessage(resolvedFailureMessage);
+        setProgressMessage(resolvedFailureMessage);
+        setFinalVideoDuration(null);
+      }
+      return null;
+    } finally {
+      setIsVideoGenerating(false);
+      if (!downloadFile) setIsPreparingPreviewVideo(false);
+      window.setTimeout(() => setTaskProgressPercent(null), 1200);
+    }
+  }, [buildProjectEnhancementPatch, currentProjectSummary?.subtitlePreset, draft.aspectRatio, draft.topic, effectiveBackgroundTracks, finalVideoTitle, finalVideoUrl, isVideoGenerating, persistSceneStudioSnapshot, previewMix, previewVideoStatus, resolvedProjectId]);
+
   const handleRegenerateImage = async (index: number) => {
     if (!acquireSceneActionLock(index, 'image')) return;
     try {
@@ -2833,8 +3023,8 @@ const SceneStudioPage: React.FC = () => {
       ...buildProjectEnhancementPatch(assetsRef.current),
       workflowDraft: buildSceneStudioWorkflowDraft(draft, assetsRef.current),
     });
-    await renderMergedVideo({
-      enableSubtitles: options.enableSubtitles,
+    await renderSceneStudioVideoWithFfmpeg({
+      enableSubtitles: false,
       qualityMode: options.qualityMode,
       downloadFile: true,
     });
@@ -2848,15 +3038,15 @@ const SceneStudioPage: React.FC = () => {
           ...buildProjectEnhancementPatch(assetsRef.current),
           workflowDraft: buildSceneStudioWorkflowDraft(draft, assetsRef.current),
         });
-        await renderMergedVideo({
+        await renderSceneStudioVideoWithFfmpeg({
           enableSubtitles: false,
           qualityMode: 'preview',
           downloadFile: false,
-          customTitle: `${draft.topic || '프로젝트'} 합본 미리보기`,
+          customTitle: `${draft.topic || '프로젝트'} 결과 미리보기`,
         });
       });
     } catch {}
-  }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, enqueueGenerationTask, flushPendingSceneStudioSave, isPreparingPreviewVideo, isVideoGenerating, renderMergedVideo]);
+  }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, enqueueGenerationTask, flushPendingSceneStudioSave, isPreparingPreviewVideo, isVideoGenerating, renderSceneStudioVideoWithFfmpeg]);
 
   const handlePreviewMixChange = useCallback((nextMix: PreviewMixSettings) => {
     setPreviewMix((prev) => {

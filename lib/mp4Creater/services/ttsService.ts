@@ -87,7 +87,7 @@ export async function generateTtsAudio(options: {
   if (options.provider === 'qwen3Tts' || options.provider === 'chatterbox') {
     try {
       const freeResult = await generateBrowserFreeTts({
-        provider: options.provider === 'heygen' || options.provider === 'elevenLabs' || options.provider === 'chatterbox' || options.provider === 'qwen3Tts' ? options.provider : 'qwen3Tts',
+        provider: options.provider,
         text: options.text,
         preset: options.provider === 'chatterbox' ? (options.qwenPreset || 'chatterbox-clear') : options.qwenPreset,
         locale: options.locale,

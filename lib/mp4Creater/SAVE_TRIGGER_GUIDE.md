@@ -42,6 +42,13 @@
   - preview/final render: must call `flushPendingSceneStudioSave(...)` before merging/exporting
   - preview invalidation after scene edits must keep the last rendered preview video payload, and only update the stale message/status until the next explicit render
   - final export must use the ffmpeg route for a finalized MP4; browser preview render is no longer the delivery path
+  - final export download headers must remain ASCII-safe with UTF-8 `filename*` support so Korean project titles do not break the render response
+  - Step6 preview render must use the same ffmpeg path as final export so the visible preview and downloaded MP4 stay identical
+  - when a current Step6 preview MP4 already exists, download should reuse that exact preview MP4 instead of silently building a different render
+  - deployed final export must prefer `ffmpeg/bin/*`, which is prepared from `ffmpeg-static` during `postinstall`, so Step6 render does not fail when the server has no machine-level ffmpeg install
+  - `next.config.ts` must keep the render route tracing include for both `ffmpeg/bin/**/*` and `node_modules/ffmpeg-static/**/*`, otherwise deployment can lose the bundled ffmpeg binary even though local export works
+  - when a scene has no real visual media result yet, Step6 preview/export should fall back to a black frame only and must not inject narration subtitles automatically
+  - lightweight studio cache writes must strip big inline media payloads and data-URL thumbnails to avoid localStorage quota overflow during Step6 autosave/export
   - existing project reopen: block draft-based scene bootstrap until saved Step6 assets finish hydrating
   - existing project reopen: show progress percent and use latest Step6 snapshot as fallback while detailed project JSON is still loading
 - `lib/mp4Creater/App.tsx`
@@ -54,3 +61,17 @@
 - Keep `lib/mp4Creater/pages/SceneStudioPage.tsx` showing cached Step6 cards immediately when `generatedData` already exists, even if hydration is still in progress.
 - Keep Step6 save triggers aligned with import/export/reopen so the same latest working copy is used everywhere.
 - When changing Step6 AI prompt or media logic, update `docs/README.md`, `docs/PROMPT_MANAGEMENT.md`, and `docs/step-guides/STEP6.md` together.
+
+## Result Preview Save Rules
+- Treat the current Step6 preview video as the canonical render output for the current working state.
+- When preview render succeeds, persist that preview video, preview status, preview message, title, and duration together.
+- Download should reuse the already-rendered preview MP4 whenever it is still the current valid preview.
+- Scene edits must not delete the saved preview video immediately; they may only change the stale status/message until the next explicit render.
+- Preview/export persistence must reflect only current Step6 media inputs:
+- scene image or video
+- scene audio
+- selected background music
+- preview mix
+- aspect ratio
+- current scene order
+- Preview/export persistence must not depend on placeholder SVG cards or narration-only subtitle fallbacks.

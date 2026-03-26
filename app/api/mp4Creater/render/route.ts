@@ -39,9 +39,16 @@ type RenderBody = {
   title?: string;
 };
 
-const EMPTY_SCENE_PLACEHOLDER_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGPk4pdkYGBgYmBgYGBgAAACcwA2I9Wz/QAAAABJRU5ErkJggg==';
+const EMPTY_SCENE_PLACEHOLDER_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGNkYGBgYGBgYmBgYGBgAAABNAAByYhQJQAAAABJRU5ErkJggg==';
 
 let resolvedFfmpegBinary: string | null | undefined;
+const ffmpegStaticBinary = (() => {
+  try {
+    return require('ffmpeg-static') as string | null;
+  } catch {
+    return null;
+  }
+})();
 
 async function isExistingFile(candidate: string) {
   try {
@@ -60,6 +67,11 @@ function trySpawn(command: string, args: string[], cwd: string) {
   });
 }
 
+async function ensureExecutable(candidate: string) {
+  if (process.platform === 'win32') return;
+  await fs.chmod(candidate, 0o755).catch(() => undefined);
+}
+
 async function resolveFfmpegBinary(cwd: string) {
   if (resolvedFfmpegBinary !== undefined) return resolvedFfmpegBinary;
 
@@ -74,6 +86,7 @@ async function resolveFfmpegBinary(cwd: string) {
     path.join(process.cwd(), 'ffmpeg', 'bin', exeName),
     path.join(process.cwd(), 'bin', exeName),
     path.join(process.cwd(), 'tools', 'ffmpeg', 'bin', exeName),
+    ffmpegStaticBinary,
     process.platform === 'win32' ? path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Links', 'ffmpeg.exe') : '',
     process.platform === 'win32' ? path.join(process.env.ProgramData || 'C:\\ProgramData', 'chocolatey', 'bin', 'ffmpeg.exe') : '',
     process.platform === 'win32' ? path.join(process.env.USERPROFILE || '', 'scoop', 'shims', 'ffmpeg.exe') : '',
@@ -84,6 +97,7 @@ async function resolveFfmpegBinary(cwd: string) {
 
   for (const candidate of fileCandidates) {
     if (!(await isExistingFile(candidate))) continue;
+    await ensureExecutable(candidate);
     if (await trySpawn(candidate, ['-version'], cwd)) {
       resolvedFfmpegBinary = candidate;
       return resolvedFfmpegBinary;
@@ -159,15 +173,41 @@ function decodeDataLike(value: string | null | undefined, fallbackMime = 'applic
   };
 }
 
+function isSvgMime(value?: string | null) {
+  return /image\/svg\+xml|(^|[\/.+-])svg([\/.+-]|$)/i.test(`${value || ''}`);
+}
+
+function bufferLooksLikeSvg(buffer: Buffer) {
+  const probe = buffer.subarray(0, Math.min(buffer.length, 1024)).toString('utf-8').trimStart().toLowerCase();
+  return probe.startsWith('<svg') || probe.startsWith('<?xml') || probe.includes('<svg');
+}
+
+function isPlaceholderSceneSvg(buffer: Buffer) {
+  const probe = buffer.subarray(0, Math.min(buffer.length, 4000)).toString('utf-8').toUpperCase();
+  return probe.includes('<SVG') && probe.includes('SAMPLE SCENE');
+}
+
 async function writeMedia(targetPath: string, value: string | null | undefined, fallbackMime: string) {
   const parsed = decodeDataLike(value, fallbackMime);
   if (!parsed) return null;
   if (parsed.kind === 'url') {
+    if (fallbackMime.startsWith('image/') && /\.svg(?:$|[?#])/i.test(parsed.url)) return null;
     const response = await fetch(parsed.url, { cache: 'no-store' });
     if (!response.ok) return null;
     const arrayBuffer = await response.arrayBuffer();
-    await fs.writeFile(targetPath, Buffer.from(arrayBuffer));
+    const buffer = Buffer.from(arrayBuffer);
+    const contentType = response.headers.get('content-type') || '';
+    if (fallbackMime.startsWith('image/') && (isSvgMime(contentType) || bufferLooksLikeSvg(buffer))) {
+      return null;
+    }
+    await fs.writeFile(targetPath, buffer);
     return targetPath;
+  }
+  if (fallbackMime.startsWith('image/')) {
+    if (value?.trim() === EMPTY_SCENE_PLACEHOLDER_IMAGE) return null;
+    if (isSvgMime(parsed.mime) || bufferLooksLikeSvg(parsed.buffer) || isPlaceholderSceneSvg(parsed.buffer)) {
+      return null;
+    }
   }
   await fs.writeFile(targetPath, parsed.buffer);
   return targetPath;
@@ -206,6 +246,19 @@ function subtitleStyle(subtitlePreset: RenderBody['subtitlePreset']) {
   return `FontName=${fontName},FontSize=${size},PrimaryColour=&H00FFFFFF,OutlineColour=&H00111111,BackColour=&H${alpha}000000,BorderStyle=3,Outline=1.2,Shadow=0,Alignment=${alignment},MarginV=42`;
 }
 
+function sanitizeAsciiFilename(value: string) {
+  const trimmed = `${value || ''}`.trim() || 'mp4creater-render';
+  const replaced = trimmed
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+  return replaced || 'mp4creater-render';
+}
+
+function encodeUtf8Filename(value: string) {
+  return encodeURIComponent(`${value || 'mp4creater-render'}.mp4`).replace(/['()*]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase()}`);
+}
+
 export async function POST(request: NextRequest) {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mp4creater-render-'));
   try {
@@ -232,11 +285,10 @@ export async function POST(request: NextRequest) {
       const scenePath = path.join(tempDir, `scene_${index + 1}.mp4`);
       const srtPath = path.join(tempDir, `scene_${index + 1}.srt`);
 
-      const writtenImage = await writeMedia(imagePath, asset.imageData || EMPTY_SCENE_PLACEHOLDER_IMAGE, 'image/png');
-      if (!writtenImage) continue;
       const writtenVideo = asset.selectedVisualType === 'image'
         ? null
         : await writeMedia(videoPath, asset.videoData || null, 'video/mp4');
+      const writtenImage = await writeMedia(imagePath, asset.imageData || null, 'image/png');
       const writtenAudio = await writeMedia(audioPath, asset.audioData || null, 'audio/wav');
 
       const vfFilters = [
@@ -255,8 +307,10 @@ export async function POST(request: NextRequest) {
         const args = ['-y'];
         if (useVideoSource && writtenVideo) {
           args.push('-stream_loop', '-1', '-i', writtenVideo);
+        } else if (writtenImage) {
+          args.push('-loop', '1', '-framerate', '25', '-i', writtenImage);
         } else {
-          args.push('-loop', '1', '-framerate', '25', '-i', imagePath);
+          args.push('-f', 'lavfi', '-i', `color=c=black:s=${width}x${height}:r=25`);
         }
 
         const audioInputIndex = 1;
@@ -346,11 +400,14 @@ export async function POST(request: NextRequest) {
     ], tempDir);
 
     const bytes = await fs.readFile(deliverPath);
+    const baseTitle = `${body.title || 'mp4creater-render'}`.trim() || 'mp4creater-render';
+    const asciiFilename = `${sanitizeAsciiFilename(baseTitle)}.mp4`;
+    const utf8Filename = encodeUtf8Filename(baseTitle);
     return new NextResponse(new Uint8Array(bytes), {
       status: 200,
       headers: {
         'Content-Type': 'video/mp4',
-        'Content-Disposition': `attachment; filename="${(body.title || 'mp4creater-render').replace(/[^a-zA-Z0-9-_가-힣]+/g, '_')}.mp4"`,
+        'Content-Disposition': `attachment; filename="${asciiFilename}"; filename*=UTF-8''${utf8Filename}`,
       },
     });
   } catch (error) {

@@ -237,8 +237,28 @@ const CharacterStudioPage: React.FC = () => {
         currentSection="characters"
       />
 
-      <SettingsDrawer open={showSettings} studioState={studioState} onClose={() => setShowSettings(false)} onSave={async (partial) => setStudioState(await saveStudioState({ ...studioState, ...partial, updatedAt: Date.now() }))} />
-      <ProviderQuickModal open={showApiModal} studioState={studioState} title="API 키 빠른 등록" description="텍스트 연결이 있으면 캐릭터 추출과 추천이 더 정교해집니다." onClose={() => setShowApiModal(false)} onSave={async (partial) => setStudioState(await saveStudioState({ ...studioState, ...partial, updatedAt: Date.now() }))} onOpenFullSettings={() => { setShowApiModal(false); setShowSettings(true); }} />
+      <SettingsDrawer
+        open={showSettings}
+        studioState={studioState}
+        onClose={() => setShowSettings(false)}
+        onSave={async (partial) => {
+          const nextState = await saveStudioState({ ...studioState, ...partial, updatedAt: Date.now() });
+          setStudioState(nextState);
+          return nextState;
+        }}
+      />
+      <ProviderQuickModal
+        open={showApiModal}
+        studioState={studioState}
+        title="API 키 빠른 등록"
+        description="텍스트 연결이 있으면 캐릭터 추출과 추천이 더 정교해집니다."
+        onClose={() => setShowApiModal(false)}
+        onSave={async (partial) => {
+          const nextState = await saveStudioState({ ...studioState, ...partial, updatedAt: Date.now() });
+          setStudioState(nextState);
+        }}
+        onOpenFullSettings={() => { setShowApiModal(false); setShowSettings(true); }}
+      />
 
       <main className="mx-auto max-w-7xl px-4 py-8">
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-sm">

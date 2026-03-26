@@ -48,9 +48,39 @@
 
 ## Final Render Invariants
 - Final MP4 export must go through `app/api/mp4Creater/render/route.ts` so the delivered file is ffmpeg-rendered, seekable, and finalized with `faststart`.
+- Final MP4 download response must keep `Content-Disposition` ASCII-safe and send the real UTF-8 project filename through `filename*` so Korean titles do not fail before the browser receives the file.
+- Step6 result preview must use the same ffmpeg render path as final download so the preview video shown in the UI and the saved MP4 do not diverge.
+- If the user already has a rendered Step6 preview MP4, final download should reuse that exact preview MP4 instead of creating a different render.
+- `scripts/ensure-ffmpeg-binary.mjs` must copy the installed `ffmpeg-static` binary into `ffmpeg/bin` during `postinstall`, and `app/api/mp4Creater/render/route.ts` must prefer that path before falling back to system ffmpeg lookup.
+- `next.config.ts` must include `outputFileTracingIncludes['/api/mp4Creater/render'] = ['./ffmpeg/bin/**/*', './node_modules/ffmpeg-static/**/*']` so Vercel keeps the bundled ffmpeg binary with the route.
 - If a scene has `selectedVisualType === 'video'` and `videoData`, final export must use that scene video instead of collapsing back to a still image.
+- If a scene has no real image/video result yet, preview/export must fall back to a black frame only; do not inject random sample style backgrounds.
 - Once Step6 preview render succeeds, reopen must keep showing that last rendered preview until the user clicks render again; edit invalidation can change the message, but must not clear the stored preview video itself.
 - The preview page progress card must appear only during preview render or final MP4 export, not merely because the page reopened with a saved render result.
+- The Step6 preview modal must not expose DaVinci auto-import or DaVinci package ZIP actions anymore.
+- Step6 autosave must keep the local browser cache small enough to avoid `QuotaExceededError`; inline preview binaries, background audio blobs, and data-URL thumbnails must be stripped from lightweight cache writes.
+- Step6 preview/export should only burn in actual Step6 media state: scene image/video, scene audio, and selected background music. Narration text should not be auto-converted into subtitles.
+- Result preview is the canonical current render product for Step6.
+- The preview player and final MP4 download must stay visually identical.
+- If a preview MP4 already exists, final download should reuse that same preview MP4 payload first.
+- If a new render is required, preview and download must share the same ffmpeg input contract.
+- Allowed render inputs:
+- current scene order
+- current scene image or current scene video
+- current selected visual type
+- current scene audio
+- current selected background music
+- current preview mix
+- current aspect ratio
+- Disallowed inputs:
+- placeholder SVG scene cards as real visuals
+- random sample backgrounds
+- narration text automatically burned into subtitles
+- any media not present in the current Step6 working state
+- If a scene has no real visual media, render a black frame for that scene duration.
+- If a scene has no audio, keep the scene duration and render silence.
+- Reopen must preserve the last successful preview video.
+- Scene edits may only mark the preview stale; they must not replace the saved preview with a different video until the user renders again.
 - Scene cards exist하면 이미지, 영상, 오디오가 하나도 없어도 결과보기의 `합본 영상 렌더링` 버튼은 반드시 동작해야 합니다.
 - 비주얼 우선순위는 `씬 영상 > 씬 이미지 > 검정 화면`입니다. 이미지와 영상이 모두 없으면 해당 씬은 검정 화면으로 `targetDuration` 또는 계산된 씬 길이만큼 유지합니다.
 - 오디오 우선순위는 `씬 나레이션 오디오 + 배경음`이며, 둘 다 없어도 무음 상태로 합본이 계속 진행되어야 합니다. 오디오가 전혀 없어도 MediaRecorder/브라우저 캡처가 깨지지 않도록 무음 트랙을 유지합니다.

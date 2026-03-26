@@ -1020,6 +1020,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         applyProjectListSnapshot([currentProject, ...savedProjects.filter((item) => item.id !== currentProject.id)]);
       }
     }
+
+    return nextState;
   };
 
   const handleQuickRoutingUpdate = async (patch: Partial<StudioState['routing']>) => {

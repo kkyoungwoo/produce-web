@@ -29,12 +29,6 @@ interface SceneStudioPreviewPageProps {
   finalVideoDuration?: number | null;
   onPreparePreviewVideo?: () => void | Promise<void>;
   isPreparingPreviewVideo?: boolean;
-  handlePrepareDavinciImport: () => void | Promise<void>;
-  handleDownloadDavinciPackage: () => void | Promise<void>;
-  isDavinciPreparing?: boolean;
-  davinciStatusMessage?: string;
-  davinciPackagePath?: string | null;
-  davinciLaunchUri?: string | null;
   onExportVideo?: (options: { enableSubtitles: boolean; qualityMode: 'preview' | 'final' }) => void;
   downloadQuality: 'preview' | 'final';
   isExporting?: boolean;
@@ -73,16 +67,6 @@ interface SceneStudioPreviewPageProps {
 
 const formatSeconds = (value?: number | null) => (typeof value === 'number' ? `${value.toFixed(1)}초` : '-');
 
-const resolveNarrationAudioSrc = (value?: string | null) => {
-  if (!value?.trim()) return '';
-  return value.startsWith('data:') ? value : `data:audio/mpeg;base64,${value}`;
-};
-
-const resolveBackgroundAudioSrc = (value?: string | null) => {
-  if (!value?.trim()) return undefined;
-  return value.startsWith('data:') ? value : `data:audio/wav;base64,${value}`;
-};
-
 const defaultPreviewMix: PreviewMixSettings = {
   narrationVolume: 0.5,
   backgroundMusicVolume: 0.5,
@@ -108,45 +92,12 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
   finalVideoDuration,
   onPreparePreviewVideo,
   isPreparingPreviewVideo,
-  handlePrepareDavinciImport,
-  handleDownloadDavinciPackage,
-  isDavinciPreparing,
-  davinciStatusMessage,
-  davinciPackagePath,
-  davinciLaunchUri,
   onExportVideo,
   downloadQuality,
   isExporting,
-  sequencePlaying,
   sequenceScene,
-  sequenceSceneIndex,
-  sequenceSceneDuration,
-  sequenceSceneAudioRate,
-  previewSequenceVideoRef,
-  previewSequenceAudioRef,
-  onToggleSequencePlayback,
-  onSelectSequenceScene,
-  onSequenceAudioPlay,
-  onSequenceAudioLoadedMetadata,
-  onSequenceAudioEnded,
   previewMix,
   onPreviewMixChange,
-  mainBgm,
-  backgroundMusicTracks = [],
-  onSelectBackgroundTrack,
-  onCreateBackgroundTrack,
-  bgmAudioRef,
-  thumbnailToolbarRef,
-  onGenerateThumbnail,
-  isThumbnailGenerating,
-  onGenerateAllImages,
-  onGenerateAllVideos,
-  isGeneratingAllVideos,
-  isGenerating,
-  sceneProgressMap,
-  getSceneVisualPayload,
-  getDisplayImageSrc,
-  getPreferredVisualType,
   onOpenMediaLightbox,
 }) => {
   if (!open) return null;
@@ -187,7 +138,7 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                   disabled={Boolean(isPreparingPreviewVideo)}
                   className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
                 >
-                  {isPreparingPreviewVideo ? '합본 영상 렌더링 중...' : '합본 영상 다시 렌더링'}
+                  {isPreparingPreviewVideo ? '결과 영상 렌더링 중...' : '결과 영상 다시 렌더링'}
                 </button>
               ) : null}
               <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
@@ -205,27 +156,28 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                 </div>
                 <div className="text-sm font-bold text-slate-600">예상 길이 {formatSeconds(totalDuration)}</div>
               </div>
+
               {showRenderProgressCard ? (
                 <div className="mt-4 rounded-[24px] border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-800">
-                <div className="flex items-center gap-3">
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-                  <div className="font-bold">{progressMessage || '결과 페이지가 준비되었습니다.'}</div>
-                </div>
-                {activeOverallProgress !== null && (
-                  <div className="mt-3 space-y-2">
-                    <div className="flex items-center justify-between gap-3 text-[11px] font-black">
-                      <span>{progressLabel || '현재 작업 진행률'}</span>
-                      <span>{activeOverallProgress}%</span>
-                    </div>
-                    <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/80">
-                      <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${activeOverallProgress}%` }} />
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-blue-700">
-                      {typeof previewRenderEstimatedRemainingSeconds === 'number' ? <span className="rounded-full bg-white px-3 py-1">남은 시간 합계 {formatSeconds(previewRenderEstimatedRemainingSeconds)}</span> : null}
-                      {typeof previewRenderEstimatedTotalSeconds === 'number' ? <span className="rounded-full bg-white px-3 py-1">예상 소요 {formatSeconds(previewRenderEstimatedTotalSeconds)}</span> : null}
-                    </div>
+                  <div className="flex items-center gap-3">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+                    <div className="font-bold">{progressMessage || '결과 페이지가 준비되었습니다.'}</div>
                   </div>
-                )}
+                  {activeOverallProgress !== null ? (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center justify-between gap-3 text-[11px] font-black">
+                        <span>{progressLabel || '현재 작업 진행률'}</span>
+                        <span>{activeOverallProgress}%</span>
+                      </div>
+                      <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/80">
+                        <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${activeOverallProgress}%` }} />
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-blue-700">
+                        {typeof previewRenderEstimatedRemainingSeconds === 'number' ? <span className="rounded-full bg-white px-3 py-1">남은 시간 합계 {formatSeconds(previewRenderEstimatedRemainingSeconds)}</span> : null}
+                        {typeof previewRenderEstimatedTotalSeconds === 'number' ? <span className="rounded-full bg-white px-3 py-1">예상 소요 {formatSeconds(previewRenderEstimatedTotalSeconds)}</span> : null}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
             </div>
@@ -257,17 +209,17 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">합본 영상</div>
-                        <div className="mt-2 text-sm leading-6 text-slate-600">{previewVideoMessage || '합본 영상을 렌더링해 주세요.'}</div>
+                        <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">결과 영상</div>
+                        <div className="mt-2 text-sm leading-6 text-slate-600">{previewVideoMessage || '결과 영상을 렌더링해 주세요.'}</div>
                       </div>
                       {showFinalRenderButton ? (
                         <button
                           type="button"
                           onClick={() => void onPreparePreviewVideo?.()}
-                          disabled={isPreparingPreviewVideo}
+                          disabled={Boolean(isPreparingPreviewVideo)}
                           className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
                         >
-                          합본 영상 렌더링하기
+                          결과 영상 렌더링하기
                         </button>
                       ) : null}
                     </div>
@@ -276,11 +228,11 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                   <>
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">합본 영상 상태</div>
+                        <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">결과 영상 상태</div>
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           <span className={`rounded-full px-3 py-1 text-xs font-black ${previewVideoTone.badgeClass}`}>{previewVideoTone.badge}</span>
                           <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">비율 {previewAspectRatio}</span>
-                          {canShowRenderedPreview ? <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">합본 준비 완료</span> : null}
+                          {canShowRenderedPreview ? <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">렌더 완료</span> : null}
                           {typeof previewRenderEstimatedRemainingSeconds === 'number' ? <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">남은 시간 합계 {formatSeconds(previewRenderEstimatedRemainingSeconds)}</span> : null}
                         </div>
                       </div>
@@ -291,38 +243,38 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                           disabled={Boolean(isPreparingPreviewVideo)}
                           className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
                         >
-                          {isPreparingPreviewVideo ? '합본 영상 렌더링 중...' : '합본 영상 다시 렌더링'}
+                          {isPreparingPreviewVideo ? '결과 영상 렌더링 중...' : '결과 영상 다시 렌더링'}
                         </button>
                       ) : null}
                     </div>
 
                     <div className="mt-4 rounded-2xl border border-white/70 bg-white/70 p-4">
-                      {showFinalOutputButton && (
+                      {showFinalOutputButton ? (
                         <div className="flex flex-wrap items-center gap-2">
                           <button
                             type="button"
                             onClick={() => onExportVideo?.({ enableSubtitles: false, qualityMode: downloadQuality })}
-                            disabled={isExporting}
+                            disabled={Boolean(isExporting)}
                             className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white hover:bg-blue-500 disabled:bg-slate-300 disabled:text-slate-500"
                           >
                             {isExporting ? '최종 출력 중...' : '최종 출력'}
                           </button>
                           <div className="text-xs leading-5 text-slate-500">자막은 영상에 합치지 않고 SRT 파일로 별도 저장합니다.</div>
                         </div>
-                      )}
+                      ) : null}
 
                       {canShowRenderedPreview ? (
                         <div className="mt-4 space-y-3">
                           <div className="flex flex-wrap items-center justify-between gap-3">
                             <div className="flex flex-wrap items-center gap-2">
-                              <div className="text-sm font-black text-slate-900">{finalVideoTitle || `${currentTopic || '프로젝트'} 합본 영상`}</div>
+                              <div className="text-sm font-black text-slate-900">{finalVideoTitle || `${currentTopic || '프로젝트'} 결과 영상`}</div>
                               {typeof finalVideoDuration === 'number' && finalVideoDuration > 0 ? (
                                 <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-black text-slate-600">길이 {formatSeconds(finalVideoDuration)}</span>
                               ) : null}
                             </div>
                             <button
                               type="button"
-                              onClick={() => onOpenMediaLightbox({ kind: 'video', src: finalVideoUrl!, title: finalVideoTitle || `${currentTopic || '프로젝트'} 합본 영상`, aspectRatio: previewAspectRatio })}
+                              onClick={() => onOpenMediaLightbox({ kind: 'video', src: finalVideoUrl!, title: finalVideoTitle || `${currentTopic || '프로젝트'} 결과 영상`, aspectRatio: previewAspectRatio })}
                               className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50"
                             >
                               크게 보기
@@ -341,13 +293,10 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                         </div>
                       ) : (
                         <div className="mt-2 flex items-center gap-2 text-sm text-slate-600">
-                          {(previewVideoStatus === 'loading' || isPreparingPreviewVideo) && <span className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" />}
-                          <span>
-                            {previewVideoStatus === 'error' ? '합본 영상을 아직 만들지 못했습니다. 다시 렌더링해 주세요.' : '합본 영상 렌더링이 끝나면 이 영역에 결과가 표시됩니다.'}
-                          </span>
+                          {(previewVideoStatus === 'loading' || isPreparingPreviewVideo) ? <span className="inline-flex h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-slate-700" /> : null}
+                          <span>{previewVideoStatus === 'error' ? '결과 영상을 아직 만들지 못했습니다. 다시 렌더링해 주세요.' : '결과 영상 렌더링이 끝나면 이 영역에 결과가 표시됩니다.'}</span>
                         </div>
                       )}
-
                     </div>
                   </>
                 )}
@@ -357,35 +306,10 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                     <button type="button" onClick={() => exportAssetsToZip(data, 'mp4Creater_storyboard')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">결과표 XLSX</button>
                     <button type="button" onClick={() => downloadProjectZip(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">CSV / ZIP</button>
                     <button type="button" onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">SRT</button>
-                    <button
-                      type="button"
-                      onClick={() => void handlePrepareDavinciImport()}
-                      disabled={isDavinciPreparing}
-                      className="rounded-2xl bg-indigo-600 px-4 py-3 text-sm font-black text-white hover:bg-indigo-500 disabled:bg-slate-300 disabled:text-slate-500"
-                    >
-                      {isDavinciPreparing ? '다빈치 자동 Import 준비 중...' : '다빈치 자동 Import'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDownloadDavinciPackage()}
-                      disabled={isDavinciPreparing}
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
-                    >
-                      다빈치 패키지 ZIP
-                    </button>
-                  </div>
-                ) : null}
-
-                {davinciStatusMessage ? (
-                  <div className="mt-4 rounded-[24px] border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm leading-6 text-indigo-900">
-                    <div className="font-black">{davinciStatusMessage}</div>
-                    {davinciPackagePath ? <div className="mt-2 break-all text-xs font-bold text-indigo-800">패키지 경로: {davinciPackagePath}</div> : null}
-                    {davinciLaunchUri ? <div className="mt-1 break-all text-[11px] font-semibold text-indigo-700">브리지 호출 URI: {davinciLaunchUri}</div> : null}
                   </div>
                 ) : null}
               </div>
             </div>
-
           </div>
         </div>
       </div>

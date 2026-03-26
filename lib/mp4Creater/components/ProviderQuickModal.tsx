@@ -11,7 +11,7 @@ interface ProviderQuickModalProps {
   description?: string;
   focusField?: 'openRouter' | 'elevenLabs' | 'heygen' | 'fal' | null;
   onClose: () => void;
-  onSave: (partial: Partial<StudioState>) => void | Promise<void>;
+  onSave: (partial: Partial<StudioState>) => void | Promise<void> | StudioState | Promise<StudioState>;
   onOpenFullSettings?: () => void;
 }
 
