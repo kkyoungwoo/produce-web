@@ -100,6 +100,7 @@ export function buildThumbnailPrompt(project: SavedProject, variantSeed = 0, opt
   const lead = pickLeadCharacter(project, options);
   const style = pickSelectedStyle(project);
   const draft = project.workflowDraft;
+  const rolePrompts = project.prompts?.rolePrompts || draft?.promptStore?.rolePrompts;
   const customPrompt = options.customPrompt?.trim();
   const title = buildTitleFromTopic(project.topic || project.name || '프로젝트 썸네일', options.titleText || undefined);
   const subtitle = buildSceneSnippet(project, options.subtitleText);
@@ -122,9 +123,12 @@ export function buildThumbnailPrompt(project: SavedProject, variantSeed = 0, opt
     draft?.selections?.endingTone ? `엔딩 톤 ${draft.selections.endingTone}` : '',
   ].filter(Boolean).join(' · ');
   const packSummary = [
-    draft?.promptPack?.storyPrompt ? `스토리 프롬프트 ${draft.promptPack.storyPrompt}` : '',
-    draft?.promptPack?.scenePrompt ? `씬 프롬프트 ${draft.promptPack.scenePrompt}` : '',
-    draft?.promptPack?.actionPrompt ? `액션 프롬프트 ${draft.promptPack.actionPrompt}` : '',
+    rolePrompts?.script?.finalPrompt ? `대본 프롬프트 ${rolePrompts.script.finalPrompt}` : draft?.promptPack?.storyPrompt ? `스토리 프롬프트 ${draft.promptPack.storyPrompt}` : '',
+    rolePrompts?.character?.finalPrompt ? `캐릭터 프롬프트 ${rolePrompts.character.finalPrompt}` : '',
+    rolePrompts?.style?.finalPrompt ? `스타일 프롬프트 ${rolePrompts.style.finalPrompt}` : '',
+    rolePrompts?.scene?.finalPrompt ? `장면 프롬프트 ${rolePrompts.scene.finalPrompt}` : draft?.promptPack?.scenePrompt ? `씬 프롬프트 ${draft.promptPack.scenePrompt}` : '',
+    rolePrompts?.video?.finalPrompt ? `영상 프롬프트 ${rolePrompts.video.finalPrompt}` : draft?.promptPack?.actionPrompt ? `액션 프롬프트 ${draft.promptPack.actionPrompt}` : '',
+    rolePrompts?.backgroundMusic?.finalPrompt ? `배경음 프롬프트 ${rolePrompts.backgroundMusic.finalPrompt}` : '',
     selectedTemplate?.prompt ? `선택 템플릿 ${selectedTemplate.prompt}` : '',
   ].filter(Boolean).join(' · ');
   const sceneReferenceSummary = (project.assets || [])
@@ -148,18 +152,20 @@ export function buildThumbnailPrompt(project: SavedProject, variantSeed = 0, opt
     similarDirection
       ? '비슷하게 재생성 모드다. 선택 썸네일의 핵심 인물, 구도 계열, 색감 결, 텍스트 무게중심은 유지하되 복제본이 아니라 새 근접 변형을 만든다.'
       : '새롭게 생성 모드다. 같은 프로젝트 안에서 일관성은 유지하되 직전 썸네일 후보와 다른 훅, 다른 배치 포인트, 다른 시선 유도를 우선한다.',
-    '개발단 기본 규칙: 대본과 같은 맥락, 같은 감정선, 같은 인물 관계가 한눈에 보여야 한다.',
+    '개발단 기본 규칙: 썸네일은 Step1~Step6 전체를 종합한 최종 대표 컷이어야 하며, 대본과 같은 맥락, 같은 감정선, 같은 인물 관계가 한눈에 보여야 한다.',
     `프로젝트 제목: ${project.topic || project.name || '프로젝트'}.`,
+    `Step1 형식: ${draft?.contentType || 'story'} / ${draft?.aspectRatio || '16:9'}.`,
+    `Step2 세계관: ${selectionSummary || '기본 스토리 구성'}.`,
     `메인 문구: ${title}. 너무 길게 넣지 말고 크게, 즉시 읽히게 배치한다.`,
     `보조 문구 힌트: ${subtitle}.`,
-    `스토리 핵심: ${storyBeat || '첫 장면과 핵심 대사 기준'}.`,
-    `선택값 요약: ${selectionSummary || '기본 스토리 구성'}.`,
+    `Step3 대본 핵심 감정: ${storyBeat || '첫 장면과 핵심 대사 기준'}.`,
     `주인공/표정/포즈: ${lead?.name || '주인공'} / ${leadPrompt}.`,
+    `Step4 캐릭터 기준: ${lead?.prompt || lead?.description || lead?.name || '주인공 기준 유지'}.`,
     `배경/공간 힌트: ${backgroundHint}.`,
     `분위기: ${mood}.`,
-    `스타일 힌트: ${stylePrompt}.`,
+    `Step5 스타일 힌트: ${stylePrompt}.`,
+    sceneReferenceSummary ? `Step6 실제 씬 기준: ${sceneReferenceSummary}.` : '',
     packSummary ? `워크플로우 프롬프트 팩: ${packSummary}.` : '',
-    sceneReferenceSummary ? `실제 씬 참조: ${sceneReferenceSummary}.` : '',
     customPrompt ? `사용자 추가 요청: ${customPrompt}. 이 요청은 기본 연출 위에 자연스럽게 덧입힌다.` : '사용자 추가 요청이 없으면 기본 연출만으로 완성도 높게 구성한다.',
     extraDirection ? `추가 연출: ${extraDirection}.` : '',
     similarDirection ? `직전 후보의 결 유지: ${similarDirection.slice(0, 220)}.` : '',

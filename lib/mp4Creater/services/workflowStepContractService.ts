@@ -5,12 +5,15 @@ import {
   ScriptSpeechStyle,
   WorkflowDraft,
   WorkflowPromptStore,
+  WorkflowRolePromptBundle,
+  WorkflowRolePromptStore,
   WorkflowScriptGenerationMeta,
   WorkflowStepContract,
 } from '../types';
 import { createLightweightSceneAssetsFromDraft } from './sceneAssemblyService';
 import { DEFAULT_SELECTIONS } from './workflowDraftService';
 import { splitStoryIntoParagraphScenes } from '../utils/storyHelpers';
+import { buildBackgroundMusicPromptSections, combineBackgroundMusicPromptSections } from './musicService';
 
 export const SCRIPT_CHARS_PER_MINUTE_BY_CONTENT_TYPE: Record<ContentType, number> = {
   music_video: 190,
@@ -91,6 +94,224 @@ function inferCastType(draft: WorkflowDraft) {
   if (!selectedCharacters.length) return 'narration-only';
   if (selectedCharacters.length === 1) return 'single-cast';
   return 'multi-cast';
+}
+
+function trimResultHint(value?: string | null, max = 320) {
+  const normalized = normalizeText(value);
+  if (!normalized) return null;
+  return normalized.length > max ? `${normalized.slice(0, max)}…` : normalized;
+}
+
+function pickUniqueStepSources(steps: string[]) {
+  return Array.from(new Set(steps.filter(Boolean)));
+}
+
+function buildRoleBundle(options: {
+  label: string;
+  stepSources: string[];
+  basePrompt?: string | null;
+  finalPrompt?: string | null;
+  resultHint?: string | null;
+  sections?: Record<string, string> | null;
+}): WorkflowRolePromptBundle {
+  const safeSections = options.sections
+    ? Object.fromEntries(
+      Object.entries(options.sections)
+        .filter(([, value]) => typeof value === 'string' && value.trim())
+        .map(([key, value]) => [key, value.trim()])
+    )
+    : null;
+
+  return {
+    label: options.label,
+    stepSources: pickUniqueStepSources(options.stepSources),
+    basePrompt: normalizeText(options.basePrompt),
+    finalPrompt: normalizeText(options.finalPrompt),
+    resultHint: trimResultHint(options.resultHint),
+    sections: safeSections && Object.keys(safeSections).length ? safeSections : null,
+  };
+}
+
+function buildThumbnailRolePrompt(options: {
+  draft: WorkflowDraft;
+  assets: GeneratedAsset[];
+  safeSelections: ReturnType<typeof getSafeSelections>;
+  selectedCharacters: ReturnType<typeof resolveSelectedCharacters>;
+  selectedStyle: ReturnType<typeof resolveSelectedStyle>;
+  finalScript: string;
+  thumbnailPrompt?: string | null;
+}) {
+  const { draft, assets, safeSelections, selectedCharacters, selectedStyle, finalScript, thumbnailPrompt } = options;
+  const sceneSummary = assets
+    .slice(0, 3)
+    .map((asset) => normalizeText(asset.narration || asset.imagePrompt || asset.visualPrompt))
+    .filter(Boolean)
+    .join(' / ');
+  const selectedCharacterSummary = selectedCharacters
+    .slice(0, 3)
+    .map((character) => normalizeText(character.name || character.description || character.prompt))
+    .filter(Boolean)
+    .join(', ');
+
+  return joinUniqueBlocks([
+    thumbnailPrompt,
+    `썸네일은 Step1 ${draft.contentType || 'story'} 형식과 ${draft.aspectRatio || '16:9'} 비율을 대표하는 최종 대표 컷으로 구성한다.`,
+    draft.topic ? `Step2 주제는 ${draft.topic}이며 분위기 ${safeSelections.mood}, 배경 ${safeSelections.setting}, 감정 축 ${safeSelections.conflict}를 유지한다.` : '',
+    finalScript ? `Step3 핵심 감정과 대본 흐름은 ${trimResultHint(finalScript, 220) || ''}` : '',
+    selectedCharacterSummary ? `Step4 캐릭터 기준은 ${selectedCharacterSummary}이다.` : '',
+    selectedStyle?.prompt ? `Step5 스타일 기준은 ${selectedStyle.prompt}` : '',
+    sceneSummary ? `Step6 실제 장면 기준은 ${sceneSummary}다.` : '',
+  ]);
+}
+
+function buildRolePromptStore(options: {
+  draft: WorkflowDraft;
+  assets: GeneratedAsset[];
+  selectedTemplate: ReturnType<typeof resolveSelectedTemplate>;
+  selectedStyle: ReturnType<typeof resolveSelectedStyle>;
+  selectedCharacters: ReturnType<typeof resolveSelectedCharacters>;
+  safeSelections: ReturnType<typeof getSafeSelections>;
+  finalScript: string;
+  finalImagePrompt: string;
+  finalVideoPrompt: string;
+  projectPrompts?: {
+    scriptPrompt?: string | null;
+    scenePrompt?: string | null;
+    imagePrompt?: string | null;
+    videoPrompt?: string | null;
+    motionPrompt?: string | null;
+    thumbnailPrompt?: string | null;
+  } | null;
+}): WorkflowRolePromptStore {
+  const {
+    draft,
+    assets,
+    selectedTemplate,
+    selectedStyle,
+    selectedCharacters,
+    safeSelections,
+    finalScript,
+    finalImagePrompt,
+    finalVideoPrompt,
+    projectPrompts,
+  } = options;
+  const bgmSections = buildBackgroundMusicPromptSections(draft, draft.backgroundMusicScene?.promptSections || null);
+  const bgmSectionMap: Record<string, string> = {
+    identity: bgmSections.identity,
+    mood: bgmSections.mood,
+    instruments: bgmSections.instruments,
+    performance: bgmSections.performance,
+    production: bgmSections.production,
+  };
+  const backgroundMusicPrompt = normalizeText(
+    draft.backgroundMusicScene?.prompt
+    || combineBackgroundMusicPromptSections(bgmSections, draft.backgroundMusicScene?.durationSeconds || 20)
+  );
+  const characterFinalPrompt = joinUniqueBlocks([
+    draft.promptPack?.characterPrompt,
+    draft.selectedCharacterStylePrompt,
+    ...selectedCharacters.map((character) => normalizeText(character.prompt || character.description || '')),
+  ]);
+  const styleFinalPrompt = joinUniqueBlocks([
+    selectedStyle?.prompt,
+    draft.selectedCharacterStylePrompt,
+  ]);
+  const sceneBasePrompt = joinUniqueBlocks([
+    draft.promptPack?.scenePrompt,
+    projectPrompts?.scenePrompt,
+  ]);
+  const videoBasePrompt = joinUniqueBlocks([
+    draft.promptPack?.actionPrompt,
+    projectPrompts?.motionPrompt,
+  ]);
+  const thumbnailFinalPrompt = buildThumbnailRolePrompt({
+    draft,
+    assets,
+    safeSelections,
+    selectedCharacters,
+    selectedStyle,
+    finalScript,
+    thumbnailPrompt: projectPrompts?.thumbnailPrompt,
+  });
+
+  return {
+    script: buildRoleBundle({
+      label: '대본 프롬프트',
+      stepSources: ['step1', 'step2', 'step3'],
+      basePrompt: joinUniqueBlocks([selectedTemplate?.prompt, draft.promptPack?.storyPrompt]),
+      finalPrompt: joinUniqueBlocks([projectPrompts?.scriptPrompt, draft.promptPack?.storyPrompt]),
+      resultHint: finalScript,
+      sections: {
+        template: selectedTemplate?.prompt || '',
+        story: draft.promptPack?.storyPrompt || '',
+      },
+    }),
+    character: buildRoleBundle({
+      label: '캐릭터 프롬프트',
+      stepSources: ['step2', 'step3', 'step4'],
+      basePrompt: draft.promptPack?.characterPrompt,
+      finalPrompt: characterFinalPrompt,
+      resultHint: selectedCharacters.map((character) => character.name).filter(Boolean).join(', '),
+      sections: {
+        character: draft.promptPack?.characterPrompt || '',
+        characterStyle: draft.selectedCharacterStylePrompt || '',
+      },
+    }),
+    style: buildRoleBundle({
+      label: '스타일 프롬프트',
+      stepSources: ['step1', 'step2', 'step5'],
+      basePrompt: selectedStyle?.prompt || draft.selectedCharacterStylePrompt || '',
+      finalPrompt: styleFinalPrompt,
+      resultHint: selectedStyle?.groupLabel || selectedStyle?.label || '',
+      sections: {
+        selectedStyle: selectedStyle?.prompt || '',
+        characterStyle: draft.selectedCharacterStylePrompt || '',
+      },
+    }),
+    scene: buildRoleBundle({
+      label: '장면 프롬프트',
+      stepSources: ['step2', 'step3', 'step5', 'step6'],
+      basePrompt: sceneBasePrompt,
+      finalPrompt: joinUniqueBlocks([projectPrompts?.imagePrompt, finalImagePrompt]),
+      resultHint: assets.map((asset) => asset.narration).filter(Boolean).slice(0, 3).join(' / '),
+      sections: {
+        scene: draft.promptPack?.scenePrompt || '',
+        imageBundle: finalImagePrompt,
+      },
+    }),
+    video: buildRoleBundle({
+      label: '영상 프롬프트',
+      stepSources: ['step3', 'step4', 'step5', 'step6'],
+      basePrompt: videoBasePrompt,
+      finalPrompt: joinUniqueBlocks([projectPrompts?.videoPrompt, finalVideoPrompt]),
+      resultHint: assets.map((asset) => asset.videoPrompt || '').filter(Boolean).slice(0, 3).join(' / '),
+      sections: {
+        motion: draft.promptPack?.actionPrompt || '',
+        videoBundle: finalVideoPrompt,
+      },
+    }),
+    backgroundMusic: buildRoleBundle({
+      label: '배경음 프롬프트',
+      stepSources: ['step2', 'step3', 'step6'],
+      basePrompt: backgroundMusicPrompt,
+      finalPrompt: backgroundMusicPrompt,
+      resultHint: `${safeSelections.mood} / ${safeSelections.setting}`,
+      sections: bgmSectionMap,
+    }),
+    thumbnail: buildRoleBundle({
+      label: '썸네일 프롬프트',
+      stepSources: ['step1', 'step2', 'step3', 'step4', 'step5', 'step6'],
+      basePrompt: projectPrompts?.thumbnailPrompt || thumbnailFinalPrompt,
+      finalPrompt: thumbnailFinalPrompt,
+      resultHint: assets[0]?.narration || draft.topic || '',
+      sections: {
+        topic: draft.topic || '',
+        mood: safeSelections.mood || '',
+        setting: safeSelections.setting || '',
+        style: selectedStyle?.prompt || '',
+      },
+    }),
+  };
 }
 
 export function getCharsPerMinuteByContentType(contentType: ContentType) {
@@ -203,12 +424,14 @@ export function buildWorkflowPromptStore(options: {
     imagePrompt?: string | null;
     videoPrompt?: string | null;
     motionPrompt?: string | null;
+    thumbnailPrompt?: string | null;
   } | null;
 }): WorkflowPromptStore {
   const { draft, projectPrompts } = options;
   const assets = createAssetsForSummary(draft, options.assets);
   const selectedTemplate = resolveSelectedTemplate(draft);
   const selectedStyle = resolveSelectedStyle(draft);
+  const safeSelections = getSafeSelections(draft);
 
   const finalImagePrompt = joinUniqueBlocks([
     projectPrompts?.imagePrompt,
@@ -219,6 +442,18 @@ export function buildWorkflowPromptStore(options: {
     ...assets.map((item) => item.videoPrompt),
   ]);
   const finalScript = draft.script || assets.map((item) => item.narration).filter(Boolean).join('\n\n') || '';
+  const rolePrompts = buildRolePromptStore({
+    draft,
+    assets,
+    selectedTemplate,
+    selectedStyle,
+    selectedCharacters: resolveSelectedCharacters(draft),
+    safeSelections,
+    finalScript,
+    finalImagePrompt,
+    finalVideoPrompt,
+    projectPrompts,
+  });
 
   return {
     commonPrompts: {
@@ -264,6 +499,7 @@ export function buildWorkflowPromptStore(options: {
       finalImagePrompt,
       finalVideoPrompt,
     },
+    rolePrompts,
   };
 }
 
@@ -277,6 +513,7 @@ export function buildWorkflowStepContract(options: {
     imagePrompt?: string | null;
     videoPrompt?: string | null;
     motionPrompt?: string | null;
+    thumbnailPrompt?: string | null;
   } | null;
 }): WorkflowStepContract {
   const { draft } = options;
@@ -384,6 +621,8 @@ export function buildWorkflowStepContract(options: {
         selectedCharacterCount: selectedCharacters.length,
         styleCandidateCount: (draft.styleImages || []).length,
         scriptCharacterCount: Array.from(finalScript).length,
+        backgroundMusicEnabled: Boolean(draft.backgroundMusicScene?.enabled),
+        thumbnailPromptReady: Boolean(promptStore.rolePrompts?.thumbnail.finalPrompt),
       },
       usedInputs: {
         step1: {
@@ -412,6 +651,19 @@ export function buildWorkflowStepContract(options: {
         step5: {
           selectedStyleImageId: selectedStyle?.id || draft.selectedStyleImageId || null,
         },
+        backgroundMusic: {
+          enabled: Boolean(draft.backgroundMusicScene?.enabled),
+          provider: draft.backgroundMusicScene?.provider || null,
+          modelId: draft.backgroundMusicScene?.modelId || null,
+          selectedTrackId: draft.backgroundMusicScene?.selectedTrackId || null,
+          prompt: promptStore.rolePrompts?.backgroundMusic.finalPrompt || draft.backgroundMusicScene?.prompt || '',
+          sections: promptStore.rolePrompts?.backgroundMusic.sections || null,
+        },
+        thumbnail: {
+          prompt: promptStore.rolePrompts?.thumbnail.finalPrompt || options.projectPrompts?.thumbnailPrompt || '',
+          sourceSteps: promptStore.rolePrompts?.thumbnail.stepSources || [],
+        },
+        rolePrompts: promptStore.rolePrompts || null,
       },
       missingInputs,
       ready: missingInputs.length === 0,

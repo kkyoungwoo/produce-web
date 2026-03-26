@@ -27,6 +27,9 @@
 - Step6은 각 문단이 개별 컷이지만 이전/다음 씬과 연결되는 하나의 영상 흐름처럼 유지해야 합니다.
 - 문단 설정 내부의 `해당 내용 적용` 버튼은 현재 문단 편집값으로 이미지와 영상을 다시 반영하는入口입니다.
 - 썸네일은 실제 씬/캐릭터/화풍/대본을 기반으로 만들고, 새 생성과 유사 재생성을 분리해서 다룹니다.
+- `workflowDraft.promptStore.rolePrompts`와 `project.prompts.rolePrompts`에 대본/캐릭터/스타일/장면/영상/배경음/썸네일 프롬프트를 역할별로 분리 저장합니다.
+- `project.prompts`는 기존 `scriptPrompt/scenePrompt/imagePrompt/videoPrompt/motionPrompt/thumbnailPrompt`를 유지하면서 `characterPrompt/stylePrompt/backgroundMusicPrompt/backgroundMusicPromptSections/rolePrompts`를 추가로 보존합니다.
+- 썸네일은 별도 부가 산출물이 아니라 Step1~Step6 전체와 현재 Step6 실제 씬을 요약한 프로젝트 대표 결과물로 저장합니다.
 
 ## Step6 Latest Stable Flow
 - Step5 -> Step6 handoff must stay centered on `lib/mp4Creater/App.tsx` `handleOpenSceneStudio`.
@@ -38,11 +41,17 @@
 - Latest Step6 state is decided by comparing project `lastSavedAt` and snapshot `savedAt`.
 - Step6 autosave must track text/prompt edits, media generation results, paragraph add/delete, and cost changes so refresh/back/import/export all reuse the same latest working copy.
 - Imported projects must recreate Step6 snapshot cache immediately from imported JSON.
+- Step6 preview render must stay visible after reopen until the user explicitly renders again; scene edits may mark the preview stale, but must not silently delete the last rendered preview video.
+- Same-session Step6 reopen should prefer the in-memory navigation cache when available so a rendered preview video does not disappear during route re-entry.
+- Final MP4 export must use the ffmpeg render route and return a faststart MP4 instead of the browser `MediaRecorder` blob path.
 
 ## Prompt Path Preserve Rules
 - Step1~5 prompt chain: `lib/mp4Creater/services/workflowPromptBuilder.ts`
+- 역할별 prompt 저장/Step 연결 요약: `lib/mp4Creater/services/workflowStepContractService.ts`
 - Step2 freshness / recommendation logic: `lib/mp4Creater/services/storyRecommendationService.ts`
 - Step4 character upload / selection / similar-regeneration logic: `lib/mp4Creater/components/InputSection.tsx`, `lib/mp4Creater/services/characterStudioService.ts`
 - Step6 paragraph image/video continuity logic: `lib/mp4Creater/pages/SceneStudioPage.tsx`, `lib/mp4Creater/services/imageService.ts`, `lib/mp4Creater/components/ResultTable.tsx`
+- 배경음 prompt 분리/scene flow 반영: `lib/mp4Creater/services/musicService.ts`
+- 썸네일 최종 대표 prompt 조립: `lib/mp4Creater/services/thumbnailService.ts`
 - Workflow contract / summary JSON structure: `lib/mp4Creater/services/workflowStepContractService.ts`
 - If any of these paths or responsibilities change, update this md and the matching step guide in the same patch.

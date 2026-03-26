@@ -160,6 +160,10 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
   const showFinalRenderButton = Boolean(onPreparePreviewVideo && !isPreparingPreviewVideo);
   const showFinalOutputButton = Boolean(canShowRenderedPreview && onExportVideo);
   const showPreviewMixControls = Boolean(!finalVideoUrl && previewVideoStatus !== 'loading' && !isPreparingPreviewVideo && onPreviewMixChange);
+  const showRenderProgressCard = Boolean(
+    (previewVideoStatus === 'loading' || isPreparingPreviewVideo || isExporting)
+    && (progressMessage || activeOverallProgress !== null),
+  );
   const mergedPreviewShellClass = previewAspectRatio === '9:16'
     ? 'mx-auto w-full max-w-[240px] sm:max-w-[280px]'
     : previewAspectRatio === '1:1'
@@ -201,9 +205,10 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                 </div>
                 <div className="text-sm font-bold text-slate-600">예상 길이 {formatSeconds(totalDuration)}</div>
               </div>
-              <div className={`mt-4 rounded-[24px] border px-4 py-4 text-sm ${isGenerating || activeOverallProgress !== null ? 'border-blue-200 bg-blue-50 text-blue-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+              {showRenderProgressCard ? (
+                <div className="mt-4 rounded-[24px] border border-blue-200 bg-blue-50 px-4 py-4 text-sm text-blue-800">
                 <div className="flex items-center gap-3">
-                  {isGenerating || activeOverallProgress !== null ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" /> : <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />}
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
                   <div className="font-bold">{progressMessage || '결과 페이지가 준비되었습니다.'}</div>
                 </div>
                 {activeOverallProgress !== null && (
@@ -221,7 +226,8 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                     </div>
                   </div>
                 )}
-              </div>
+                </div>
+              ) : null}
             </div>
 
             {showPreviewMixControls ? (

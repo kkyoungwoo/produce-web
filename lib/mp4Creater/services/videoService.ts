@@ -47,6 +47,11 @@ interface RenderProfile {
   bitrate: number;
 }
 
+function getRecorderStopDelayMs(fps: number) {
+  const frameIntervalMs = Math.max(16, Math.ceil(1000 / Math.max(1, fps)));
+  return Math.max(80, frameIntervalMs * 2);
+}
+
 function resolvePreferredImageSources(value: string): string[] {
   if (!value) return [];
   const trimmed = value.trim();
@@ -461,6 +466,7 @@ export const generateVideoStaticFallback = async (
   const renderProfile = resolveRenderProfile(validAssets.length, aspectRatio, qualityMode);
   const preparedScenes: PreparedScene[] = [];
   let timelinePointer = 0;
+  const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
   const DEFAULT_DURATION = 1;
 
   for (let i = 0; i < validAssets.length; i += 1) {
@@ -472,7 +478,7 @@ export const generateVideoStaticFallback = async (
     await prepareSceneImage(img, asset, i, renderProfile);
 
     let audioBuffer: AudioBuffer | null = null;
-    let duration = resolveAssetPlaybackDuration(asset, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true });
+    let duration = resolveAssetPlaybackDuration(asset, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true, preferTargetDuration: true });
 
     if (asset.audioData) {
       try {
@@ -480,7 +486,7 @@ export const generateVideoStaticFallback = async (
         duration = resolveAssetPlaybackDuration({
           ...asset,
           audioDuration: Math.max(audioBuffer.duration || 0, asset.audioDuration || 0),
-        }, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true });
+        }, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true, preferTargetDuration: true });
       } catch (error) {
         console.warn(`[Video/Fallback] 씬 ${i + 1} 오디오 디코딩 실패`, error);
       }
@@ -681,7 +687,7 @@ export const generateVideoStaticFallback = async (
       if (elapsed >= totalDuration) {
         isFinished = true;
         onProgress('정적 씬 안전 합본 완료! 파일 생성 중...');
-        window.setTimeout(() => recorder.stop(), 350);
+        window.setTimeout(() => recorder.stop(), recorderStopDelayMs);
         return;
       }
 
@@ -732,6 +738,8 @@ export const generateVideo = async (
 
   const DEFAULT_DURATION = 1; // 오디오/영상/대본이 비어 있어도 기본 1초는 유지
 
+  const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+
   for (let i = 0; i < validAssets.length; i++) {
     const asset = validAssets[i];
     onProgress(`데이터 디코딩 및 프레임 매칭 중 (${i + 1}/${validAssets.length})...`);
@@ -774,7 +782,7 @@ export const generateVideo = async (
     }
 
     let audioBuffer: AudioBuffer | null = null;
-    let duration = resolveAssetPlaybackDuration(asset, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true });
+    let duration = resolveAssetPlaybackDuration(asset, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true, preferTargetDuration: true });
 
     // 오디오가 있으면 디코딩, 없으면 기본 시간 사용
     if (asset.audioData) {
@@ -783,7 +791,7 @@ export const generateVideo = async (
         duration = resolveAssetPlaybackDuration({
           ...asset,
           audioDuration: Math.max(audioBuffer.duration || 0, asset.audioDuration || 0),
-        }, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true });
+        }, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true, preferTargetDuration: true });
       } catch (e) {
         console.warn(`[Video] 씬 ${i + 1} 오디오 디코딩 실패, 기본 ${DEFAULT_DURATION}초 사용`);
       }
@@ -967,7 +975,7 @@ export const generateVideo = async (
       if (elapsed >= totalDuration) {
         isFinished = true;
         onProgress("렌더링 완료! 파일 생성 중...");
-        setTimeout(() => recorder.stop(), 500); // 마지막 프레임 유지를 위해 0.5초 대기
+        setTimeout(() => recorder.stop(), recorderStopDelayMs);
         return;
       }
 
@@ -1066,3 +1074,4 @@ export const generateVideo = async (
     renderLoop();
   });
 };
+

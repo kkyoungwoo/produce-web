@@ -6,6 +6,7 @@ import { AnimatePresence, motion, type Transition } from 'framer-motion';
 import { SavedProject } from '../types';
 import { formatKRW } from '../config';
 import { rememberProjectNavigationProject } from '../services/projectNavigationCache';
+import { resolveAssetPlaybackDuration } from '../services/projectEnhancementService';
 import { buildProjectsExportPayload, getProjectById } from '../services/projectService';
 import { triggerTextDownload } from '../utils/downloadHelpers';
 
@@ -89,7 +90,7 @@ const getCompletedMinutesLabel = (project: SavedProject) => {
   if (!assets.length) return null;
   const isCompleted = assets.every((asset) => Boolean(asset.imageData) && (Boolean(asset.audioData) || Boolean(asset.videoData)));
   if (!isCompleted) return null;
-  const totalSeconds = assets.reduce((sum, asset) => sum + (asset.targetDuration || asset.audioDuration || asset.videoDuration || 0), 0);
+  const totalSeconds = assets.reduce((sum, asset) => sum + resolveAssetPlaybackDuration(asset, { minimum: 1, fallbackNarrationEstimate: true, preferTargetDuration: true }), 0);
   if (!totalSeconds) return null;
   const minutes = Math.max(1, Math.round(totalSeconds / 60));
   return `${minutes}분`;
@@ -236,7 +237,6 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
     if (isInteractionLocked) return;
     const detailedProject = await getProjectById(project.id, { localOnly: true }) || await getProjectById(project.id) || project;
     rememberProjectNavigationProject(detailedProject);
-    onLoad?.(detailedProject);
     try {
       window.scrollTo({ top: 0, behavior: 'auto' });
     } catch {}

@@ -106,6 +106,7 @@ interface ResultTableProps {
 
 const formatSeconds = (value?: number | null) => (typeof value === 'number' ? `${value.toFixed(1)}초` : '-');
 const MAX_SCENE_DURATION = 6;
+const MIN_SCENE_DURATION = 1;
 const DEFAULT_SCENE_NARRATION_VOLUME = 0.5;
 const DEFAULT_SCENE_VIDEO_AUDIO_VOLUME = 0.5;
 const clampMediaVolume = (value?: number | null) => {
@@ -122,8 +123,8 @@ const getAdjustedAudioDuration = (audioDuration?: number | null, silenceTrim?: n
 
 const getSceneCutDuration = (row: GeneratedAsset, silenceTrim?: number | null) => {
   const audioDuration = getAdjustedAudioDuration(row.audioDuration, silenceTrim);
-  const preferredDuration = audioDuration || row.targetDuration || row.videoDuration || 0;
-  return Math.max(0, Math.min(MAX_SCENE_DURATION, Number(preferredDuration.toFixed(1))));
+  const preferredDuration = row.targetDuration || audioDuration || row.videoDuration || 0;
+  return Math.max(MIN_SCENE_DURATION, Math.min(MAX_SCENE_DURATION, Number(preferredDuration.toFixed(1))));
 };
 
 const resolveImageSrc = (value?: string | null) => {
@@ -396,7 +397,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
     return { imageCount, audioCount, videoCount };
   }, [data]);
 
-  const totalDuration = useMemo(() => Number(data.reduce((sum, item) => sum + resolveAssetPlaybackDuration(item, { minimum: 3, fallbackNarrationEstimate: true }), 0).toFixed(2)), [data]);
+  const totalDuration = useMemo(() => Number(data.reduce((sum, item) => sum + resolveAssetPlaybackDuration(item, { minimum: MIN_SCENE_DURATION, fallbackNarrationEstimate: true, preferTargetDuration: true }), 0).toFixed(2)), [data]);
 
   const mainBgm = useMemo(() => {
     if (!backgroundMusicTracks.length) return null;
@@ -445,12 +446,13 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const sequenceScene = data[sequenceSceneIndex] || null;
   const sequenceSceneAudioRate = sceneAudioRates[sequenceSceneIndex] || 1;
   const sequenceSceneDuration = sequenceScene
-    ? Number(Math.max(
-        ((sequenceScene.audioDuration || 0) / sequenceSceneAudioRate) || 0,
-        resolveAssetPlaybackDuration(sequenceScene, { minimum: 3, fallbackNarrationEstimate: true }),
-        3,
-      ).toFixed(2))
-    : 3;
+    ? resolveAssetPlaybackDuration({
+        ...sequenceScene,
+        audioDuration: typeof sequenceScene.audioDuration === 'number'
+          ? Number((sequenceScene.audioDuration / Math.max(0.1, sequenceSceneAudioRate)).toFixed(2))
+          : sequenceScene.audioDuration,
+      }, { minimum: MIN_SCENE_DURATION, fallbackNarrationEstimate: true, preferTargetDuration: true })
+    : MIN_SCENE_DURATION;
 
   const stopSequencePlayback = () => {
     setSequencePlaying(false);
@@ -1757,7 +1759,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                             <span>컷 길이</span>
                             <span>{formatSeconds(row.targetDuration)}</span>
                           </div>
-                          <input type="range" min="0" max={MAX_SCENE_DURATION} step="0.5" value={Math.min(MAX_SCENE_DURATION, Math.max(0, row.targetDuration || 0))} onChange={(e) => onDurationChange?.(index, Number(e.target.value))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
+                          <input type="range" min={MIN_SCENE_DURATION} max={MAX_SCENE_DURATION} step="0.5" value={Math.min(MAX_SCENE_DURATION, Math.max(MIN_SCENE_DURATION, row.targetDuration || 0))} onChange={(e) => onDurationChange?.(index, Number(e.target.value))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
                           <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">Step1 비율은 유지하고 컷 길이만 조절합니다.</div>
                         </div>
                         {!isMuteMode ? (

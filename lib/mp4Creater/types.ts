@@ -362,6 +362,26 @@ export interface WorkflowPromptStore {
     step6: Record<string, string>;
   };
   finalPrompts: Record<string, string>;
+  rolePrompts?: WorkflowRolePromptStore;
+}
+
+export interface WorkflowRolePromptBundle {
+  label: string;
+  stepSources: string[];
+  basePrompt: string;
+  finalPrompt: string;
+  resultHint?: string | null;
+  sections?: Record<string, string> | null;
+}
+
+export interface WorkflowRolePromptStore {
+  script: WorkflowRolePromptBundle;
+  character: WorkflowRolePromptBundle;
+  style: WorkflowRolePromptBundle;
+  scene: WorkflowRolePromptBundle;
+  video: WorkflowRolePromptBundle;
+  backgroundMusic: WorkflowRolePromptBundle;
+  thumbnail: WorkflowRolePromptBundle;
 }
 
 export interface WorkflowScriptGenerationMeta {
@@ -612,10 +632,15 @@ export interface FreeMediaItem {
 export interface ProjectPromptRecord {
   scriptPrompt?: string | null;
   scenePrompt?: string | null;
+  characterPrompt?: string | null;
+  stylePrompt?: string | null;
   imagePrompt?: string | null;
   videoPrompt?: string | null;
   motionPrompt?: string | null;
+  backgroundMusicPrompt?: string | null;
+  backgroundMusicPromptSections?: BackgroundMusicPromptSections | null;
   thumbnailPrompt?: string | null;
+  rolePrompts?: WorkflowRolePromptStore | null;
   youtubeMetaPrompt?: string | null;
 }
 

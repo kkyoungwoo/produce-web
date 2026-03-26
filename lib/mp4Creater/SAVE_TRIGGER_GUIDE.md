@@ -36,8 +36,12 @@
 - `lib/mp4Creater/pages/SceneStudioPage.tsx`
   - paragraph narration/imagePrompt/videoPrompt/visual type/duration edits: immediate snapshot write + debounced project JSON save
   - autosave signature must include paragraph text/prompt changes, selected visual mode, media duration/url changes, and current cost so JSON/export/import stay aligned with the visible Step6 cards
+  - Step6 save patch must refresh `workflowDraft.promptStore.rolePrompts` and `project.prompts.rolePrompts` together so prompt-role separation survives reopen/export/import
+  - Step6 save patch must keep `project.prompts.backgroundMusicPrompt`, `project.prompts.backgroundMusicPromptSections`, and the thumbnail representative prompt summary aligned with the latest visible scene flow
   - paragraph add/delete and audio-clear actions: immediate snapshot write + project JSON sync
   - preview/final render: must call `flushPendingSceneStudioSave(...)` before merging/exporting
+  - preview invalidation after scene edits must keep the last rendered preview video payload, and only update the stale message/status until the next explicit render
+  - final export must use the ffmpeg route for a finalized MP4; browser preview render is no longer the delivery path
   - existing project reopen: block draft-based scene bootstrap until saved Step6 assets finish hydrating
   - existing project reopen: show progress percent and use latest Step6 snapshot as fallback while detailed project JSON is still loading
 - `lib/mp4Creater/App.tsx`

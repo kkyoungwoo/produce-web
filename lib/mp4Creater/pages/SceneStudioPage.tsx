@@ -29,6 +29,7 @@ import { buildBackgroundMusicPrompt, buildBackgroundMusicPromptSections, combine
 import { buildProjectSettingsSnapshot } from '../services/projectSettingsSnapshot';
 import { generateImage, getSelectedImageModel, isSampleImageModel } from '../services/imageService';
 import { buildThumbnailScene, createSampleThumbnail } from '../services/thumbnailService';
+import { isFfmpegUnavailableError, renderVideoWithFfmpeg } from '../services/serverRenderService';
 import { generateTtsAudio } from '../services/ttsService';
 import { generateMotionPrompt, generateScript } from '../services/geminiService';
 import { generateVideo, generateVideoStaticFallback } from '../services/videoService';
@@ -50,6 +51,7 @@ import SceneStudioHeaderPanel from '../components/scene-studio/SceneStudioHeader
 import { buildWorkflowPromptStore, buildWorkflowStepContract } from '../services/workflowStepContractService';
 import SceneStudioResultPanel from '../components/scene-studio/SceneStudioResultPanel';
 import { buildSceneStudioSnapshotPayload, mergeSceneStudioSnapshotIntoProject, readSceneStudioSnapshot, writeSceneStudioSnapshot, type SceneStudioSnapshotPayload } from '../services/sceneStudioSnapshotCache';
+import { hasDetailedSceneStudioProject } from './sceneStudio/helpers';
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const DEFAULT_SCENE_DURATION = 1;
 const MAX_SCENE_DURATION = 6;
@@ -67,21 +69,6 @@ function hasDetailedSceneStudioWorkflowDraft(draft?: WorkflowDraft | null) {
     || (draft.promptStore && Object.keys(draft.promptStore).length)
     || (draft.stepContract && Object.keys(draft.stepContract).length),
   );
-}
-
-function hasSceneStudioMediaPayload(project?: SavedProject | null) {
-  if (!project) return false;
-  return Boolean(
-    (Array.isArray(project.assets) && project.assets.length)
-    || (Array.isArray(project.backgroundMusicTracks) && project.backgroundMusicTracks.length)
-    || project.previewMix
-    || project.cost
-    || project.sceneStudioPreviewVideo,
-  );
-}
-
-function hasDetailedSceneStudioProject(project?: SavedProject | null) {
-  return Boolean(project && (hasSceneStudioMediaPayload(project) || hasDetailedSceneStudioWorkflowDraft(project.workflowDraft)));
 }
 
 function createSceneStudioSnapshotFallbackProject(
@@ -190,7 +177,7 @@ function readMergedSceneStudioProject(projectId: string) {
 }
 
 function resolveScenePlaybackDuration(asset?: Pick<GeneratedAsset, 'audioDuration' | 'targetDuration' | 'videoDuration' | 'narration'> | null) {
-  return resolveAssetPlaybackDuration(asset, { minimum: DEFAULT_SCENE_DURATION, fallbackNarrationEstimate: true });
+  return resolveAssetPlaybackDuration(asset, { minimum: DEFAULT_SCENE_DURATION, fallbackNarrationEstimate: true, preferTargetDuration: true });
 }
 
 function revokePreviewVideoUrl(value?: string | null) {
@@ -250,7 +237,7 @@ function resolveStep2VideoDurationSeconds(draft: WorkflowDraft) {
 }
 
 function resolveCurrentVideoDurationSeconds(draft: WorkflowDraft, assets: GeneratedAsset[] = []) {
-  const assetTotal = Number(assets.reduce((sum, asset) => sum + resolveAssetPlaybackDuration(asset, { fallbackNarrationEstimate: true }), 0).toFixed(1));
+  const assetTotal = Number(assets.reduce((sum, asset) => sum + resolveAssetPlaybackDuration(asset, { fallbackNarrationEstimate: true, preferTargetDuration: true }), 0).toFixed(1));
   if (assetTotal > 0) return Math.max(10, Math.round(assetTotal));
   return resolveStep2VideoDurationSeconds(draft);
 }
@@ -671,6 +658,7 @@ const SceneStudioPage: React.FC = () => {
       imagePrompt: currentProjectSummary?.prompts?.imagePrompt || summarySceneImagePrompt || null,
       videoPrompt: currentProjectSummary?.prompts?.videoPrompt || summarySceneVideoPrompt || null,
       motionPrompt: currentProjectSummary?.prompts?.motionPrompt || draft.promptPack?.actionPrompt || null,
+      thumbnailPrompt: currentProjectSummary?.thumbnailPrompt || null,
     };
     const persistedPromptStore = draft.promptStore || buildWorkflowPromptStore({
       draft,
@@ -1250,6 +1238,22 @@ const SceneStudioPage: React.FC = () => {
   const buildProjectEnhancementPatch = useCallback((assets: GeneratedAsset[], overrides?: Partial<SavedProject>) => {
     const subtitlePreset = overrides?.subtitlePreset || buildDefaultSubtitlePreset();
     const sceneDrivenScript = (draft.script || '').trim() || assets.map((item) => item.narration).filter(Boolean).join('\n\n');
+    const sceneImagePrompt = assets.map((item) => item.imagePrompt || item.visualPrompt).filter(Boolean).join('\n\n') || null;
+    const sceneVideoPrompt = assets.map((item) => item.videoPrompt).filter(Boolean).join('\n\n') || null;
+    const projectPromptContext = {
+      scriptPrompt: draft.promptPack?.storyPrompt || null,
+      scenePrompt: draft.promptPack?.scenePrompt || null,
+      imagePrompt: sceneImagePrompt,
+      videoPrompt: sceneVideoPrompt,
+      motionPrompt: draft.promptPack?.actionPrompt || null,
+      thumbnailPrompt: overrides?.thumbnailPrompt ?? null,
+    };
+    const promptStore = buildWorkflowPromptStore({
+      draft,
+      assets,
+      projectPrompts: projectPromptContext,
+    });
+    const rolePrompts = promptStore.rolePrompts || null;
     return {
       script: sceneDrivenScript || null,
       scriptParagraphs: buildScriptParagraphPlans(sceneDrivenScript),
@@ -1264,17 +1268,22 @@ const SceneStudioPage: React.FC = () => {
       subtitlePosition: subtitlePreset.position,
       subtitleBackgroundOpacity: subtitlePreset.backgroundOpacity,
       prompts: {
-        scriptPrompt: draft.promptPack?.storyPrompt || null,
-        scenePrompt: draft.promptPack?.scenePrompt || null,
-        imagePrompt: assets.map((item) => item.imagePrompt || item.visualPrompt).filter(Boolean).join('\n\n') || null,
-        videoPrompt: assets.map((item) => item.videoPrompt).filter(Boolean).join('\n\n') || null,
-        motionPrompt: draft.promptPack?.actionPrompt || null,
-        thumbnailPrompt: overrides?.thumbnailPrompt ?? null,
+        scriptPrompt: rolePrompts?.script.finalPrompt || draft.promptPack?.storyPrompt || null,
+        scenePrompt: rolePrompts?.scene.basePrompt || draft.promptPack?.scenePrompt || null,
+        characterPrompt: rolePrompts?.character.finalPrompt || draft.promptPack?.characterPrompt || null,
+        stylePrompt: rolePrompts?.style.finalPrompt || null,
+        imagePrompt: rolePrompts?.scene.finalPrompt || sceneImagePrompt,
+        videoPrompt: rolePrompts?.video.finalPrompt || sceneVideoPrompt,
+        motionPrompt: rolePrompts?.video.basePrompt || draft.promptPack?.actionPrompt || null,
+        backgroundMusicPrompt: rolePrompts?.backgroundMusic.finalPrompt || backgroundMusicSceneConfig.prompt || null,
+        backgroundMusicPromptSections: backgroundMusicSceneConfig.promptSections || null,
+        thumbnailPrompt: overrides?.thumbnailPrompt ?? rolePrompts?.thumbnail.finalPrompt ?? null,
+        rolePrompts,
         youtubeMetaPrompt: overrides?.prompts?.youtubeMetaPrompt ?? null,
       },
       ...overrides,
     } satisfies Partial<SavedProject>;
-  }, [draft.promptPack, draft.script, resolveSceneTtsOptions, studioState]);
+  }, [backgroundMusicSceneConfig.prompt, backgroundMusicSceneConfig.promptSections, draft, resolveSceneTtsOptions, studioState]);
 
   const buildReferenceImages = useCallback((): ReferenceImages => {
     const resolvedCharacterIds = draft.selectedCharacterIds.length ? draft.selectedCharacterIds : draft.extractedCharacters.map((item) => item.id);
@@ -1323,6 +1332,7 @@ const SceneStudioPage: React.FC = () => {
       imagePrompt: assets.map((item) => item.imagePrompt || item.visualPrompt).filter(Boolean).join('\n\n') || null,
       videoPrompt: assets.map((item) => item.videoPrompt).filter(Boolean).join('\n\n') || null,
       motionPrompt: source.promptPack?.actionPrompt || null,
+      thumbnailPrompt: source.promptStore?.rolePrompts?.thumbnail.finalPrompt || null,
     };
     const promptStore = buildWorkflowPromptStore({
       draft: source,
@@ -1501,25 +1511,28 @@ const SceneStudioPage: React.FC = () => {
 
   const invalidateFinalPreview = useCallback((message?: string) => {
     const nextMessage = message || '씬 구성이 바뀌어 합본 영상을 다시 렌더링해야 합니다.';
+    const canKeepExistingPreview = finalPreviewPersistedRef.current
+      && (previewVideoStatus === 'ready' || previewVideoStatus === 'fallback')
+      && Boolean(finalVideoUrl);
     previewRenderNonceRef.current += 1;
-    setFinalVideoUrl((previous) => {
-      revokePreviewVideoUrl(previous);
-      return null;
-    });
-    setFinalVideoTitle('');
-    setFinalVideoDuration(null);
-    setPreviewVideoStatus('idle');
+    if (!canKeepExistingPreview) {
+      setFinalVideoUrl((previous) => {
+        revokePreviewVideoUrl(previous);
+        return null;
+      });
+      setFinalVideoTitle('');
+      setFinalVideoDuration(null);
+    }
+    setPreviewVideoStatus(canKeepExistingPreview ? previewVideoStatus : 'idle');
     setPreviewVideoMessage(nextMessage);
 
     if (resolvedProjectId && finalPreviewPersistedRef.current) {
-      finalPreviewPersistedRef.current = false;
       void persistSceneStudioSnapshot(resolvedProjectId, {
-        sceneStudioPreviewVideo: null,
-        sceneStudioPreviewStatus: 'idle',
+        sceneStudioPreviewStatus: canKeepExistingPreview ? previewVideoStatus : 'idle',
         sceneStudioPreviewMessage: nextMessage,
       });
     }
-  }, [persistSceneStudioSnapshot, resolvedProjectId]);
+  }, [finalVideoUrl, persistSceneStudioSnapshot, previewVideoStatus, resolvedProjectId]);
 
   const setSceneProgress = useCallback((index: number, percent: number, label: string) => {
     setSceneProgressMap((prev) => ({
@@ -1546,7 +1559,7 @@ const SceneStudioPage: React.FC = () => {
     }
   }, [queuedGenerationCount]);
 
-  const applyProjectToScreen = useCallback((project: SavedProject, options?: { message?: string }) => {
+  const applyProjectToScreen = useCallback((project: SavedProject, options?: { message?: string; suppressStatusMessage?: boolean }) => {
     const hydratedProject = mergeSceneStudioSnapshotIntoProject(project, readSceneStudioSnapshot(project.id));
     const safeAssets = Array.isArray(hydratedProject.assets) && hydratedProject.assets.length
       ? hydratedProject.assets.map((asset) => ({ ...asset, aspectRatio: asset?.aspectRatio || hydratedProject.workflowDraft?.aspectRatio || '16:9' }))
@@ -1581,7 +1594,11 @@ const SceneStudioPage: React.FC = () => {
     setPreviewVideoStatus(persistedPreviewStatus);
     setPreviewVideoMessage(hydratedProject.sceneStudioPreviewMessage || '합본 영상을 렌더링해 주세요.');
     setStep4Open(false);
-    setProgressMessage(options?.message || `"${hydratedProject.name}" 프로젝트를 열었습니다. 씬 카드는 먼저 가볍게 보여 주고, 실제 AI 생성은 생성 버튼을 눌렀을 때만 시작합니다.`);
+    if (options?.suppressStatusMessage) {
+      setProgressMessage('');
+    } else {
+      setProgressMessage(options?.message || `"${hydratedProject.name}" 프로젝트를 열었습니다. 씬 카드는 먼저 가볍게 보여 주고, 실제 AI 생성은 생성 버튼을 눌렀을 때만 시작합니다.`);
+    }
     rememberProjectNavigationProject(hydratedProject);
   }, []);
 
@@ -1717,7 +1734,7 @@ const SceneStudioPage: React.FC = () => {
       promptSections: {
         ...(backgroundMusicSceneConfig.promptSections || {}),
         mood: suggestedMood,
-      },
+      } as BackgroundMusicPromptSections,
     });
     setProgressMessage('현재 프로젝트 흐름을 바탕으로 배경음 느낌 문장을 자동으로 채웠습니다. 필요하면 바로 수정해서 다시 생성하면 됩니다.');
   }, [backgroundMusicSceneConfig.promptSections, draft, updateBackgroundMusicScene]);
@@ -1809,18 +1826,28 @@ const SceneStudioPage: React.FC = () => {
     let cancelled = false;
 
     void (async () => {
-      setStep((prev) => (prev === GenerationStep.IDLE ? GenerationStep.ASSETS : prev));
-      setProgressMessage('프로젝트 요약과 씬 카드를 먼저 붙이는 중...');
-      setTaskProgressPercent(12);
-
       const snapshot = readSceneStudioSnapshot(projectId);
       const navigationProject = readMergedSceneStudioProject(projectId);
       const snapshotProject = createSceneStudioSnapshotFallbackProject(projectId, snapshot, navigationProject);
       const immediateProject = pickLatestSceneStudioProject(snapshotProject, navigationProject);
-      if (immediateProject) {
-        setTaskProgressPercent(42);
-        applyProjectToScreen(immediateProject, { message: `"${immediateProject.name}" 프로젝트 저장본을 먼저 붙였습니다. 상세 데이터를 확인하는 동안 현재 씬부터 이어서 보여 드립니다.` });
+      let shouldShowRestoreUi = hasDetailedSceneStudioProject(immediateProject);
+      if (shouldShowRestoreUi) {
+        setStep((prev) => (prev === GenerationStep.IDLE ? GenerationStep.ASSETS : prev));
+        setProgressMessage('프로젝트 요약과 씬 카드를 먼저 붙이는 중...');
+        setTaskProgressPercent(12);
       } else {
+        setProgressMessage('');
+        setTaskProgressPercent(null);
+      }
+
+      if (immediateProject) {
+        if (shouldShowRestoreUi) {
+          setTaskProgressPercent(42);
+          applyProjectToScreen(immediateProject, { message: `"${immediateProject.name}" 프로젝트 저장본을 먼저 붙였습니다. 상세 데이터를 확인하는 동안 현재 씬부터 이어서 보여 드립니다.` });
+        } else {
+          applyProjectToScreen(immediateProject, { suppressStatusMessage: true });
+        }
+      } else if (shouldShowRestoreUi) {
         setTaskProgressPercent(30);
       }
       const localProjectRecord = await withSoftTimeout(getProjectById(projectId, { localOnly: true }), 700, null);
@@ -1831,7 +1858,8 @@ const SceneStudioPage: React.FC = () => {
       if (cancelled) return;
 
       if (cachedProject) {
-        setTaskProgressPercent(58);
+        const hasCachedRestoreProject = hasDetailedSceneStudioProject(cachedProject);
+        shouldShowRestoreUi = shouldShowRestoreUi || hasCachedRestoreProject;
         const cachedDraft = cachedProject.workflowDraft;
         if (cachedDraft) {
           setStudioState((prev) => prev ? {
@@ -1840,10 +1868,21 @@ const SceneStudioPage: React.FC = () => {
             lastContentType: cachedDraft.contentType || prev.lastContentType || 'story',
           } : prev);
         }
-        applyProjectToScreen(cachedProject, { message: `"${cachedProject.name}" 프로젝트를 빠르게 열었습니다. 저장본을 확인하는 동안 씬 카드는 먼저 보여 드립니다.` });
+        if (hasCachedRestoreProject) {
+          setStep((prev) => (prev === GenerationStep.IDLE ? GenerationStep.ASSETS : prev));
+          setTaskProgressPercent(58);
+          applyProjectToScreen(cachedProject, { message: `"${cachedProject.name}" 프로젝트를 빠르게 열었습니다. 저장본을 확인하는 동안 씬 카드는 먼저 보여 드립니다.` });
+        } else {
+          setTaskProgressPercent(null);
+          applyProjectToScreen(cachedProject, { suppressStatusMessage: true });
+        }
       }
 
-      setTaskProgressPercent(cachedProject ? 76 : 48);
+      if (shouldShowRestoreUi) {
+        setTaskProgressPercent(cachedProject ? 76 : 48);
+      } else {
+        setTaskProgressPercent(null);
+      }
       const projectRecord = await withSoftTimeout(getProjectById(projectId, { forceSync: !cachedProject }), 1800, cachedProject || snapshotProject || null);
       const project = projectRecord
         ? mergeSceneStudioSnapshotIntoProject(projectRecord, snapshot)
@@ -1855,12 +1894,18 @@ const SceneStudioPage: React.FC = () => {
           projectHydrationPendingRef.current = false;
           setIsProjectHydrating(false);
           setTaskProgressPercent(null);
-          setProgressMessage('저장된 Step6 데이터를 아직 찾지 못했습니다. 잠시 후 다시 열면 마지막 저장본을 다시 확인합니다.');
+          if (shouldShowRestoreUi) {
+            setProgressMessage('저장된 Step6 데이터를 아직 찾지 못했습니다. 잠시 후 다시 열면 마지막 저장본을 다시 확인합니다.');
+          } else {
+            setProgressMessage('');
+          }
           return;
         }
         projectQueryHandledRef.current = '';
-        setTaskProgressPercent(66);
-        setProgressMessage(`저장 직후 프로젝트 상세 JSON을 다시 확인하는 중입니다... (${projectLookupRetryCountRef.current}/3)`);
+        if (shouldShowRestoreUi) {
+          setTaskProgressPercent(66);
+          setProgressMessage(`저장 직후 프로젝트 상세 JSON을 다시 확인하는 중입니다... (${projectLookupRetryCountRef.current}/3)`);
+        }
         if (projectQueryRetryTimerRef.current) window.clearTimeout(projectQueryRetryTimerRef.current);
         projectQueryRetryTimerRef.current = window.setTimeout(() => {
           setProjectLookupTick((prev) => prev + 1);
@@ -1896,9 +1941,16 @@ const SceneStudioPage: React.FC = () => {
         }
       }
 
-      setTaskProgressPercent(100);
-      applyProjectToScreen(project);
-      window.setTimeout(() => setTaskProgressPercent(null), 600);
+      const hasPersistedRestoreProject = hasDetailedSceneStudioProject(project);
+      if (hasPersistedRestoreProject) {
+        setStep((prev) => (prev === GenerationStep.IDLE ? GenerationStep.ASSETS : prev));
+        setTaskProgressPercent(100);
+        applyProjectToScreen(project);
+        window.setTimeout(() => setTaskProgressPercent(null), 600);
+      } else {
+        setTaskProgressPercent(null);
+        applyProjectToScreen(project, { suppressStatusMessage: true });
+      }
       clearProjectNavigationProject(projectId);
       if (projectQueryRetryTimerRef.current) {
         window.clearTimeout(projectQueryRetryTimerRef.current);
@@ -2214,10 +2266,14 @@ const SceneStudioPage: React.FC = () => {
     if (isVideoGenerating) return null;
 
     const renderableAssets = [...assetsRef.current];
+    const existingPreviewUrl = finalVideoUrl;
+    const existingPreviewStatus = previewVideoStatus;
+    const existingPreviewMessage = previewVideoMessage;
     const sceneVideoCount = renderableAssets.filter((asset) => Boolean(asset.videoData)).length;
     const hasSceneOutputs = renderableAssets.some((asset) => Boolean(asset.imageData || asset.videoData || asset.audioData));
     const hasBackgroundOutputs = effectiveBackgroundTracks.some((track) => Boolean(track?.audioData));
     const shouldStartWithStaticFallback = !hasSceneOutputs && !hasBackgroundOutputs;
+    const subtitlePreset = currentProjectSummary?.subtitlePreset || buildDefaultSubtitlePreset();
 
     if (!renderableAssets.length) {
       const message = '합칠 씬이 아직 없어 결과 미리보기를 만들 수 없습니다.';
@@ -2262,12 +2318,39 @@ const SceneStudioPage: React.FC = () => {
       setIsVideoGenerating(true);
       if (!downloadFile) {
         setIsPreparingPreviewVideo(true);
-        setFinalVideoUrl((previous) => {
-          if (previous) URL.revokeObjectURL(previous);
-          return null;
-        });
-        setFinalVideoDuration(null);
       }
+      if (downloadFile) {
+        setTaskProgressPercent(12);
+        setProgressMessage('ffmpeg로 완성형 MP4를 정리하는 중입니다.');
+        const finalResult = await renderVideoWithFfmpeg({
+          assets: assetsRef.current,
+          backgroundTracks: effectiveBackgroundTracks,
+          previewMix,
+          aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
+          qualityMode,
+          enableSubtitles,
+          subtitlePreset,
+          title: renderTitle(),
+        });
+        setTaskProgressPercent(92);
+        triggerBlobDownload(finalResult.videoBlob, `mp4Creater_${enableSubtitles ? 'sub' : 'nosub'}_${Date.now()}.mp4`);
+        setProgressMessage('완성형 MP4 저장이 완료되었습니다.');
+        setTaskProgressPercent(100);
+
+        if (resolvedProjectId) {
+          await persistSceneStudioSnapshot(resolvedProjectId, {
+            ...buildProjectEnhancementPatch(assetsRef.current, {
+              encodingMode: 'ffmpeg',
+            }),
+          });
+        }
+
+        return {
+          videoBlob: finalResult.videoBlob,
+          recordedSubtitles: [],
+        };
+      }
+
       setTaskProgressPercent(8);
       setPreviewVideoStatus('loading');
 
@@ -2384,7 +2467,7 @@ const SceneStudioPage: React.FC = () => {
         setPreviewVideoMessage(invalidDurationMessage);
         setProgressMessage(invalidDurationMessage);
 
-        finalResult = await generateVideoStaticFallback(
+        const safeFallbackResult = await generateVideoStaticFallback(
           assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
           progressHandler,
           isAbortedRef,
@@ -2396,6 +2479,8 @@ const SceneStudioPage: React.FC = () => {
             aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
           }
         );
+        if (!safeFallbackResult) return null;
+        finalResult = safeFallbackResult;
       }
 
       const safeMeasuredDuration = await measureRenderedVideoDuration(finalResult.videoBlob);
@@ -2471,17 +2556,33 @@ const SceneStudioPage: React.FC = () => {
     } catch (error) {
       console.error('[SceneStudioPage] merged render failed', error);
       const failureMessage = '브라우저에서 합본 영상을 만드는 중 문제가 발생했습니다. 다시 시도하거나 씬 수를 줄여 확인해 주세요.';
-      setPreviewVideoStatus('error');
-      setPreviewVideoMessage(failureMessage);
-      setProgressMessage(failureMessage);
-      setFinalVideoDuration(null);
+      const resolvedFailureMessage = downloadFile
+        ? (isFfmpegUnavailableError(error)
+          ? '완성형 MP4 출력에 필요한 ffmpeg를 찾지 못했습니다. ffmpeg 설치 또는 FFMPEG_PATH 설정이 필요합니다.'
+          : error instanceof Error && error.message
+            ? error.message
+            : '완성형 MP4 출력 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.')
+        : failureMessage;
+      if (downloadFile) {
+        setProgressMessage(resolvedFailureMessage);
+        setPreviewVideoMessage(resolvedFailureMessage);
+      } else if (existingPreviewUrl && (existingPreviewStatus === 'ready' || existingPreviewStatus === 'fallback')) {
+        setPreviewVideoStatus(existingPreviewStatus);
+        setPreviewVideoMessage(existingPreviewMessage);
+        setProgressMessage(resolvedFailureMessage);
+      } else {
+        setPreviewVideoStatus('error');
+        setPreviewVideoMessage(resolvedFailureMessage);
+        setProgressMessage(resolvedFailureMessage);
+        setFinalVideoDuration(null);
+      }
       return null;
     } finally {
       setIsVideoGenerating(false);
       if (!downloadFile) setIsPreparingPreviewVideo(false);
       window.setTimeout(() => setTaskProgressPercent(null), 1200);
     }
-  }, [buildProjectEnhancementPatch, draft.aspectRatio, draft.topic, effectiveBackgroundTracks, isVideoGenerating, openApiModal, persistSceneStudioSnapshot, previewMix, resolvedProjectId]);
+  }, [buildProjectEnhancementPatch, currentProjectSummary?.subtitlePreset, draft.aspectRatio, draft.topic, effectiveBackgroundTracks, finalVideoUrl, isVideoGenerating, openApiModal, persistSceneStudioSnapshot, previewMix, previewVideoMessage, previewVideoStatus, resolvedProjectId]);
 
   const handleRegenerateImage = async (index: number) => {
     if (!acquireSceneActionLock(index, 'image')) return;
@@ -2942,12 +3043,17 @@ const SceneStudioPage: React.FC = () => {
         ...item,
         selected: index === 0,
       }));
+      const nextWorkflowDraft = buildSceneStudioWorkflowDraft(draft, generatedData);
+      const projectEnhancementPatch = buildProjectEnhancementPatch(generatedData, {
+        thumbnailPrompt: sampleThumbnail.prompt,
+      });
 
       await updateProject(currentProjectId, {
+        ...projectEnhancementPatch,
         assets: generatedData,
         backgroundMusicTracks,
         previewMix,
-        workflowDraft: draft,
+        workflowDraft: nextWorkflowDraft,
         thumbnail: nextThumbnail,
         thumbnailTitle: sampleThumbnail.title,
         thumbnailPrompt: sampleThumbnail.prompt,
@@ -2959,7 +3065,7 @@ const SceneStudioPage: React.FC = () => {
     } finally {
       setIsThumbnailGenerating(false);
     }
-  }, [backgroundMusicTracks, buildReferenceImages, currentProjectId, draft, generatedData, isThumbnailGenerating, previewMix, studioState?.routing?.audioModel, studioState?.routing?.imageModel]);
+  }, [backgroundMusicTracks, buildProjectEnhancementPatch, buildReferenceImages, buildSceneStudioWorkflowDraft, currentProjectId, draft, generatedData, isThumbnailGenerating, previewMix, studioState?.routing?.audioModel, studioState?.routing?.imageModel]);
 
 
   const renderSummarySection = () => {
@@ -3058,6 +3164,17 @@ const SceneStudioPage: React.FC = () => {
         </div>
       );
     }
+    const step2Summary = (summaryJsonBySection.step6.usedInputs.step2 || {}) as {
+      resolvedTopic?: string;
+      selections?: {
+        genre?: string;
+        mood?: string;
+        setting?: string;
+        protagonist?: string;
+        conflict?: string;
+        endingTone?: string;
+      };
+    };
     return (
       <div className="space-y-4">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -3069,8 +3186,8 @@ const SceneStudioPage: React.FC = () => {
         <div className="rounded-2xl border border-slate-200 bg-white p-4">
           <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">씬 제작으로 넘기는 핵심 값</div>
           <div className="mt-3 space-y-3 text-sm leading-6 text-slate-700">
-            <div><span className="font-black text-slate-900">기본:</span> {getContentTypeLabel(draft.contentType)} · {draft.aspectRatio} · 주제 {summaryJsonBySection.step6.usedInputs.step2.resolvedTopic || '미입력'}</div>
-            <div><span className="font-black text-slate-900">2단계 입력:</span> 장르 {summaryJsonBySection.step6.usedInputs.step2.selections?.genre || '미입력'} · 분위기 {summaryJsonBySection.step6.usedInputs.step2.selections?.mood || '미입력'} · 배경 {summaryJsonBySection.step6.usedInputs.step2.selections?.setting || '미입력'} · 주인공 {summaryJsonBySection.step6.usedInputs.step2.selections?.protagonist || '미입력'} · 갈등 {summaryJsonBySection.step6.usedInputs.step2.selections?.conflict || '미입력'} · 결말 {summaryJsonBySection.step6.usedInputs.step2.selections?.endingTone || '미입력'}</div>
+            <div><span className="font-black text-slate-900">기본:</span> {getContentTypeLabel(draft.contentType)} · {draft.aspectRatio} · 주제 {step2Summary.resolvedTopic || '미입력'}</div>
+            <div><span className="font-black text-slate-900">2단계 입력:</span> 장르 {step2Summary.selections?.genre || '미입력'} · 분위기 {step2Summary.selections?.mood || '미입력'} · 배경 {step2Summary.selections?.setting || '미입력'} · 주인공 {step2Summary.selections?.protagonist || '미입력'} · 갈등 {step2Summary.selections?.conflict || '미입력'} · 결말 {step2Summary.selections?.endingTone || '미입력'}</div>
             <div><span className="font-black text-slate-900">대본 소스:</span> {draft.scriptGenerationMeta?.source === 'ai' ? 'AI 생성' : draft.scriptGenerationMeta?.source === 'sample' ? '샘플 생성' : draft.script?.trim() ? '직접 입력 / 수정' : '미생성'} · 프롬프트 카드 {summaryPromptTransfer.selectedPromptTemplateName || '없음'}</div>
             <div><span className="font-black text-slate-900">선택 출연자:</span> {summaryCharacters.map((item) => item.name).join(', ') || '없음'}</div>
             <div><span className="font-black text-slate-900">캐릭터 스타일:</span> {draft.selectedCharacterStyleLabel || '미선택'}</div>

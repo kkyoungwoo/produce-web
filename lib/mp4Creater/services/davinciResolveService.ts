@@ -1,4 +1,5 @@
 import { BackgroundMusicTrack, GeneratedAsset, PreviewMixSettings } from '../types';
+import { resolveAssetPlaybackDuration } from './projectEnhancementService';
 import { extensionFromMime, parseDataUrl, triggerBlobDownload } from '../utils/downloadHelpers';
 
 interface DavinciSceneRecord {
@@ -214,7 +215,7 @@ function buildSceneSrt(asset: GeneratedAsset): string {
   }
   const text = `${asset.subtitleData?.fullText || asset.narration || ''}`.trim();
   if (!text) return '';
-  const duration = Math.max(asset.audioDuration || 0, asset.targetDuration || 0, 3);
+  const duration = resolveAssetPlaybackDuration(asset, { minimum: 1, fallbackNarrationEstimate: true, preferTargetDuration: true });
   return `1\n${formatSrtTime(0)} --> ${formatSrtTime(duration)}\n${text}\n`;
 }
 
@@ -224,7 +225,7 @@ function buildMasterSrt(assets: GeneratedAsset[]): string {
   const rows: string[] = [];
   assets.forEach((asset) => {
     const text = `${asset.subtitleData?.fullText || asset.narration || ''}`.trim();
-    const duration = Math.max(asset.audioDuration || 0, asset.targetDuration || 0, 3);
+    const duration = resolveAssetPlaybackDuration(asset, { minimum: 1, fallbackNarrationEstimate: true, preferTargetDuration: true });
     if (text) rows.push(`${index++}\n${formatSrtTime(pointer)} --> ${formatSrtTime(pointer + duration)}\n${text}\n`);
     pointer += duration;
   });
@@ -319,7 +320,7 @@ function buildPackageManifest(options: { assets: GeneratedAsset[]; topic: string
     const sceneNumber = asset.sceneNumber || index + 1;
     const sceneNo = String(sceneNumber).padStart(3, '0');
     const visualType = resolveVisualType(asset);
-    const duration = Math.max(asset.audioDuration || 0, asset.targetDuration || 0, 3);
+    const duration = resolveAssetPlaybackDuration(asset, { minimum: 1, fallbackNarrationEstimate: true, preferTargetDuration: true });
     const timelineStartSec = timelinePointer;
     const timelineEndSec = timelinePointer + duration;
     timelinePointer = timelineEndSec;

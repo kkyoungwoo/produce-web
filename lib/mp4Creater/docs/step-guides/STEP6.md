@@ -14,6 +14,9 @@
 - 대본 발화 구간은 입모양 싱크를 우선합니다.
 - 문단 설정 내부 `해당 내용 적용` 버튼은 현재 문단 편집값으로 이미지와 영상을 다시 생성하는 버튼입니다.
 - Thumbnail Studio는 현재 씬 결과를 참조해 새 생성과 유사 재생성을 분리합니다.
+- Step6 저장본은 `rolePrompts` 기준으로 대본 / 캐릭터 / 스타일 / 장면 / 영상 / 배경음 / 썸네일 프롬프트를 각각 분리해 남겨야 합니다.
+- 배경음은 Step2 분위기, Step3 감정선, Step6 실제 scene flow를 따로 유지한 채 prompt를 조립해야 합니다.
+- 썸네일은 Step1~Step6 전체를 종합한 프로젝트 대표 결과물로 저장되어야 하며, 현재 실제 씬 결과와 이질감이 나면 안 됩니다.
 
 ## Step6 Save/Render Guard
 - Paragraph edit, add/delete, and preview-setting changes must write the Step6 working snapshot immediately.
@@ -26,6 +29,7 @@
 - Deleted scenes must not be restored from an older snapshot.
 - Preview/final render must flush pending Step6 saves and merge the current paragraph order, duration, and media from the latest working copy.
 - Project import must rebuild the Step6 snapshot cache from imported project JSON so imported Step6 scene cards reopen with the same structure before later rehydration finishes.
+- Step6 project save must keep `project.prompts.backgroundMusicPrompt`, `project.prompts.backgroundMusicPromptSections`, `project.prompts.rolePrompts`, and the latest thumbnail prompt summary aligned with the visible cards.
 
 ## Step6 Stable Dev Guard
 - Step5 -> Step6 transition currently depends on `App.tsx` writing the newest draft/scene snapshot before route push. Keep this behavior when adding or changing AI features.
@@ -43,6 +47,10 @@
 - Image generation path: `lib/mp4Creater/services/imageService.ts`
 
 ## Final Render Invariants
+- Final MP4 export must go through `app/api/mp4Creater/render/route.ts` so the delivered file is ffmpeg-rendered, seekable, and finalized with `faststart`.
+- If a scene has `selectedVisualType === 'video'` and `videoData`, final export must use that scene video instead of collapsing back to a still image.
+- Once Step6 preview render succeeds, reopen must keep showing that last rendered preview until the user clicks render again; edit invalidation can change the message, but must not clear the stored preview video itself.
+- The preview page progress card must appear only during preview render or final MP4 export, not merely because the page reopened with a saved render result.
 - Scene cards exist하면 이미지, 영상, 오디오가 하나도 없어도 결과보기의 `합본 영상 렌더링` 버튼은 반드시 동작해야 합니다.
 - 비주얼 우선순위는 `씬 영상 > 씬 이미지 > 검정 화면`입니다. 이미지와 영상이 모두 없으면 해당 씬은 검정 화면으로 `targetDuration` 또는 계산된 씬 길이만큼 유지합니다.
 - 오디오 우선순위는 `씬 나레이션 오디오 + 배경음`이며, 둘 다 없어도 무음 상태로 합본이 계속 진행되어야 합니다. 오디오가 전혀 없어도 MediaRecorder/브라우저 캡처가 깨지지 않도록 무음 트랙을 유지합니다.

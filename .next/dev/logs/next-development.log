@@ -1,1842 +1,1646 @@
-[00:00:01.562] Server  LOG     ✓ Ready in 1343ms
-[00:00:07.406] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:00:13.950] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:00:14.058] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:00:14.198] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:00:15.619] Server  LOG     ○ Compiling /api/local-storage/project ...
-[00:01:12.424] Browser ERROR   [ffmpegExportService] mp4 normalize failed ErrnoError: FS error
-[00:02:05.955] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:06.076] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:08.808] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:08.935] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:09.488] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:09.596] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:27.286] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:28.103] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:28.196] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:28.345] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:54.008] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:54.087] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:02:54.197] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:03:00.904] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:03:00.994] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:03:01.099] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:03:10.496] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:03:10.695] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:03:10.797] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:03:31.752] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:03:31.867] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:04:32.690] Browser ERROR   [ffmpegExportService] mp4 normalize failed ErrnoError: FS error
-[00:05:26.163] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:05:26.457] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:05:26.572] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:05:30.566] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:05:30.679] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:05:39.844] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:05:39.845] Browser ERROR   In HTML, %s cannot be a descendant of <%s>.
-This will cause a hydration error.%s <button> button 
-
-  ...
-    <InnerLayoutRouter url="/mp4Create..." tree={[...]} params={{}} cacheNode={{rsc:Promise, ...}} segmentPath={[...]} ...>
-      <SegmentViewNode type="page" pagePath="mp4Creater...">
-        <SegmentTrieNode>
-        <Page>
-          <ThumbnailStudioPage>
-            <div className="min-h-scre...">
-              <Header>
-              <main className="mx-auto ma...">
-                <section>
-                <div className="mt-4 grid ...">
-                  <section>
-                  <section className="overflow-h...">
-                    <div className="flex h-ful...">
-                      <div>
-                      <div className="mt-4 flex ...">
-                        <div className="flex min-h...">
-                          <div>
-                          <div ref={{...}} onWheel={function ThumbnailStudioPage.useCallback[handleStripWheel]} ...>
-                            <div ref={function ref} onClick={function onClick} className="w-[360px] ...">
->                             <button
->                               type="button"
->                               onClick={function onClick}
->                               className="block w-full overflow-hidden border-b border-slate-200 bg-slate-100"
->                             >
-                                <span>
->                               <button
->                                 type="button"
->                                 onClick={function onClick}
->                                 className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg..."
->                               >
-                                ...
-                              ...
-              ...
-      ...
-
-[00:05:40.026] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:05:40.131] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:11:54.158] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:11:54.288] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:12:08.352] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:12:08.776] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:12:08.852] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:12:09.009] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:13:06.223] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 1 failed ErrnoError: FS error
-[00:13:06.442] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 2 failed ErrnoError: FS error
-[00:13:06.442] Browser ERROR   [ffmpegExportService] mp4 normalize failed ErrnoError: FS error
-[00:14:19.981] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:20.152] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:22.006] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:22.298] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:22.404] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:22.584] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:22.844] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:22.946] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:23.259] Browser ERROR   uncaughtError: ReferenceError: canScrollLeft is not defined
-[00:14:26.894] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
-[00:14:26.895] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:27.236] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:27.331] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:27.506] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:27.923] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:14:28.087] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[00:14:28.087] Browser ERROR   In HTML, %s cannot be a descendant of <%s>.
-This will cause a hydration error.%s <button> button 
-
-  ...
-    <InnerLayoutRouter url="/mp4Create..." tree={[...]} params={{}} cacheNode={{rsc:<Fragment>, ...}} segmentPath={[...]} ...>
-      <SegmentViewNode type="page" pagePath="mp4Creater...">
-        <SegmentTrieNode>
-        <Page>
-          <ThumbnailStudioPage>
-            <div className="min-h-scre...">
-              <Header>
-              <main className="mx-auto ma...">
-                <section>
-                <div className="mt-4 grid ...">
-                  <section>
-                  <section className="overflow-h...">
-                    <div className="flex h-ful...">
-                      <div>
-                      <div className="mt-4 flex ...">
-                        <div className="flex min-h...">
-                          <div>
-                          <div ref={{current:null}} onWheel={function ThumbnailStudioPage.useCallback[handleStripWheel]} ...>
-                            <div ref={function ref} onClick={function onClick} className="w-[360px] ...">
->                             <button
->                               type="button"
->                               onClick={function onClick}
->                               className="block w-full overflow-hidden border-b border-slate-200 bg-slate-100"
->                             >
-                                <span>
->                               <button
->                                 type="button"
->                                 onClick={function onClick}
->                                 className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg..."
->                               >
-                                ...
-                              ...
-              ...
-      ...
-
-[00:14:33.744] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
-[00:14:33.744] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:33.744] Browser ERROR   uncaughtError: ReferenceError: canScrollLeft is not defined
-[00:14:34.082] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:34.186] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:34.340] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:34.769] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:14:34.926] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[00:14:34.926] Browser ERROR   uncaughtError: ReferenceError: canScrollLeft is not defined
-[00:14:35.219] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
-[00:14:35.219] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:35.537] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:35.602] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:35.768] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:36.131] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:14:36.288] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[00:14:36.288] Browser ERROR   In HTML, %s cannot be a descendant of <%s>.
-This will cause a hydration error.%s <button> button 
-
-  ...
-    <InnerLayoutRouter url="/mp4Create..." tree={[...]} params={{}} cacheNode={{rsc:<Fragment>, ...}} segmentPath={[...]} ...>
-      <SegmentViewNode type="page" pagePath="mp4Creater...">
-        <SegmentTrieNode>
-        <Page>
-          <ThumbnailStudioPage>
-            <div className="min-h-scre...">
-              <Header>
-              <main className="mx-auto ma...">
-                <section>
-                <div className="mt-4 grid ...">
-                  <section>
-                  <section className="overflow-h...">
-                    <div className="flex h-ful...">
-                      <div>
-                      <div className="mt-4 flex ...">
-                        <div className="flex min-h...">
-                          <div>
-                          <div ref={{current:null}} onWheel={function ThumbnailStudioPage.useCallback[handleStripWheel]} ...>
-                            <div ref={function ref} onClick={function onClick} className="w-[360px] ...">
->                             <button
->                               type="button"
->                               onClick={function onClick}
->                               className="block w-full overflow-hidden border-b border-slate-200 bg-slate-100"
->                             >
-                                <span>
->                               <button
->                                 type="button"
->                                 onClick={function onClick}
->                                 className="mt-3 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg..."
->                               >
-                                ...
-                              ...
-              ...
-      ...
-
-[00:14:40.948] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:41.157] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:14:41.268] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:17:15.352] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:17:15.751] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:17:15.839] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:17:16.003] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:17:29.317] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:17:29.617] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:17:29.725] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:17:30.129] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:17:30.418] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:17:30.539] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:18:46.057] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:18:46.592] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:18:46.763] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:19:45.068] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 1 failed {}
-[00:19:45.069] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 2 failed {}
-[00:19:45.069] Browser ERROR   [ffmpegExportService] mp4 normalize failed {}
-[00:21:19.005] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:21:19.388] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:21:19.516] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:21:22.445] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:21:22.675] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:21:22.789] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:33:42.288] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:33:42.573] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:33:43.279] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:33:43.279] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:33:47.982] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:33:48.089] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:33:51.920] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:33:52.059] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[00:34:06.552] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:34:06.745] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:34:06.858] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:34:07.126] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:34:07.426] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:34:07.533] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:35:08.718] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 1 failed ErrnoError: FS error
-[00:35:08.918] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 2 failed ErrnoError: FS error
-[00:35:08.918] Browser ERROR   [ffmpegExportService] mp4 normalize failed ErrnoError: FS error
-[00:42:15.109] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:15.299] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:15.487] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:15.592] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:17.622] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:42:17.688] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:17.737] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[00:42:17.947] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:18.052] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:19.373] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:19.560] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:19.624] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:19.662] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:20.236] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:20.385] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:22.771] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:23.219] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:23.461] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:23.601] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:23.737] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:26.015] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:26.450] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:26.711] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:26.868] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:26.981] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:28.591] Browser WARN    [Prompt Translation] script composer request translation skipped: {}
-[00:42:31.656] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:32.222] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:32.560] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:32.714] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:32.817] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:37.087] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:38.233] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:38.454] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:42:38.589] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:43:12.729] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 1 failed {}
-[00:43:12.864] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 2 failed {}
-[00:43:12.864] Browser ERROR   [ffmpegExportService] mp4 normalize failed {}
-[00:43:42.549] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:43:42.665] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[00:50:21.049] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:50:21.433] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:50:21.630] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:50:21.973] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:50:22.132] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:50:22.132] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:50:22.353] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:50:22.612] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:50:22.695] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[00:50:23.228] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:50:23.357] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[00:50:25.425] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:50:25.562] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[00:50:56.419] Browser ERROR   [ffmpegExportService] mp4 normalize attempt 1 failed {}
-[00:50:56.419] Browser ERROR   [SceneStudioPage] merged render failed {}
-[01:04:37.770] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:04:37.910] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:04:38.087] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:04:38.160] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:04:38.293] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:04:38.664] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:04:38.764] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:04:38.905] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:04:39.661] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:04:39.787] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[01:06:21.694] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:06:22.519] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:06:22.640] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:06:45.562] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:06:45.695] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[01:19:01.075] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:19:01.500] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:19:01.659] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:19:01.866] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:19:02.207] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:19:02.293] Server  ERROR   ⨯ Error: aborted
-[01:19:02.581] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:19:02.708] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[01:19:02.719] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:19:03.108] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:19:03.258] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:19:03.370] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:34.056] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:34.584] Browser ERROR   The final argument passed to %s changed size between renders. The order and size of this array must remain constant.
-
-Previous: %s
-Incoming: %s useEffect [blob:http://localhost:3000/ca7bf052-0169-498f-b425-553a096e7405] [28.23, blob:http://localhost:3000/ca7bf052-0169-498f-b425-553a096e7405]
-[01:26:34.799] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:34.933] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:35.597] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:35.914] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:35.997] Server  ERROR   ⨯ Error: aborted
-[01:26:36.607] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:26:36.740] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[01:26:36.756] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:37.212] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:37.381] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:37.486] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:44.463] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:26:44.588] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[01:26:49.222] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[01:26:49.341] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-[01:26:50.166] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:50.649] Server  WARN    ⚠ ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:26:50.779] Browser WARN    ./node_modules/@huggingface/transformers/dist/transformers.web.js
-Critical dependency: Accessing import.meta directly is unsupported (only property access or destructuring is supported)
-
-Import trace for requested module:
-./node_modules/@huggingface/transformers/dist/transformers.web.js
-./lib/mp4Creater/services/chatterboxBrowserTtsService.ts
-./lib/mp4Creater/services/ttsService.ts
-./lib/mp4Creater/components/SettingsDrawer.tsx
-./lib/mp4Creater/App.tsx
-./app/mp4Creater/ClientOnlyApp.tsx
-[01:42:54.090] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:02.058] Server  LOG     ✓ Ready in 1838ms
+[00:00:06.986] Server  LOG     ○ Compiling / ...
+[00:00:09.987] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:13.263] Server  LOG     ○ Compiling /mp4Creater ...
+[00:17:19.457] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:42:20.909] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:42:39.225] Browser WARN    [Prompt Translation] script composer request translation skipped: {}
+[00:42:49.337] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:42:49.337] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:42:49.577] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:42:53.239] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:42:53.410] Server  ERROR   ⨯ ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:42:53.446] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/services/exportService.ts
+./lib/mp4Creater/components/scene-studio/SceneStudioPreviewPage.tsx
+./lib/mp4Creater/components/ResultTable.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:42:58.358] Server  LOG     
+[00:42:58.359] Server  LOG     Could not open App.tsx in the editor.
+[00:42:58.359] Server  LOG     
+[00:42:58.359] Server  LOG     To set up the editor integration, add something like REACT_EDITOR=atom to the .env.local file in your project folder and restart the development server.
+[00:42:58.359] Server  LOG     
+[00:43:00.896] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:43:01.525] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:43:02.006] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/services/exportService.ts
+./lib/mp4Creater/components/scene-studio/SceneStudioPreviewPage.tsx
+./lib/mp4Creater/components/ResultTable.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:43:02.006] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:43:02.285] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:43:02.645] Server  ERROR   ⨯ ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:43:02.840] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:43:03.139] Browser ERROR   uncaughtError: ModuleParseError: Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+File was processed with these loaders:
+ * ./node_modules/next/dist/compiled/@next/react-refresh-utils/dist/loader.js
+ * ./node_modules/next/dist/build/webpack/loaders/next-flight-client-module-loader.js
+ * ./node_modules/next/dist/build/webpack/loaders/next-swc-loader.js
+You may need an additional loader to handle the result of these loaders.
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+[00:43:03.251] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+[00:43:03.720] Server  LOG     ○ Compiling /_error ...
+[00:43:08.279] Browser ERROR   uncaughtError: ModuleParseError: Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+File was processed with these loaders:
+ * ./node_modules/next/dist/compiled/@next/react-refresh-utils/dist/loader.js
+ * ./node_modules/next/dist/build/webpack/loaders/next-flight-client-module-loader.js
+ * ./node_modules/next/dist/build/webpack/loaders/next-swc-loader.js
+You may need an additional loader to handle the result of these loaders.
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+[00:43:08.381] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+[00:43:10.712] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Module parse failed: Identifier 'recorderStopDelayMs' has already been declared (437:10)
+|     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     const DEFAULT_DURATION = 1;
+>     const recorderStopDelayMs = getRecorderStopDelayMs(renderProfile.fps);
+|     for(let i = 0; i < validAssets.length; i += 1){
+|         const asset = validAssets[i];
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:43:11.701] Server  WARN    ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+[00:43:12.259] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:43:12.497] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:43:12.497] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:43:12.652] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:43:13.234] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:43:13.444] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:43:13.444] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:43:13.611] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:43:14.463] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:43:14.935] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:43:14.935] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:43:14.935] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:43:15.166] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:47:50.361] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Error:   × Expected ';', '}' or <eof>
+     ╭─[C:\Users\gorhr\OneDrive\문서\GitHub\produce-web\lib\mp4Creater\services\videoService.ts:136:1]
+ 133 │         cursor = cursor.slice(sliceIndex).trim();
+ 134 │       }
+ 135 │       if (cursor && chunks.length >= maxLines) {
+ 136 │ ╭─▶     chunks[maxLines - 1] = `${chunks[maxLines - 1].slice(0, Math.max(0, maxChars - 1)).trim()}??;
+ 137 │ │     }
+ 138 │ │     return chunks.filter(Boolean);
+ 139 │ │   }
+ 140 │ │   
+ 141 │ │   function buildScenePlaceholderDataUrl(_asset: GeneratedAsset, _sceneIndex: number, width: number, height: number): string {
+ 142 │ │     const canvas = document.createElement('canvas');
+ 143 │ │     canvas.width = Math.max(320, width);
+ 144 │ │     canvas.height = Math.max(320, height);
+ 145 │ │     const ctx = canvas.getContext('2d', { alpha: false });
+ 146 │ │     if (!ctx) return '';
+ 147 │ │   
+ 148 │ │     ctx.fillStyle = '#000000';
+ 149 │ │     ctx.fillRect(0, 0, canvas.width, canvas.height);
+ 150 │ │     return canvas.toDataURL('image/png');
+ 151 │ │   }
+ 152 │ │   
+ 153 │ │   function isRenderableSceneAsset(asset: GeneratedAsset | null | undefined): asset is GeneratedAsset {
+ 154 │ │     return Boolean(asset);
+ 155 │ │   }
+ 156 │ │   
+ 157 │ │   async function prepareSceneImage(
+ 158 │ │     img: HTMLImageElement,
+ 159 │ │     asset: GeneratedAsset,
+ 160 │ │     sceneIndex: number,
+ 161 │ │     renderProfile: RenderProfile,
+ 162 │ │   ): Promise<void> {
+ 163 │ │     const placeholder = buildScenePlaceholderDataUrl(asset, sceneIndex, renderProfile.width, renderProfile.height);
+ 164 │ │     try {
+ 165 │ │       if (!asset.imageData) throw new Error('Image source missing');
+ 166 │ │       await loadSceneImage(img, asset, sceneIndex);
+ 167 │ │     } catch {
+ 168 │ │       await new Promise<void>((resolve, reject) => {
+ 169 │ │         img.onload = () => resolve();
+ 170 │ │         img.onerror = () => reject(new Error('Placeholder image load failed'));
+ 171 │ │         img.src = placeholder;
+ 172 │ │       });
+ 173 │ │     }
+ 174 │ │   }
+ 175 │ │   
+ 176 │ │   function attachSilentAudioBed(
+ 177 │ │     audioCtx: AudioContext,
+ 178 │ │     destination: MediaStreamAudioDestinationNode,
+ 179 │ │     totalDuration: number,
+ 180 │ │   ) {
+ 181 │ │     const oscillator = audioCtx.createOscillator();
+ 182 │ │     const gainNode = audioCtx.createGain();
+ 183 │ │     oscillator.type = 'sine';
+ 184 │ │     oscillator.frequency.value = 220;
+ 185 │ │     gainNode.gain.value = 0.00001;
+ 186 │ │     oscillator.connect(gainNode);
+ 187 │ │     gainNode.connect(destination);
+ 188 │ │     return {
+ 189 │ │       start(startAt: number) {
+ 190 │ │         oscillator.start(startAt);
+ 191 │ │         oscillator.stop(startAt + Math.max(1, totalDuration) + 0.6);
+ 192 │ │       },
+ 193 │ │     };
+ 194 │ │   }
+ 195 │ │   
+ 196 │ │   /**
+ 197 │ │    * ?뚮뜑留?怨쇰???諛⑹????꾨줈?뚯씪
+ 198 │ │    * - ???섍? 留롮쓣?섎줉 ?댁긽?꾩? FPS瑜???떠 CPU/GPU ?쒓컙 ?쇳겕瑜?以꾩엯?덈떎.
+ 199 │ │    * - ?ъ슜?먭? 釉뚮씪?곗??먯꽌 吏곸젒 ?뚮뜑留곹븯誘濡??덉쟾??湲곕낯媛믪쓣 ?곗꽑?⑸땲??
+ 200 │ │    */
+ 201 │ │   function resolveRenderProfile(
+ 202 │ │     sceneCount: number,
+ 203 │ │     aspectRatio: AspectRatio = '16:9',
+ 204 │ │     qualityMode: 'preview' | 'final' = 'preview'
+ 205 │ │   ): RenderProfile {
+ 206 │ │     const profileKey = sceneCount >= 14 ? 'small' : sceneCount >= 8 ? 'medium' : 'large';
+ 207 │ │     const previewProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 208 │ │       '16:9': {
+ 209 │ │         small: { width: 640, height: 360, fps: 18, bitrate: 2_500_000 },
+ 210 │ │         medium: { width: 854, height: 480, fps: 20, bitrate: 3_500_000 },
+ 211 │ │         large: { width: 960, height: 540, fps: 24, bitrate: 4_200_000 },
+ 212 │ │       },
+ 213 │ │       '1:1': {
+ 214 │ │         small: { width: 640, height: 640, fps: 18, bitrate: 2_500_000 },
+ 215 │ │         medium: { width: 800, height: 800, fps: 20, bitrate: 3_500_000 },
+ 216 │ │         large: { width: 960, height: 960, fps: 24, bitrate: 4_200_000 },
+ 217 │ │       },
+ 218 │ │       '9:16': {
+ 219 │ │         small: { width: 360, height: 640, fps: 18, bitrate: 2_500_000 },
+ 220 │ │         medium: { width: 480, height: 854, fps: 20, bitrate: 3_500_000 },
+ 221 │ │         large: { width: 540, height: 960, fps: 24, bitrate: 4_200_000 },
+ 222 │ │       },
+ 223 │ │     };
+ 224 │ │   
+ 225 │ │     const finalProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 226 │ │       '16:9': {
+ 227 │ │         small: { width: 1280, height: 720, fps: 24, bitrate: 6_500_000 },
+ 228 │ │         medium: { width: 1600, height: 900, fps: 24, bitrate: 8_000_000 },
+ 229 │ │         large: { width: 1920, height: 1080, fps: 30, bitrate: 10_000_000 },
+ 230 │ │       },
+ 231 │ │       '1:1': {
+ 232 │ │         small: { width: 1080, height: 1080, fps: 24, bitrate: 6_500_000 },
+ 233 │ │         medium: { width: 1440, height: 1440, fps: 24, bitrate: 8_000_000 },
+ 234 │ │         large: { width: 1920, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 235 │ │       },
+ 236 │ │       '9:16': {
+ 237 │ │         small: { width: 720, height: 1280, fps: 24, bitrate: 6_500_000 },
+ 238 │ │         medium: { width: 900, height: 1600, fps: 24, bitrate: 8_000_000 },
+ 239 │ │         large: { width: 1080, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 240 │ │       },
+ 241 │ │     };
+ 242 │ │   
+ 243 │ │     const sourceProfiles = qualityMode === 'final' ? finalProfiles : previewProfiles;
+ 244 │ │     return sourceProfiles[aspectRatio]?.[profileKey] || sourceProfiles['16:9'][profileKey];
+ 245 │ │   }
+ 246 │ │   
+ 247 │ │   interface PreparedScene {
+ 248 │ │     img: HTMLImageElement;
+ 249 │ │     video: HTMLVideoElement | null;  // ?좊땲硫붿씠???곸긽 (?덉쑝硫??대?吏 ????ъ슜)
+ 250 │ │     isAnimated: boolean;             // ?좊땲硫붿씠?????щ?
+ 251 │ │     audioBuffer: AudioBuffer | null;
+ 252 │ │     subtitleChunks: SubtitleChunk[];  // 誘몃━ 怨꾩궛???먮쭑 泥?겕??
+ 253 │ │     startTime: number;
+ 254 │ │     endTime: number;
+ 255 │ │     duration: number;
+ 256 │ │   }
+ 257 │ │   
+ 258 │ │   /**
+ 259 │ │    * ?먮쭑 ?곗씠?곕? 泥?겕濡?蹂??
+ 260 │ │    * - AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜 (22???댄븯, ?섎? ?⑥쐞)
+ 261 │ │    * - ?놁쑝硫?湲곗〈 ?⑥뼱 ??湲곕컲?쇰줈 ?대갚
+ 262 │ │    */
+ 263 │ │   function createSubtitleChunks(
+ 264 │ │     subtitleData: SubtitleData | null,
+ 265 │ │     config: SubtitleConfig
+ 266 │ │   ): SubtitleChunk[] {
+ 267 │ │     if (!subtitleData || subtitleData.words.length === 0) {
+ 268 │ │       return [];
+ 269 │ │     }
+ 270 │ │   
+ 271 │ │     // AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜
+ 272 │ │     if (subtitleData.meaningChunks && subtitleData.meaningChunks.length > 0) {
+ 273 │ ├─▶     console.log(`[Video] AI ?섎? ?⑥쐞 ?먮쭑 ?ъ슜: ${subtitleData.meaningChunks.length}媛?泥?겕`);
+     · ╰───                         ──
+     · ╰──── This is the expression part of an expression statement
+ 274 │         return subtitleData.meaningChunks.map(chunk => ({
+ 275 │           text: chunk.text,
+ 275 │           startTime: chunk.startTime,
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/services/exportService.ts
+./lib/mp4Creater/components/scene-studio/SceneStudioPreviewPage.tsx
+./lib/mp4Creater/components/ResultTable.tsx
+./lib/mp4Creater/App.tsx
+./app/mp4Creater/ClientOnlyApp.tsx
+[00:47:50.451] Server  ERROR   ⨯ ./lib/mp4Creater/services/videoService.ts
+Error:   × Expected ';', '}' or <eof>
+     ╭─[C:\Users\gorhr\OneDrive\문서\GitHub\produce-web\lib\mp4Creater\services\videoService.ts:136:1]
+ 133 │         cursor = cursor.slice(sliceIndex).trim();
+ 134 │       }
+ 135 │       if (cursor && chunks.length >= maxLines) {
+ 136 │ ╭─▶     chunks[maxLines - 1] = `${chunks[maxLines - 1].slice(0, Math.max(0, maxChars - 1)).trim()}??;
+ 137 │ │     }
+ 138 │ │     return chunks.filter(Boolean);
+ 139 │ │   }
+ 140 │ │   
+ 141 │ │   function buildScenePlaceholderDataUrl(_asset: GeneratedAsset, _sceneIndex: number, width: number, height: number): string {
+ 142 │ │     const canvas = document.createElement('canvas');
+ 143 │ │     canvas.width = Math.max(320, width);
+ 144 │ │     canvas.height = Math.max(320, height);
+ 145 │ │     const ctx = canvas.getContext('2d', { alpha: false });
+ 146 │ │     if (!ctx) return '';
+ 147 │ │   
+ 148 │ │     ctx.fillStyle = '#000000';
+ 149 │ │     ctx.fillRect(0, 0, canvas.width, canvas.height);
+ 150 │ │     return canvas.toDataURL('image/png');
+ 151 │ │   }
+ 152 │ │   
+ 153 │ │   function isRenderableSceneAsset(asset: GeneratedAsset | null | undefined): asset is GeneratedAsset {
+ 154 │ │     return Boolean(asset);
+ 155 │ │   }
+ 156 │ │   
+ 157 │ │   async function prepareSceneImage(
+ 158 │ │     img: HTMLImageElement,
+ 159 │ │     asset: GeneratedAsset,
+ 160 │ │     sceneIndex: number,
+ 161 │ │     renderProfile: RenderProfile,
+ 162 │ │   ): Promise<void> {
+ 163 │ │     const placeholder = buildScenePlaceholderDataUrl(asset, sceneIndex, renderProfile.width, renderProfile.height);
+ 164 │ │     try {
+ 165 │ │       if (!asset.imageData) throw new Error('Image source missing');
+ 166 │ │       await loadSceneImage(img, asset, sceneIndex);
+ 167 │ │     } catch {
+ 168 │ │       await new Promise<void>((resolve, reject) => {
+ 169 │ │         img.onload = () => resolve();
+ 170 │ │         img.onerror = () => reject(new Error('Placeholder image load failed'));
+ 171 │ │         img.src = placeholder;
+ 172 │ │       });
+ 173 │ │     }
+ 174 │ │   }
+ 175 │ │   
+ 176 │ │   function attachSilentAudioBed(
+ 177 │ │     audioCtx: AudioContext,
+ 178 │ │     destination: MediaStreamAudioDestinationNode,
+ 179 │ │     totalDuration: number,
+ 180 │ │   ) {
+ 181 │ │     const oscillator = audioCtx.createOscillator();
+ 182 │ │     const gainNode = audioCtx.createGain();
+ 183 │ │     oscillator.type = 'sine';
+ 184 │ │     oscillator.frequency.value = 220;
+ 185 │ │     gainNode.gain.value = 0.00001;
+ 186 │ │     oscillator.connect(gainNode);
+ 187 │ │     gainNode.connect(destination);
+ 188 │ │     return {
+ 189 │ │       start(startAt: number) {
+ 190 │ │         oscillator.start(startAt);
+ 191 │ │         oscillator.stop(startAt + Math.max(1, totalDuration) + 0.6);
+ 192 │ │       },
+ 193 │ │     };
+ 194 │ │   }
+ 195 │ │   
+ 196 │ │   /**
+ 197 │ │    * ?뚮뜑留?怨쇰???諛⑹????꾨줈?뚯씪
+ 198 │ │    * - ???섍? 留롮쓣?섎줉 ?댁긽?꾩? FPS瑜???떠 CPU/GPU ?쒓컙 ?쇳겕瑜?以꾩엯?덈떎.
+ 199 │ │    * - ?ъ슜?먭? 釉뚮씪?곗??먯꽌 吏곸젒 ?뚮뜑留곹븯誘濡??덉쟾??湲곕낯媛믪쓣 ?곗꽑?⑸땲??
+ 200 │ │    */
+ 201 │ │   function resolveRenderProfile(
+ 202 │ │     sceneCount: number,
+ 203 │ │     aspectRatio: AspectRatio = '16:9',
+ 204 │ │     qualityMode: 'preview' | 'final' = 'preview'
+ 205 │ │   ): RenderProfile {
+ 206 │ │     const profileKey = sceneCount >= 14 ? 'small' : sceneCount >= 8 ? 'medium' : 'large';
+ 207 │ │     const previewProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 208 │ │       '16:9': {
+ 209 │ │         small: { width: 640, height: 360, fps: 18, bitrate: 2_500_000 },
+ 210 │ │         medium: { width: 854, height: 480, fps: 20, bitrate: 3_500_000 },
+ 211 │ │         large: { width: 960, height: 540, fps: 24, bitrate: 4_200_000 },
+ 212 │ │       },
+ 213 │ │       '1:1': {
+ 214 │ │         small: { width: 640, height: 640, fps: 18, bitrate: 2_500_000 },
+ 215 │ │         medium: { width: 800, height: 800, fps: 20, bitrate: 3_500_000 },
+ 216 │ │         large: { width: 960, height: 960, fps: 24, bitrate: 4_200_000 },
+ 217 │ │       },
+ 218 │ │       '9:16': {
+ 219 │ │         small: { width: 360, height: 640, fps: 18, bitrate: 2_500_000 },
+ 220 │ │         medium: { width: 480, height: 854, fps: 20, bitrate: 3_500_000 },
+ 221 │ │         large: { width: 540, height: 960, fps: 24, bitrate: 4_200_000 },
+ 222 │ │       },
+ 223 │ │     };
+ 224 │ │   
+ 225 │ │     const finalProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 226 │ │       '16:9': {
+ 227 │ │         small: { width: 1280, height: 720, fps: 24, bitrate: 6_500_000 },
+ 228 │ │         medium: { width: 1600, height: 900, fps: 24, bitrate: 8_000_000 },
+ 229 │ │         large: { width: 1920, height: 1080, fps: 30, bitrate: 10_000_000 },
+ 230 │ │       },
+ 231 │ │       '1:1': {
+ 232 │ │         small: { width: 1080, height: 1080, fps: 24, bitrate: 6_500_000 },
+ 233 │ │         medium: { width: 1440, height: 1440, fps: 24, bitrate: 8_000_000 },
+ 234 │ │         large: { width: 1920, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 235 │ │       },
+ 236 │ │       '9:16': {
+ 237 │ │         small: { width: 720, height: 1280, fps: 24, bitrate: 6_500_000 },
+ 238 │ │         medium: { width: 900, height: 1600, fps: 24, bitrate: 8_000_000 },
+ 239 │ │         large: { width: 1080, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 240 │ │       },
+ 241 │ │     };
+ 242 │ │   
+ 243 │ │     const sourceProfiles = qualityMode === 'final' ? finalProfiles : previewProfiles;
+ 244 │ │     return sourceProfiles[aspectRatio]?.[profileKey] || sourceProfiles['16:9'][profileKey];
+ 245 │ │   }
+ 246 │ │   
+ 247 │ │   interface PreparedScene {
+ 248 │ │     img: HTMLImageElement;
+ 249 │ │     video: HTMLVideoElement | null;  // ?좊땲硫붿씠???곸긽 (?덉쑝硫??대?吏 ????ъ슜)
+ 250 │ │     isAnimated: boolean;             // ?좊땲硫붿씠?????щ?
+ 251 │ │     audioBuffer: AudioBuffer | null;
+ 252 │ │     subtitleChunks: SubtitleChunk[];  // 誘몃━ 怨꾩궛???먮쭑 泥?겕??
+ 253 │ │     startTime: number;
+ 254 │ │     endTime: number;
+ 255 │ │     duration: number;
+ 256 │ │   }
+ 257 │ │   
+ 258 │ │   /**
+ 259 │ │    * ?먮쭑 ?곗씠?곕? 泥?겕濡?蹂??
+ 260 │ │    * - AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜 (22???댄븯, ?섎? ?⑥쐞)
+ 261 │ │    * - ?놁쑝硫?湲곗〈 ?⑥뼱 ??湲곕컲?쇰줈 ?대갚
+ 262 │ │    */
+ 263 │ │   function createSubtitleChunks(
+ 264 │ │     subtitleData: SubtitleData | null,
+ 265 │ │     config: SubtitleConfig
+ 266 │ │   ): SubtitleChunk[] {
+ 267 │ │     if (!subtitleData || subtitleData.words.length === 0) {
+ 268 │ │       return [];
+ 269 │ │     }
+ 270 │ │   
+ 271 │ │     // AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜
+ 272 │ │     if (subtitleData.meaningChunks && subtitleData.meaningChunks.length > 0) {
+ 273 │ ├─▶     console.log(`[Video] AI ?섎? ?⑥쐞 ?먮쭑 ?ъ슜: ${subtitleData.meaningChunks.length}媛?泥?겕`);
+     · ╰───                         ──
+     · ╰──── This is the expression part of an expression statement
+ 274 │         return subtitleData.meaningChunks.map(chunk => ({
+ 275 │           text: chunk.text,
+ 275 │           startTime: chunk.startTime,
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:48:17.396] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Error:   × Expected ';', '}' or <eof>
+     ╭─[C:\Users\gorhr\OneDrive\문서\GitHub\produce-web\lib\mp4Creater\services\videoService.ts:136:1]
+ 133 │         cursor = cursor.slice(sliceIndex).trim();
+ 134 │       }
+ 135 │       if (cursor && chunks.length >= maxLines) {
+ 136 │ ╭─▶     chunks[maxLines - 1] = `${chunks[maxLines - 1].slice(0, Math.max(0, maxChars - 1)).trim()}??;
+ 137 │ │     }
+ 138 │ │     return chunks.filter(Boolean);
+ 139 │ │   }
+ 140 │ │   
+ 141 │ │   function buildScenePlaceholderDataUrl(_asset: GeneratedAsset, _sceneIndex: number, width: number, height: number): string {
+ 142 │ │     const canvas = document.createElement('canvas');
+ 143 │ │     canvas.width = Math.max(320, width);
+ 144 │ │     canvas.height = Math.max(320, height);
+ 145 │ │     const ctx = canvas.getContext('2d', { alpha: false });
+ 146 │ │     if (!ctx) return '';
+ 147 │ │   
+ 148 │ │     ctx.fillStyle = '#000000';
+ 149 │ │     ctx.fillRect(0, 0, canvas.width, canvas.height);
+ 150 │ │     return canvas.toDataURL('image/png');
+ 151 │ │   }
+ 152 │ │   
+ 153 │ │   function isRenderableSceneAsset(asset: GeneratedAsset | null | undefined): asset is GeneratedAsset {
+ 154 │ │     return Boolean(asset);
+ 155 │ │   }
+ 156 │ │   
+ 157 │ │   async function prepareSceneImage(
+ 158 │ │     img: HTMLImageElement,
+ 159 │ │     asset: GeneratedAsset,
+ 160 │ │     sceneIndex: number,
+ 161 │ │     renderProfile: RenderProfile,
+ 162 │ │   ): Promise<void> {
+ 163 │ │     const placeholder = buildScenePlaceholderDataUrl(asset, sceneIndex, renderProfile.width, renderProfile.height);
+ 164 │ │     try {
+ 165 │ │       if (!asset.imageData) throw new Error('Image source missing');
+ 166 │ │       await loadSceneImage(img, asset, sceneIndex);
+ 167 │ │     } catch {
+ 168 │ │       await new Promise<void>((resolve, reject) => {
+ 169 │ │         img.onload = () => resolve();
+ 170 │ │         img.onerror = () => reject(new Error('Placeholder image load failed'));
+ 171 │ │         img.src = placeholder;
+ 172 │ │       });
+ 173 │ │     }
+ 174 │ │   }
+ 175 │ │   
+ 176 │ │   function attachSilentAudioBed(
+ 177 │ │     audioCtx: AudioContext,
+ 178 │ │     destination: MediaStreamAudioDestinationNode,
+ 179 │ │     totalDuration: number,
+ 180 │ │   ) {
+ 181 │ │     const oscillator = audioCtx.createOscillator();
+ 182 │ │     const gainNode = audioCtx.createGain();
+ 183 │ │     oscillator.type = 'sine';
+ 184 │ │     oscillator.frequency.value = 220;
+ 185 │ │     gainNode.gain.value = 0.00001;
+ 186 │ │     oscillator.connect(gainNode);
+ 187 │ │     gainNode.connect(destination);
+ 188 │ │     return {
+ 189 │ │       start(startAt: number) {
+ 190 │ │         oscillator.start(startAt);
+ 191 │ │         oscillator.stop(startAt + Math.max(1, totalDuration) + 0.6);
+ 192 │ │       },
+ 193 │ │     };
+ 194 │ │   }
+ 195 │ │   
+ 196 │ │   /**
+ 197 │ │    * ?뚮뜑留?怨쇰???諛⑹????꾨줈?뚯씪
+ 198 │ │    * - ???섍? 留롮쓣?섎줉 ?댁긽?꾩? FPS瑜???떠 CPU/GPU ?쒓컙 ?쇳겕瑜?以꾩엯?덈떎.
+ 199 │ │    * - ?ъ슜?먭? 釉뚮씪?곗??먯꽌 吏곸젒 ?뚮뜑留곹븯誘濡??덉쟾??湲곕낯媛믪쓣 ?곗꽑?⑸땲??
+ 200 │ │    */
+ 201 │ │   function resolveRenderProfile(
+ 202 │ │     sceneCount: number,
+ 203 │ │     aspectRatio: AspectRatio = '16:9',
+ 204 │ │     qualityMode: 'preview' | 'final' = 'preview'
+ 205 │ │   ): RenderProfile {
+ 206 │ │     const profileKey = sceneCount >= 14 ? 'small' : sceneCount >= 8 ? 'medium' : 'large';
+ 207 │ │     const previewProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 208 │ │       '16:9': {
+ 209 │ │         small: { width: 640, height: 360, fps: 18, bitrate: 2_500_000 },
+ 210 │ │         medium: { width: 854, height: 480, fps: 20, bitrate: 3_500_000 },
+ 211 │ │         large: { width: 960, height: 540, fps: 24, bitrate: 4_200_000 },
+ 212 │ │       },
+ 213 │ │       '1:1': {
+ 214 │ │         small: { width: 640, height: 640, fps: 18, bitrate: 2_500_000 },
+ 215 │ │         medium: { width: 800, height: 800, fps: 20, bitrate: 3_500_000 },
+ 216 │ │         large: { width: 960, height: 960, fps: 24, bitrate: 4_200_000 },
+ 217 │ │       },
+ 218 │ │       '9:16': {
+ 219 │ │         small: { width: 360, height: 640, fps: 18, bitrate: 2_500_000 },
+ 220 │ │         medium: { width: 480, height: 854, fps: 20, bitrate: 3_500_000 },
+ 221 │ │         large: { width: 540, height: 960, fps: 24, bitrate: 4_200_000 },
+ 222 │ │       },
+ 223 │ │     };
+ 224 │ │   
+ 225 │ │     const finalProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 226 │ │       '16:9': {
+ 227 │ │         small: { width: 1280, height: 720, fps: 24, bitrate: 6_500_000 },
+ 228 │ │         medium: { width: 1600, height: 900, fps: 24, bitrate: 8_000_000 },
+ 229 │ │         large: { width: 1920, height: 1080, fps: 30, bitrate: 10_000_000 },
+ 230 │ │       },
+ 231 │ │       '1:1': {
+ 232 │ │         small: { width: 1080, height: 1080, fps: 24, bitrate: 6_500_000 },
+ 233 │ │         medium: { width: 1440, height: 1440, fps: 24, bitrate: 8_000_000 },
+ 234 │ │         large: { width: 1920, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 235 │ │       },
+ 236 │ │       '9:16': {
+ 237 │ │         small: { width: 720, height: 1280, fps: 24, bitrate: 6_500_000 },
+ 238 │ │         medium: { width: 900, height: 1600, fps: 24, bitrate: 8_000_000 },
+ 239 │ │         large: { width: 1080, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 240 │ │       },
+ 241 │ │     };
+ 242 │ │   
+ 243 │ │     const sourceProfiles = qualityMode === 'final' ? finalProfiles : previewProfiles;
+ 244 │ │     return sourceProfiles[aspectRatio]?.[profileKey] || sourceProfiles['16:9'][profileKey];
+ 245 │ │   }
+ 246 │ │   
+ 247 │ │   interface PreparedScene {
+ 248 │ │     img: HTMLImageElement;
+ 249 │ │     video: HTMLVideoElement | null;  // ?좊땲硫붿씠???곸긽 (?덉쑝硫??대?吏 ????ъ슜)
+ 250 │ │     isAnimated: boolean;             // ?좊땲硫붿씠?????щ?
+ 251 │ │     audioBuffer: AudioBuffer | null;
+ 252 │ │     subtitleChunks: SubtitleChunk[];  // 誘몃━ 怨꾩궛???먮쭑 泥?겕??
+ 253 │ │     startTime: number;
+ 254 │ │     endTime: number;
+ 255 │ │     duration: number;
+ 256 │ │   }
+ 257 │ │   
+ 258 │ │   /**
+ 259 │ │    * ?먮쭑 ?곗씠?곕? 泥?겕濡?蹂??
+ 260 │ │    * - AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜 (22???댄븯, ?섎? ?⑥쐞)
+ 261 │ │    * - ?놁쑝硫?湲곗〈 ?⑥뼱 ??湲곕컲?쇰줈 ?대갚
+ 262 │ │    */
+ 263 │ │   function createSubtitleChunks(
+ 264 │ │     subtitleData: SubtitleData | null,
+ 265 │ │     config: SubtitleConfig
+ 266 │ │   ): SubtitleChunk[] {
+ 267 │ │     if (!subtitleData || subtitleData.words.length === 0) {
+ 268 │ │       return [];
+ 269 │ │     }
+ 270 │ │   
+ 271 │ │     // AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜
+ 272 │ │     if (subtitleData.meaningChunks && subtitleData.meaningChunks.length > 0) {
+ 273 │ ├─▶     console.log(`[Video] AI ?섎? ?⑥쐞 ?먮쭑 ?ъ슜: ${subtitleData.meaningChunks.length}媛?泥?겕`);
+     · ╰───                         ──
+     · ╰──── This is the expression part of an expression statement
+ 274 │         return subtitleData.meaningChunks.map(chunk => ({
+ 275 │           text: chunk.text,
+ 275 │           startTime: chunk.startTime,
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:48:17.620] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Error:   × Expected ';', '}' or <eof>
+     ╭─[C:\Users\gorhr\OneDrive\문서\GitHub\produce-web\lib\mp4Creater\services\videoService.ts:136:1]
+ 133 │         cursor = cursor.slice(sliceIndex).trim();
+ 134 │       }
+ 135 │       if (cursor && chunks.length >= maxLines) {
+ 136 │ ╭─▶     chunks[maxLines - 1] = `${chunks[maxLines - 1].slice(0, Math.max(0, maxChars - 1)).trim()}??;
+ 137 │ │     }
+ 138 │ │     return chunks.filter(Boolean);
+ 139 │ │   }
+ 140 │ │   
+ 141 │ │   function buildScenePlaceholderDataUrl(_asset: GeneratedAsset, _sceneIndex: number, width: number, height: number): string {
+ 142 │ │     const canvas = document.createElement('canvas');
+ 143 │ │     canvas.width = Math.max(320, width);
+ 144 │ │     canvas.height = Math.max(320, height);
+ 145 │ │     const ctx = canvas.getContext('2d', { alpha: false });
+ 146 │ │     if (!ctx) return '';
+ 147 │ │   
+ 148 │ │     ctx.fillStyle = '#000000';
+ 149 │ │     ctx.fillRect(0, 0, canvas.width, canvas.height);
+ 150 │ │     return canvas.toDataURL('image/png');
+ 151 │ │   }
+ 152 │ │   
+ 153 │ │   function isRenderableSceneAsset(asset: GeneratedAsset | null | undefined): asset is GeneratedAsset {
+ 154 │ │     return Boolean(asset);
+ 155 │ │   }
+ 156 │ │   
+ 157 │ │   async function prepareSceneImage(
+ 158 │ │     img: HTMLImageElement,
+ 159 │ │     asset: GeneratedAsset,
+ 160 │ │     sceneIndex: number,
+ 161 │ │     renderProfile: RenderProfile,
+ 162 │ │   ): Promise<void> {
+ 163 │ │     const placeholder = buildScenePlaceholderDataUrl(asset, sceneIndex, renderProfile.width, renderProfile.height);
+ 164 │ │     try {
+ 165 │ │       if (!asset.imageData) throw new Error('Image source missing');
+ 166 │ │       await loadSceneImage(img, asset, sceneIndex);
+ 167 │ │     } catch {
+ 168 │ │       await new Promise<void>((resolve, reject) => {
+ 169 │ │         img.onload = () => resolve();
+ 170 │ │         img.onerror = () => reject(new Error('Placeholder image load failed'));
+ 171 │ │         img.src = placeholder;
+ 172 │ │       });
+ 173 │ │     }
+ 174 │ │   }
+ 175 │ │   
+ 176 │ │   function attachSilentAudioBed(
+ 177 │ │     audioCtx: AudioContext,
+ 178 │ │     destination: MediaStreamAudioDestinationNode,
+ 179 │ │     totalDuration: number,
+ 180 │ │   ) {
+ 181 │ │     const oscillator = audioCtx.createOscillator();
+ 182 │ │     const gainNode = audioCtx.createGain();
+ 183 │ │     oscillator.type = 'sine';
+ 184 │ │     oscillator.frequency.value = 220;
+ 185 │ │     gainNode.gain.value = 0.00001;
+ 186 │ │     oscillator.connect(gainNode);
+ 187 │ │     gainNode.connect(destination);
+ 188 │ │     return {
+ 189 │ │       start(startAt: number) {
+ 190 │ │         oscillator.start(startAt);
+ 191 │ │         oscillator.stop(startAt + Math.max(1, totalDuration) + 0.6);
+ 192 │ │       },
+ 193 │ │     };
+ 194 │ │   }
+ 195 │ │   
+ 196 │ │   /**
+ 197 │ │    * ?뚮뜑留?怨쇰???諛⑹????꾨줈?뚯씪
+ 198 │ │    * - ???섍? 留롮쓣?섎줉 ?댁긽?꾩? FPS瑜???떠 CPU/GPU ?쒓컙 ?쇳겕瑜?以꾩엯?덈떎.
+ 199 │ │    * - ?ъ슜?먭? 釉뚮씪?곗??먯꽌 吏곸젒 ?뚮뜑留곹븯誘濡??덉쟾??湲곕낯媛믪쓣 ?곗꽑?⑸땲??
+ 200 │ │    */
+ 201 │ │   function resolveRenderProfile(
+ 202 │ │     sceneCount: number,
+ 203 │ │     aspectRatio: AspectRatio = '16:9',
+ 204 │ │     qualityMode: 'preview' | 'final' = 'preview'
+ 205 │ │   ): RenderProfile {
+ 206 │ │     const profileKey = sceneCount >= 14 ? 'small' : sceneCount >= 8 ? 'medium' : 'large';
+ 207 │ │     const previewProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 208 │ │       '16:9': {
+ 209 │ │         small: { width: 640, height: 360, fps: 18, bitrate: 2_500_000 },
+ 210 │ │         medium: { width: 854, height: 480, fps: 20, bitrate: 3_500_000 },
+ 211 │ │         large: { width: 960, height: 540, fps: 24, bitrate: 4_200_000 },
+ 212 │ │       },
+ 213 │ │       '1:1': {
+ 214 │ │         small: { width: 640, height: 640, fps: 18, bitrate: 2_500_000 },
+ 215 │ │         medium: { width: 800, height: 800, fps: 20, bitrate: 3_500_000 },
+ 216 │ │         large: { width: 960, height: 960, fps: 24, bitrate: 4_200_000 },
+ 217 │ │       },
+ 218 │ │       '9:16': {
+ 219 │ │         small: { width: 360, height: 640, fps: 18, bitrate: 2_500_000 },
+ 220 │ │         medium: { width: 480, height: 854, fps: 20, bitrate: 3_500_000 },
+ 221 │ │         large: { width: 540, height: 960, fps: 24, bitrate: 4_200_000 },
+ 222 │ │       },
+ 223 │ │     };
+ 224 │ │   
+ 225 │ │     const finalProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 226 │ │       '16:9': {
+ 227 │ │         small: { width: 1280, height: 720, fps: 24, bitrate: 6_500_000 },
+ 228 │ │         medium: { width: 1600, height: 900, fps: 24, bitrate: 8_000_000 },
+ 229 │ │         large: { width: 1920, height: 1080, fps: 30, bitrate: 10_000_000 },
+ 230 │ │       },
+ 231 │ │       '1:1': {
+ 232 │ │         small: { width: 1080, height: 1080, fps: 24, bitrate: 6_500_000 },
+ 233 │ │         medium: { width: 1440, height: 1440, fps: 24, bitrate: 8_000_000 },
+ 234 │ │         large: { width: 1920, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 235 │ │       },
+ 236 │ │       '9:16': {
+ 237 │ │         small: { width: 720, height: 1280, fps: 24, bitrate: 6_500_000 },
+ 238 │ │         medium: { width: 900, height: 1600, fps: 24, bitrate: 8_000_000 },
+ 239 │ │         large: { width: 1080, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 240 │ │       },
+ 241 │ │     };
+ 242 │ │   
+ 243 │ │     const sourceProfiles = qualityMode === 'final' ? finalProfiles : previewProfiles;
+ 244 │ │     return sourceProfiles[aspectRatio]?.[profileKey] || sourceProfiles['16:9'][profileKey];
+ 245 │ │   }
+ 246 │ │   
+ 247 │ │   interface PreparedScene {
+ 248 │ │     img: HTMLImageElement;
+ 249 │ │     video: HTMLVideoElement | null;  // ?좊땲硫붿씠???곸긽 (?덉쑝硫??대?吏 ????ъ슜)
+ 250 │ │     isAnimated: boolean;             // ?좊땲硫붿씠?????щ?
+ 251 │ │     audioBuffer: AudioBuffer | null;
+ 252 │ │     subtitleChunks: SubtitleChunk[];  // 誘몃━ 怨꾩궛???먮쭑 泥?겕??
+ 253 │ │     startTime: number;
+ 254 │ │     endTime: number;
+ 255 │ │     duration: number;
+ 256 │ │   }
+ 257 │ │   
+ 258 │ │   /**
+ 259 │ │    * ?먮쭑 ?곗씠?곕? 泥?겕濡?蹂??
+ 260 │ │    * - AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜 (22???댄븯, ?섎? ?⑥쐞)
+ 261 │ │    * - ?놁쑝硫?湲곗〈 ?⑥뼱 ??湲곕컲?쇰줈 ?대갚
+ 262 │ │    */
+ 263 │ │   function createSubtitleChunks(
+ 264 │ │     subtitleData: SubtitleData | null,
+ 265 │ │     config: SubtitleConfig
+ 266 │ │   ): SubtitleChunk[] {
+ 267 │ │     if (!subtitleData || subtitleData.words.length === 0) {
+ 268 │ │       return [];
+ 269 │ │     }
+ 270 │ │   
+ 271 │ │     // AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜
+ 272 │ │     if (subtitleData.meaningChunks && subtitleData.meaningChunks.length > 0) {
+ 273 │ ├─▶     console.log(`[Video] AI ?섎? ?⑥쐞 ?먮쭑 ?ъ슜: ${subtitleData.meaningChunks.length}媛?泥?겕`);
+     · ╰───                         ──
+     · ╰──── This is the expression part of an expression statement
+ 274 │         return subtitleData.meaningChunks.map(chunk => ({
+ 275 │           text: chunk.text,
+ 275 │           startTime: chunk.startTime,
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:48:17.898] Server  ERROR   ⨯ ./lib/mp4Creater/services/videoService.ts
+Error:   × Expected ';', '}' or <eof>
+     ╭─[C:\Users\gorhr\OneDrive\문서\GitHub\produce-web\lib\mp4Creater\services\videoService.ts:136:1]
+ 133 │         cursor = cursor.slice(sliceIndex).trim();
+ 134 │       }
+ 135 │       if (cursor && chunks.length >= maxLines) {
+ 136 │ ╭─▶     chunks[maxLines - 1] = `${chunks[maxLines - 1].slice(0, Math.max(0, maxChars - 1)).trim()}??;
+ 137 │ │     }
+ 138 │ │     return chunks.filter(Boolean);
+ 139 │ │   }
+ 140 │ │   
+ 141 │ │   function buildScenePlaceholderDataUrl(_asset: GeneratedAsset, _sceneIndex: number, width: number, height: number): string {
+ 142 │ │     const canvas = document.createElement('canvas');
+ 143 │ │     canvas.width = Math.max(320, width);
+ 144 │ │     canvas.height = Math.max(320, height);
+ 145 │ │     const ctx = canvas.getContext('2d', { alpha: false });
+ 146 │ │     if (!ctx) return '';
+ 147 │ │   
+ 148 │ │     ctx.fillStyle = '#000000';
+ 149 │ │     ctx.fillRect(0, 0, canvas.width, canvas.height);
+ 150 │ │     return canvas.toDataURL('image/png');
+ 151 │ │   }
+ 152 │ │   
+ 153 │ │   function isRenderableSceneAsset(asset: GeneratedAsset | null | undefined): asset is GeneratedAsset {
+ 154 │ │     return Boolean(asset);
+ 155 │ │   }
+ 156 │ │   
+ 157 │ │   async function prepareSceneImage(
+ 158 │ │     img: HTMLImageElement,
+ 159 │ │     asset: GeneratedAsset,
+ 160 │ │     sceneIndex: number,
+ 161 │ │     renderProfile: RenderProfile,
+ 162 │ │   ): Promise<void> {
+ 163 │ │     const placeholder = buildScenePlaceholderDataUrl(asset, sceneIndex, renderProfile.width, renderProfile.height);
+ 164 │ │     try {
+ 165 │ │       if (!asset.imageData) throw new Error('Image source missing');
+ 166 │ │       await loadSceneImage(img, asset, sceneIndex);
+ 167 │ │     } catch {
+ 168 │ │       await new Promise<void>((resolve, reject) => {
+ 169 │ │         img.onload = () => resolve();
+ 170 │ │         img.onerror = () => reject(new Error('Placeholder image load failed'));
+ 171 │ │         img.src = placeholder;
+ 172 │ │       });
+ 173 │ │     }
+ 174 │ │   }
+ 175 │ │   
+ 176 │ │   function attachSilentAudioBed(
+ 177 │ │     audioCtx: AudioContext,
+ 178 │ │     destination: MediaStreamAudioDestinationNode,
+ 179 │ │     totalDuration: number,
+ 180 │ │   ) {
+ 181 │ │     const oscillator = audioCtx.createOscillator();
+ 182 │ │     const gainNode = audioCtx.createGain();
+ 183 │ │     oscillator.type = 'sine';
+ 184 │ │     oscillator.frequency.value = 220;
+ 185 │ │     gainNode.gain.value = 0.00001;
+ 186 │ │     oscillator.connect(gainNode);
+ 187 │ │     gainNode.connect(destination);
+ 188 │ │     return {
+ 189 │ │       start(startAt: number) {
+ 190 │ │         oscillator.start(startAt);
+ 191 │ │         oscillator.stop(startAt + Math.max(1, totalDuration) + 0.6);
+ 192 │ │       },
+ 193 │ │     };
+ 194 │ │   }
+ 195 │ │   
+ 196 │ │   /**
+ 197 │ │    * ?뚮뜑留?怨쇰???諛⑹????꾨줈?뚯씪
+ 198 │ │    * - ???섍? 留롮쓣?섎줉 ?댁긽?꾩? FPS瑜???떠 CPU/GPU ?쒓컙 ?쇳겕瑜?以꾩엯?덈떎.
+ 199 │ │    * - ?ъ슜?먭? 釉뚮씪?곗??먯꽌 吏곸젒 ?뚮뜑留곹븯誘濡??덉쟾??湲곕낯媛믪쓣 ?곗꽑?⑸땲??
+ 200 │ │    */
+ 201 │ │   function resolveRenderProfile(
+ 202 │ │     sceneCount: number,
+ 203 │ │     aspectRatio: AspectRatio = '16:9',
+ 204 │ │     qualityMode: 'preview' | 'final' = 'preview'
+ 205 │ │   ): RenderProfile {
+ 206 │ │     const profileKey = sceneCount >= 14 ? 'small' : sceneCount >= 8 ? 'medium' : 'large';
+ 207 │ │     const previewProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 208 │ │       '16:9': {
+ 209 │ │         small: { width: 640, height: 360, fps: 18, bitrate: 2_500_000 },
+ 210 │ │         medium: { width: 854, height: 480, fps: 20, bitrate: 3_500_000 },
+ 211 │ │         large: { width: 960, height: 540, fps: 24, bitrate: 4_200_000 },
+ 212 │ │       },
+ 213 │ │       '1:1': {
+ 214 │ │         small: { width: 640, height: 640, fps: 18, bitrate: 2_500_000 },
+ 215 │ │         medium: { width: 800, height: 800, fps: 20, bitrate: 3_500_000 },
+ 216 │ │         large: { width: 960, height: 960, fps: 24, bitrate: 4_200_000 },
+ 217 │ │       },
+ 218 │ │       '9:16': {
+ 219 │ │         small: { width: 360, height: 640, fps: 18, bitrate: 2_500_000 },
+ 220 │ │         medium: { width: 480, height: 854, fps: 20, bitrate: 3_500_000 },
+ 221 │ │         large: { width: 540, height: 960, fps: 24, bitrate: 4_200_000 },
+ 222 │ │       },
+ 223 │ │     };
+ 224 │ │   
+ 225 │ │     const finalProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 226 │ │       '16:9': {
+ 227 │ │         small: { width: 1280, height: 720, fps: 24, bitrate: 6_500_000 },
+ 228 │ │         medium: { width: 1600, height: 900, fps: 24, bitrate: 8_000_000 },
+ 229 │ │         large: { width: 1920, height: 1080, fps: 30, bitrate: 10_000_000 },
+ 230 │ │       },
+ 231 │ │       '1:1': {
+ 232 │ │         small: { width: 1080, height: 1080, fps: 24, bitrate: 6_500_000 },
+ 233 │ │         medium: { width: 1440, height: 1440, fps: 24, bitrate: 8_000_000 },
+ 234 │ │         large: { width: 1920, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 235 │ │       },
+ 236 │ │       '9:16': {
+ 237 │ │         small: { width: 720, height: 1280, fps: 24, bitrate: 6_500_000 },
+ 238 │ │         medium: { width: 900, height: 1600, fps: 24, bitrate: 8_000_000 },
+ 239 │ │         large: { width: 1080, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 240 │ │       },
+ 241 │ │     };
+ 242 │ │   
+ 243 │ │     const sourceProfiles = qualityMode === 'final' ? finalProfiles : previewProfiles;
+ 244 │ │     return sourceProfiles[aspectRatio]?.[profileKey] || sourceProfiles['16:9'][profileKey];
+ 245 │ │   }
+ 246 │ │   
+ 247 │ │   interface PreparedScene {
+ 248 │ │     img: HTMLImageElement;
+ 249 │ │     video: HTMLVideoElement | null;  // ?좊땲硫붿씠???곸긽 (?덉쑝硫??대?吏 ????ъ슜)
+ 250 │ │     isAnimated: boolean;             // ?좊땲硫붿씠?????щ?
+ 251 │ │     audioBuffer: AudioBuffer | null;
+ 252 │ │     subtitleChunks: SubtitleChunk[];  // 誘몃━ 怨꾩궛???먮쭑 泥?겕??
+ 253 │ │     startTime: number;
+ 254 │ │     endTime: number;
+ 255 │ │     duration: number;
+ 256 │ │   }
+ 257 │ │   
+ 258 │ │   /**
+ 259 │ │    * ?먮쭑 ?곗씠?곕? 泥?겕濡?蹂??
+ 260 │ │    * - AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜 (22???댄븯, ?섎? ?⑥쐞)
+ 261 │ │    * - ?놁쑝硫?湲곗〈 ?⑥뼱 ??湲곕컲?쇰줈 ?대갚
+ 262 │ │    */
+ 263 │ │   function createSubtitleChunks(
+ 264 │ │     subtitleData: SubtitleData | null,
+ 265 │ │     config: SubtitleConfig
+ 266 │ │   ): SubtitleChunk[] {
+ 267 │ │     if (!subtitleData || subtitleData.words.length === 0) {
+ 268 │ │       return [];
+ 269 │ │     }
+ 270 │ │   
+ 271 │ │     // AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜
+ 272 │ │     if (subtitleData.meaningChunks && subtitleData.meaningChunks.length > 0) {
+ 273 │ ├─▶     console.log(`[Video] AI ?섎? ?⑥쐞 ?먮쭑 ?ъ슜: ${subtitleData.meaningChunks.length}媛?泥?겕`);
+     · ╰───                         ──
+     · ╰──── This is the expression part of an expression statement
+ 274 │         return subtitleData.meaningChunks.map(chunk => ({
+ 275 │           text: chunk.text,
+ 275 │           startTime: chunk.startTime,
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:48:17.903] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Error:   × Expected ';', '}' or <eof>
+     ╭─[C:\Users\gorhr\OneDrive\문서\GitHub\produce-web\lib\mp4Creater\services\videoService.ts:136:1]
+ 133 │         cursor = cursor.slice(sliceIndex).trim();
+ 134 │       }
+ 135 │       if (cursor && chunks.length >= maxLines) {
+ 136 │ ╭─▶     chunks[maxLines - 1] = `${chunks[maxLines - 1].slice(0, Math.max(0, maxChars - 1)).trim()}??;
+ 137 │ │     }
+ 138 │ │     return chunks.filter(Boolean);
+ 139 │ │   }
+ 140 │ │   
+ 141 │ │   function buildScenePlaceholderDataUrl(_asset: GeneratedAsset, _sceneIndex: number, width: number, height: number): string {
+ 142 │ │     const canvas = document.createElement('canvas');
+ 143 │ │     canvas.width = Math.max(320, width);
+ 144 │ │     canvas.height = Math.max(320, height);
+ 145 │ │     const ctx = canvas.getContext('2d', { alpha: false });
+ 146 │ │     if (!ctx) return '';
+ 147 │ │   
+ 148 │ │     ctx.fillStyle = '#000000';
+ 149 │ │     ctx.fillRect(0, 0, canvas.width, canvas.height);
+ 150 │ │     return canvas.toDataURL('image/png');
+ 151 │ │   }
+ 152 │ │   
+ 153 │ │   function isRenderableSceneAsset(asset: GeneratedAsset | null | undefined): asset is GeneratedAsset {
+ 154 │ │     return Boolean(asset);
+ 155 │ │   }
+ 156 │ │   
+ 157 │ │   async function prepareSceneImage(
+ 158 │ │     img: HTMLImageElement,
+ 159 │ │     asset: GeneratedAsset,
+ 160 │ │     sceneIndex: number,
+ 161 │ │     renderProfile: RenderProfile,
+ 162 │ │   ): Promise<void> {
+ 163 │ │     const placeholder = buildScenePlaceholderDataUrl(asset, sceneIndex, renderProfile.width, renderProfile.height);
+ 164 │ │     try {
+ 165 │ │       if (!asset.imageData) throw new Error('Image source missing');
+ 166 │ │       await loadSceneImage(img, asset, sceneIndex);
+ 167 │ │     } catch {
+ 168 │ │       await new Promise<void>((resolve, reject) => {
+ 169 │ │         img.onload = () => resolve();
+ 170 │ │         img.onerror = () => reject(new Error('Placeholder image load failed'));
+ 171 │ │         img.src = placeholder;
+ 172 │ │       });
+ 173 │ │     }
+ 174 │ │   }
+ 175 │ │   
+ 176 │ │   function attachSilentAudioBed(
+ 177 │ │     audioCtx: AudioContext,
+ 178 │ │     destination: MediaStreamAudioDestinationNode,
+ 179 │ │     totalDuration: number,
+ 180 │ │   ) {
+ 181 │ │     const oscillator = audioCtx.createOscillator();
+ 182 │ │     const gainNode = audioCtx.createGain();
+ 183 │ │     oscillator.type = 'sine';
+ 184 │ │     oscillator.frequency.value = 220;
+ 185 │ │     gainNode.gain.value = 0.00001;
+ 186 │ │     oscillator.connect(gainNode);
+ 187 │ │     gainNode.connect(destination);
+ 188 │ │     return {
+ 189 │ │       start(startAt: number) {
+ 190 │ │         oscillator.start(startAt);
+ 191 │ │         oscillator.stop(startAt + Math.max(1, totalDuration) + 0.6);
+ 192 │ │       },
+ 193 │ │     };
+ 194 │ │   }
+ 195 │ │   
+ 196 │ │   /**
+ 197 │ │    * ?뚮뜑留?怨쇰???諛⑹????꾨줈?뚯씪
+ 198 │ │    * - ???섍? 留롮쓣?섎줉 ?댁긽?꾩? FPS瑜???떠 CPU/GPU ?쒓컙 ?쇳겕瑜?以꾩엯?덈떎.
+ 199 │ │    * - ?ъ슜?먭? 釉뚮씪?곗??먯꽌 吏곸젒 ?뚮뜑留곹븯誘濡??덉쟾??湲곕낯媛믪쓣 ?곗꽑?⑸땲??
+ 200 │ │    */
+ 201 │ │   function resolveRenderProfile(
+ 202 │ │     sceneCount: number,
+ 203 │ │     aspectRatio: AspectRatio = '16:9',
+ 204 │ │     qualityMode: 'preview' | 'final' = 'preview'
+ 205 │ │   ): RenderProfile {
+ 206 │ │     const profileKey = sceneCount >= 14 ? 'small' : sceneCount >= 8 ? 'medium' : 'large';
+ 207 │ │     const previewProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 208 │ │       '16:9': {
+ 209 │ │         small: { width: 640, height: 360, fps: 18, bitrate: 2_500_000 },
+ 210 │ │         medium: { width: 854, height: 480, fps: 20, bitrate: 3_500_000 },
+ 211 │ │         large: { width: 960, height: 540, fps: 24, bitrate: 4_200_000 },
+ 212 │ │       },
+ 213 │ │       '1:1': {
+ 214 │ │         small: { width: 640, height: 640, fps: 18, bitrate: 2_500_000 },
+ 215 │ │         medium: { width: 800, height: 800, fps: 20, bitrate: 3_500_000 },
+ 216 │ │         large: { width: 960, height: 960, fps: 24, bitrate: 4_200_000 },
+ 217 │ │       },
+ 218 │ │       '9:16': {
+ 219 │ │         small: { width: 360, height: 640, fps: 18, bitrate: 2_500_000 },
+ 220 │ │         medium: { width: 480, height: 854, fps: 20, bitrate: 3_500_000 },
+ 221 │ │         large: { width: 540, height: 960, fps: 24, bitrate: 4_200_000 },
+ 222 │ │       },
+ 223 │ │     };
+ 224 │ │   
+ 225 │ │     const finalProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 226 │ │       '16:9': {
+ 227 │ │         small: { width: 1280, height: 720, fps: 24, bitrate: 6_500_000 },
+ 228 │ │         medium: { width: 1600, height: 900, fps: 24, bitrate: 8_000_000 },
+ 229 │ │         large: { width: 1920, height: 1080, fps: 30, bitrate: 10_000_000 },
+ 230 │ │       },
+ 231 │ │       '1:1': {
+ 232 │ │         small: { width: 1080, height: 1080, fps: 24, bitrate: 6_500_000 },
+ 233 │ │         medium: { width: 1440, height: 1440, fps: 24, bitrate: 8_000_000 },
+ 234 │ │         large: { width: 1920, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 235 │ │       },
+ 236 │ │       '9:16': {
+ 237 │ │         small: { width: 720, height: 1280, fps: 24, bitrate: 6_500_000 },
+ 238 │ │         medium: { width: 900, height: 1600, fps: 24, bitrate: 8_000_000 },
+ 239 │ │         large: { width: 1080, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 240 │ │       },
+ 241 │ │     };
+ 242 │ │   
+ 243 │ │     const sourceProfiles = qualityMode === 'final' ? finalProfiles : previewProfiles;
+ 244 │ │     return sourceProfiles[aspectRatio]?.[profileKey] || sourceProfiles['16:9'][profileKey];
+ 245 │ │   }
+ 246 │ │   
+ 247 │ │   interface PreparedScene {
+ 248 │ │     img: HTMLImageElement;
+ 249 │ │     video: HTMLVideoElement | null;  // ?좊땲硫붿씠???곸긽 (?덉쑝硫??대?吏 ????ъ슜)
+ 250 │ │     isAnimated: boolean;             // ?좊땲硫붿씠?????щ?
+ 251 │ │     audioBuffer: AudioBuffer | null;
+ 252 │ │     subtitleChunks: SubtitleChunk[];  // 誘몃━ 怨꾩궛???먮쭑 泥?겕??
+ 253 │ │     startTime: number;
+ 254 │ │     endTime: number;
+ 255 │ │     duration: number;
+ 256 │ │   }
+ 257 │ │   
+ 258 │ │   /**
+ 259 │ │    * ?먮쭑 ?곗씠?곕? 泥?겕濡?蹂??
+ 260 │ │    * - AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜 (22???댄븯, ?섎? ?⑥쐞)
+ 261 │ │    * - ?놁쑝硫?湲곗〈 ?⑥뼱 ??湲곕컲?쇰줈 ?대갚
+ 262 │ │    */
+ 263 │ │   function createSubtitleChunks(
+ 264 │ │     subtitleData: SubtitleData | null,
+ 265 │ │     config: SubtitleConfig
+ 266 │ │   ): SubtitleChunk[] {
+ 267 │ │     if (!subtitleData || subtitleData.words.length === 0) {
+ 268 │ │       return [];
+ 269 │ │     }
+ 270 │ │   
+ 271 │ │     // AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜
+ 272 │ │     if (subtitleData.meaningChunks && subtitleData.meaningChunks.length > 0) {
+ 273 │ ├─▶     console.log(`[Video] AI ?섎? ?⑥쐞 ?먮쭑 ?ъ슜: ${subtitleData.meaningChunks.length}媛?泥?겕`);
+     · ╰───                         ──
+     · ╰──── This is the expression part of an expression statement
+ 274 │         return subtitleData.meaningChunks.map(chunk => ({
+ 275 │           text: chunk.text,
+ 275 │           startTime: chunk.startTime,
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:48:36.408] Server  ERROR   ⨯ ./lib/mp4Creater/services/videoService.ts
+Error:   × Expected ';', '}' or <eof>
+     ╭─[C:\Users\gorhr\OneDrive\문서\GitHub\produce-web\lib\mp4Creater\services\videoService.ts:136:1]
+ 133 │         cursor = cursor.slice(sliceIndex).trim();
+ 134 │       }
+ 135 │       if (cursor && chunks.length >= maxLines) {
+ 136 │ ╭─▶     chunks[maxLines - 1] = `${chunks[maxLines - 1].slice(0, Math.max(0, maxChars - 1)).trim()}??;
+ 137 │ │     }
+ 138 │ │     return chunks.filter(Boolean);
+ 139 │ │   }
+ 140 │ │   
+ 141 │ │   function buildScenePlaceholderDataUrl(_asset: GeneratedAsset, _sceneIndex: number, width: number, height: number): string {
+ 142 │ │     const canvas = document.createElement('canvas');
+ 143 │ │     canvas.width = Math.max(320, width);
+ 144 │ │     canvas.height = Math.max(320, height);
+ 145 │ │     const ctx = canvas.getContext('2d', { alpha: false });
+ 146 │ │     if (!ctx) return '';
+ 147 │ │   
+ 148 │ │     ctx.fillStyle = '#000000';
+ 149 │ │     ctx.fillRect(0, 0, canvas.width, canvas.height);
+ 150 │ │     return canvas.toDataURL('image/png');
+ 151 │ │   }
+ 152 │ │   
+ 153 │ │   function isRenderableSceneAsset(asset: GeneratedAsset | null | undefined): asset is GeneratedAsset {
+ 154 │ │     return Boolean(asset);
+ 155 │ │   }
+ 156 │ │   
+ 157 │ │   async function prepareSceneImage(
+ 158 │ │     img: HTMLImageElement,
+ 159 │ │     asset: GeneratedAsset,
+ 160 │ │     sceneIndex: number,
+ 161 │ │     renderProfile: RenderProfile,
+ 162 │ │   ): Promise<void> {
+ 163 │ │     const placeholder = buildScenePlaceholderDataUrl(asset, sceneIndex, renderProfile.width, renderProfile.height);
+ 164 │ │     try {
+ 165 │ │       if (!asset.imageData) throw new Error('Image source missing');
+ 166 │ │       await loadSceneImage(img, asset, sceneIndex);
+ 167 │ │     } catch {
+ 168 │ │       await new Promise<void>((resolve, reject) => {
+ 169 │ │         img.onload = () => resolve();
+ 170 │ │         img.onerror = () => reject(new Error('Placeholder image load failed'));
+ 171 │ │         img.src = placeholder;
+ 172 │ │       });
+ 173 │ │     }
+ 174 │ │   }
+ 175 │ │   
+ 176 │ │   function attachSilentAudioBed(
+ 177 │ │     audioCtx: AudioContext,
+ 178 │ │     destination: MediaStreamAudioDestinationNode,
+ 179 │ │     totalDuration: number,
+ 180 │ │   ) {
+ 181 │ │     const oscillator = audioCtx.createOscillator();
+ 182 │ │     const gainNode = audioCtx.createGain();
+ 183 │ │     oscillator.type = 'sine';
+ 184 │ │     oscillator.frequency.value = 220;
+ 185 │ │     gainNode.gain.value = 0.00001;
+ 186 │ │     oscillator.connect(gainNode);
+ 187 │ │     gainNode.connect(destination);
+ 188 │ │     return {
+ 189 │ │       start(startAt: number) {
+ 190 │ │         oscillator.start(startAt);
+ 191 │ │         oscillator.stop(startAt + Math.max(1, totalDuration) + 0.6);
+ 192 │ │       },
+ 193 │ │     };
+ 194 │ │   }
+ 195 │ │   
+ 196 │ │   /**
+ 197 │ │    * ?뚮뜑留?怨쇰???諛⑹????꾨줈?뚯씪
+ 198 │ │    * - ???섍? 留롮쓣?섎줉 ?댁긽?꾩? FPS瑜???떠 CPU/GPU ?쒓컙 ?쇳겕瑜?以꾩엯?덈떎.
+ 199 │ │    * - ?ъ슜?먭? 釉뚮씪?곗??먯꽌 吏곸젒 ?뚮뜑留곹븯誘濡??덉쟾??湲곕낯媛믪쓣 ?곗꽑?⑸땲??
+ 200 │ │    */
+ 201 │ │   function resolveRenderProfile(
+ 202 │ │     sceneCount: number,
+ 203 │ │     aspectRatio: AspectRatio = '16:9',
+ 204 │ │     qualityMode: 'preview' | 'final' = 'preview'
+ 205 │ │   ): RenderProfile {
+ 206 │ │     const profileKey = sceneCount >= 14 ? 'small' : sceneCount >= 8 ? 'medium' : 'large';
+ 207 │ │     const previewProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 208 │ │       '16:9': {
+ 209 │ │         small: { width: 640, height: 360, fps: 18, bitrate: 2_500_000 },
+ 210 │ │         medium: { width: 854, height: 480, fps: 20, bitrate: 3_500_000 },
+ 211 │ │         large: { width: 960, height: 540, fps: 24, bitrate: 4_200_000 },
+ 212 │ │       },
+ 213 │ │       '1:1': {
+ 214 │ │         small: { width: 640, height: 640, fps: 18, bitrate: 2_500_000 },
+ 215 │ │         medium: { width: 800, height: 800, fps: 20, bitrate: 3_500_000 },
+ 216 │ │         large: { width: 960, height: 960, fps: 24, bitrate: 4_200_000 },
+ 217 │ │       },
+ 218 │ │       '9:16': {
+ 219 │ │         small: { width: 360, height: 640, fps: 18, bitrate: 2_500_000 },
+ 220 │ │         medium: { width: 480, height: 854, fps: 20, bitrate: 3_500_000 },
+ 221 │ │         large: { width: 540, height: 960, fps: 24, bitrate: 4_200_000 },
+ 222 │ │       },
+ 223 │ │     };
+ 224 │ │   
+ 225 │ │     const finalProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 226 │ │       '16:9': {
+ 227 │ │         small: { width: 1280, height: 720, fps: 24, bitrate: 6_500_000 },
+ 228 │ │         medium: { width: 1600, height: 900, fps: 24, bitrate: 8_000_000 },
+ 229 │ │         large: { width: 1920, height: 1080, fps: 30, bitrate: 10_000_000 },
+ 230 │ │       },
+ 231 │ │       '1:1': {
+ 232 │ │         small: { width: 1080, height: 1080, fps: 24, bitrate: 6_500_000 },
+ 233 │ │         medium: { width: 1440, height: 1440, fps: 24, bitrate: 8_000_000 },
+ 234 │ │         large: { width: 1920, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 235 │ │       },
+ 236 │ │       '9:16': {
+ 237 │ │         small: { width: 720, height: 1280, fps: 24, bitrate: 6_500_000 },
+ 238 │ │         medium: { width: 900, height: 1600, fps: 24, bitrate: 8_000_000 },
+ 239 │ │         large: { width: 1080, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 240 │ │       },
+ 241 │ │     };
+ 242 │ │   
+ 243 │ │     const sourceProfiles = qualityMode === 'final' ? finalProfiles : previewProfiles;
+ 244 │ │     return sourceProfiles[aspectRatio]?.[profileKey] || sourceProfiles['16:9'][profileKey];
+ 245 │ │   }
+ 246 │ │   
+ 247 │ │   interface PreparedScene {
+ 248 │ │     img: HTMLImageElement;
+ 249 │ │     video: HTMLVideoElement | null;  // ?좊땲硫붿씠???곸긽 (?덉쑝硫??대?吏 ????ъ슜)
+ 250 │ │     isAnimated: boolean;             // ?좊땲硫붿씠?????щ?
+ 251 │ │     audioBuffer: AudioBuffer | null;
+ 252 │ │     subtitleChunks: SubtitleChunk[];  // 誘몃━ 怨꾩궛???먮쭑 泥?겕??
+ 253 │ │     startTime: number;
+ 254 │ │     endTime: number;
+ 255 │ │     duration: number;
+ 256 │ │   }
+ 257 │ │   
+ 258 │ │   /**
+ 259 │ │    * ?먮쭑 ?곗씠?곕? 泥?겕濡?蹂??
+ 260 │ │    * - AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜 (22???댄븯, ?섎? ?⑥쐞)
+ 261 │ │    * - ?놁쑝硫?湲곗〈 ?⑥뼱 ??湲곕컲?쇰줈 ?대갚
+ 262 │ │    */
+ 263 │ │   function createSubtitleChunks(
+ 264 │ │     subtitleData: SubtitleData | null,
+ 265 │ │     config: SubtitleConfig
+ 266 │ │   ): SubtitleChunk[] {
+ 267 │ │     if (!subtitleData || subtitleData.words.length === 0) {
+ 268 │ │       return [];
+ 269 │ │     }
+ 270 │ │   
+ 271 │ │     // AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜
+ 272 │ │     if (subtitleData.meaningChunks && subtitleData.meaningChunks.length > 0) {
+ 273 │ ├─▶     console.log(`[Video] AI ?섎? ?⑥쐞 ?먮쭑 ?ъ슜: ${subtitleData.meaningChunks.length}媛?泥?겕`);
+     · ╰───                         ──
+     · ╰──── This is the expression part of an expression statement
+ 274 │         return subtitleData.meaningChunks.map(chunk => ({
+ 275 │           text: chunk.text,
+ 275 │           startTime: chunk.startTime,
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:48:53.156] Browser ERROR   ./lib/mp4Creater/services/videoService.ts
+Error:   × Expected ';', '}' or <eof>
+     ╭─[C:\Users\gorhr\OneDrive\문서\GitHub\produce-web\lib\mp4Creater\services\videoService.ts:136:1]
+ 133 │         cursor = cursor.slice(sliceIndex).trim();
+ 134 │       }
+ 135 │       if (cursor && chunks.length >= maxLines) {
+ 136 │ ╭─▶     chunks[maxLines - 1] = `${chunks[maxLines - 1].slice(0, Math.max(0, maxChars - 1)).trim()}??;
+ 137 │ │     }
+ 138 │ │     return chunks.filter(Boolean);
+ 139 │ │   }
+ 140 │ │   
+ 141 │ │   function buildScenePlaceholderDataUrl(_asset: GeneratedAsset, _sceneIndex: number, width: number, height: number): string {
+ 142 │ │     const canvas = document.createElement('canvas');
+ 143 │ │     canvas.width = Math.max(320, width);
+ 144 │ │     canvas.height = Math.max(320, height);
+ 145 │ │     const ctx = canvas.getContext('2d', { alpha: false });
+ 146 │ │     if (!ctx) return '';
+ 147 │ │   
+ 148 │ │     ctx.fillStyle = '#000000';
+ 149 │ │     ctx.fillRect(0, 0, canvas.width, canvas.height);
+ 150 │ │     return canvas.toDataURL('image/png');
+ 151 │ │   }
+ 152 │ │   
+ 153 │ │   function isRenderableSceneAsset(asset: GeneratedAsset | null | undefined): asset is GeneratedAsset {
+ 154 │ │     return Boolean(asset);
+ 155 │ │   }
+ 156 │ │   
+ 157 │ │   async function prepareSceneImage(
+ 158 │ │     img: HTMLImageElement,
+ 159 │ │     asset: GeneratedAsset,
+ 160 │ │     sceneIndex: number,
+ 161 │ │     renderProfile: RenderProfile,
+ 162 │ │   ): Promise<void> {
+ 163 │ │     const placeholder = buildScenePlaceholderDataUrl(asset, sceneIndex, renderProfile.width, renderProfile.height);
+ 164 │ │     try {
+ 165 │ │       if (!asset.imageData) throw new Error('Image source missing');
+ 166 │ │       await loadSceneImage(img, asset, sceneIndex);
+ 167 │ │     } catch {
+ 168 │ │       await new Promise<void>((resolve, reject) => {
+ 169 │ │         img.onload = () => resolve();
+ 170 │ │         img.onerror = () => reject(new Error('Placeholder image load failed'));
+ 171 │ │         img.src = placeholder;
+ 172 │ │       });
+ 173 │ │     }
+ 174 │ │   }
+ 175 │ │   
+ 176 │ │   function attachSilentAudioBed(
+ 177 │ │     audioCtx: AudioContext,
+ 178 │ │     destination: MediaStreamAudioDestinationNode,
+ 179 │ │     totalDuration: number,
+ 180 │ │   ) {
+ 181 │ │     const oscillator = audioCtx.createOscillator();
+ 182 │ │     const gainNode = audioCtx.createGain();
+ 183 │ │     oscillator.type = 'sine';
+ 184 │ │     oscillator.frequency.value = 220;
+ 185 │ │     gainNode.gain.value = 0.00001;
+ 186 │ │     oscillator.connect(gainNode);
+ 187 │ │     gainNode.connect(destination);
+ 188 │ │     return {
+ 189 │ │       start(startAt: number) {
+ 190 │ │         oscillator.start(startAt);
+ 191 │ │         oscillator.stop(startAt + Math.max(1, totalDuration) + 0.6);
+ 192 │ │       },
+ 193 │ │     };
+ 194 │ │   }
+ 195 │ │   
+ 196 │ │   /**
+ 197 │ │    * ?뚮뜑留?怨쇰???諛⑹????꾨줈?뚯씪
+ 198 │ │    * - ???섍? 留롮쓣?섎줉 ?댁긽?꾩? FPS瑜???떠 CPU/GPU ?쒓컙 ?쇳겕瑜?以꾩엯?덈떎.
+ 199 │ │    * - ?ъ슜?먭? 釉뚮씪?곗??먯꽌 吏곸젒 ?뚮뜑留곹븯誘濡??덉쟾??湲곕낯媛믪쓣 ?곗꽑?⑸땲??
+ 200 │ │    */
+ 201 │ │   function resolveRenderProfile(
+ 202 │ │     sceneCount: number,
+ 203 │ │     aspectRatio: AspectRatio = '16:9',
+ 204 │ │     qualityMode: 'preview' | 'final' = 'preview'
+ 205 │ │   ): RenderProfile {
+ 206 │ │     const profileKey = sceneCount >= 14 ? 'small' : sceneCount >= 8 ? 'medium' : 'large';
+ 207 │ │     const previewProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 208 │ │       '16:9': {
+ 209 │ │         small: { width: 640, height: 360, fps: 18, bitrate: 2_500_000 },
+ 210 │ │         medium: { width: 854, height: 480, fps: 20, bitrate: 3_500_000 },
+ 211 │ │         large: { width: 960, height: 540, fps: 24, bitrate: 4_200_000 },
+ 212 │ │       },
+ 213 │ │       '1:1': {
+ 214 │ │         small: { width: 640, height: 640, fps: 18, bitrate: 2_500_000 },
+ 215 │ │         medium: { width: 800, height: 800, fps: 20, bitrate: 3_500_000 },
+ 216 │ │         large: { width: 960, height: 960, fps: 24, bitrate: 4_200_000 },
+ 217 │ │       },
+ 218 │ │       '9:16': {
+ 219 │ │         small: { width: 360, height: 640, fps: 18, bitrate: 2_500_000 },
+ 220 │ │         medium: { width: 480, height: 854, fps: 20, bitrate: 3_500_000 },
+ 221 │ │         large: { width: 540, height: 960, fps: 24, bitrate: 4_200_000 },
+ 222 │ │       },
+ 223 │ │     };
+ 224 │ │   
+ 225 │ │     const finalProfiles: Record<AspectRatio, Record<'small' | 'medium' | 'large', RenderProfile>> = {
+ 226 │ │       '16:9': {
+ 227 │ │         small: { width: 1280, height: 720, fps: 24, bitrate: 6_500_000 },
+ 228 │ │         medium: { width: 1600, height: 900, fps: 24, bitrate: 8_000_000 },
+ 229 │ │         large: { width: 1920, height: 1080, fps: 30, bitrate: 10_000_000 },
+ 230 │ │       },
+ 231 │ │       '1:1': {
+ 232 │ │         small: { width: 1080, height: 1080, fps: 24, bitrate: 6_500_000 },
+ 233 │ │         medium: { width: 1440, height: 1440, fps: 24, bitrate: 8_000_000 },
+ 234 │ │         large: { width: 1920, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 235 │ │       },
+ 236 │ │       '9:16': {
+ 237 │ │         small: { width: 720, height: 1280, fps: 24, bitrate: 6_500_000 },
+ 238 │ │         medium: { width: 900, height: 1600, fps: 24, bitrate: 8_000_000 },
+ 239 │ │         large: { width: 1080, height: 1920, fps: 30, bitrate: 10_000_000 },
+ 240 │ │       },
+ 241 │ │     };
+ 242 │ │   
+ 243 │ │     const sourceProfiles = qualityMode === 'final' ? finalProfiles : previewProfiles;
+ 244 │ │     return sourceProfiles[aspectRatio]?.[profileKey] || sourceProfiles['16:9'][profileKey];
+ 245 │ │   }
+ 246 │ │   
+ 247 │ │   interface PreparedScene {
+ 248 │ │     img: HTMLImageElement;
+ 249 │ │     video: HTMLVideoElement | null;  // ?좊땲硫붿씠???곸긽 (?덉쑝硫??대?吏 ????ъ슜)
+ 250 │ │     isAnimated: boolean;             // ?좊땲硫붿씠?????щ?
+ 251 │ │     audioBuffer: AudioBuffer | null;
+ 252 │ │     subtitleChunks: SubtitleChunk[];  // 誘몃━ 怨꾩궛???먮쭑 泥?겕??
+ 253 │ │     startTime: number;
+ 254 │ │     endTime: number;
+ 255 │ │     duration: number;
+ 256 │ │   }
+ 257 │ │   
+ 258 │ │   /**
+ 259 │ │    * ?먮쭑 ?곗씠?곕? 泥?겕濡?蹂??
+ 260 │ │    * - AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜 (22???댄븯, ?섎? ?⑥쐞)
+ 261 │ │    * - ?놁쑝硫?湲곗〈 ?⑥뼱 ??湲곕컲?쇰줈 ?대갚
+ 262 │ │    */
+ 263 │ │   function createSubtitleChunks(
+ 264 │ │     subtitleData: SubtitleData | null,
+ 265 │ │     config: SubtitleConfig
+ 266 │ │   ): SubtitleChunk[] {
+ 267 │ │     if (!subtitleData || subtitleData.words.length === 0) {
+ 268 │ │       return [];
+ 269 │ │     }
+ 270 │ │   
+ 271 │ │     // AI ?섎? ?⑥쐞 泥?겕媛 ?덉쑝硫??곗꽑 ?ъ슜
+ 272 │ │     if (subtitleData.meaningChunks && subtitleData.meaningChunks.length > 0) {
+ 273 │ ├─▶     console.log(`[Video] AI ?섎? ?⑥쐞 ?먮쭑 ?ъ슜: ${subtitleData.meaningChunks.length}媛?泥?겕`);
+     · ╰───                         ──
+     · ╰──── This is the expression part of an expression statement
+ 274 │         return subtitleData.meaningChunks.map(chunk => ({
+ 275 │           text: chunk.text,
+ 275 │           startTime: chunk.startTime,
+     ╰────
+
+Caused by:
+    Syntax Error
+
+Import trace for requested module:
+./lib/mp4Creater/services/videoService.ts
+./lib/mp4Creater/pages/SceneStudioPage.tsx
+./lib/mp4Creater/components/inputSection/steps/Step6Page.tsx
+./app/mp4Creater/step-6/page.tsx
+[00:50:43.844] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:50:43.844] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:50:46.887] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:50:58.549] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:50:58.549] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:54:43.402] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:55:07.992] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:07.992] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:08.485] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:17.362] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:19.063] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:19.612] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:19.612] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:24.777] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:25.762] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:25.762] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:25.762] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:26.065] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:27.986] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:28.625] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:28.625] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:32.126] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:46.756] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:55:57.572] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:56:12.148] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:57:10.547] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:57:10.547] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:57:11.005] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:57:17.712] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:57:17.712] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:57:18.245] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:57:21.433] Browser LOG     [Video] 총 18개 씬 중 18개 렌더링, 자막: 비활성화
+[00:57:21.540] Browser LOG     [Video] 씬 1: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:57:21.868] Browser LOG     [Video] 씬 2: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 2 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 3: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 3 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 4: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 4 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 5: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 5 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 6: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 6 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 7: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 7 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 8: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 8 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 9: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 9 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 10: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 10 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 11: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 11 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 12: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 12 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 13: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 13 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 14: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 14 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 15: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 15 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 16: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 16 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 17: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 17 오디오 없음, 기본 1초 사용
+[00:57:21.868] Browser LOG     [Video] 씬 18: 이미지 또는 플레이스홀더 준비 완료 (360x640)
+[00:57:21.868] Browser LOG     [Video] 씬 18 오디오 없음, 기본 1초 사용
+[00:57:52.123] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:57:56.260] Browser LOG     [Video] 총 18개 씬 중 18개 렌더링, 자막: 비활성화
+[00:57:56.373] Browser LOG     [Video] 씬 1: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.483] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:57:56.483] Browser LOG     [Video] 씬 2: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.483] Browser LOG     [Video] 씬 2 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 3: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 3 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 4: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 4 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 5: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 5 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 6: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 6 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 7: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 7 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 8: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 8 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 9: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 9 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 10: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 10 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 11: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 11 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 12: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 12 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 13: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 13 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 14: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 14 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 15: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 15 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 16: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 16 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 17: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 17 오디오 없음, 기본 1초 사용
+[00:57:56.890] Browser LOG     [Video] 씬 18: 이미지 또는 플레이스홀더 준비 완료 (720x1280)
+[00:57:56.890] Browser LOG     [Video] 씬 18 오디오 없음, 기본 1초 사용
+[00:58:27.109] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:58:57.224] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:58:59.810] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:58:59.810] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:01.676] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:03.292] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:11.252] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:11.252] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:13.063] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:35.211] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:35.211] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:35.211] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:35.762] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:39.062] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:59:39.641] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:39.641] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[00:59:40.168] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:01:39.888] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:01:39.889] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:01:40.279] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:01:40.279] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:01:44.411] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:01:44.636] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:01:44.636] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:21:33.191] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:30:26.980] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:30:28.290] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:30:28.291] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:49:32.539] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:49:32.539] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:49:33.911] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:49:43.028] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:49:44.737] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:04.376] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:04.376] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:04.669] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:07.182] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:07.741] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:07.961] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:08.648] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:08.762] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:09.423] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:09.633] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:09.760] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:10.639] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:10.904] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:11.040] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:11.679] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:11.679] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:11.679] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:11.888] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:14.431] Browser WARN    [mp4Creater] lightweight studio cache write failed {}
+[01:50:25.593] Browser WARN    [mp4Creater] lightweight studio cache write failed {}

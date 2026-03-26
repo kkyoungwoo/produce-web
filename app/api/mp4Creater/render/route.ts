@@ -14,8 +14,10 @@ type RenderAsset = {
   audioData?: string | null;
   audioDuration?: number | null;
   targetDuration?: number | null;
+  videoData?: string | null;
   videoDuration?: number | null;
   narration?: string;
+  selectedVisualType?: 'image' | 'video';
   subtitleData?: {
     fullText?: string;
   } | null;
@@ -223,14 +225,18 @@ export async function POST(request: NextRequest) {
         audioDuration: typeof asset.audioDuration === 'number' ? asset.audioDuration : null,
         targetDuration: typeof asset.targetDuration === 'number' ? asset.targetDuration : null,
         videoDuration: typeof asset.videoDuration === 'number' ? asset.videoDuration : null,
-      }, { minimum: 1, fallbackNarrationEstimate: true });
+      }, { minimum: 1, fallbackNarrationEstimate: true, preferTargetDuration: true });
       const imagePath = path.join(tempDir, `scene_${index + 1}.png`);
+      const videoPath = path.join(tempDir, `scene_${index + 1}_source.mp4`);
       const audioPath = path.join(tempDir, `scene_${index + 1}.wav`);
       const scenePath = path.join(tempDir, `scene_${index + 1}.mp4`);
       const srtPath = path.join(tempDir, `scene_${index + 1}.srt`);
 
       const writtenImage = await writeMedia(imagePath, asset.imageData || EMPTY_SCENE_PLACEHOLDER_IMAGE, 'image/png');
       if (!writtenImage) continue;
+      const writtenVideo = asset.selectedVisualType === 'image'
+        ? null
+        : await writeMedia(videoPath, asset.videoData || null, 'video/mp4');
       const writtenAudio = await writeMedia(audioPath, asset.audioData || null, 'audio/wav');
 
       const vfFilters = [
@@ -245,33 +251,49 @@ export async function POST(request: NextRequest) {
         vfFilters.push(`subtitles='${ffmpegSubtitlePath(srtPath)}':force_style='${subtitleStyle(body.subtitlePreset)}'`);
       }
 
-      const args = [
-        '-y',
-        '-loop', '1',
-        '-framerate', '25',
-        '-i', imagePath,
-      ];
+      const renderScene = async (useVideoSource: boolean) => {
+        const args = ['-y'];
+        if (useVideoSource && writtenVideo) {
+          args.push('-stream_loop', '-1', '-i', writtenVideo);
+        } else {
+          args.push('-loop', '1', '-framerate', '25', '-i', imagePath);
+        }
 
-      const audioFilterLabel = writtenAudio ? '[1:a]apad=pad_dur=' : '[1:a]atrim=';
-      if (writtenAudio) {
-        args.push('-i', audioPath);
+        const audioInputIndex = 1;
+        const audioFilterLabel = writtenAudio ? `[${audioInputIndex}:a]apad=pad_dur=` : `[${audioInputIndex}:a]atrim=`;
+        if (writtenAudio) {
+          args.push('-i', audioPath);
+        } else {
+          args.push('-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo');
+        }
+
+        args.push(
+          '-filter_complex', `${audioFilterLabel}${duration}[aout]`,
+          '-map', '0:v:0',
+          '-map', '[aout]',
+          '-t', `${duration}`,
+          '-vf', vfFilters.join(','),
+          '-r', '25',
+          '-c:v', 'libx264',
+          '-pix_fmt', 'yuv420p',
+          '-c:a', 'aac',
+          scenePath,
+        );
+
+        await runFfmpeg(args, tempDir);
+      };
+
+      if (writtenVideo) {
+        try {
+          await renderScene(true);
+        } catch (error) {
+          console.warn(`[render-route] scene ${index + 1} video source failed, falling back to image`, error);
+          await renderScene(false);
+        }
       } else {
-        args.push('-f', 'lavfi', '-i', 'anullsrc=r=48000:cl=stereo');
+        await renderScene(false);
       }
 
-      args.push(
-        '-filter_complex', `${audioFilterLabel}${duration}[aout]`,
-        '-map', '0:v:0',
-        '-map', '[aout]',
-        '-t', `${duration}`,
-        '-vf', vfFilters.join(','),
-        '-c:v', 'libx264',
-        '-pix_fmt', 'yuv420p',
-        '-c:a', 'aac',
-        scenePath,
-      );
-
-      await runFfmpeg(args, tempDir);
       sceneFiles.push(scenePath);
     }
 
@@ -313,7 +335,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const bytes = await fs.readFile(finalPath);
+    const deliverPath = path.join(tempDir, 'deliver.mp4');
+    await runFfmpeg([
+      '-y',
+      '-i', finalPath,
+      '-map', '0',
+      '-c', 'copy',
+      '-movflags', '+faststart',
+      deliverPath,
+    ], tempDir);
+
+    const bytes = await fs.readFile(deliverPath);
     return new NextResponse(new Uint8Array(bytes), {
       status: 200,
       headers: {

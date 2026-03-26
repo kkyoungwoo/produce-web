@@ -8,6 +8,15 @@ type ProjectNavigationCachePayload = {
   project: SavedProject;
 };
 
+let inMemoryProjectNavigationCache: ProjectNavigationCachePayload | null = null;
+
+function cloneProjectForMemory(project: SavedProject): SavedProject {
+  if (typeof globalThis.structuredClone === 'function') {
+    return globalThis.structuredClone(project);
+  }
+  return JSON.parse(JSON.stringify(project)) as SavedProject;
+}
+
 function cloneWorkflowImageForNavigation(item: any) {
   if (!item || typeof item !== 'object') return item;
   return {
@@ -71,6 +80,11 @@ function stripProjectBinary(project: SavedProject): SavedProject {
 export function rememberProjectNavigationProject(project: SavedProject | null | undefined) {
   if (typeof window === 'undefined' || !project?.id) return;
   try {
+    inMemoryProjectNavigationCache = {
+      projectId: project.id,
+      savedAt: Date.now(),
+      project: cloneProjectForMemory(project),
+    };
     const payload: ProjectNavigationCachePayload = {
       projectId: project.id,
       savedAt: Date.now(),
@@ -84,6 +98,9 @@ export function rememberProjectNavigationProject(project: SavedProject | null | 
 
 export function readProjectNavigationProject(projectId: string): SavedProject | null {
   if (typeof window === 'undefined' || !projectId) return null;
+  if (inMemoryProjectNavigationCache?.projectId === projectId) {
+    return cloneProjectForMemory(inMemoryProjectNavigationCache.project);
+  }
   try {
     const raw = window.sessionStorage.getItem(PROJECT_NAVIGATION_CACHE_KEY);
     if (!raw) return null;
@@ -97,6 +114,9 @@ export function readProjectNavigationProject(projectId: string): SavedProject | 
 
 export function clearProjectNavigationProject(projectId?: string) {
   if (typeof window === 'undefined') return;
+  if (!projectId || inMemoryProjectNavigationCache?.projectId === projectId) {
+    inMemoryProjectNavigationCache = null;
+  }
   try {
     if (!projectId) {
       window.sessionStorage.removeItem(PROJECT_NAVIGATION_CACHE_KEY);

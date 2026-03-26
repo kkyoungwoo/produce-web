@@ -115,9 +115,19 @@ function createAmbientTrack(seedText: string, seconds = 20, mood = 'ambient') {
 }
 
 function buildMusicVideoReference(draft: WorkflowDraft) {
-  const lyrics = (draft.script || '').trim().replace(/\s+/g, ' ');
+  const lyrics = ((draft.promptStore?.finalPrompts?.finalScript || draft.script || '')).trim().replace(/\s+/g, ' ');
   const excerpt = lyrics ? lyrics.slice(0, 140) : `${draft.topic || '프로젝트 주제'}를 따라가는 장면 흐름`;
   return `뮤직비디오 콘셉트이며 step3에서 작성한 가사를 그대로 lyric reference로 사용합니다. 현재 가사/대본 흐름은 "${excerpt}"이며, step6 배경음악은 이 가사의 훅, 리듬, 보컬 호흡을 우선 반영해야 합니다.`;
+}
+
+function buildSceneFlowReference(draft: WorkflowDraft) {
+  const finalScript = (draft.promptStore?.finalPrompts?.finalScript || draft.script || '').trim().replace(/\s+/g, ' ');
+  const sceneCount = Number((draft.stepContract?.step6?.summaryData as any)?.sceneCount || 0);
+  if (!finalScript) return sceneCount > 0 ? `step6은 총 ${sceneCount}개의 장면 흐름으로 이어집니다.` : '';
+  const excerpt = finalScript.slice(0, 140);
+  return sceneCount > 0
+    ? `step6 장면 흐름은 총 ${sceneCount}개 컷이며, 현재 대표 흐름은 "${excerpt}"입니다.`
+    : `step6 장면 흐름은 "${excerpt}"를 기준으로 이어집니다.`;
 }
 
 export function buildBackgroundMusicPromptSections(
@@ -135,12 +145,13 @@ export function buildBackgroundMusicPromptSections(
   const protagonist = (selections.protagonist || '주요 인물').trim();
   const conflict = (selections.conflict || '핵심 변화').trim();
   const languageLabel = getLanguageLabel(draft);
+  const sceneFlowReference = buildSceneFlowReference(draft);
   const identityBase = draft.contentType === 'music_video'
     ? `보컬 성별은 자유 선택, 장르는 ${genre} 결의 감성 팝, 시네마틱 팝, 혹은 밝은 팝/댄스와 친밀한 시티팝/Lo-Fi 대화형 톤 사이에서 프로젝트 무드에 맞게 결정합니다. 프로젝트 주제는 ${topic}, 배경 무드는 ${setting}이며 ${protagonist}의 감정선과 ${conflict} 흐름이 음악 정체성에 자연스럽게 스며들어야 합니다.`
-    : `보컬은 필요 시 최소화하고, 장르는 ${genre} 결의 인스트루멘털 중심 cinematic background로 설정합니다. 프로젝트 주제 ${topic}, 주요 배경 ${setting}, 주인공 ${protagonist}, 핵심 변화 ${conflict}를 방해하지 않는 배경음 정체성을 유지합니다.`;
+    : `보컬은 필요 시 최소화하고, 장르는 ${genre} 결의 인스트루멘털 중심 cinematic background로 설정합니다. 프로젝트 주제 ${topic}, 주요 배경 ${setting}, 주인공 ${protagonist}, 핵심 변화 ${conflict}를 방해하지 않는 배경음 정체성을 유지합니다. ${sceneFlowReference}`.trim();
   const moodBase = draft.contentType === 'music_video'
-    ? `${mood} 감정선, 미디엄 템포 ${bpm} BPM, ${key}, ${buildMusicVideoReference(draft)} 선택 언어는 ${languageLabel} 기준으로 자연스럽게 들려야 하고, 보컬이 들어가면 step3 가사 줄바꿈과 문장 호흡을 최대한 유지한 채 음절이 너무 뭉개지지 않도록 또렷한 발음과 립싱크 친화적인 프레이징을 유지합니다. 후렴이나 반복 구간이 떠오를 수 있는 리듬 포인트를 분명하게 둡니다.`
-    : `${mood} 분위기, 설명을 방해하지 않는 안정적인 템포 ${bpm} BPM, ${key}, 프롬프트 분위기에 맞게 전개합니다. 선택 언어가 ${languageLabel}라면 허밍이나 짧은 보컬 텍스처도 해당 언어권 발화 흐름과 어긋나지 않게 유지합니다.`;
+    ? `${mood} 감정선, 미디엄 템포 ${bpm} BPM, ${key}, ${buildMusicVideoReference(draft)} ${sceneFlowReference} 선택 언어는 ${languageLabel} 기준으로 자연스럽게 들려야 하고, 보컬이 들어가면 step3 가사 줄바꿈과 문장 호흡을 최대한 유지한 채 음절이 너무 뭉개지지 않도록 또렷한 발음과 립싱크 친화적인 프레이징을 유지합니다. 후렴이나 반복 구간이 떠오를 수 있는 리듬 포인트를 분명하게 둡니다.`
+    : `${mood} 분위기, 설명을 방해하지 않는 안정적인 템포 ${bpm} BPM, ${key}, 프롬프트 분위기에 맞게 전개합니다. ${sceneFlowReference} 선택 언어가 ${languageLabel}라면 허밍이나 짧은 보컬 텍스처도 해당 언어권 발화 흐름과 어긋나지 않게 유지합니다.`;
   const instrumentsBase = draft.contentType === 'music_video'
     ? '일렉트릭 피아노가 따뜻한 메인 모티프를 연주하고, 신스 베이스가 저역 리듬을 밀어주며, 부드러운 드럼이 그루브를 받치고, 기타 포인트가 감정 고조 구간을 강조하고, 에어리 패드가 후렴 공간을 넓혀 주며, 장면 전환에는 과하지 않은 전환 효과를 짧게 넣습니다.'
     : '피아노가 깔끔한 메인 모티프를 연주하고, 소프트 베이스가 바닥을 받치며, 가벼운 퍼커션이 안정적인 박을 유지하고, 스트링이 전환 지점을 살짝 강조하고, 앰비언트 패드가 내레이션 뒤 공간감을 채우며, 필요한 순간에만 짧은 라이저를 넣습니다.';

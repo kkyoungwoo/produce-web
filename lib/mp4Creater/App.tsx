@@ -49,6 +49,7 @@ import { CONFIG } from './config';
 import { readProjectNavigationProject, rememberProjectNavigationProject } from './services/projectNavigationCache';
 import { applyProjectSettingsToRouting, buildProjectSettingsSnapshot } from './services/projectSettingsSnapshot';
 import { buildSceneStudioSnapshotPayload, writeSceneStudioSnapshot } from './services/sceneStudioSnapshotCache';
+import { hasDetailedSceneStudioProject } from './pages/sceneStudio/helpers';
 
 function normalizeLoadedAssets(assets: GeneratedAsset[]): GeneratedAsset[] {
   return assets.map((asset) => ({
@@ -82,20 +83,6 @@ const resolveAppViewMode = (params: ReturnType<typeof useSearchParams>) => {
   if (params?.get('new') || params?.get('projectId') || params?.get('returnTo')) return 'main' as const;
   return 'gallery' as const;
 };
-
-function hasDetailedSceneStudioProject(project?: SavedProject | null) {
-  if (!project) return false;
-  return Boolean(
-    (Array.isArray(project.assets) && project.assets.length)
-    || (Array.isArray(project.backgroundMusicTracks) && project.backgroundMusicTracks.length)
-    || project.previewMix
-    || project.cost
-    || project.sceneStudioPreviewVideo
-    || (Array.isArray(project.sceneList) && project.sceneList.length)
-    || (Array.isArray(project.scriptParagraphs) && project.scriptParagraphs.length)
-    || (Array.isArray(project.ttsFiles) && project.ttsFiles.length)
-  );
-}
 
 function createOptimisticProjectId() {
   return `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

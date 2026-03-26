@@ -5,7 +5,7 @@
  */
 
 import { CONFIG } from '../config';
-import { SavedProject, GeneratedAsset, CostBreakdown, BackgroundMusicTrack, PreviewMixSettings, WorkflowDraft, AudioPreviewAsset, VideoPreviewAsset, ScriptParagraphPlan, ScenePlanItem, TtsFileItem, SubtitlePresetState, YoutubeConnectedAccountInfo, YoutubeUploadStatus } from '../types';
+import { SavedProject, GeneratedAsset, CostBreakdown, BackgroundMusicPromptSections, BackgroundMusicTrack, PreviewMixSettings, WorkflowDraft, AudioPreviewAsset, VideoPreviewAsset, ScriptParagraphPlan, ScenePlanItem, TtsFileItem, SubtitlePresetState, WorkflowRolePromptBundle, WorkflowRolePromptStore, YoutubeConnectedAccountInfo, YoutubeUploadStatus } from '../types';
 import { buildProjectSettingsSnapshot } from './projectSettingsSnapshot';
 import { compactWorkflowDraftForStorage } from './workflowDraftService';
 import { deleteStudioProjects, fetchStudioProjectById, fetchStudioProjects, getCachedStudioState, saveProjectsToStudio, saveStudioProject, summarizeProjectForIndex } from './localFileApi';
@@ -115,14 +115,53 @@ function normalizeTrack(track: any, index: number): BackgroundMusicTrack {
     mode: track?.mode === 'final' ? 'final' : 'preview',
     stylePreset: typeof track?.stylePreset === 'string' ? track.stylePreset : undefined,
     requestedDuration: typeof track?.requestedDuration === 'number' ? track.requestedDuration : (typeof track?.duration === 'number' ? track.duration : null),
-    promptSections: track?.promptSections && typeof track.promptSections === 'object' ? {
-      identity: typeof track.promptSections.identity === 'string' ? track.promptSections.identity : '',
-      mood: typeof track.promptSections.mood === 'string' ? track.promptSections.mood : '',
-      instruments: typeof track.promptSections.instruments === 'string' ? track.promptSections.instruments : '',
-      performance: typeof track.promptSections.performance === 'string' ? track.promptSections.performance : '',
-      production: typeof track.promptSections.production === 'string' ? track.promptSections.production : '',
-    } : null,
+    promptSections: normalizePromptSections(track?.promptSections),
     parentTrackId: typeof track?.parentTrackId === 'string' ? track.parentTrackId : null,
+  };
+}
+
+function normalizePromptSections(value: any): BackgroundMusicPromptSections | null {
+  if (!value || typeof value !== 'object') return null;
+  return {
+    identity: typeof value.identity === 'string' ? value.identity : '',
+    mood: typeof value.mood === 'string' ? value.mood : '',
+    instruments: typeof value.instruments === 'string' ? value.instruments : '',
+    performance: typeof value.performance === 'string' ? value.performance : '',
+    production: typeof value.production === 'string' ? value.production : '',
+  };
+}
+
+function normalizeRolePromptBundle(bundle: any, label: string, stepSources: string[]): WorkflowRolePromptBundle {
+  const sections = bundle?.sections && typeof bundle.sections === 'object'
+    ? Object.fromEntries(
+      Object.entries(bundle.sections)
+        .filter(([, value]) => typeof value === 'string' && value.trim())
+        .map(([key, value]) => [key, (value as string).trim()])
+    )
+    : null;
+
+  return {
+    label: typeof bundle?.label === 'string' && bundle.label.trim() ? bundle.label.trim() : label,
+    stepSources: Array.isArray(bundle?.stepSources)
+      ? bundle.stepSources.filter((value: any) => typeof value === 'string' && value.trim())
+      : stepSources,
+    basePrompt: typeof bundle?.basePrompt === 'string' ? bundle.basePrompt : '',
+    finalPrompt: typeof bundle?.finalPrompt === 'string' ? bundle.finalPrompt : '',
+    resultHint: typeof bundle?.resultHint === 'string' ? bundle.resultHint : null,
+    sections: sections && Object.keys(sections).length ? sections : null,
+  };
+}
+
+function normalizeRolePromptStore(store: any): WorkflowRolePromptStore | null {
+  if (!store || typeof store !== 'object') return null;
+  return {
+    script: normalizeRolePromptBundle(store.script, '대본 프롬프트', ['step1', 'step2', 'step3']),
+    character: normalizeRolePromptBundle(store.character, '캐릭터 프롬프트', ['step2', 'step3', 'step4']),
+    style: normalizeRolePromptBundle(store.style, '스타일 프롬프트', ['step1', 'step2', 'step5']),
+    scene: normalizeRolePromptBundle(store.scene, '장면 프롬프트', ['step2', 'step3', 'step5', 'step6']),
+    video: normalizeRolePromptBundle(store.video, '영상 프롬프트', ['step3', 'step4', 'step5', 'step6']),
+    backgroundMusic: normalizeRolePromptBundle(store.backgroundMusic, '배경음 프롬프트', ['step2', 'step3', 'step6']),
+    thumbnail: normalizeRolePromptBundle(store.thumbnail, '썸네일 프롬프트', ['step1', 'step2', 'step3', 'step4', 'step5', 'step6']),
   };
 }
 
@@ -326,10 +365,15 @@ function normalizeProject(raw: any): SavedProject {
       ? {
           scriptPrompt: typeof raw.prompts.scriptPrompt === 'string' ? raw.prompts.scriptPrompt : null,
           scenePrompt: typeof raw.prompts.scenePrompt === 'string' ? raw.prompts.scenePrompt : null,
+          characterPrompt: typeof raw.prompts.characterPrompt === 'string' ? raw.prompts.characterPrompt : null,
+          stylePrompt: typeof raw.prompts.stylePrompt === 'string' ? raw.prompts.stylePrompt : null,
           imagePrompt: typeof raw.prompts.imagePrompt === 'string' ? raw.prompts.imagePrompt : null,
           videoPrompt: typeof raw.prompts.videoPrompt === 'string' ? raw.prompts.videoPrompt : null,
           motionPrompt: typeof raw.prompts.motionPrompt === 'string' ? raw.prompts.motionPrompt : null,
+          backgroundMusicPrompt: typeof raw.prompts.backgroundMusicPrompt === 'string' ? raw.prompts.backgroundMusicPrompt : null,
+          backgroundMusicPromptSections: normalizePromptSections(raw.prompts.backgroundMusicPromptSections),
           thumbnailPrompt: typeof raw.prompts.thumbnailPrompt === 'string' ? raw.prompts.thumbnailPrompt : null,
+          rolePrompts: normalizeRolePromptStore(raw.prompts.rolePrompts),
           youtubeMetaPrompt: typeof raw.prompts.youtubeMetaPrompt === 'string' ? raw.prompts.youtubeMetaPrompt : null,
         }
       : null,
@@ -1094,6 +1138,7 @@ export async function duplicateProject(id: string): Promise<SavedProject | null>
 
 function buildWorkflowTransferSummary(project: SavedProject) {
   const draft = project.workflowDraft || null;
+  const rolePrompts = project.prompts?.rolePrompts || draft?.promptStore?.rolePrompts || null;
   const selectedCharacterIdSet = Array.isArray(draft?.selectedCharacterIds) && draft.selectedCharacterIds.length
     ? new Set(draft.selectedCharacterIds.filter(Boolean))
     : null;
@@ -1139,15 +1184,37 @@ function buildWorkflowTransferSummary(project: SavedProject) {
       _comment_storyPrompt: '대본 생성용 기본 스토리 프롬프트',
       scenePrompt: draft?.promptPack?.scenePrompt || project.prompts?.scenePrompt || null,
       _comment_scenePrompt: '씬 분해와 장면 작성 기준 프롬프트',
-      characterPrompt: draft?.promptPack?.characterPrompt || null,
+      characterPrompt: project.prompts?.characterPrompt || draft?.promptPack?.characterPrompt || null,
       _comment_characterPrompt: '출연자 캐릭터 설정 기준 프롬프트',
       actionPrompt: draft?.promptPack?.actionPrompt || project.prompts?.motionPrompt || null,
       _comment_actionPrompt: '모션/행동 연출 기준 프롬프트',
+      stylePrompt: project.prompts?.stylePrompt || selectedStyle?.prompt || null,
+      _comment_stylePrompt: 'Step5 최종 화풍과 시각 무드 기준 프롬프트',
       imagePrompt: project.prompts?.imagePrompt || null,
       _comment_imagePrompt: '씬별 이미지 프롬프트를 합쳐 둔 값',
       videoPrompt: project.prompts?.videoPrompt || null,
       _comment_videoPrompt: '씬별 영상 프롬프트를 합쳐 둔 값',
+      backgroundMusicPrompt: project.prompts?.backgroundMusicPrompt || draft?.backgroundMusicScene?.prompt || null,
+      _comment_backgroundMusicPrompt: 'Step2 분위기, Step3 감정선, Step6 흐름을 반영한 배경음 프롬프트',
+      thumbnailPrompt: project.thumbnailPrompt || project.prompts?.thumbnailPrompt || null,
+      _comment_thumbnailPrompt: 'Step1~Step6 전체를 종합한 프로젝트 대표 썸네일 프롬프트',
     },
+    promptRoleSteps: rolePrompts
+      ? Object.fromEntries(Object.entries(rolePrompts).map(([key, bundle]) => [key, bundle.stepSources]))
+      : null,
+    _comment_promptRoleSteps: '역할별 프롬프트가 어느 Step 입력을 기반으로 묶였는지 표시',
+    backgroundMusic: {
+      enabled: Boolean(draft?.backgroundMusicScene?.enabled),
+      selectedTrackId: draft?.backgroundMusicScene?.selectedTrackId || project.activeBackgroundTrackId || null,
+      promptSections: project.prompts?.backgroundMusicPromptSections || draft?.backgroundMusicScene?.promptSections || null,
+    },
+    _comment_backgroundMusic: '배경음은 Step2 분위기, Step3 대본 감정, Step6 장면 흐름을 같이 반영',
+    thumbnail: {
+      selectedThumbnailId: project.selectedThumbnailId || null,
+      thumbnailTitle: project.thumbnailTitle || null,
+      thumbnailPrompt: project.thumbnailPrompt || project.prompts?.thumbnailPrompt || null,
+    },
+    _comment_thumbnail: '썸네일은 별도 산출물이 아니라 Step1~Step6 최종 대표 결과물',
     script: project.script || draft?.script || '',
     _comment_script: 'Step3 최종 대본 또는 Step6에서 편집된 최신 대본',
     paragraphCount: Array.isArray(project.scriptParagraphs) ? project.scriptParagraphs.length : 0,

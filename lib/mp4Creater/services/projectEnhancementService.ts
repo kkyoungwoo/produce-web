@@ -41,7 +41,7 @@ export function buildScenePlanItems(assets: GeneratedAsset[]): ScenePlanItem[] {
     videoPrompt: asset.videoPrompt || '',
     motionPrompt: asset.videoPrompt || asset.visualPrompt || '',
     estimatedSeconds: estimateClipDuration(asset.narration || ''),
-    targetDuration: typeof asset.targetDuration === 'number' ? asset.targetDuration : estimateClipDuration(asset.narration || ''),
+    targetDuration: resolveAssetPlaybackDuration(asset, { fallbackNarrationEstimate: true, preferTargetDuration: true }),
     sceneSourceType: inferAssetSceneSourceType(asset),
     sourceAssetUrl: asset.imageData || asset.videoData || null,
   }));
@@ -62,15 +62,20 @@ export function buildTtsFileItems(assets: GeneratedAsset[], defaultProvider: Tts
 
 export function resolveAssetPlaybackDuration(
   asset?: Pick<GeneratedAsset, 'audioDuration' | 'targetDuration' | 'videoDuration' | 'narration'> | null,
-  options?: { minimum?: number; maximum?: number; fallbackNarrationEstimate?: boolean }
+  options?: { minimum?: number; maximum?: number; fallbackNarrationEstimate?: boolean; preferTargetDuration?: boolean }
 ) {
   const minimum = typeof options?.minimum === 'number' ? options.minimum : 0;
   const maximum = typeof options?.maximum === 'number' ? options.maximum : undefined;
   const narration = `${asset?.narration || ''}`.trim();
+  const safeTargetDuration = typeof asset?.targetDuration === 'number' && Number.isFinite(asset.targetDuration) && asset.targetDuration > 0
+    ? asset.targetDuration
+    : 0;
   const candidates = [asset?.audioDuration, asset?.targetDuration, asset?.videoDuration]
     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0);
 
-  let resolved = candidates.length ? Math.max(...candidates) : 0;
+  let resolved = options?.preferTargetDuration && safeTargetDuration > 0
+    ? safeTargetDuration
+    : (candidates.length ? Math.max(...candidates) : 0);
 
   if ((!resolved || resolved <= 0) && options?.fallbackNarrationEstimate !== false) {
     resolved = narration
@@ -90,7 +95,7 @@ export function resolveAssetPlaybackDuration(
 }
 
 export function sumSceneDuration(assets: GeneratedAsset[]): number {
-  return Number(assets.reduce((total, asset) => total + resolveAssetPlaybackDuration(asset, { fallbackNarrationEstimate: true }), 0).toFixed(2));
+  return Number(assets.reduce((total, asset) => total + resolveAssetPlaybackDuration(asset, { fallbackNarrationEstimate: true, preferTargetDuration: true }), 0).toFixed(2));
 }
 
 export function sumTtsDuration(assets: GeneratedAsset[]): number {
