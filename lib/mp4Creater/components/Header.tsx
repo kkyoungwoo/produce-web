@@ -8,6 +8,7 @@ interface HeaderProps {
   projectCount?: number;
   selectedCharacterName?: string;
   storageDir?: string;
+  liveApiCostTotal?: number | null;
   onOpenSettings?: () => void;
   onGoGallery?: () => void;
   viewMode?: 'main' | 'gallery';
@@ -15,6 +16,12 @@ interface HeaderProps {
   currentSection?: 'main' | 'gallery' | 'characters' | 'scene';
   progressPercent?: number;
   progressText?: string;
+}
+
+function formatApiCost(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return null;
+  if (value === 0) return '$0.00';
+  return value < 0.01 ? `$${value.toFixed(4)}` : `$${value.toFixed(2)}`;
 }
 
 function NavAction({
@@ -53,6 +60,7 @@ function NavAction({
 
 const Header: React.FC<HeaderProps> = ({
   projectCount = 0,
+  liveApiCostTotal,
   onOpenSettings,
   onGoGallery,
   viewMode = 'main',
@@ -66,6 +74,7 @@ const Header: React.FC<HeaderProps> = ({
     basePath.length > 1 && basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
 
   const currentView = searchParams.get('view');
+  const formattedLiveApiCost = formatApiCost(liveApiCostTotal);
 
   // URL이 gallery면 props보다 우선해서 무조건 gallery 활성화
   const isGalleryByUrl =
@@ -106,6 +115,13 @@ const Header: React.FC<HeaderProps> = ({
             >
               프로젝트 {projectCount > 0 ? `(${projectCount})` : ''}
             </NavAction>
+
+            {formattedLiveApiCost ? (
+              <div className="mp4-glass-pill inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700">
+                <span>실시간 API 예상요금</span>
+                <span className="text-sm text-emerald-900">{formattedLiveApiCost}</span>
+              </div>
+            ) : null}
 
             <button
               type="button"

@@ -107,7 +107,7 @@ interface InputSectionProps {
   onSaveWorkflowDraft?: (draft: Partial<WorkflowDraft>) => void | Promise<void>;
   onOpenSceneStudio?: (draft: Partial<WorkflowDraft>) => void | Promise<void>;
   routeStep?: 1 | 2 | 3 | 4 | 5 | null;
-  onNavigateStep?: (step: 1 | 2 | 3 | 4 | 5) => void;
+  onNavigateStep?: (step: 1 | 2 | 3 | 4 | 5) => void | Promise<void>;
   onGoBackFromStep1?: () => void;
 }
 
@@ -1373,7 +1373,7 @@ const InputSection: React.FC<InputSectionProps> = ({
 
   const moveRouteStep = async (targetStep: 1 | 2 | 3 | 4 | 5) => {
     await persistCurrentDraft();
-    onNavigateStep?.(targetStep);
+    await Promise.resolve(onNavigateStep?.(targetStep));
   };
 
   const goBackFromStep1 = () => {
@@ -1462,12 +1462,12 @@ const InputSection: React.FC<InputSectionProps> = ({
       }
       setNotice(`${stage}단계 완료. ${nextStage}단계로 이동합니다.`);
       if (routeStep) {
-        onNavigateStep?.(nextStage as 1 | 2 | 3 | 4 | 5);
+        await Promise.resolve(onNavigateStep?.(nextStage as 1 | 2 | 3 | 4 | 5));
         return true;
       }
       setActiveStage((prev) => Math.max(prev, nextActiveStage) as StepId);
       openStageWithIntent(nextActiveStage);
-      onNavigateStep?.(nextStage as 1 | 2 | 3 | 4 | 5);
+      await Promise.resolve(onNavigateStep?.(nextStage as 1 | 2 | 3 | 4 | 5));
       return true;
     }
 
@@ -2213,17 +2213,31 @@ const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const toggleCharacterSelection = (characterId: string) => {
-    setSelectedCharacterIds((prev) => {
-      if (!prev.includes(characterId)) {
-        return [...new Set([...prev, characterId])];
-      }
-      return prev.filter((id) => id !== characterId);
-    });
-    if (contentType === 'music_video') return;
-    setExtractedCharacters((prev) => prev.map((item) => {
-      if (item.id !== characterId || item.voiceProvider) return item;
-      return { ...item, ...buildCharacterVoicePatch('project-default') };
-    }));
+    const nextSelectedIds = selectedCharacterIdsRef.current.includes(characterId)
+      ? selectedCharacterIdsRef.current.filter((id) => id !== characterId)
+      : [...new Set([...selectedCharacterIdsRef.current, characterId])];
+    selectedCharacterIdsRef.current = nextSelectedIds;
+    setSelectedCharacterIds(nextSelectedIds);
+
+    const nextCharacters = contentType === 'music_video'
+      ? extractedCharactersRef.current
+      : extractedCharactersRef.current.map((item) => {
+          if (item.id !== characterId || item.voiceProvider) return item;
+          return { ...item, ...buildCharacterVoicePatch('project-default') };
+        });
+
+    if (contentType !== 'music_video') {
+      extractedCharactersRef.current = nextCharacters;
+      setExtractedCharacters(nextCharacters);
+    }
+
+    if (onSaveWorkflowDraft) {
+      void Promise.resolve(onSaveWorkflowDraft({
+        extractedCharacters: nextCharacters,
+        selectedCharacterIds: nextSelectedIds,
+      }));
+    }
+    requestWorkflowDraftSave('action');
   };
 
   const chooseCharacterImage = (characterId: string, image: PromptedImageAsset) => {
@@ -2282,6 +2296,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         kind: 'character',
         count: 1,
         existingCount: existingImages.length,
+        mode: options?.sourceLabel ? 'similar' : 'fresh',
       });
       setExtractedCharacters((prev) =>
         prev.map((item) =>
@@ -2872,7 +2887,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     const isCompleted = await completeStage(finalStageForSceneOpen);
     if (!isCompleted) {
       if (routeStep && onNavigateStep) {
-        onNavigateStep(finalStageForSceneOpen as 1 | 2 | 3 | 4 | 5);
+        await Promise.resolve(onNavigateStep(finalStageForSceneOpen as 1 | 2 | 3 | 4 | 5));
         return;
       }
       scrollStageIntoFocus(stepCompleted[3] ? finalStageForSceneOpen : 3);
@@ -3268,5 +3283,3 @@ const InputSection: React.FC<InputSectionProps> = ({
 };
 
 export default InputSection;
-
-

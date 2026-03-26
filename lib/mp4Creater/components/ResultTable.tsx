@@ -44,6 +44,7 @@ interface QuickModelSelector {
 interface ResultTableProps {
   data: GeneratedAsset[];
   onRegenerateImage?: (index: number) => void;
+  onApplySceneSettings?: (index: number) => void | Promise<void>;
   onRegenerateAudio?: (index: number) => void;
   onDeleteAllAudio?: () => void;
   onExportVideo?: (options: { enableSubtitles: boolean; qualityMode: 'preview' | 'final' }) => void;
@@ -77,9 +78,12 @@ interface ResultTableProps {
   progressMessage?: string;
   progressPercent?: number | null;
   progressLabel?: string;
+  previewRenderEstimatedTotalSeconds?: number | null;
+  previewRenderEstimatedRemainingSeconds?: number | null;
   sceneProgressMap?: Record<number, { percent: number; label: string }>;
   finalVideoUrl?: string | null;
   finalVideoTitle?: string;
+  finalVideoDuration?: number | null;
   onPreparePreviewVideo?: () => void | Promise<void>;
   isPreparingPreviewVideo?: boolean;
   onGenerateThumbnail?: () => void | Promise<void>;
@@ -283,6 +287,7 @@ async function downloadScenePackage(row: GeneratedAsset) {
 const ResultTable: React.FC<ResultTableProps> = ({
   data,
   onRegenerateImage,
+  onApplySceneSettings,
   onRegenerateAudio,
   onDeleteAllAudio,
   onExportVideo,
@@ -316,9 +321,12 @@ const ResultTable: React.FC<ResultTableProps> = ({
   progressMessage,
   progressPercent,
   progressLabel,
+  previewRenderEstimatedTotalSeconds,
+  previewRenderEstimatedRemainingSeconds,
   sceneProgressMap,
   finalVideoUrl,
   finalVideoTitle,
+  finalVideoDuration,
   onPreparePreviewVideo,
   isPreparingPreviewVideo,
   onGenerateThumbnail,
@@ -1775,6 +1783,24 @@ const ResultTable: React.FC<ResultTableProps> = ({
                       <div className="mt-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
                         회색으로 잠긴 항목은 아직 조절할 대상이 준비되지 않은 상태입니다. 문단 설정은 미리 열어둘 수 있고, 생성이 끝나면 바로 활성화됩니다.
                       </div>
+                      {onApplySceneSettings ? (
+                        <button
+                          type="button"
+                          disabled={isSceneWorking}
+                          onMouseDown={preventButtonFocusScroll}
+                          onClick={() => {
+                            setActiveModelPicker(null);
+                            setSceneEditorModes((prev) => ({ ...prev, [index]: 'image' }));
+                            setSceneFinalPreviewMode(index, 'video');
+                            void runSceneAction(`apply-scene-${index}`, async () => {
+                              await Promise.resolve(onApplySceneSettings(index));
+                            });
+                          }}
+                          className="mt-2 w-full rounded-2xl border border-blue-200 bg-blue-50 px-3 py-3 text-sm font-black text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          {isSceneWorking ? '문단 설정 반영 중...' : '해당 내용 적용'}
+                        </button>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -2057,11 +2083,14 @@ const ResultTable: React.FC<ResultTableProps> = ({
         progressMessage={progressMessage}
         activeOverallProgress={activeOverallProgress}
         progressLabel={progressLabel}
+        previewRenderEstimatedTotalSeconds={previewRenderEstimatedTotalSeconds}
+        previewRenderEstimatedRemainingSeconds={previewRenderEstimatedRemainingSeconds}
         previewVideoTone={previewVideoTone}
         previewVideoStatus={previewVideoStatus}
         previewVideoMessage={previewVideoMessage}
         finalVideoUrl={finalVideoUrl}
         finalVideoTitle={finalVideoTitle}
+        finalVideoDuration={finalVideoDuration}
         onPreparePreviewVideo={onPreparePreviewVideo}
         isPreparingPreviewVideo={isPreparingPreviewVideo}
         handlePrepareDavinciImport={handlePrepareDavinciImport}

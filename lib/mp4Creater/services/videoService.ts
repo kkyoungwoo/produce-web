@@ -7,16 +7,21 @@ import { resolveAssetPlaybackDuration } from './projectEnhancementService';
  * 고정밀 오디오 디코딩: ElevenLabs(MP3)와 Gemini(PCM) 통합 처리
  */
 async function decodeAudio(base64: string, ctx: AudioContext): Promise<AudioBuffer> {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+  const parsed = parseDataUrl(base64, 'audio/mpeg');
+  const sourceBase64 = parsed ? '' : (base64.startsWith('data:audio') ? (base64.split(',')[1] || '') : base64);
+  const bytes = parsed
+    ? Uint8Array.from(parsed.bytes)
+    : (() => {
+        const binaryString = atob(sourceBase64);
+        const buffer = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) buffer[i] = binaryString.charCodeAt(i);
+        return buffer;
+      })();
 
   try {
-    // MP3/WAV (ElevenLabs)
     return await ctx.decodeAudioData(bytes.buffer.slice(0));
   } catch (e) {
-    // Raw PCM (Gemini)
-    const dataInt16 = new Int16Array(bytes.buffer);
+    const dataInt16 = new Int16Array(bytes.buffer.slice(0));
     const frameCount = dataInt16.length;
     const buffer = ctx.createBuffer(1, frameCount, 24000);
     const channelData = buffer.getChannelData(0);
@@ -104,6 +109,94 @@ async function loadSceneImage(img: HTMLImageElement, asset: GeneratedAsset, scen
   }
 
   throw lastError || new Error(`Scene ${sceneIndex + 1} image load failed`);
+}
+
+
+function wrapPlaceholderText(value: string, maxChars = 24, maxLines = 4): string[] {
+  const normalized = (value || '').replace(/\s+/g, ' ').trim();
+  if (!normalized) return [];
+  const chunks: string[] = [];
+  let cursor = normalized;
+  while (cursor && chunks.length < maxLines) {
+    if (cursor.length <= maxChars) {
+      chunks.push(cursor);
+      break;
+    }
+    let sliceIndex = cursor.lastIndexOf(' ', maxChars);
+    if (sliceIndex < Math.floor(maxChars * 0.55)) sliceIndex = maxChars;
+    chunks.push(cursor.slice(0, sliceIndex).trim());
+    cursor = cursor.slice(sliceIndex).trim();
+  }
+  if (cursor && chunks.length >= maxLines) {
+    chunks[maxLines - 1] = `${chunks[maxLines - 1].slice(0, Math.max(0, maxChars - 1)).trim()}…`;
+  }
+  return chunks.filter(Boolean);
+}
+
+function buildScenePlaceholderDataUrl(asset: GeneratedAsset, sceneIndex: number, width: number, height: number): string {
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(320, width);
+  canvas.height = Math.max(320, height);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, '#0f172a');
+  gradient.addColorStop(0.55, '#1e293b');
+  gradient.addColorStop(1, '#111827');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(canvas.width * 0.08, canvas.height * 0.12, canvas.width * 0.84, canvas.height * 0.76);
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = `700 ${Math.max(26, Math.round(canvas.width * 0.026))}px sans-serif`;
+  ctx.fillText(`씬 ${asset.sceneNumber || sceneIndex + 1}`, canvas.width / 2, canvas.height * 0.28);
+
+  const bodyLines = wrapPlaceholderText(
+    asset.narration || asset.imagePrompt || asset.visualPrompt || asset.videoPrompt || '이미지가 없어도 이 문단은 최종 합본에 포함됩니다.',
+    Math.max(16, Math.round(canvas.width / 32)),
+    4,
+  );
+
+  ctx.font = `600 ${Math.max(18, Math.round(canvas.width * 0.018))}px sans-serif`;
+  const lineHeight = Math.max(28, Math.round(canvas.height * 0.055));
+  const startY = canvas.height * 0.46 - ((bodyLines.length - 1) * lineHeight) / 2;
+  bodyLines.forEach((line, idx) => {
+    ctx.fillText(line, canvas.width / 2, startY + idx * lineHeight);
+  });
+
+  ctx.font = `500 ${Math.max(14, Math.round(canvas.width * 0.013))}px sans-serif`;
+  ctx.fillStyle = 'rgba(255,255,255,0.72)';
+  ctx.fillText('이미지 미등록 씬 자동 플레이스홀더', canvas.width / 2, canvas.height * 0.78);
+
+  return canvas.toDataURL('image/png');
+}
+
+function isRenderableSceneAsset(asset: GeneratedAsset | null | undefined): asset is GeneratedAsset {
+  return Boolean(asset);
+}
+
+async function prepareSceneImage(
+  img: HTMLImageElement,
+  asset: GeneratedAsset,
+  sceneIndex: number,
+  renderProfile: RenderProfile,
+): Promise<void> {
+  const placeholder = buildScenePlaceholderDataUrl(asset, sceneIndex, renderProfile.width, renderProfile.height);
+  try {
+    if (!asset.imageData) throw new Error('Image source missing');
+    await loadSceneImage(img, asset, sceneIndex);
+  } catch {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Placeholder image load failed'));
+      img.src = placeholder;
+    });
+  }
 }
 
 /**
@@ -355,6 +448,246 @@ export interface VideoGenerationResult {
   recordedSubtitles: RecordedSubtitleEntry[];
 }
 
+export const generateVideoStaticFallback = async (
+  assets: GeneratedAsset[],
+  onProgress: (msg: string) => void,
+  abortRef?: { current: boolean },
+  options?: VideoExportOptions
+): Promise<VideoGenerationResult | null> => {
+  const enableSubtitles = options?.enableSubtitles ?? true;
+  const config: SubtitleConfig = { ...DEFAULT_SUBTITLE_CONFIG, ...options?.subtitleConfig };
+  const backgroundTracks = options?.backgroundTracks || [];
+  const previewMix = options?.previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 };
+  const aspectRatio = options?.aspectRatio || assets[0]?.aspectRatio || '16:9';
+  const qualityMode = options?.qualityMode || 'preview';
+
+  const validAssets = assets.filter(isRenderableSceneAsset);
+  if (!validAssets.length) throw new Error('에셋이 준비되지 않았습니다.');
+
+  onProgress(`정적 씬 안전 합본 준비 중 (1/3) · ${qualityMode === 'final' ? '고화질' : '미리보기'}...`);
+
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  const audioCtx = new AudioContextClass();
+  const destination = audioCtx.createMediaStreamDestination();
+  const renderProfile = resolveRenderProfile(validAssets.length, aspectRatio, qualityMode);
+  const preparedScenes: PreparedScene[] = [];
+  let timelinePointer = 0;
+  const DEFAULT_DURATION = 1;
+
+  for (let i = 0; i < validAssets.length; i += 1) {
+    const asset = validAssets[i];
+    onProgress(`안전 합본용 씬 준비 중 (${i + 1}/${validAssets.length})...`);
+
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    await prepareSceneImage(img, asset, i, renderProfile);
+
+    let audioBuffer: AudioBuffer | null = null;
+    let duration = resolveAssetPlaybackDuration(asset, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true });
+
+    if (asset.audioData) {
+      try {
+        audioBuffer = await decodeAudio(asset.audioData, audioCtx);
+        duration = resolveAssetPlaybackDuration({
+          ...asset,
+          audioDuration: Math.max(audioBuffer.duration || 0, asset.audioDuration || 0),
+        }, { minimum: DEFAULT_DURATION, fallbackNarrationEstimate: true });
+      } catch (error) {
+        console.warn(`[Video/Fallback] 씬 ${i + 1} 오디오 디코딩 실패`, error);
+      }
+    }
+
+    const startTime = Number(timelinePointer.toFixed(2));
+    const endTime = Number((timelinePointer + duration).toFixed(2));
+    const subtitleChunks = enableSubtitles ? createSubtitleChunks(asset.subtitleData || null, config) : [];
+
+    preparedScenes.push({
+      img,
+      video: null,
+      isAnimated: false,
+      audioBuffer,
+      subtitleChunks,
+      startTime,
+      endTime,
+      duration,
+    });
+    timelinePointer = endTime;
+  }
+
+  const totalDuration = Number(timelinePointer.toFixed(2));
+  if (totalDuration <= 0) throw new Error('합본 길이를 계산하지 못했습니다.');
+
+  const canvas = document.createElement('canvas');
+  canvas.width = renderProfile.width;
+  canvas.height = renderProfile.height;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  if (!ctx) throw new Error('캔버스 초기화 실패');
+
+  const canvasStream = canvas.captureStream(renderProfile.fps);
+  const combinedStream = new MediaStream([
+    ...canvasStream.getVideoTracks(),
+    ...destination.stream.getAudioTracks(),
+  ]);
+
+  const mimeType = MediaRecorder.isTypeSupported('video/mp4; codecs="avc1.42E01E, mp4a.40.2"')
+    ? 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"'
+    : 'video/webm; codecs=vp9,opus';
+
+  const recorder = new MediaRecorder(combinedStream, {
+    mimeType,
+    videoBitsPerSecond: renderProfile.bitrate,
+  });
+
+  const chunks: Blob[] = [];
+  recorder.ondataavailable = (event) => {
+    if (event.data.size > 0) chunks.push(event.data);
+  };
+
+  const recordedSubtitles: RecordedSubtitleEntry[] = [];
+  let lastRecordedChunkText: string | null = null;
+  let currentChunkStartTime = 0;
+  let subtitleIndex = 0;
+
+  return new Promise(async (resolve, reject) => {
+    let isFinished = false;
+    let lastProgressPercent = -1;
+
+    recorder.onstop = async () => {
+      await audioCtx.close().catch(() => undefined);
+      if (lastRecordedChunkText !== null) {
+        recordedSubtitles.push({
+          index: subtitleIndex,
+          startTime: currentChunkStartTime,
+          endTime: totalDuration,
+          text: lastRecordedChunkText,
+        });
+      }
+      resolve({
+        videoBlob: new Blob(chunks, { type: mimeType }),
+        recordedSubtitles,
+      });
+    };
+
+    recorder.onerror = (event) => reject(event);
+
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
+    }
+
+    onProgress(`정적 씬 안전 합본 렌더링 시작 (2/3)... ${renderProfile.width}x${renderProfile.height}`);
+
+    const initialDelay = 0.35;
+    const masterStartTime = audioCtx.currentTime + initialDelay;
+    const startAt = performance.now() + initialDelay * 1000;
+
+    preparedScenes.forEach((scene) => {
+      if (!scene.audioBuffer) return;
+      const source = audioCtx.createBufferSource();
+      const gainNode = audioCtx.createGain();
+      gainNode.gain.value = previewMix.narrationVolume ?? 1;
+      source.buffer = scene.audioBuffer;
+      source.connect(gainNode);
+      gainNode.connect(destination);
+      source.start(masterStartTime + scene.startTime);
+      source.stop(masterStartTime + Math.min(scene.endTime, scene.startTime + scene.audioBuffer.duration));
+    });
+
+    for (const track of backgroundTracks) {
+      if (!track?.audioData) continue;
+      try {
+        const bgBuffer = await decodeAudio(track.audioData, audioCtx);
+        const source = audioCtx.createBufferSource();
+        const gainNode = audioCtx.createGain();
+        source.buffer = bgBuffer;
+        source.loop = true;
+        gainNode.gain.value = previewMix.backgroundMusicVolume ?? track.volume ?? 0.28;
+        source.connect(gainNode);
+        gainNode.connect(destination);
+        source.start(masterStartTime);
+        source.stop(masterStartTime + totalDuration + 0.25);
+      } catch (error) {
+        console.warn('[Video/Fallback] 배경음 디코딩 실패', error);
+      }
+    }
+
+    recorder.start();
+
+    const drawScene = (scene: PreparedScene, elapsed: number) => {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      const sceneElapsed = Math.max(0, Math.min(scene.duration, elapsed - scene.startTime));
+      const sceneProgress = scene.duration > 0 ? Math.min(1, Math.max(0, sceneElapsed / scene.duration)) : 0;
+      const img = scene.img;
+      if (img.width > 0 && img.height > 0) {
+        const ratio = Math.min(canvas.width / img.width, canvas.height / img.height);
+        const scale = 1 + 0.08 * sceneProgress;
+        const drawWidth = img.width * ratio * scale;
+        const drawHeight = img.height * ratio * scale;
+        ctx.drawImage(img, (canvas.width - drawWidth) / 2, (canvas.height - drawHeight) / 2, drawWidth, drawHeight);
+      }
+
+      if (enableSubtitles) {
+        renderSubtitle(ctx, canvas, scene.subtitleChunks, sceneElapsed, config);
+        const currentChunk = getCurrentChunk(scene.subtitleChunks, sceneElapsed);
+        const currentChunkText = currentChunk?.text || null;
+        if (currentChunkText !== lastRecordedChunkText) {
+          if (lastRecordedChunkText !== null) {
+            recordedSubtitles.push({
+              index: subtitleIndex,
+              startTime: currentChunkStartTime,
+              endTime: Math.max(0, elapsed),
+              text: lastRecordedChunkText,
+            });
+            subtitleIndex += 1;
+          }
+          if (currentChunkText !== null) {
+            currentChunkStartTime = Math.max(0, elapsed);
+          }
+          lastRecordedChunkText = currentChunkText;
+        }
+      }
+    };
+
+    const renderLoop = (now: number = performance.now()) => {
+      if (isFinished) return;
+
+      if (abortRef?.current) {
+        isFinished = true;
+        recorder.stop();
+        return;
+      }
+
+      const elapsed = Math.max(0, (now - startAt) / 1000);
+      const clampedElapsed = Math.min(totalDuration, elapsed);
+      const currentScene = preparedScenes.find((scene) => clampedElapsed >= scene.startTime && clampedElapsed <= scene.endTime)
+        || preparedScenes.find((scene) => clampedElapsed < scene.startTime)
+        || preparedScenes[preparedScenes.length - 1];
+
+      if (currentScene) {
+        drawScene(currentScene, clampedElapsed);
+      }
+
+      const percent = Math.min(100, Math.round((clampedElapsed / totalDuration) * 100));
+      if (percent !== lastProgressPercent && percent % 5 === 0) {
+        lastProgressPercent = percent;
+        onProgress(`정적 씬 안전 합본 렌더링 중: ${percent}%`);
+      }
+
+      if (elapsed >= totalDuration) {
+        isFinished = true;
+        onProgress('정적 씬 안전 합본 완료! 파일 생성 중...');
+        window.setTimeout(() => recorder.stop(), 350);
+        return;
+      }
+
+      requestAnimationFrame(renderLoop);
+    };
+
+    requestAnimationFrame(renderLoop);
+  });
+};
+
 export const generateVideo = async (
   assets: GeneratedAsset[],
   onProgress: (msg: string) => void,
@@ -371,7 +704,7 @@ export const generateVideo = async (
   const useSceneVideos = options?.useSceneVideos ?? true;
 
   // 이미지가 있는 모든 씬 포함 (오디오 없으면 기본 3초)
-  const validAssets = assets.filter((a): a is GeneratedAsset & { imageData: string } => Boolean(a.imageData));
+  const validAssets = assets.filter(isRenderableSceneAsset);
   if (validAssets.length === 0) throw new Error("에셋이 준비되지 않았습니다.");
 
   // 자막 데이터 유무 체크
@@ -393,7 +726,7 @@ export const generateVideo = async (
   const preparedScenes: PreparedScene[] = [];
   let timelinePointer = 0;
 
-  const DEFAULT_DURATION = 3; // 오디오 없을 때 기본 3초
+  const DEFAULT_DURATION = 1; // 오디오/영상/대본이 비어 있어도 기본 1초는 유지
 
   for (let i = 0; i < validAssets.length; i++) {
     const asset = validAssets[i];
@@ -402,23 +735,10 @@ export const generateVideo = async (
     // 이미지 로드 (폴백용으로 항상 필요) - 에러 핸들링 추가
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    await loadSceneImage(img, asset, i).then(() => {
-      console.log(`[Video] 씬 ${i + 1}: 이미지 로드 완료 (${img.width}x${img.height})`);
+    await prepareSceneImage(img, asset, i, renderProfile).then(() => {
+      console.log(`[Video] 씬 ${i + 1}: 이미지 또는 플레이스홀더 준비 완료 (${img.width}x${img.height})`);
     }).catch((e) => {
-      console.warn(`[Video] 씬 ${i + 1}: ${e.message}, 플레이스홀더 사용`);
-      const placeholderCanvas = document.createElement('canvas');
-      placeholderCanvas.width = renderProfile.width;
-      placeholderCanvas.height = renderProfile.height;
-      const pCtx = placeholderCanvas.getContext('2d');
-      if (pCtx) {
-        pCtx.fillStyle = '#1a1a2e';
-        pCtx.fillRect(0, 0, placeholderCanvas.width, placeholderCanvas.height);
-        pCtx.fillStyle = '#fff';
-        pCtx.font = 'bold 48px sans-serif';
-        pCtx.textAlign = 'center';
-        pCtx.fillText(`씬 ${i + 1}`, placeholderCanvas.width / 2, placeholderCanvas.height / 2);
-      }
-      img.src = placeholderCanvas.toDataURL('image/png');
+      console.warn(`[Video] 씬 ${i + 1}: ${e.message}`);
     });
 
     // 애니메이션 영상 로드 (있는 경우)
@@ -569,8 +889,7 @@ export const generateVideo = async (
     for (const track of backgroundTracks) {
       if (!track?.audioData) continue;
       try {
-        const audioData = track.audioData.startsWith('data:audio') ? track.audioData.split(',')[1] : track.audioData;
-        const bgBuffer = await decodeAudio(audioData, audioCtx);
+        const bgBuffer = await decodeAudio(track.audioData, audioCtx);
         const source = audioCtx.createBufferSource();
         const gainNode = audioCtx.createGain();
         source.buffer = bgBuffer;

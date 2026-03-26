@@ -14,23 +14,32 @@
 - `lib/mp4Creater/docs/SETTINGS_MODELS.md`
 - `lib/mp4Creater/docs/step-guides/README.md`
 
-## 작업 순서 추천
-1. 메인 가이드 확인
-2. 관련 Step md 확인
-3. 실제 컴포넌트, 서비스, 저장 경로 수정
-4. 수정한 내용과 연결된 md도 함께 갱신
-5. 저장/복원/선택 반영까지 점검
-
-## 꼭 같이 확인할 파일
-- `lib/mp4Creater/components/InputSection.tsx`
-- `lib/mp4Creater/App.tsx`
-- `lib/mp4Creater/services/projectService.ts`
-- `app/api/local-storage/_shared.ts`
-
-이 문서는 짧고 명확하게 유지합니다. 새 기능이 붙으면 관련 Step 문서와 함께 바로 갱신해 주세요.
+## 이번 프롬프트 연계의 핵심 경로
+- Step1~5 프롬프트 팩: `lib/mp4Creater/services/workflowPromptBuilder.ts`
+- Step2 추천 새로움: `lib/mp4Creater/services/storyRecommendationService.ts`
+- Step4 캐릭터 유사 재생성/업로드 기반 프롬프트: `lib/mp4Creater/components/InputSection.tsx`, `lib/mp4Creater/services/characterStudioService.ts`
+- Step6 문단별 이미지/영상 재생성: `lib/mp4Creater/pages/SceneStudioPage.tsx`, `lib/mp4Creater/components/ResultTable.tsx`, `lib/mp4Creater/services/imageService.ts`
+- Thumbnail Studio: `lib/mp4Creater/services/thumbnailService.ts`, `lib/mp4Creater/pages/ThumbnailStudioPage.tsx`
 
 ## 최신 구현 메모
-- Step6 결과 미리보기는 **팝업 먼저 열고**, 팝업 안에서 사용자가 직접 합본 렌더링 버튼을 눌러 시작하는 흐름을 유지합니다.
-- Step6 컷 길이는 처음 생성 시 0초부터 시작하고, 오디오 생성 또는 영상 생성 뒤 실제 길이로 채웁니다.
-- Step6의 이미지 / 오디오 / 영상 / 합본 렌더링은 과부하와 비용 폭주를 막기 위해 **순차 대기열**로 처리합니다.
-- `thumbnail-studio`는 자동 생성 루프를 만들지 않도록 상태 조회와 프로젝트 저장을 분리하고, 제목/설명/썸네일 생성은 모두 **버튼 트리거**로만 실행합니다.
+- 기본 생성은 항상 새 결과를 우선합니다. 동일 선택값이어도 추천/대본/이미지/영상/썸네일은 최근 결과를 반복하지 않도록 설계합니다.
+- `비슷하게 재생성`은 선택된 기준 이미지나 썸네일의 핵심 정체성만 유지한 근접 변형입니다.
+- Step6은 각 문단이 개별 컷이지만 이전/다음 씬과 연결되는 하나의 영상 흐름처럼 유지해야 합니다.
+- 문단 설정 내부의 `해당 내용 적용` 버튼은 현재 문단 편집값으로 이미지와 영상을 다시 반영하는入口입니다.
+- 썸네일은 실제 씬/캐릭터/화풍/대본을 기반으로 만들고, 새 생성과 유사 재생성을 분리해서 다룹니다.
+
+## Step6 Latest Stable Flow
+- Step5 -> Step6 handoff must stay centered on `lib/mp4Creater/App.tsx` `handleOpenSceneStudio`.
+- Before route push, the latest `workflowDraft`, initial scene cards, background tracks, and preview mix must be written to both `projectNavigationCache` and `sceneStudioSnapshotCache`.
+- Step6 first paint must prefer the newest source among navigation cache, scene snapshot, and saved project JSON.
+- If `generatedData` already exists, Step6 must keep the result panel visible even while project hydration is still running.
+- Reopen logic must not recreate draft placeholder scenes before saved Step6 payload hydration finishes.
+- Latest Step6 state is decided by comparing project `lastSavedAt` and snapshot `savedAt`.
+
+## Prompt Path Preserve Rules
+- Step1~5 prompt chain: `lib/mp4Creater/services/workflowPromptBuilder.ts`
+- Step2 freshness / recommendation logic: `lib/mp4Creater/services/storyRecommendationService.ts`
+- Step4 character upload / selection / similar-regeneration logic: `lib/mp4Creater/components/InputSection.tsx`, `lib/mp4Creater/services/characterStudioService.ts`
+- Step6 paragraph image/video continuity logic: `lib/mp4Creater/pages/SceneStudioPage.tsx`, `lib/mp4Creater/services/imageService.ts`, `lib/mp4Creater/components/ResultTable.tsx`
+- Workflow contract / summary JSON structure: `lib/mp4Creater/services/workflowStepContractService.ts`
+- If any of these paths or responsibilities change, update this md and the matching step guide in the same patch.

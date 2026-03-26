@@ -244,6 +244,7 @@ export interface VideoPreviewAsset {
   title: string;
   prompt: string;
   videoData: string | null;
+  duration?: number | null;
   provider: 'elevenLabs' | 'sample';
   mode: 'preview' | 'final';
   sourceMode: 'ai' | 'sample';

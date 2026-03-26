@@ -13,3 +13,7 @@
 2. 적힌 경로의 컴포넌트와 서비스 확인
 3. 저장/export/import 연결 파일도 같이 확인
 4. 수정 후 관련 md도 바로 갱신
+
+## Step6 latest note
+- Before touching Step6, read `docs/step-guides/STEP6.md`, `SAVE_TRIGGER_GUIDE.md`, and `docs/PROMPT_MANAGEMENT.md` together.
+- Current stable behavior: Step5 writes the newest Step6 snapshot before route push, and Step6 must show cached cards immediately if they already exist.

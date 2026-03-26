@@ -1,14 +1,13 @@
 # STEP1
 
-목표: 콘셉트와 화면비율이 뒤 step까지 또렷하게 이어지게 유지합니다.
+목표: 콘텐츠 타입과 화면 비율이 뒤 Step 전체의 고정 축이 되게 유지합니다.
 
 ## 먼저 읽을 파일
 - `lib/mp4Creater/components/InputSection.tsx`
+- `lib/mp4Creater/services/workflowPromptBuilder.ts`
 - `lib/mp4Creater/services/workflowDraftService.ts`
-- `lib/mp4Creater/config/promptEditGuides.ts`
 
-## 안전 수정 포인트
-- Step1 선택값은 workflowDraft의 시작값입니다.
-- 콘셉트 문구를 바꿀 때는 Step3 추천 분량과 문체 영향도 같이 확인하면 좋습니다.
-- 화면비율은 Step6 씬 제작 기준과 연결됩니다.
-- Step1 관련 항목이 추가되면 이 md와 저장 경로를 함께 갱신합니다.
+## 이번 유지 포인트
+- Step1 선택값은 Step3 대본, Step4 캐릭터, Step5 화풍, Step6 씬, 썸네일까지 계속 전달됩니다.
+- 콘텐츠 타입이 바뀌면 대본 문체뿐 아니라 립싱크 규칙과 썸네일 방향도 같이 바뀌어야 합니다.
+- 화면 비율은 Step6 이미지/영상 생성 기준과 함께 유지합니다.

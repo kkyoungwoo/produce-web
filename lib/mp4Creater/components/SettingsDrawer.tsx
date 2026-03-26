@@ -144,16 +144,16 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const youtubePopupPollRef = useRef<number | null>(null);
 
   const visibleScriptModels = useMemo(
-    () => SCRIPT_MODEL_OPTIONS,
-    [],
+    () => (isPaidMode ? SCRIPT_MODEL_OPTIONS : SCRIPT_MODEL_OPTIONS.filter((item) => item.tier !== 'paid')),
+    [isPaidMode],
   );
   const visibleImageModels = useMemo(
-    () => IMAGE_MODELS,
-    [],
+    () => (isPaidMode ? IMAGE_MODELS : IMAGE_MODELS.filter((item) => item.tier !== 'paid')),
+    [isPaidMode],
   );
   const visibleVideoModels = useMemo(
-    () => VIDEO_MODEL_OPTIONS,
-    [],
+    () => (isPaidMode ? VIDEO_MODEL_OPTIONS : VIDEO_MODEL_OPTIONS.filter((item) => item.tier !== 'paid')),
+    [isPaidMode],
   );
 
   useEffect(() => {
@@ -378,6 +378,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
       routing.voiceReferenceName || '',
     ].join('|');
+    const canUseVoiceReference = provider === 'chatterbox';
 
     if (isVoicePreviewing && voicePreviewKeyRef.current === voicePreviewKey) {
       stopVoicePreview();
@@ -411,8 +412,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
         modelId: routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
         qwenPreset: provider === 'chatterbox' ? (routing.chatterboxVoicePreset || 'chatterbox-clear') : (routing.qwenVoicePreset || 'qwen-default'),
         locale: 'ko',
-        voiceReferenceAudioData: routing.voiceReferenceAudioData || null,
-        voiceReferenceMimeType: routing.voiceReferenceMimeType || null,
+        voiceReferenceAudioData: canUseVoiceReference ? (routing.voiceReferenceAudioData || null) : null,
+        voiceReferenceMimeType: canUseVoiceReference ? (routing.voiceReferenceMimeType || null) : null,
       });
 
       const audioSrc = asset.audioData?.startsWith('data:') ? asset.audioData : `data:audio/mpeg;base64,${asset.audioData}`;
@@ -436,9 +437,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       }
 
       if (provider === 'qwen3Tts') {
-        setVoicePreviewMessage(routing.voiceReferenceName
-          ? `경량 무료 모델로 ${routing.voiceReferenceName} 목소리를 반영한 미리 듣기 중입니다.`
-          : '경량 무료 모델로 한국어 기본 보이스 미리 듣기 중입니다.');
+        setVoicePreviewMessage('경량 무료 모델로 한국어 기본 보이스 미리 듣기 중입니다.');
         return;
       }
 
@@ -1393,7 +1392,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                     </select>
                   </label>
                 ) : null}
-                {(routing.ttsProvider === 'qwen3Tts' || routing.ttsProvider === 'chatterbox') ? (
+                {routing.ttsProvider === 'chatterbox' ? (
                   <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
@@ -1432,7 +1431,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                     ? `현재 기본 보이스: ${selectedElevenVoice?.name || 'ElevenLabs 기본 보이스'}${selectedElevenVoice?.labels?.gender ? ` · ${selectedElevenVoice.labels.gender}` : ''}`
                     : routing.ttsProvider === 'chatterbox'
                       ? `현재 기본 보이스: ${selectedChatterboxVoice?.name || 'Chatterbox 클리어'} · 고품질 무료 모델${routing.voiceReferenceName ? ` · 등록 샘플 ${routing.voiceReferenceName}` : ''}`
-                      : `현재 기본 보이스: ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'} · 경량 무료 모델${routing.voiceReferenceName ? ` · 등록 샘플 ${routing.voiceReferenceName}` : ''}`}
+                      : `현재 기본 보이스: ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'} · 경량 무료 모델`}
                 </div>
                 <button type="button" onClick={() => void playVoicePreview()} className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
                   {isVoicePreviewing ? '음성 정지' : '음성 재생'}

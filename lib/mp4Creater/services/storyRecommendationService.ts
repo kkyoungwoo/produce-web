@@ -1,7 +1,8 @@
 import { ContentType, ScriptLanguageOption, StorySelectionState } from '../types';
 import { runOpenRouterText } from './openRouterService';
 
-type SelectionBank = { topic: string[] } & Record<keyof StorySelectionState, string[]>;
+type StorySelectionField = 'genre' | 'mood' | 'endingTone' | 'setting' | 'protagonist' | 'conflict';
+type SelectionBank = { topic: string[] } & Record<StorySelectionField, string[]>;
 
 const BANKS: Record<ContentType, SelectionBank> = {
   music_video: {
@@ -41,29 +42,6 @@ const BANKS: Record<ContentType, SelectionBank> = {
     conflict: ['복잡한 내용을 쉽게 전달해야 함', '핵심 우선순위를 빠르게 전달해야 함', '오해 없이 정확히 안내해야 함', '짧은 시간 내 이해도를 올려야 함'],
   },
 };
-
-function pickFromList(list: string[], seedText: string, offset = 0): string {
-  const seed = Array.from(`${seedText}:${offset}`).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return list[seed % list.length];
-}
-
-function fallbackSelections(contentType: ContentType, topic?: string): StorySelectionState {
-  const bank = BANKS[contentType];
-  const seed = topic?.trim() || bank.topic[0];
-  return {
-    genre: pickFromList(bank.genre, seed, 1),
-    mood: pickFromList(bank.mood, seed, 2),
-    endingTone: pickFromList(bank.endingTone, seed, 3),
-    setting: pickFromList(bank.setting, seed, 4),
-    protagonist: pickFromList(bank.protagonist, seed, 5),
-    conflict: pickFromList(bank.conflict, seed, 6),
-  };
-}
-
-export function getTopicSuggestion(contentType: ContentType, currentTopic = ''): string {
-  const bank = BANKS[contentType];
-  return currentTopic.trim() || pickFromList(bank.topic, String(Date.now()), 1);
-}
 
 const TOPIC_SENTENCE_PATTERNS: Record<ContentType, string[]> = {
   music_video: [
@@ -108,11 +86,105 @@ const TOPIC_SENTENCE_PATTERNS: Record<ContentType, string[]> = {
   ],
 };
 
+const RECOMMENDATION_HISTORY_KEY = 'mp4creater:recommendation-history';
+const STORY_SELECTION_FIELDS: StorySelectionField[] = ['genre', 'mood', 'endingTone', 'setting', 'protagonist', 'conflict'];
+const MAX_HISTORY_PER_KEY = 8;
+
 function normalizeTopicSeed(value: string): string {
   const compact = value.replace(/\s+/g, ' ').trim();
   if (!compact) return '';
-  const firstChunk = compact.split(/[,\n|/]/)[0]?.trim() || compact;
+  const firstChunk = compact.split(/[\n,|/]/)[0]?.trim() || compact;
   return firstChunk.slice(0, 36);
+}
+
+function readRecommendationHistory(): Record<string, string[]> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(RECOMMENDATION_HISTORY_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeRecommendationHistory(next: Record<string, string[]>) {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(RECOMMENDATION_HISTORY_KEY, JSON.stringify(next));
+  } catch {}
+}
+
+function normalizeHistoryValue(value: string): string {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
+function buildRecommendationHistoryKey(contentType: ContentType, scope: string, seedText = '') {
+  const normalizedSeed = normalizeTopicSeed(seedText).toLowerCase();
+  return `${contentType}:${scope}:${normalizedSeed || 'global'}`;
+}
+
+function getRecentRecommendations(key: string): string[] {
+  const history = readRecommendationHistory();
+  return Array.isArray(history[key]) ? history[key] : [];
+}
+
+function rememberRecommendations(key: string, values: string[]) {
+  const cleaned = values
+    .map((item) => item.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+  if (!cleaned.length) return;
+
+  const history = readRecommendationHistory();
+  const merged: string[] = [];
+  for (const value of [...cleaned, ...(history[key] || [])]) {
+    const normalized = normalizeHistoryValue(value);
+    if (!normalized || merged.some((entry) => normalizeHistoryValue(entry) === normalized)) continue;
+    merged.push(value);
+    if (merged.length >= MAX_HISTORY_PER_KEY) break;
+  }
+  history[key] = merged;
+  writeRecommendationHistory(history);
+}
+
+function filterRecentDuplicates(values: string[], recent: string[]): string[] {
+  const recentSet = new Set(recent.map((item) => normalizeHistoryValue(item)));
+  return values.filter((item) => !recentSet.has(normalizeHistoryValue(item)));
+}
+
+function hashCode(value: string) {
+  return Array.from(value).reduce((acc, char, index) => {
+    return (acc + char.charCodeAt(0) * (index + 1)) % 100000;
+  }, 0);
+}
+
+function buildNonceLabel(seedText: string) {
+  return `${Date.now().toString(36)}-${hashCode(seedText || String(Date.now())).toString(36)}`;
+}
+
+function pickFromList(list: string[], seedText: string, offset = 0): string {
+  const seed = Array.from(`${seedText}:${offset}`).reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return list[seed % list.length];
+}
+
+function pickFreshFallbackValue(list: string[], seedText: string, offset: number, recent: string[]) {
+  const freshPool = filterRecentDuplicates(list, recent);
+  const pool = freshPool.length ? freshPool : list;
+  return pickFromList(pool, `${seedText}:${buildNonceLabel(seedText)}`, offset);
+}
+
+function fallbackSelections(contentType: ContentType, topic?: string): StorySelectionState {
+  const bank = BANKS[contentType];
+  const seed = topic?.trim() || bank.topic[0];
+  return {
+    genre: pickFreshFallbackValue(bank.genre, seed, 1, getRecentRecommendations(buildRecommendationHistoryKey(contentType, 'genre', seed))),
+    mood: pickFreshFallbackValue(bank.mood, seed, 2, getRecentRecommendations(buildRecommendationHistoryKey(contentType, 'mood', seed))),
+    endingTone: pickFreshFallbackValue(bank.endingTone, seed, 3, getRecentRecommendations(buildRecommendationHistoryKey(contentType, 'endingTone', seed))),
+    setting: pickFreshFallbackValue(bank.setting, seed, 4, getRecentRecommendations(buildRecommendationHistoryKey(contentType, 'setting', seed))),
+    protagonist: pickFreshFallbackValue(bank.protagonist, seed, 5, getRecentRecommendations(buildRecommendationHistoryKey(contentType, 'protagonist', seed))),
+    conflict: pickFreshFallbackValue(bank.conflict, seed, 6, getRecentRecommendations(buildRecommendationHistoryKey(contentType, 'conflict', seed))),
+  };
 }
 
 function getContentLabel(contentType: ContentType) {
@@ -120,6 +192,11 @@ function getContentLabel(contentType: ContentType) {
   if (contentType === 'cinematic') return '영화';
   if (contentType === 'info_delivery') return '정보 전달';
   return '이야기';
+}
+
+export function getTopicSuggestion(contentType: ContentType, currentTopic = ''): string {
+  const bank = BANKS[contentType];
+  return currentTopic.trim() || pickFreshFallbackValue(bank.topic, String(Date.now()), 1, getRecentRecommendations(buildRecommendationHistoryKey(contentType, 'topic')));
 }
 
 export function buildTopicSentenceRecommendations(contentType: ContentType, topic: string, count = 8): string[] {
@@ -159,29 +236,36 @@ export async function recommendStorySelections(options: {
   model?: string;
 }): Promise<StorySelectionState> {
   const fallback = fallbackSelections(options.contentType, options.topic);
+  const topicSeed = normalizeTopicSeed(options.topic || '') || fallback.genre;
+  const recentSummary = STORY_SELECTION_FIELDS
+    .map((field) => `${field}: ${getRecentRecommendations(buildRecommendationHistoryKey(options.contentType, field, topicSeed)).slice(0, 3).join(' / ') || '없음'}`)
+    .join('\n');
+
   try {
     const contentLabel = getContentLabel(options.contentType);
     const response = await runOpenRouterText({
       model: options.model || 'openrouter/auto',
-      temperature: 0.85,
+      temperature: 0.9,
       responseFormat: { type: 'json_object' },
       messages: [
         {
           role: 'system',
-          content:
-            '당신은 한국어 영상 스토리 기획 보조다. 직관적이고 자연스러운 값만 JSON으로 반환해라. 키는 genre, mood, endingTone, setting, protagonist, conflict 이다.',
+          content: '당신은 한국어 영상 스토리 기획 보조다. 직관적이고 자연스러운 값만 JSON으로 반환해라. 키는 genre, mood, endingTone, setting, protagonist, conflict 이다. 최근 추천을 반복하지 말고 매번 새 디테일로 제안해라.',
         },
         {
           role: 'user',
           content: `콘텐츠 유형: ${contentLabel}
 주제: ${options.topic || '자동 추천'}
-너무 과하지 않지만 초보자가 쓰기 쉬운 값으로 추천해줘.`,
+최근 추천 히스토리:
+${recentSummary}
+새 추천 nonce: ${buildNonceLabel(topicSeed)}
+너무 과하지 않지만 초보자가 쓰기 쉬운 값으로 추천해줘. 같은 주제여도 직전 추천과 표현이 겹치지 않게 바꿔줘.`,
         },
       ],
     });
 
     const parsed = JSON.parse(response);
-    return {
+    const result: StorySelectionState = {
       genre: parsed.genre || fallback.genre,
       mood: parsed.mood || fallback.mood,
       endingTone: parsed.endingTone || fallback.endingTone,
@@ -189,13 +273,20 @@ export async function recommendStorySelections(options: {
       protagonist: parsed.protagonist || fallback.protagonist,
       conflict: parsed.conflict || fallback.conflict,
     };
+    STORY_SELECTION_FIELDS.forEach((field) => {
+      rememberRecommendations(buildRecommendationHistoryKey(options.contentType, field, topicSeed), [result[field]]);
+    });
+    return result;
   } catch {
+    STORY_SELECTION_FIELDS.forEach((field) => {
+      rememberRecommendations(buildRecommendationHistoryKey(options.contentType, field, topicSeed), [fallback[field]]);
+    });
     return fallback;
   }
 }
 
 export async function recommendStoryField(options: {
-  field: keyof StorySelectionState;
+  field: StorySelectionField;
   contentType: ContentType;
   topic?: string;
   model?: string;
@@ -205,6 +296,7 @@ export async function recommendStoryField(options: {
     topic: options.topic,
     model: options.model,
   });
+  rememberRecommendations(buildRecommendationHistoryKey(options.contentType, options.field, options.topic || ''), [all[options.field]]);
   return all[options.field];
 }
 
@@ -216,11 +308,16 @@ export async function recommendTopicFromInput(options: {
   scriptLanguage?: ScriptLanguageOption;
 }): Promise<string> {
   const seedText = normalizeTopicSeed(options.inputText);
+  const historyKey = buildRecommendationHistoryKey(options.contentType, 'topic', seedText);
+  const recentTopics = getRecentRecommendations(historyKey);
   const fallbackBase = seedText || getTopicSuggestion(options.contentType, '');
-  const fallbackPool = buildTopicSentenceRecommendations(options.contentType, fallbackBase);
-  const fallback = fallbackPool[Math.floor(Math.random() * fallbackPool.length)] || fallbackBase;
+  const fallbackPool = filterRecentDuplicates(buildTopicSentenceRecommendations(options.contentType, fallbackBase), recentTopics);
+  const fallback = fallbackPool[Math.floor(Math.random() * Math.max(1, fallbackPool.length))] || fallbackBase;
 
-  if (!options.allowAi) return fallback;
+  if (!options.allowAi) {
+    rememberRecommendations(historyKey, [fallback]);
+    return fallback;
+  }
 
   try {
     const contentLabel = getContentLabel(options.contentType);
@@ -237,16 +334,19 @@ export async function recommendTopicFromInput(options: {
           content: `콘텐츠 유형: ${contentLabel}
 사용자 입력: ${seedText || '자동 추천'}
 무음 모드 여부: ${options.scriptLanguage === 'mute' ? '예' : '아니오'}
-새 추천 nonce: ${Date.now()}
+최근 추천: ${recentTopics.slice(0, 5).join(' / ') || '없음'}
+새 추천 nonce: ${buildNonceLabel(seedText || fallbackBase)}
 이 입력을 바탕으로 바로 사용할 수 있는 새 주제 한 줄만 추천해줘.
 입력이 길면 정보 밀도에 맞춰 조금 더 구체적으로 쓰고, 무음 모드면 화면 전개와 장면 흐름이 떠오르도록 제안해줘.`,
         },
       ],
     });
 
-    const cleaned = response.replace(/\s+/g, ' ').trim();
-    return cleaned || fallback;
+    const cleaned = response.replace(/\s+/g, ' ').trim() || fallback;
+    rememberRecommendations(historyKey, [cleaned]);
+    return cleaned;
   } catch {
+    rememberRecommendations(historyKey, [fallback]);
     return fallback;
   }
 }
@@ -261,14 +361,21 @@ export async function recommendTopicCandidatesFromInput(options: {
 }): Promise<string[]> {
   const count = Math.max(1, options.count || 5);
   const seedText = normalizeTopicSeed(options.inputText);
-  const fallbackFactory = () => buildTopicSentenceRecommendations(
-    options.contentType,
-    seedText || getTopicSuggestion(options.contentType, ''),
-    count + 2
+  const historyKey = buildRecommendationHistoryKey(options.contentType, 'topic-candidates', seedText);
+  const recentTopics = getRecentRecommendations(historyKey);
+  const fallbackFactory = () => normalizeUniqueTopicList(
+    filterRecentDuplicates(
+      buildTopicSentenceRecommendations(options.contentType, seedText || getTopicSuggestion(options.contentType, ''), count + 4),
+      recentTopics,
+    ),
+    count + 2,
+    () => buildTopicSentenceRecommendations(options.contentType, seedText || getTopicSuggestion(options.contentType, ''), count + 4),
   );
 
   if (!options.allowAi) {
-    return normalizeUniqueTopicList(fallbackFactory(), count, fallbackFactory);
+    const fallbackTopics = normalizeUniqueTopicList(fallbackFactory(), count, fallbackFactory);
+    rememberRecommendations(historyKey, fallbackTopics);
+    return fallbackTopics;
   }
 
   try {
@@ -287,7 +394,8 @@ export async function recommendTopicCandidatesFromInput(options: {
           content: `콘텐츠 유형: ${contentLabel}
 사용자 입력: ${seedText || '자동 추천'}
 무음 모드 여부: ${options.scriptLanguage === 'mute' ? '예' : '아니오'}
-새 추천 nonce: ${Date.now()}
+최근 추천: ${recentTopics.slice(0, 6).join(' / ') || '없음'}
+새 추천 nonce: ${buildNonceLabel(seedText || String(count))}
 조건:
 1) 주제 문장을 ${count}개 추천
 2) 각 항목은 줄바꿈 없는 한 줄 문장으로 작성
@@ -302,12 +410,16 @@ export async function recommendTopicCandidatesFromInput(options: {
 
     const parsed = JSON.parse(response);
     const topics = Array.isArray(parsed?.topics) ? parsed.topics : [];
-    return normalizeUniqueTopicList(
-      topics.map((item: unknown) => (typeof item === 'string' ? item : '')).filter(Boolean),
+    const normalized = normalizeUniqueTopicList(
+      filterRecentDuplicates(topics.map((item: unknown) => (typeof item === 'string' ? item : '')).filter(Boolean), recentTopics),
       count,
-      fallbackFactory
+      fallbackFactory,
     );
+    rememberRecommendations(historyKey, normalized);
+    return normalized;
   } catch {
-    return normalizeUniqueTopicList(fallbackFactory(), count, fallbackFactory);
+    const fallbackTopics = normalizeUniqueTopicList(fallbackFactory(), count, fallbackFactory);
+    rememberRecommendations(historyKey, fallbackTopics);
+    return fallbackTopics;
   }
 }

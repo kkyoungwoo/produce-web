@@ -48,6 +48,7 @@ import { createDefaultWorkflowDraft, ensureWorkflowDraft } from './services/work
 import { CONFIG } from './config';
 import { readProjectNavigationProject, rememberProjectNavigationProject } from './services/projectNavigationCache';
 import { applyProjectSettingsToRouting, buildProjectSettingsSnapshot } from './services/projectSettingsSnapshot';
+import { buildSceneStudioSnapshotPayload, writeSceneStudioSnapshot } from './services/sceneStudioSnapshotCache';
 
 function normalizeLoadedAssets(assets: GeneratedAsset[]): GeneratedAsset[] {
   return assets.map((asset) => ({
@@ -294,14 +295,15 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   const requestedProjectId = searchParams?.get('projectId') || '';
 
   const buildNavigationSnapshotProject = useCallback((workflowDraftOverride?: WorkflowDraft | null) => {
-    if (!currentProjectId) return null;
-    const existingProject = savedProjects.find((item) => item.id === currentProjectId) || null;
+    const targetProjectId = currentProjectId || requestedProjectId;
+    if (!targetProjectId) return null;
+    const existingProject = savedProjects.find((item) => item.id === targetProjectId) || null;
     const topic = workflowDraftOverride?.topic || currentTopic || existingProject?.topic || existingProject?.name || '새 프로젝트';
     const fallbackDraft = workflowDraftOverride
       || studioStateRef.current?.workflowDraft
       || createDefaultWorkflowDraft(studioStateRef.current?.lastContentType || 'story');
     const baseProject = createOptimisticWorkflowProject({
-      projectId: currentProjectId,
+      projectId: targetProjectId,
       topic,
       workflowDraft: fallbackDraft,
       assets: generatedData,
@@ -312,7 +314,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     return {
       ...baseProject,
       ...existingProject,
-      id: currentProjectId,
+      id: targetProjectId,
       topic,
       workflowDraft: fallbackDraft,
       assets: generatedData.length ? normalizeLoadedAssets(generatedData) : (existingProject?.assets || []),
@@ -321,7 +323,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       lastSavedAt: Date.now(),
       cost: currentCost || existingProject?.cost,
     } as SavedProject;
-  }, [backgroundMusicTracks, currentCost, currentProjectId, currentTopic, generatedData, previewMix, savedProjects]);
+  }, [backgroundMusicTracks, currentCost, currentProjectId, currentTopic, generatedData, previewMix, requestedProjectId, savedProjects]);
 
   const applyProjectListSnapshot = useCallback((projects: SavedProject[] = []) => {
     const nextProjects = [...projects]
@@ -1096,10 +1098,11 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       void commitPendingWorkflowDraft();
     }, 180);
 
-    if (currentProjectId && storageReady) {
+    const targetProjectId = currentProjectId || requestedProjectId;
+    if (targetProjectId && storageReady) {
       if (projectDraftSyncTimerRef.current) window.clearTimeout(projectDraftSyncTimerRef.current);
       projectDraftSyncTimerRef.current = window.setTimeout(() => {
-        void updateProject(currentProjectId, {
+        void updateProject(targetProjectId, {
           workflowDraft: nextDraft,
           topic: nextDraft.topic || currentTopic || '새 프로젝트',
         });
@@ -1160,6 +1163,15 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       setPreviewMix(nextPreviewMix);
       setCurrentProjectId(optimisticSceneProject.id);
       rememberProjectNavigationProject(optimisticSceneProject);
+      writeSceneStudioSnapshot(buildSceneStudioSnapshotPayload({
+        projectId: optimisticSceneProject.id,
+        assets: initialSceneAssets,
+        backgroundMusicTracks: nextBackgroundTracks,
+        activeBackgroundTrackId: nextBackgroundTracks[0]?.id || null,
+        previewMix: nextPreviewMix,
+        workflowDraft: projectDraftForScene,
+        cost: currentCost || null,
+      }));
 
       try {
         localStorage.removeItem(CONFIG.STORAGE_KEYS.PENDING_SCENE_AUTOSTART);
@@ -1218,6 +1230,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         projectCount={savedProjects.length}
         selectedCharacterName={selectedCharacterName}
         storageDir={studioState?.storageDir}
+        liveApiCostTotal={currentCost?.total ?? null}
         onOpenSettings={() => setShowSettings(true)}
         onGoGallery={() => { router.push(`${basePath}?view=gallery`, { scroll: false }); }}
         viewMode={viewMode}
@@ -1306,10 +1319,18 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
             workflowDraft={effectiveWorkflowDraft}
             basePath={basePath}
             routeStep={routeStep}
-            onNavigateStep={(nextStep) => {
+            onNavigateStep={async (nextStep) => {
               const currentDraft = pendingWorkflowDraftRef.current || studioStateRef.current?.workflowDraft || effectiveWorkflowDraft;
+              if (workflowDraftSaveTimerRef.current) {
+                window.clearTimeout(workflowDraftSaveTimerRef.current);
+                workflowDraftSaveTimerRef.current = null;
+              }
+              if (projectDraftSyncTimerRef.current) {
+                window.clearTimeout(projectDraftSyncTimerRef.current);
+                projectDraftSyncTimerRef.current = null;
+              }
               if (pendingWorkflowDraftRef.current) {
-                void commitPendingWorkflowDraft();
+                await commitPendingWorkflowDraft();
               }
               if (currentDraft) {
                 const navigationSnapshotProject = buildNavigationSnapshotProject(currentDraft);
@@ -1317,13 +1338,17 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
                   rememberProjectNavigationProject(navigationSnapshotProject);
                 }
               }
-              if (currentProjectId && storageReady && currentDraft) {
-                void updateProject(currentProjectId, {
+              const targetProjectId = currentProjectId || requestedProjectId;
+              if (targetProjectId && storageReady && currentDraft) {
+                const persistedProject = await updateProject(targetProjectId, {
                   workflowDraft: currentDraft,
                   topic: currentDraft.topic || currentTopic || '새 프로젝트',
                 });
+                if (persistedProject) {
+                  rememberProjectNavigationProject(persistedProject);
+                }
               }
-              const projectQuery = currentProjectId ? `?projectId=${encodeURIComponent(currentProjectId)}` : '';
+              const projectQuery = targetProjectId ? `?projectId=${encodeURIComponent(targetProjectId)}` : '';
               try { window.scrollTo({ top: 0, behavior: 'auto' }); } catch {}
               router.push(`${basePath}/step-${nextStep}${projectQuery}`, { scroll: false });
             }}

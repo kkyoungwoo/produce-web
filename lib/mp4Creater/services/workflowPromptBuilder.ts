@@ -117,6 +117,52 @@ function buildSceneMotionGuide(contentType: ContentType) {
   ].join('\n');
 }
 
+function buildWorkflowLinkGuide(contentType: ContentType) {
+  return [
+    '[STEP LINK RULE]',
+    '- Step1~2에서 고른 콘텐츠 타입, 분위기, 배경, 주인공, 갈등, 엔딩 톤은 이후 Step3~6까지 계속 동일한 프로젝트 축으로 유지한다.',
+    '- Step3 대본은 Step4 캐릭터 추출, Step5 화풍 선택, Step6 씬 이미지/영상, Thumbnail Studio까지 재사용되는 원본이므로 장면화 가능한 문장으로 작성한다.',
+    '- Step4 캐릭터는 이후 모든 씬과 썸네일의 기준 얼굴/실루엣/입모양 구조가 되어야 한다.',
+    '- Step5 화풍은 Step6 씬 이미지, 씬 영상, 썸네일의 공통 스타일 기준점이 되어야 한다.',
+    '- Step6은 각 문단이 개별 컷으로 끊겨도 전체 프로젝트는 하나의 영상처럼 자연스럽게 이어지게 만든다.',
+    contentType === 'music_video'
+      ? '- 썸네일과 모든 씬은 같은 노래 세계관 안에서 후렴, 벌스, 훅의 감정 차이가 읽히도록 연결한다.'
+      : '- 썸네일과 모든 씬은 같은 이야기/영화/정보전달 프로젝트처럼 인물, 공간, 감정선이 이어지게 설계한다.',
+  ].join('\n');
+}
+
+function buildFreshnessGuide() {
+  return [
+    '[FRESHNESS / ANTI-REPETITION RULE]',
+    '- 기본값은 항상 새 결과다. 직전 생성의 문장, 장면 배치, 비유, 추천 문구, 이미지 구도를 그대로 반복하지 않는다.',
+    '- 같은 선택값이어도 매번 새 훅, 새 세부 묘사, 새 장면 전환 포인트를 만든다.',
+    '- 사용자가 비슷하게 재생성을 명시한 경우에만 핵심 정체성을 유지한 근접 변형을 만든다. 그 외에는 캐시된 느낌을 답습하지 않는다.',
+    '- 추천, 대본, 이미지 프롬프트, 영상 프롬프트, 썸네일 프롬프트 모두 최근 결과와 결이 겹치지 않도록 새 표현을 우선한다.',
+  ].join('\n');
+}
+
+function buildScriptSceneContinuityGuide(contentType: ContentType) {
+  return [
+    '[SCRIPT / SCENE CONTINUITY RULE]',
+    '- 각 문단은 하나의 독립된 씬처럼 쓸 수 있어야 하지만, 바로 앞 문단과 뒤 문단으로 자연스럽게 연결되는 감정/행동/시선/공간 흐름을 남긴다.',
+    '- 모든 씬은 이전 씬을 참고해 후속 반응처럼 이어지고, 다음 씬의 도착점을 미리 예고하는 연결 단서를 가진다.',
+    contentType === 'music_video'
+      ? '- 노래가 있는 장면은 실제로 입모양이 맞는 짧고 선명한 보컬 라인으로 쓰고, 간주 장면은 퍼포먼스와 감정 연결을 담당하게 한다.'
+      : '- 말하는 장면은 실제 입모양 싱크가 가능한 길이의 문장으로 쓰고, 말하지 않는 장면은 표정, 시선, 몸짓, 공간 반응으로 감정을 전달하게 한다.',
+    '- 씬 이미지 프롬프트는 문단의 대표 순간을 잡고, 씬 영상 프롬프트는 그 이미지가 자연스럽게 움직이는 다음 1~2초 행동처럼 설계한다.',
+    '- 문단 설정을 바꿔도 전체 프로젝트의 인물 정체성, 화풍, 시간축, 감정선은 깨지지 않아야 한다.',
+  ].join('\n');
+}
+
+function buildThumbnailAlignmentGuide() {
+  return [
+    '[THUMBNAIL ALIGNMENT RULE]',
+    '- 썸네일은 실제 대본/씬/캐릭터/화풍을 기반으로 만들어야 하며, 프로젝트의 핵심 장면과 감정을 한 장으로 압축한다.',
+    '- 새롭게 생성은 같은 프로젝트 안에서 새 결의 썸네일을 만들고, 비슷하게 재생성은 선택 썸네일과 핵심 구도/인물/색감 결을 유지한 근접 변형으로 만든다.',
+    '- 썸네일 텍스트와 이미지가 서로 충돌하지 않게 하고, 본편 씬과 다른 세계관처럼 보이지 않게 한다.',
+  ].join('\n');
+}
+
 function buildConceptLock(contentType: ContentType) {
   if (contentType === 'music_video') {
     return [
@@ -290,6 +336,10 @@ export function buildWorkflowPromptPack(options: {
   const songProductionGuide = buildSongProductionGuide(options.contentType, options.selections);
   const characterGenerationGuide = buildCharacterGenerationGuide(options.contentType);
   const sceneMotionGuide = buildSceneMotionGuide(options.contentType);
+  const workflowLinkGuide = buildWorkflowLinkGuide(options.contentType);
+  const freshnessGuide = buildFreshnessGuide();
+  const scriptSceneContinuityGuide = buildScriptSceneContinuityGuide(options.contentType);
+  const thumbnailAlignmentGuide = buildThumbnailAlignmentGuide();
 
   const storyOutputGuide = buildStoryOutputGuide(options.contentType);
   const lyricsOutputGuide = buildLyricsOutputGuide();
@@ -297,12 +347,188 @@ export function buildWorkflowPromptPack(options: {
   const sceneOutputGuide = buildSceneOutputGuide(options.contentType);
   const actionOutputGuide = buildActionOutputGuide(options.contentType);
 
-  const storyPrompt = `${bundle.story}\n\n[GLOBAL EXECUTION RULE]\n${globalExecutionGuide}\n\n[CONCEPT LOCK]\n${conceptLock}\n\n[PARAGRAPH FLOW]\n${paragraphGuide}\n\n${conceptFolderGuide}\n\n${scriptFolderGuide}\n\n${songProductionGuide}\n\n${storyOutputGuide}\n\n[PROJECT BRIEF]\n${summary}\n\n[CURRENT DRAFT]\n${currentDraft}`;
-  const lyricsPrompt = `${bundle.story}\n\n[GLOBAL EXECUTION RULE]\n${globalExecutionGuide}\n\n[CONCEPT LOCK]\n${buildConceptLock('music_video')}\n\n[PARAGRAPH FLOW]\n${buildParagraphFlowGuide('music_video')}\n\n${buildPromptStudioStepBlock('music_video', 'script')}\n\n${buildPromptStudioStepBlock('music_video', 'scene')}\n\n${songProductionGuide}\n\n${lyricsOutputGuide}\n\n[MUSIC VIDEO FLOW]\n${summary}\n\n[CURRENT DRAFT]\n${currentDraft}`;
-  const characterPrompt = `${bundle.story}\n\n[GLOBAL EXECUTION RULE]\n${globalExecutionGuide}\n\n[CONCEPT LOCK]\n${conceptLock}\n\n${conceptFolderGuide}\n\n${characterFolderGuide}\n\n${styleFolderGuide}\n\n${characterGenerationGuide}\n\n${characterOutputGuide}\n\n[CHARACTERS]\n${summary}\n\n[SCRIPT]\n${currentDraft}`;
-  const scenePrompt = `${bundle.story}\n\n[GLOBAL EXECUTION RULE]\n${globalExecutionGuide}\n\n[CONCEPT LOCK]\n${conceptLock}\n\n${conceptFolderGuide}\n\n${sceneFolderGuide}\n\n${styleFolderGuide}\n\n${sceneMotionGuide}\n\n${sceneOutputGuide}\n\n[SCENE PROMPTS]\n${summary}\n\n[SCRIPT]\n${currentDraft}`;
-  const actionPrompt = `${bundle.story}\n\n[GLOBAL EXECUTION RULE]\n${globalExecutionGuide}\n\n[CONCEPT LOCK]\n${conceptLock}\n\n${conceptFolderGuide}\n\n${actionFolderGuide}\n\n${styleFolderGuide}\n\n${sceneMotionGuide}\n\n${actionOutputGuide}\n\n[SCENE ACTIONS]\n${summary}\n\n[SCRIPT]\n${currentDraft}`;
-  const persuasionStoryPrompt = `${bundle.story}\n\n[GLOBAL EXECUTION RULE]\n${globalExecutionGuide}\n\n[CONCEPT LOCK]\n${conceptLock}\n\n[PARAGRAPH FLOW]\n${paragraphGuide}\n\n${conceptFolderGuide}\n\n${scriptFolderGuide}\n\n${songProductionGuide}\n\n${options.contentType === 'music_video' ? lyricsOutputGuide : storyOutputGuide}\n\n[RECOMMENDED PHRASES]\n${bundle.recommendations.join('\n')}`;
+  const storyPrompt = `${bundle.story}
+
+[GLOBAL EXECUTION RULE]
+${globalExecutionGuide}
+
+[CONCEPT LOCK]
+${conceptLock}
+
+[PARAGRAPH FLOW]
+${paragraphGuide}
+
+${workflowLinkGuide}
+
+${freshnessGuide}
+
+${scriptSceneContinuityGuide}
+
+${thumbnailAlignmentGuide}
+
+${conceptFolderGuide}
+
+${scriptFolderGuide}
+
+${songProductionGuide}
+
+${storyOutputGuide}
+
+[PROJECT BRIEF]
+${summary}
+
+[CURRENT DRAFT]
+${currentDraft}`;
+  const lyricsPrompt = `${bundle.story}
+
+[GLOBAL EXECUTION RULE]
+${globalExecutionGuide}
+
+[CONCEPT LOCK]
+${buildConceptLock('music_video')}
+
+[PARAGRAPH FLOW]
+${buildParagraphFlowGuide('music_video')}
+
+${buildWorkflowLinkGuide('music_video')}
+
+${freshnessGuide}
+
+${buildScriptSceneContinuityGuide('music_video')}
+
+${thumbnailAlignmentGuide}
+
+${buildPromptStudioStepBlock('music_video', 'script')}
+
+${buildPromptStudioStepBlock('music_video', 'scene')}
+
+${songProductionGuide}
+
+${lyricsOutputGuide}
+
+[MUSIC VIDEO FLOW]
+${summary}
+
+[CURRENT DRAFT]
+${currentDraft}`;
+  const characterPrompt = `${bundle.story}
+
+[GLOBAL EXECUTION RULE]
+${globalExecutionGuide}
+
+[CONCEPT LOCK]
+${conceptLock}
+
+${workflowLinkGuide}
+
+${freshnessGuide}
+
+${scriptSceneContinuityGuide}
+
+${conceptFolderGuide}
+
+${characterFolderGuide}
+
+${styleFolderGuide}
+
+${characterGenerationGuide}
+
+${characterOutputGuide}
+
+[CHARACTERS]
+${summary}
+
+[SCRIPT]
+${currentDraft}`;
+  const scenePrompt = `${bundle.story}
+
+[GLOBAL EXECUTION RULE]
+${globalExecutionGuide}
+
+[CONCEPT LOCK]
+${conceptLock}
+
+${workflowLinkGuide}
+
+${freshnessGuide}
+
+${scriptSceneContinuityGuide}
+
+${thumbnailAlignmentGuide}
+
+${conceptFolderGuide}
+
+${sceneFolderGuide}
+
+${styleFolderGuide}
+
+${sceneMotionGuide}
+
+${sceneOutputGuide}
+
+[SCENE PROMPTS]
+${summary}
+
+[SCRIPT]
+${currentDraft}`;
+  const actionPrompt = `${bundle.story}
+
+[GLOBAL EXECUTION RULE]
+${globalExecutionGuide}
+
+[CONCEPT LOCK]
+${conceptLock}
+
+${workflowLinkGuide}
+
+${freshnessGuide}
+
+${scriptSceneContinuityGuide}
+
+${conceptFolderGuide}
+
+${actionFolderGuide}
+
+${styleFolderGuide}
+
+${sceneMotionGuide}
+
+${actionOutputGuide}
+
+[SCENE ACTIONS]
+${summary}
+
+[SCRIPT]
+${currentDraft}`;
+  const persuasionStoryPrompt = `${bundle.story}
+
+[GLOBAL EXECUTION RULE]
+${globalExecutionGuide}
+
+[CONCEPT LOCK]
+${conceptLock}
+
+[PARAGRAPH FLOW]
+${paragraphGuide}
+
+${workflowLinkGuide}
+
+${freshnessGuide}
+
+${scriptSceneContinuityGuide}
+
+${thumbnailAlignmentGuide}
+
+${conceptFolderGuide}
+
+${scriptFolderGuide}
+
+${songProductionGuide}
+
+${options.contentType === 'music_video' ? lyricsOutputGuide : storyOutputGuide}
+
+[RECOMMENDED PHRASES]
+${bundle.recommendations.join('\n')}`;
 
   return { storyPrompt, lyricsPrompt, characterPrompt, scenePrompt, actionPrompt, persuasionStoryPrompt };
 }

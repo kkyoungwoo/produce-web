@@ -1,41 +1,40 @@
 # STEP6
 
-목표: 앞 step에서 선택한 핵심 데이터가 최종 생성 흐름에 부드럽게 이어지게 유지합니다.
+목표: 각 문단이 개별 컷이면서도 이전/다음 씬과 연결되는 자연스러운 영상 흐름을 유지합니다.
 
 ## 먼저 읽을 파일
 - `lib/mp4Creater/pages/SceneStudioPage.tsx`
 - `lib/mp4Creater/components/ResultTable.tsx`
-- `lib/mp4Creater/App.tsx`
-
-## 최소 가이드
-- Step6는 아직 확장 여지가 많으므로 가이드는 짧게 유지합니다.
-- 입력 누락 여부와 선택본 반영 여부를 먼저 확인합니다.
-- 구조가 바뀌면 관련 md도 함께 갱신합니다.
+- `lib/mp4Creater/services/imageService.ts`
+- `lib/mp4Creater/services/thumbnailService.ts`
 
 ## 이번 유지 포인트
-- 씬 영역 최상단에는 배경음 전용 카드가 1개만 생성될 수 있고, 배경음 프롬프트 / 생성 방식 / 생성 이력은 이 카드에서만 관리합니다.
-- 배경음 프롬프트는 `Identity / Mood / Instruments / Performance / Production` 5개 섹션으로 저장하며, 한국어 입력도 그대로 허용합니다.
-- 배경음 길이는 10초~60초 범위에서 저장되고, 생성/연장/삭제 이력과 현재 선택 트랙 ID가 프로젝트 JSON에 함께 저장되어야 합니다.
-- 배경음 생성 이력 영역은 카드 폭을 고정하고 가로 스크롤로만 넘기며, 새로 생성된 트랙은 자동 선택 + 자동 포커스됩니다.
-- 배경음 볼륨 / 나레이션 볼륨 슬라이더는 Step6 배경음 카드에서 제거하고, 결과 미리보기 단계에서만 최종 밸런스를 조절합니다.
-- Step2가 무음 모드이면 Step6 씬 카드에서는 대사 / 오디오 생성 UI를 숨기고 이미지 / 영상 프롬프트만 노출합니다.
-- 헤더 설정 저장은 화면 상태 저장과 현재 프로젝트 설정 저장이 같이 반영되어야 합니다.
-- 유료 배경음 모드는 향후 Google API 음악 생성 연결을 붙일 수 있도록 섹션 프롬프트 / 길이 / 선택 트랙 정보가 분리된 상태로 남아 있어야 합니다.
+- 이미지 프롬프트는 항상 새 컷을 우선하되, 현재 프로젝트 캐릭터/화풍/문단 흐름을 유지합니다.
+- 영상 프롬프트는 현재 이미지가 첫 프레임이 되도록 맞추고, 이전/다음 씬을 참고해 자연스럽게 연결합니다.
+- 대본 발화 구간은 입모양 싱크를 우선합니다.
+- 문단 설정 내부 `해당 내용 적용` 버튼은 현재 문단 편집값으로 이미지와 영상을 다시 생성하는 버튼입니다.
+- Thumbnail Studio는 현재 씬 결과를 참조해 새 생성과 유사 재생성을 분리합니다.
 
+## Step6 Save/Render Guard
+- Paragraph edit, add/delete, and preview-setting changes must write the Step6 working snapshot immediately.
+- On refresh or re-entry, Step6 must prefer the newer state between project JSON `lastSavedAt` and snapshot `savedAt`.
+- When Step5 opens Step6, write the latest Step6 draft/assets snapshot before route transition so the first Step6 paint can restore cards immediately.
+- While reopening an existing project, do not rebuild draft-based placeholder scenes before the saved Step6 payload finishes hydrating.
+- Reopen loading must show visible progress, and if full project detail is delayed, use the latest Step6 snapshot as a temporary fallback instead of leaving the page empty.
+- Deleted scenes must not be restored from an older snapshot.
+- Preview/final render must flush pending Step6 saves and merge the current paragraph order, duration, and media from the latest working copy.
 
-## 이번 최종 정리
-- 배경음 전용 카드의 생성 이력은 고정 폭 가로 스트립으로 유지되며, 새로 만든 트랙은 자동 선택 후 해당 카드로 포커스됩니다.
-- 배경음 트랙은 `backgroundMusicTracks` + `activeBackgroundTrackId` + `workflowDraft.backgroundMusicScene`에 함께 저장되어 프로젝트를 다시 열어도 선택 상태가 유지됩니다.
-- 배경음 프롬프트는 `Identity / Mood / Instruments / Performance / Production` 5섹션으로 나뉘며, 한국어 입력값을 그대로 저장하고 필요 시 Google Lyria용 프롬프트 문자열로 합성합니다.
-- 설정창에서 저장한 모델/보이스/BGM 선택은 프로젝트별 `settings` 스냅샷에도 같이 저장되어, 여러 프로젝트를 오갈 때 각 프로젝트의 초기 AI 설정값이 다시 복원됩니다.
-- 무음 프로젝트는 Step6에서 대사/오디오 UI를 숨기고 이미지/영상 중심으로만 씬 생성을 이어갑니다.
+## Step6 Stable Dev Guard
+- Step5 -> Step6 transition currently depends on `App.tsx` writing the newest draft/scene snapshot before route push. Keep this behavior when adding or changing AI features.
+- Step6 must restore cards from cache/snapshot/project JSON in that order of immediacy, then prefer the newest payload by timestamp.
+- During hydration, keep the loading panel visible only when there is truly no `generatedData` to show yet.
+- Scene delete/edit/add, media generation completion, and preview render must all preserve the same latest working copy so refresh/import/export stay aligned.
+- If Step6 save flow changes, update `SAVE_TRIGGER_GUIDE.md` in the same patch.
 
-## 추가 유지 포인트
-- 결과 미리보기 버튼은 팝업만 먼저 열고, 합본 렌더링은 팝업 안 버튼으로 시작해야 합니다.
-- 결과 미리보기 팝업은 중앙 정렬을 유지하고, 합본 영상은 처음에는 작은 크기로 보여 준 뒤 필요할 때만 크게 보기로 확장합니다.
-- 결과 미리보기에서는 씬 오디오와 배경음을 각각 조절할 수 있어야 하고, 최종 출력은 현재 믹스를 합쳐 1개의 결과 영상으로 저장합니다.
-- 씬 카드 우측 상단 `생성 작업` 영역에는 문단 삭제 버튼을 두고, 삭제 전 `window.confirm`으로 한 번 더 확인합니다.
-- 새 문단은 `targetDuration = 0`으로 시작하고, 대사 오디오 생성 또는 영상 생성 이후 실제 길이를 반영합니다. 대사가 없어도 이미지 / 영상 프롬프트만으로 작업을 이어갈 수 있어야 합니다.
-- 빠른 연속 클릭으로 이미지 / 오디오 / 영상 / 합본 생성이 동시에 폭주하지 않도록 Step6 생성 작업은 순차 대기열에 넣어 처리합니다.
-- 썸네일 스튜디오는 프로젝트의 캐릭터 / 화풍뿐 아니라 현재 프로젝트 씬 이미지도 레퍼런스로 사용하고, 썸네일 메인 문구와 디자인 프롬프트를 저장 / 재사용할 수 있어야 합니다.
-- 영상 제목 / 설명 / 태그 자동 생성은 사용자가 버튼을 눌렀을 때만 채우고, 자동 효과로 계속 덮어쓰면 안 됩니다.
+## Step6 Key Files To Preserve
+- Route handoff: `lib/mp4Creater/App.tsx`
+- Main Step6 logic: `lib/mp4Creater/pages/SceneStudioPage.tsx`
+- Step6 result rendering UI: `lib/mp4Creater/components/ResultTable.tsx`
+- Snapshot storage: `lib/mp4Creater/services/sceneStudioSnapshotCache.ts`
+- Navigation cache: `lib/mp4Creater/services/projectNavigationCache.ts`
+- Image generation path: `lib/mp4Creater/services/imageService.ts`

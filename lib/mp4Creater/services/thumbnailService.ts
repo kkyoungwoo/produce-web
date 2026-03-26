@@ -1,4 +1,5 @@
 import { CharacterProfile, PromptedImageAsset, SavedProject, ScriptScene } from '../types';
+import { buildCreativeDirectionBlock, buildGenerationSignature } from '../config/creativeVariance';
 
 export interface ThumbnailComposerOptions {
   titleText?: string;
@@ -126,9 +127,27 @@ export function buildThumbnailPrompt(project: SavedProject, variantSeed = 0, opt
     draft?.promptPack?.actionPrompt ? `액션 프롬프트 ${draft.promptPack.actionPrompt}` : '',
     selectedTemplate?.prompt ? `선택 템플릿 ${selectedTemplate.prompt}` : '',
   ].filter(Boolean).join(' · ');
+  const sceneReferenceSummary = (project.assets || [])
+    .slice(0, 4)
+    .map((item) => [item.narration, item.imagePrompt || item.visualPrompt].filter(Boolean).join(' / '))
+    .filter(Boolean)
+    .join(' · ');
+  const freshnessMode = similarDirection ? 'similar' : 'fresh';
+  const creativeBlock = buildCreativeDirectionBlock({
+    task: 'image',
+    seedText: `${project.id || project.name || project.topic}:${title}:${subtitle}:${similarDirection || customPrompt || ''}`,
+    index: variantSeed,
+    mode: freshnessMode,
+    contentType: draft?.contentType,
+  });
 
   return [
     '한국어 유튜브 썸네일 생성용 아트 디렉션.',
+    `[GENERATION SIGNATURE] ${buildGenerationSignature('image', `${project.id || project.name || project.topic}:${variantSeed}`, variantSeed)}`,
+    creativeBlock,
+    similarDirection
+      ? '비슷하게 재생성 모드다. 선택 썸네일의 핵심 인물, 구도 계열, 색감 결, 텍스트 무게중심은 유지하되 복제본이 아니라 새 근접 변형을 만든다.'
+      : '새롭게 생성 모드다. 같은 프로젝트 안에서 일관성은 유지하되 직전 썸네일 후보와 다른 훅, 다른 배치 포인트, 다른 시선 유도를 우선한다.',
     '개발단 기본 규칙: 대본과 같은 맥락, 같은 감정선, 같은 인물 관계가 한눈에 보여야 한다.',
     `프로젝트 제목: ${project.topic || project.name || '프로젝트'}.`,
     `메인 문구: ${title}. 너무 길게 넣지 말고 크게, 즉시 읽히게 배치한다.`,
@@ -140,6 +159,7 @@ export function buildThumbnailPrompt(project: SavedProject, variantSeed = 0, opt
     `분위기: ${mood}.`,
     `스타일 힌트: ${stylePrompt}.`,
     packSummary ? `워크플로우 프롬프트 팩: ${packSummary}.` : '',
+    sceneReferenceSummary ? `실제 씬 참조: ${sceneReferenceSummary}.` : '',
     customPrompt ? `사용자 추가 요청: ${customPrompt}. 이 요청은 기본 연출 위에 자연스럽게 덧입힌다.` : '사용자 추가 요청이 없으면 기본 연출만으로 완성도 높게 구성한다.',
     extraDirection ? `추가 연출: ${extraDirection}.` : '',
     similarDirection ? `직전 후보의 결 유지: ${similarDirection.slice(0, 220)}.` : '',

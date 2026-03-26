@@ -31,3 +31,18 @@
 ## 주의
 - 자동 추천/초기 hydration 같은 비사용자 트리거는 저장을 직접 유발하지 않게 유지한다.
 - mp4Creater 외 영역에는 같은 저장 규칙을 임의로 확장하지 않는다.
+
+## Step6 specific
+- `lib/mp4Creater/pages/SceneStudioPage.tsx`
+  - paragraph narration/imagePrompt/videoPrompt/visual type/duration edits: immediate snapshot write + debounced project JSON save
+  - paragraph add/delete and audio-clear actions: immediate snapshot write + project JSON sync
+  - preview/final render: must call `flushPendingSceneStudioSave(...)` before merging/exporting
+  - existing project reopen: block draft-based scene bootstrap until saved Step6 assets finish hydrating
+  - existing project reopen: show progress percent and use latest Step6 snapshot as fallback while detailed project JSON is still loading
+- `lib/mp4Creater/App.tsx`
+  - Step5 -> Step6 transition: write the latest Step6 snapshot before route push so the first Step6 load can restore draft cards even before JSON re-fetch finishes
+- Refresh/re-entry/import/export should use the latest Step6 state by comparing project `lastSavedAt` with snapshot `savedAt`.
+- Keep `lib/mp4Creater/App.tsx` Step5 -> Step6 handoff writing the newest Step6 snapshot before route transition.
+- Keep `lib/mp4Creater/pages/SceneStudioPage.tsx` showing cached Step6 cards immediately when `generatedData` already exists, even if hydration is still in progress.
+- Keep Step6 save triggers aligned with import/export/reopen so the same latest working copy is used everywhere.
+- When changing Step6 AI prompt or media logic, update `docs/README.md`, `docs/PROMPT_MANAGEMENT.md`, and `docs/step-guides/STEP6.md` together.

@@ -66,13 +66,16 @@ export function resolveAssetPlaybackDuration(
 ) {
   const minimum = typeof options?.minimum === 'number' ? options.minimum : 0;
   const maximum = typeof options?.maximum === 'number' ? options.maximum : undefined;
+  const narration = `${asset?.narration || ''}`.trim();
   const candidates = [asset?.audioDuration, asset?.targetDuration, asset?.videoDuration]
     .filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0);
 
   let resolved = candidates.length ? Math.max(...candidates) : 0;
 
   if ((!resolved || resolved <= 0) && options?.fallbackNarrationEstimate !== false) {
-    resolved = estimateClipDuration(asset?.narration || '');
+    resolved = narration
+      ? estimateClipDuration(narration)
+      : (minimum > 0 ? minimum : 1);
   }
 
   if (!Number.isFinite(resolved) || resolved < minimum) {

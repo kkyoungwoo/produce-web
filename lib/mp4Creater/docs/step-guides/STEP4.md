@@ -1,14 +1,13 @@
 # STEP4
 
-목표: 캐릭터 후보와 최종 선택 캐릭터를 같이 보존하면서, 실제 생성에는 선택본만 안정적으로 쓰게 유지합니다.
+목표: 선택한 캐릭터 이미지가 이후 씬과 썸네일의 기준 얼굴이 되도록 유지합니다.
 
 ## 먼저 읽을 파일
 - `lib/mp4Creater/components/InputSection.tsx`
+- `lib/mp4Creater/services/characterStudioService.ts`
 - `lib/mp4Creater/services/workflowDraftService.ts`
-- `app/api/local-storage/_shared.ts`
 
-## 안전 수정 포인트
-- `selectedCharacterIds`, `selectedImageId`, `generatedImages` 관계를 같이 봅니다.
-- 저장 시 후보 이미지를 잃지 않게 media hydrate/persist 경로를 함께 확인합니다.
-- Step6에는 선택된 캐릭터만 좁혀 보내되, 프로젝트 저장본에는 후보를 남겨 둡니다.
-- Step4 구조가 바뀌면 이 md와 저장 경로를 함께 수정합니다.
+## 이번 유지 포인트
+- 업로드 이미지는 이미지 기반 설명을 뽑아 캐릭터 프롬프트에 반영합니다.
+- `비슷하게 재생성`은 반드시 `similar` 모드로 보내 선택 이미지의 정체성을 최대한 유지한 근접 변형을 만듭니다.
+- Step6과 썸네일은 최종 선택된 캐릭터 이미지 기준으로 얼굴/실루엣/입모양 구조를 이어받아야 합니다.

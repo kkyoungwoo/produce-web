@@ -37,14 +37,87 @@ type RenderBody = {
   title?: string;
 };
 
-function runFfmpeg(args: string[], cwd: string) {
+const EMPTY_SCENE_PLACEHOLDER_IMAGE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR4nGPk4pdkYGBgYmBgYGBgAAACcwA2I9Wz/QAAAABJRU5ErkJggg==';
+
+let resolvedFfmpegBinary: string | null | undefined;
+
+async function isExistingFile(candidate: string) {
+  try {
+    await fs.access(candidate);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function trySpawn(command: string, args: string[], cwd: string) {
+  return new Promise<boolean>((resolve) => {
+    const child = spawn(command, args, { cwd, stdio: 'ignore' });
+    child.on('error', () => resolve(false));
+    child.on('close', (code) => resolve(code === 0));
+  });
+}
+
+async function resolveFfmpegBinary(cwd: string) {
+  if (resolvedFfmpegBinary !== undefined) return resolvedFfmpegBinary;
+
+  const exeName = process.platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg';
+  const commandCandidates = process.platform === 'win32'
+    ? ['ffmpeg.exe', 'ffmpeg']
+    : ['ffmpeg'];
+
+  const fileCandidates = [
+    process.env.FFMPEG_PATH,
+    process.env.FFMPEG_BINARY,
+    path.join(process.cwd(), 'ffmpeg', 'bin', exeName),
+    path.join(process.cwd(), 'bin', exeName),
+    path.join(process.cwd(), 'tools', 'ffmpeg', 'bin', exeName),
+    process.platform === 'win32' ? path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Links', 'ffmpeg.exe') : '',
+    process.platform === 'win32' ? path.join(process.env.ProgramData || 'C:\\ProgramData', 'chocolatey', 'bin', 'ffmpeg.exe') : '',
+    process.platform === 'win32' ? path.join(process.env.USERPROFILE || '', 'scoop', 'shims', 'ffmpeg.exe') : '',
+    process.platform === 'win32' ? 'C:\\ffmpeg\\bin\\ffmpeg.exe' : '/usr/local/bin/ffmpeg',
+    process.platform === 'win32' ? 'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe' : '/usr/bin/ffmpeg',
+    process.platform === 'win32' ? 'C:\\Program Files (x86)\\ffmpeg\\bin\\ffmpeg.exe' : '',
+  ].filter(Boolean) as string[];
+
+  for (const candidate of fileCandidates) {
+    if (!(await isExistingFile(candidate))) continue;
+    if (await trySpawn(candidate, ['-version'], cwd)) {
+      resolvedFfmpegBinary = candidate;
+      return resolvedFfmpegBinary;
+    }
+  }
+
+  for (const candidate of commandCandidates) {
+    if (await trySpawn(candidate, ['-version'], cwd)) {
+      resolvedFfmpegBinary = candidate;
+      return resolvedFfmpegBinary;
+    }
+  }
+
+  resolvedFfmpegBinary = null;
+  return resolvedFfmpegBinary;
+}
+
+async function runFfmpeg(args: string[], cwd: string) {
+  const ffmpegBinary = await resolveFfmpegBinary(cwd);
+  if (!ffmpegBinary) {
+    throw new Error('ffmpeg executable not found. Install ffmpeg or set FFMPEG_PATH to the ffmpeg binary.');
+  }
+
   return new Promise<void>((resolve, reject) => {
-    const child = spawn('ffmpeg', args, { cwd });
+    const child = spawn(ffmpegBinary, args, { cwd });
     let stderr = '';
     child.stderr.on('data', (chunk) => {
       stderr += chunk.toString();
     });
-    child.on('error', reject);
+    child.on('error', (error) => {
+      if ((error as NodeJS.ErrnoException)?.code === 'ENOENT') {
+        reject(new Error(`ffmpeg executable not found at ${ffmpegBinary}. Install ffmpeg or update FFMPEG_PATH.`));
+        return;
+      }
+      reject(error);
+    });
     child.on('close', (code) => {
       if (code === 0) resolve();
       else reject(new Error(stderr || `ffmpeg exited with code ${code}`));
@@ -135,7 +208,7 @@ export async function POST(request: NextRequest) {
   const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mp4creater-render-'));
   try {
     const body = (await request.json()) as RenderBody;
-    const assets = Array.isArray(body.assets) ? body.assets.filter((item) => item && item.imageData) : [];
+    const assets = Array.isArray(body.assets) ? body.assets.filter((item) => Boolean(item)) : [];
     if (!assets.length) {
       return NextResponse.json({ error: 'renderable assets are required' }, { status: 400 });
     }
@@ -145,13 +218,18 @@ export async function POST(request: NextRequest) {
 
     for (let index = 0; index < assets.length; index += 1) {
       const asset = assets[index];
-      const duration = resolveAssetPlaybackDuration(asset, { minimum: 2, fallbackNarrationEstimate: true });
+      const duration = resolveAssetPlaybackDuration({
+        narration: asset.narration || '',
+        audioDuration: typeof asset.audioDuration === 'number' ? asset.audioDuration : null,
+        targetDuration: typeof asset.targetDuration === 'number' ? asset.targetDuration : null,
+        videoDuration: typeof asset.videoDuration === 'number' ? asset.videoDuration : null,
+      }, { minimum: 1, fallbackNarrationEstimate: true });
       const imagePath = path.join(tempDir, `scene_${index + 1}.png`);
       const audioPath = path.join(tempDir, `scene_${index + 1}.wav`);
       const scenePath = path.join(tempDir, `scene_${index + 1}.mp4`);
       const srtPath = path.join(tempDir, `scene_${index + 1}.srt`);
 
-      const writtenImage = await writeMedia(imagePath, asset.imageData || null, 'image/png');
+      const writtenImage = await writeMedia(imagePath, asset.imageData || EMPTY_SCENE_PLACEHOLDER_IMAGE, 'image/png');
       if (!writtenImage) continue;
       const writtenAudio = await writeMedia(audioPath, asset.audioData || null, 'audio/wav');
 
@@ -174,6 +252,7 @@ export async function POST(request: NextRequest) {
         '-i', imagePath,
       ];
 
+      const audioFilterLabel = writtenAudio ? '[1:a]apad=pad_dur=' : '[1:a]atrim=';
       if (writtenAudio) {
         args.push('-i', audioPath);
       } else {
@@ -181,12 +260,14 @@ export async function POST(request: NextRequest) {
       }
 
       args.push(
+        '-filter_complex', `${audioFilterLabel}${duration}[aout]`,
+        '-map', '0:v:0',
+        '-map', '[aout]',
         '-t', `${duration}`,
         '-vf', vfFilters.join(','),
         '-c:v', 'libx264',
         '-pix_fmt', 'yuv420p',
         '-c:a', 'aac',
-        '-shortest',
         scenePath,
       );
 

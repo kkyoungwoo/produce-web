@@ -82,7 +82,7 @@ function normalizeAsset(asset: any, index: number): GeneratedAsset {
     subtitleData: asset?.subtitleData ?? null,
     videoData: typeof asset?.videoData === 'string' ? asset.videoData : null,
     videoDuration: typeof asset?.videoDuration === 'number' ? asset.videoDuration : null,
-    targetDuration: typeof asset?.targetDuration === 'number' ? asset.targetDuration : (typeof asset?.audioDuration === 'number' ? asset.audioDuration : 5),
+    targetDuration: typeof asset?.targetDuration === 'number' ? asset.targetDuration : (typeof asset?.audioDuration === 'number' ? asset.audioDuration : 1),
     aspectRatio: asset?.aspectRatio === '1:1' || asset?.aspectRatio === '9:16' ? asset.aspectRatio : '16:9',
     imageHistory: normalizeAssetHistory(asset?.imageHistory, 'image'),
     videoHistory: normalizeAssetHistory(asset?.videoHistory, 'video'),
@@ -149,6 +149,7 @@ function normalizeVideoPreview(item: any): VideoPreviewAsset | null {
     title: typeof item.title === 'string' ? item.title : '뮤직비디오',
     prompt: typeof item.prompt === 'string' ? item.prompt : '',
     videoData: typeof item.videoData === 'string' ? item.videoData : null,
+    duration: typeof item.duration === 'number' ? item.duration : null,
     provider: item.provider === 'elevenLabs' ? 'elevenLabs' : 'sample',
     mode: item.mode === 'final' ? 'final' : 'preview',
     sourceMode: item.sourceMode === 'ai' ? 'ai' : 'sample',
@@ -278,7 +279,7 @@ function normalizeProject(raw: any): SavedProject {
             videoPrompt: typeof item.videoPrompt === 'string' ? item.videoPrompt : undefined,
             motionPrompt: typeof item.motionPrompt === 'string' ? item.motionPrompt : undefined,
             estimatedSeconds: typeof item.estimatedSeconds === 'number' ? item.estimatedSeconds : 0,
-            targetDuration: typeof item.targetDuration === 'number' ? item.targetDuration : 5,
+            targetDuration: typeof item.targetDuration === 'number' ? item.targetDuration : 1,
             sceneSourceType: item.sceneSourceType === 'ai' || item.sceneSourceType === 'free-media' || item.sceneSourceType === 'sample' || item.sceneSourceType === 'mixed'
               ? item.sceneSourceType
               : undefined,
@@ -490,6 +491,31 @@ function mergeSavedProjects(primary: SavedProject[] = [], fallback: SavedProject
   return Array.from(byId.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 
+function hasDetailedWorkflowDraft(draft?: WorkflowDraft | null) {
+  if (!draft) return false;
+  return Boolean(
+    (Array.isArray(draft.extractedCharacters) && draft.extractedCharacters.length)
+    || (Array.isArray(draft.styleImages) && draft.styleImages.length)
+    || (Array.isArray(draft.characterImages) && draft.characterImages.length)
+    || (draft.promptStore && Object.keys(draft.promptStore).length)
+    || (draft.stepContract && Object.keys(draft.stepContract).length)
+    || (draft.backgroundMusicScene && Object.keys(draft.backgroundMusicScene).length)
+  );
+}
+
+function hasDetailedProjectPayload(project?: SavedProject | null) {
+  if (!project) return false;
+  return Boolean(
+    (Array.isArray(project.assets) && project.assets.length)
+    || (Array.isArray(project.backgroundMusicTracks) && project.backgroundMusicTracks.length)
+    || (Array.isArray(project.sceneList) && project.sceneList.length)
+    || (Array.isArray(project.scriptParagraphs) && project.scriptParagraphs.length)
+    || (Array.isArray(project.ttsFiles) && project.ttsFiles.length)
+    || Boolean(project.sceneStudioPreviewVideo?.videoData)
+    || hasDetailedWorkflowDraft(project.workflowDraft || null)
+  );
+}
+
 async function readIndexedProjects(): Promise<SavedProject[]> {
   try {
     const db = await openDB();
@@ -610,8 +636,14 @@ export async function saveProject(
   }
 
   const current = await readIndexedProjects();
+  const cachedProjects = Array.isArray(getCachedStudioState()?.projects)
+    ? getCachedStudioState()!.projects
+    : [];
   const existingProjectNumber = extras?.projectId
-    ? current.find((item) => item.id === extras.projectId)?.projectNumber
+    ? (
+      current.find((item) => item.id === extras.projectId)?.projectNumber
+      ?? cachedProjects.find((item) => item.id === extras.projectId)?.projectNumber
+    )
     : undefined;
   const nextProjectNumber = (
     typeof existingProjectNumber === 'number' && existingProjectNumber > 0
@@ -905,9 +937,9 @@ export async function getSavedProjects(options?: { forceSync?: boolean; localOnl
 
 export async function getProjectById(id: string, options?: { forceSync?: boolean; localOnly?: boolean }): Promise<SavedProject | null> {
   const direct = await readIndexedProjectById(id);
-  const hasDirectDetail = Boolean(direct && (direct.assets?.length || direct.workflowDraft || direct.backgroundMusicTracks?.length));
-  if (direct && (!options?.forceSync || hasDirectDetail)) return direct;
-  if (options?.localOnly) return direct || null;
+  const hasDirectDetail = hasDetailedProjectPayload(direct);
+  if (direct && !options?.forceSync && hasDirectDetail) return direct;
+  if (options?.localOnly) return hasDirectDetail ? direct : null;
 
   const remoteDetail = await fetchStudioProjectById(id);
   if (remoteDetail) {
@@ -918,10 +950,11 @@ export async function getProjectById(id: string, options?: { forceSync?: boolean
 
   const projects = await getSavedProjects(options);
   const found = projects.find((project) => project.id === id);
-  if (found) return found;
+  if (hasDetailedProjectPayload(found)) return found || null;
   if (!options?.forceSync) {
     const refreshed = await getSavedProjects({ forceSync: true });
-    return refreshed.find((project) => project.id === id) || null;
+    const detailed = refreshed.find((project) => project.id === id);
+    return hasDetailedProjectPayload(detailed) ? detailed || null : null;
   }
   return null;
 }

@@ -3,6 +3,7 @@ import { ScriptScene, ReferenceImages } from '../types';
 import { makeScenePlaceholderImage } from '../utils/storyHelpers';
 import { getPrimaryFreeImageForScene } from './freeMediaService';
 import { translatePromptToEnglish } from './promptTranslationService';
+import { buildCreativeDirectionBlock, buildGenerationSignature } from '../config/creativeVariance';
 
 function getGoogleAiStudioApiKey(): string {
   if (typeof window === 'undefined') return '';
@@ -54,16 +55,29 @@ async function buildImagePrompt(scene: ScriptScene, referenceImages: ReferenceIm
   const normalizedNarration = (scene.narration || '').replace(/\s+/g, ' ').trim();
   const normalizedScenePrompt = scenePrompt.replace(/\s+/g, ' ').trim();
   const shouldAppendScriptLine = Boolean(normalizedNarration) && !normalizedScenePrompt.includes(normalizedNarration);
+  const similarityRequested = /비슷|유사|same vibe|near-match|similar/i.test(`${scenePrompt} ${scene.videoPrompt || ''}`);
+  const creativeBlock = buildCreativeDirectionBlock({
+    task: 'image',
+    seedText: `${scene.sceneNumber}:${scene.narration}:${scenePrompt}`,
+    index: scene.sceneNumber,
+    mode: similarityRequested ? 'similar' : 'fresh',
+  });
 
   const rawPrompt = [
     'Create a single production-ready storyboard image for one short-form video scene.',
     `Scene ${scene.sceneNumber}.`,
+    `[GENERATION SIGNATURE] ${buildGenerationSignature('image', `${scene.sceneNumber}:${scene.narration}`, scene.sceneNumber)}`,
+    creativeBlock,
+    similarityRequested
+      ? '[SIMILAR REGENERATION] User asked for a near-match based on the current image/reference. Keep the core identity, composition family, and styling cues, but still output a newly authored adjacent variation instead of a duplicate.'
+      : '[FRESH GENERATION] Default to a new frame with the same project continuity. Do not copy the most recent cached composition or wording.',
     scenePrompt,
     shouldAppendScriptLine ? `[SCRIPT LINE] ${scene.narration}` : '',
     hasDialogueCue(scene.narration)
       ? '[DIALOGUE TIMING] If dialogue starts in this scene, prefer the frame right before the first spoken word or the exact instant the first line lands, so the cut feels motivated by conversation timing.'
       : '',
     referenceHint,
+    '[VIDEO HANDOFF] The resulting image must be a strong first frame for the next video-generation step. Preserve layout, identity, and motion-readiness so the frame can animate naturally into the matching scene video.',
     'Focus on one decisive frame. Keep continuity with the selected character and style references. No captions, subtitles, UI, watermark, logo, or split layout.',
   ]
     .filter(Boolean)

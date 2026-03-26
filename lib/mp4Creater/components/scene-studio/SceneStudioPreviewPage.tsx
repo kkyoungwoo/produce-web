@@ -19,11 +19,14 @@ interface SceneStudioPreviewPageProps {
   progressMessage?: string;
   activeOverallProgress: number | null;
   progressLabel?: string;
+  previewRenderEstimatedTotalSeconds?: number | null;
+  previewRenderEstimatedRemainingSeconds?: number | null;
   previewVideoTone: { panelClass: string; badgeClass: string; badge: string };
   previewVideoStatus?: PreviewVideoStatus;
   previewVideoMessage?: string;
   finalVideoUrl?: string | null;
   finalVideoTitle?: string;
+  finalVideoDuration?: number | null;
   onPreparePreviewVideo?: () => void | Promise<void>;
   isPreparingPreviewVideo?: boolean;
   handlePrepareDavinciImport: () => void | Promise<void>;
@@ -95,11 +98,14 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
   progressMessage,
   activeOverallProgress,
   progressLabel,
+  previewRenderEstimatedTotalSeconds,
+  previewRenderEstimatedRemainingSeconds,
   previewVideoTone,
   previewVideoStatus = 'idle',
   previewVideoMessage,
   finalVideoUrl,
   finalVideoTitle,
+  finalVideoDuration,
   onPreparePreviewVideo,
   isPreparingPreviewVideo,
   handlePrepareDavinciImport,
@@ -151,7 +157,7 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
   const previewAspectRatio = sequenceScene?.aspectRatio || data[0]?.aspectRatio || '16:9';
   const hasPreviewRenderStarted = previewVideoStatus !== 'idle' || Boolean(isPreparingPreviewVideo);
   const canShowRenderedPreview = Boolean(finalVideoUrl) && (previewVideoStatus === 'ready' || previewVideoStatus === 'fallback');
-  const showFinalRenderButton = Boolean(onPreparePreviewVideo && !isPreparingPreviewVideo && !canShowRenderedPreview && (previewVideoStatus === 'idle' || previewVideoStatus === 'error'));
+  const showFinalRenderButton = Boolean(onPreparePreviewVideo && !isPreparingPreviewVideo);
   const showFinalOutputButton = Boolean(canShowRenderedPreview && onExportVideo);
   const showPreviewMixControls = Boolean(!canShowRenderedPreview && previewVideoStatus !== 'loading' && !isPreparingPreviewVideo && onPreviewMixChange);
   const mergedPreviewShellClass = previewAspectRatio === '9:16'
@@ -169,7 +175,19 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
               <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">결과 미리보기</div>
               <h3 className="mt-2 text-2xl font-black text-slate-900">{currentTopic || '프로젝트'} 결과 페이지</h3>
             </div>
-            <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
+            <div className="flex flex-wrap items-center gap-2">
+              {showFinalRenderButton ? (
+                <button
+                  type="button"
+                  onClick={() => void onPreparePreviewVideo?.()}
+                  disabled={Boolean(isPreparingPreviewVideo)}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
+                >
+                  {isPreparingPreviewVideo ? '합본 영상 렌더링 중...' : '합본 영상 다시 렌더링'}
+                </button>
+              ) : null}
+              <button type="button" onClick={onClose} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto">
@@ -189,13 +207,17 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                   <div className="font-bold">{progressMessage || '결과 페이지가 준비되었습니다.'}</div>
                 </div>
                 {activeOverallProgress !== null && (
-                  <div className="mt-3">
+                  <div className="mt-3 space-y-2">
                     <div className="flex items-center justify-between gap-3 text-[11px] font-black">
                       <span>{progressLabel || '현재 작업 진행률'}</span>
                       <span>{activeOverallProgress}%</span>
                     </div>
                     <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/80">
                       <div className="h-full rounded-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-300" style={{ width: `${activeOverallProgress}%` }} />
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-blue-700">
+                      {typeof previewRenderEstimatedRemainingSeconds === 'number' ? <span className="rounded-full bg-white px-3 py-1">남은 시간 합계 {formatSeconds(previewRenderEstimatedRemainingSeconds)}</span> : null}
+                      {typeof previewRenderEstimatedTotalSeconds === 'number' ? <span className="rounded-full bg-white px-3 py-1">예상 소요 {formatSeconds(previewRenderEstimatedTotalSeconds)}</span> : null}
                     </div>
                   </div>
                 )}
@@ -253,8 +275,19 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                           <span className={`rounded-full px-3 py-1 text-xs font-black ${previewVideoTone.badgeClass}`}>{previewVideoTone.badge}</span>
                           <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">비율 {previewAspectRatio}</span>
                           {canShowRenderedPreview ? <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">합본 준비 완료</span> : null}
+                          {typeof previewRenderEstimatedRemainingSeconds === 'number' ? <span className="rounded-full bg-white px-3 py-1 text-xs font-bold text-slate-600">남은 시간 합계 {formatSeconds(previewRenderEstimatedRemainingSeconds)}</span> : null}
                         </div>
                       </div>
+                      {showFinalRenderButton ? (
+                        <button
+                          type="button"
+                          onClick={() => void onPreparePreviewVideo?.()}
+                          disabled={Boolean(isPreparingPreviewVideo)}
+                          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          {isPreparingPreviewVideo ? '합본 영상 렌더링 중...' : '합본 영상 다시 렌더링'}
+                        </button>
+                      ) : null}
                     </div>
 
                     <div className="mt-4 rounded-2xl border border-white/70 bg-white/70 p-4">
@@ -275,7 +308,12 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                       {canShowRenderedPreview ? (
                         <div className="mt-4 space-y-3">
                           <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="text-sm font-black text-slate-900">{finalVideoTitle || `${currentTopic || '프로젝트'} 합본 영상`}</div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <div className="text-sm font-black text-slate-900">{finalVideoTitle || `${currentTopic || '프로젝트'} 합본 영상`}</div>
+                              {typeof finalVideoDuration === 'number' && finalVideoDuration > 0 ? (
+                                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-black text-slate-600">길이 {formatSeconds(finalVideoDuration)}</span>
+                              ) : null}
+                            </div>
                             <button
                               type="button"
                               onClick={() => onOpenMediaLightbox({ kind: 'video', src: finalVideoUrl!, title: finalVideoTitle || `${currentTopic || '프로젝트'} 합본 영상`, aspectRatio: previewAspectRatio })}

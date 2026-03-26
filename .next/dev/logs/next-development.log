@@ -1,32 +1,50 @@
-[00:00:01.591] Server  LOG     ✓ Ready in 1343ms
-[00:00:07.362] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:00:07.585] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:05:04.234] Browser LOG     [Video] 총 14개 씬 중 14개 렌더링, 자막: 비활성화
-[00:05:04.433] Browser WARN    [Video] 씬 1: Image load failed, 플레이스홀더 사용
-[00:05:04.433] Browser LOG     [Video] 씬 1 오디오 없음, 기본 3초 사용
-[00:05:04.624] Browser WARN    [Video] 씬 2: Image load failed, 플레이스홀더 사용
-[00:05:04.625] Browser LOG     [Video] 씬 2 오디오 없음, 기본 3초 사용
-[00:05:05.015] Browser WARN    [Video] 씬 3: Image load failed, 플레이스홀더 사용
-[00:05:05.015] Browser LOG     [Video] 씬 3 오디오 없음, 기본 3초 사용
-[00:05:05.015] Browser WARN    [Video] 씬 4: Image load failed, 플레이스홀더 사용
-[00:05:05.015] Browser LOG     [Video] 씬 4 오디오 없음, 기본 3초 사용
-[00:05:05.015] Browser WARN    [Video] 씬 5: Image load failed, 플레이스홀더 사용
-[00:05:05.016] Browser LOG     [Video] 씬 5 오디오 없음, 기본 3초 사용
-[00:05:05.016] Browser WARN    [Video] 씬 6: Image load failed, 플레이스홀더 사용
-[00:05:05.016] Browser LOG     [Video] 씬 6 오디오 없음, 기본 3초 사용
-[00:05:05.016] Browser WARN    [Video] 씬 7: Image load failed, 플레이스홀더 사용
-[00:05:05.016] Browser LOG     [Video] 씬 7 오디오 없음, 기본 3초 사용
-[00:05:05.016] Browser WARN    [Video] 씬 8: Image load failed, 플레이스홀더 사용
-[00:05:05.016] Browser LOG     [Video] 씬 8 오디오 없음, 기본 3초 사용
-[00:05:05.016] Browser WARN    [Video] 씬 9: Image load failed, 플레이스홀더 사용
-[00:05:05.016] Browser LOG     [Video] 씬 9 오디오 없음, 기본 3초 사용
-[00:05:05.016] Browser WARN    [Video] 씬 10: Image load failed, 플레이스홀더 사용
-[00:05:05.016] Browser LOG     [Video] 씬 10 오디오 없음, 기본 3초 사용
-[00:05:05.016] Browser WARN    [Video] 씬 11: Image load failed, 플레이스홀더 사용
-[00:05:05.016] Browser LOG     [Video] 씬 11 오디오 없음, 기본 3초 사용
-[00:05:05.016] Browser WARN    [Video] 씬 12: Image load failed, 플레이스홀더 사용
-[00:05:05.016] Browser LOG     [Video] 씬 12 오디오 없음, 기본 3초 사용
-[00:05:05.016] Browser WARN    [Video] 씬 13: Image load failed, 플레이스홀더 사용
-[00:05:05.016] Browser LOG     [Video] 씬 13 오디오 없음, 기본 3초 사용
-[00:05:05.347] Browser WARN    [Video] 씬 14: Image load failed, 플레이스홀더 사용
-[00:05:05.347] Browser LOG     [Video] 씬 14 오디오 없음, 기본 3초 사용
+[00:00:01.694] Server  LOG     ✓ Ready in 1460ms
+[00:00:07.168] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:01:05.548] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:01:06.124] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[00:01:12.275] Browser LOG     [Video] 총 2개 씬 중 2개 렌더링, 자막: 비활성화
+[00:01:12.275] Browser LOG     [Video] 씬 1: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:01:12.275] Browser LOG     [Video] 씬 2: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:01:49.970] Browser LOG     [Video] 총 5개 씬 중 5개 렌더링, 자막: 비활성화
+[00:01:49.970] Browser LOG     [Video] 씬 1: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:01:49.970] Browser LOG     [Video] 씬 1 오디오 없음, 기본 1초 사용
+[00:01:49.970] Browser LOG     [Video] 씬 2: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:01:49.970] Browser LOG     [Video] 씬 2 오디오 없음, 기본 1초 사용
+[00:01:49.970] Browser LOG     [Video] 씬 3: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:01:49.970] Browser LOG     [Video] 씬 3 오디오 없음, 기본 1초 사용
+[00:01:49.970] Browser LOG     [Video] 씬 4: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:01:49.970] Browser LOG     [Video] 씬 4 오디오 없음, 기본 1초 사용
+[00:01:49.970] Browser LOG     [Video] 씬 5: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:01:49.970] Browser LOG     [Video] 씬 5 오디오 없음, 기본 1초 사용
+[00:02:32.153] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:04:30.613] Browser LOG     [Video] 총 5개 씬 중 5개 렌더링, 자막: 비활성화
+[00:04:30.613] Browser LOG     [Video] 씬 1: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:04:30.613] Browser LOG     [Video] 씬 1 오디오 없음, 기본 1초 사용
+[00:04:30.613] Browser LOG     [Video] 씬 2: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:04:30.613] Browser LOG     [Video] 씬 2 오디오 없음, 기본 1초 사용
+[00:04:30.613] Browser LOG     [Video] 씬 3: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:04:30.613] Browser LOG     [Video] 씬 3 오디오 없음, 기본 1초 사용
+[00:04:30.613] Browser LOG     [Video] 씬 4: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:04:30.613] Browser LOG     [Video] 씬 4 오디오 없음, 기본 1초 사용
+[00:04:30.613] Browser LOG     [Video] 씬 5: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[00:04:30.613] Browser LOG     [Video] 씬 5 오디오 없음, 기본 1초 사용
+[00:34:10.642] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:34:15.950] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:40:14.788] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:40:16.603] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:40:24.129] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:40:48.273] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:42:08.037] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:42:12.523] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:47:19.339] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:48:10.361] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:52:19.970] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:07:07.158] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:07:11.129] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[01:07:18.706] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[01:07:22.064] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
+[01:07:25.484] Browser LOG     [Video] 총 3개 씬 중 3개 렌더링, 자막: 비활성화
+[01:07:25.484] Browser LOG     [Video] 씬 1: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[01:07:25.484] Browser LOG     [Video] 씬 1 오디오 없음, 기본 1초 사용
+[01:07:25.484] Browser LOG     [Video] 씬 2: 이미지 또는 플레이스홀더 준비 완료 (960x960)
+[01:07:25.484] Browser LOG     [Video] 씬 3: 이미지 또는 플레이스홀더 준비 완료 (960x960)

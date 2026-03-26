@@ -1,15 +1,13 @@
 # STEP3
 
-목표: 샘플과 AI 생성이 같은 저장 구조를 쓰고, 선택한 프롬프트와 대본만 다음 단계에 또렷하게 전달되게 유지합니다.
+목표: 대본이 바로 씬으로 분해되고 입모양 싱크까지 이어질 수 있는 문단형 원본이 되게 유지합니다.
 
 ## 먼저 읽을 파일
+- `lib/mp4Creater/services/workflowPromptBuilder.ts`
 - `lib/mp4Creater/components/InputSection.tsx`
-- `lib/mp4Creater/services/textAiService.ts`
-- `lib/mp4Creater/services/openRouterService.ts`
-- `lib/mp4Creater/config/promptEditGuides.ts`
+- `lib/mp4Creater/services/workflowStepContractService.ts`
 
-## 안전 수정 포인트
-- 프롬프트 카드는 선택본과 후보를 함께 저장합니다.
-- 샘플 fallback도 workflowDraft 형식을 맞추면 Step6 재현성이 좋아집니다.
-- PromptEditorModal 경로는 `lib/mp4Creater/components/inputSection/overlays.tsx` 입니다.
-- Step3 프롬프트 항목이 늘어나면 이 md와 프롬프트 가이드도 함께 수정합니다.
+## 이번 유지 포인트
+- 문단은 개별 씬으로 잘릴 수 있어야 하지만 앞뒤 감정선이 이어져야 합니다.
+- 발화 문장은 실제 영상 입모양과 맞출 수 있는 길이와 호흡으로 유지합니다.
+- Step3 프롬프트를 바꾸면 Step4 캐릭터 추출, Step6 이미지/영상, 썸네일에도 같은 축이 이어지는지 봅니다.
