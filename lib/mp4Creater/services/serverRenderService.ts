@@ -15,12 +15,37 @@ export async function renderVideoWithFfmpeg(options: {
   subtitlePreset?: SubtitlePresetState | null;
   title?: string;
 }) {
+  const absolutizeMediaValue = (value?: string | null) => {
+    const normalized = `${value || ''}`.trim();
+    if (!normalized) return null;
+    if (normalized.startsWith('/')) {
+      if (typeof window !== 'undefined' && window.location?.origin) {
+        return `${window.location.origin}${normalized}`;
+      }
+    }
+    return normalized;
+  };
+
+  const payload = {
+    ...options,
+    assets: options.assets.map((asset) => ({
+      ...asset,
+      imageData: absolutizeMediaValue(asset.imageData),
+      audioData: absolutizeMediaValue(asset.audioData),
+      videoData: absolutizeMediaValue(asset.videoData),
+    })),
+    backgroundTracks: (options.backgroundTracks || []).map((track) => ({
+      ...track,
+      audioData: absolutizeMediaValue(track.audioData),
+    })),
+  };
+
   const response = await fetch('/api/mp4Creater/render', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(options),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {

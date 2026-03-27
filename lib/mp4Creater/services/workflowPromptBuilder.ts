@@ -12,6 +12,15 @@ import {
 } from '../prompts/channelConstitutionPrompts';
 import { getPromptRegistry } from './promptRegistryService';
 import { buildPromptStudioStepBlock } from '../prompt-center';
+import {
+  buildConceptDirectionLines,
+  buildMarkdownKeyValueSection,
+  buildMarkdownSection,
+  buildSimilarityControlLines,
+  buildTransitionIntentLines,
+  joinPromptBlocks,
+  splitGuideLines,
+} from './promptMarkdown';
 
 const WORKFLOW_TEMPLATE_IDS = {
   core: 'builtin-core-script',
@@ -45,10 +54,10 @@ function buildBaseSummary(topic: string, selections: StorySelectionState) {
 function buildGlobalExecutionGuide(contentType: ContentType) {
   return [
     '- 사용자가 최종으로 고른 언어를 끝까지 유지한다.',
-    '- 선택 언어가 한국어가 아니어도 그 언어로 자연스럽게 읽고, 말하고, 노래할 수 있는 문장 호흡을 우선한다.',
+    '- 선택 언어가 무엇이든 그 언어로 자연스럽게 읽고, 말하고, 노래할 수 있도록 발화 호흡과 입모양 싱크가 살아나는 문장 흐름을 우선한다.',
     contentType === 'music_video'
-      ? '- 보컬이 있는 장면은 해당 언어의 노래 음절 흐름이 자연스럽고 입모양 싱크가 가능한 길이로 쓴다.'
-      : '- 말하는 장면은 해당 언어의 TTS와 입모양 싱크가 가능한 길이와 어순으로 쓴다.',
+      ? '- 보컬이 있는 장면은 해당 언어의 노래 음절 흐름과 발화 호흡이 자연스럽고, 입모양 싱크가 가능한 길이로 쓴다.'
+      : '- 말하는 장면은 해당 언어의 TTS와 입모양 싱크가 가능한 길이, 어순, 발화 호흡으로 쓴다.',
     '- 실사 또는 반실사 인물이라면 자연스러운 한국인 인상과 과장되지 않은 얼굴 비율을 유지한다.',
     '- 프로젝트에서 실제로 쓰지 않는 출력은 만들지 않는다. 설명문, 분석문, 장황한 서론보다 바로 사용 가능한 결과 형식을 우선한다.',
   ].join('\n');
@@ -72,14 +81,14 @@ function buildSongProductionGuide(contentType: ContentType, selections: StorySel
       '- 영어 단어나 문장은 각 Verse/Hook/Bridge마다 최대 1회만 허용하고, Hook은 최대 2회까지만 허용한다.',
       '- 외계, 행성, 인류 같은 세계관 핵심어를 직접 설명하지 말고 비유와 장면 이미지로 변환한다.',
       '- 장면 전환 포인트가 떠오를 수 있게 빛, 몸짓, 시선, 거리, 소품, 날씨, 도시, 반사광 같은 시각 단어를 적절히 넣는다.',
-      '- 보컬 입모양이 잘 맞도록 지나치게 긴 라임, 발음이 무너지는 영어 남발, 한 줄에 과하게 많은 음절을 피한다.',
+      '- 보컬 입모양과 발화 호흡이 잘 맞도록 지나치게 긴 라임, 발음이 무너지는 영어 남발, 한 줄에 과하게 많은 음절을 피한다.',
     ].join('\n');
   }
 
   return [
     '[MUSIC-DERIVED RHYTHM RULE]',
     '- 문장 리듬은 뮤직비디오처럼 강한 훅과 반복 포인트를 참고하되, 결과물의 목적은 현재 콘텐츠 타입에 맞춰 조절한다.',
-    '- 장면 전환이 살아나도록 반복 가능한 키워드, 운율, 호흡 포인트를 일부 사용하되, 설명성과 서사를 해치지 않는다.',
+    '- 장면 전환이 살아나도록 반복 가능한 키워드, 운율, 발화 포인트를 일부 사용하되, 설명성과 서사를 해치지 않는다.',
     '- 시각적으로 잘게 분해될 수 있는 문장을 우선하고, 나중 단계의 장면 분해와 립싱크를 방해하는 장문을 피한다.',
   ].join('\n');
 }
@@ -110,6 +119,8 @@ function buildSceneMotionGuide(contentType: ContentType) {
     '- 캐릭터가 등장하면 가능하면 based on reference images 원칙을 적용해 참조 이미지 기반 정체성을 유지한다.',
     '- 동영상 움직임 프롬프트는 외형, 의상, 배경, 스타일을 다시 설명하지 말고 한 줄에 하나의 핵심 행동만 적는다.',
     '- 동영상 움직임 프롬프트는 그대로 복사해 사용할 수 있을 정도로 짧고 분명해야 하며, 과도한 기술적 영상 용어를 피한다.',
+    '- 읽어야 하는 글자나 간판이 장면 중심이 되지 않게 하고, 포스터, 라벨, UI, 자막, 로고 같은 텍스트 요소는 필요 없는 한 만들지 않는다.',
+    '- 배경 정보보다 인물 행동, 시선 변화, 몸짓, 공간 반응이 먼저 읽히게 쓴다.',
     contentType === 'music_video'
       ? '- 뮤직비디오라면 보컬이 들리는 구간의 입모양은 해당 음악 보컬과 맞추고, 간주에서는 퍼포먼스와 리듬감을 우선한다.'
       : '- 뮤직비디오가 아니라면 말하는 장면의 입모양은 대본과 TTS를 따르고, 비발화 장면은 억지 립싱크 없이 표정과 행동을 우선한다.',
@@ -151,6 +162,7 @@ function buildScriptSceneContinuityGuide(contentType: ContentType) {
       : '- 말하는 장면은 실제 입모양 싱크가 가능한 길이의 문장으로 쓰고, 말하지 않는 장면은 표정, 시선, 몸짓, 공간 반응으로 감정을 전달하게 한다.',
     '- 씬 이미지 프롬프트는 문단의 대표 순간을 잡고, 씬 영상 프롬프트는 그 이미지가 자연스럽게 움직이는 다음 1~2초 행동처럼 설계한다.',
     '- 문단 설정을 바꿔도 전체 프로젝트의 인물 정체성, 화풍, 시간축, 감정선은 깨지지 않아야 한다.',
+    '- 씬 이미지와 영상은 글자를 읽는 장면보다 행동과 감정 변화가 먼저 보여야 한다. 간판, 포스터, UI, 로고, 자막 같은 읽는 요소는 만들지 않거나 읽히지 않게 처리한다.',
   ].join('\n');
 }
 
@@ -232,6 +244,41 @@ function buildParagraphFlowGuide(contentType: ContentType) {
   ].join('\n');
 }
 
+function buildFreedomWindowGuide(contentType: ContentType) {
+  return [
+    'Keep creative freedom, variation in staging, and visual interpretation alive inside the selected concept.',
+    contentType === 'info_delivery'
+      ? 'Do not trade clarity for randomness. Variation should change delivery texture, examples, and staging, not the core understanding.'
+      : 'Do not collapse into a rigid template. Let each run discover a fresh hook, composition family, or emotional density while staying on-concept.',
+    'Reduce concept drift, mismatched tone, disconnected scenes, and thumbnail/world mismatch.',
+  ];
+}
+
+function buildResultIntentGuide(contentType: ContentType) {
+  if (contentType === 'music_video') {
+    return [
+      'The result should feel like one connected music video from script to scene to thumbnail to background music.',
+      'The first generation should already feel performable, visual, and rhythm-aware.',
+    ];
+  }
+  if (contentType === 'cinematic') {
+    return [
+      'The result should feel like one short cinematic piece with atmosphere, scene continuity, and emotional residue.',
+      'The first generation should already feel filmable and visually composed.',
+    ];
+  }
+  if (contentType === 'info_delivery') {
+    return [
+      'The result should feel like one coherent explain-video with readable flow, useful structure, and supportive visuals.',
+      'The first generation should already feel organized, understandable, and easy to visualize.',
+    ];
+  }
+  return [
+    'The result should feel like one connected story video with emotional continuity, visible scene beats, and a representative thumbnail.',
+    'The first generation should already feel narratively shaped instead of rough notes.',
+  ];
+}
+
 function buildStoryOutputGuide(contentType: ContentType) {
   if (contentType === 'cinematic') {
     return [
@@ -308,6 +355,8 @@ function buildActionOutputGuide(contentType: ContentType) {
     '- 장면 시간 순서를 유지한다.',
     '- 외형, 의상, 배경, 스타일을 재설명하지 않는다.',
     '- 기술적 영상 용어를 남발하지 않는다. 사람이 바로 붙여넣어도 이해되는 행동 문장으로 쓴다.',
+    '- 장면 안에서 읽어야 하는 글자, 간판, 포스터, UI, 자막, 로고를 새로 만들지 않는다.',
+    '- 배경 설명보다 행동과 감정 변화가 먼저 보이게 쓴다.',
     contentType === 'music_video'
       ? '- 노래가 들리는 장면은 보컬과 입모양 싱크가 자연스럽게 느껴지는 행동을 쓴다.'
       : '- 말하는 장면은 대본/TTS와 입모양이 맞게, 말하지 않는 장면은 표정과 행동 중심으로 쓴다.',
@@ -340,6 +389,10 @@ export function buildWorkflowPromptPack(options: {
   const freshnessGuide = buildFreshnessGuide();
   const scriptSceneContinuityGuide = buildScriptSceneContinuityGuide(options.contentType);
   const thumbnailAlignmentGuide = buildThumbnailAlignmentGuide();
+  const conceptDirectionGuide = buildConceptDirectionLines(options.contentType, 'script');
+  const freedomWindowGuide = buildFreedomWindowGuide(options.contentType);
+  const transitionGuide = buildTransitionIntentLines(options.contentType, 'script');
+  const resultIntentGuide = buildResultIntentGuide(options.contentType);
 
   const storyOutputGuide = buildStoryOutputGuide(options.contentType);
   const lyricsOutputGuide = buildLyricsOutputGuide();
@@ -347,188 +400,129 @@ export function buildWorkflowPromptPack(options: {
   const sceneOutputGuide = buildSceneOutputGuide(options.contentType);
   const actionOutputGuide = buildActionOutputGuide(options.contentType);
 
-  const storyPrompt = `${bundle.story}
-
-[GLOBAL EXECUTION RULE]
-${globalExecutionGuide}
-
-[CONCEPT LOCK]
-${conceptLock}
-
-[PARAGRAPH FLOW]
-${paragraphGuide}
-
-${workflowLinkGuide}
-
-${freshnessGuide}
-
-${scriptSceneContinuityGuide}
-
-${thumbnailAlignmentGuide}
-
-${conceptFolderGuide}
-
-${scriptFolderGuide}
-
-${songProductionGuide}
-
-${storyOutputGuide}
-
-[PROJECT BRIEF]
-${summary}
-
-[CURRENT DRAFT]
-${currentDraft}`;
-  const lyricsPrompt = `${bundle.story}
-
-[GLOBAL EXECUTION RULE]
-${globalExecutionGuide}
-
-[CONCEPT LOCK]
-${buildConceptLock('music_video')}
-
-[PARAGRAPH FLOW]
-${buildParagraphFlowGuide('music_video')}
-
-${buildWorkflowLinkGuide('music_video')}
-
-${freshnessGuide}
-
-${buildScriptSceneContinuityGuide('music_video')}
-
-${thumbnailAlignmentGuide}
-
-${buildPromptStudioStepBlock('music_video', 'script')}
-
-${buildPromptStudioStepBlock('music_video', 'scene')}
-
-${songProductionGuide}
-
-${lyricsOutputGuide}
-
-[MUSIC VIDEO FLOW]
-${summary}
-
-[CURRENT DRAFT]
-${currentDraft}`;
-  const characterPrompt = `${bundle.story}
-
-[GLOBAL EXECUTION RULE]
-${globalExecutionGuide}
-
-[CONCEPT LOCK]
-${conceptLock}
-
-${workflowLinkGuide}
-
-${freshnessGuide}
-
-${scriptSceneContinuityGuide}
-
-${conceptFolderGuide}
-
-${characterFolderGuide}
-
-${styleFolderGuide}
-
-${characterGenerationGuide}
-
-${characterOutputGuide}
-
-[CHARACTERS]
-${summary}
-
-[SCRIPT]
-${currentDraft}`;
-  const scenePrompt = `${bundle.story}
-
-[GLOBAL EXECUTION RULE]
-${globalExecutionGuide}
-
-[CONCEPT LOCK]
-${conceptLock}
-
-${workflowLinkGuide}
-
-${freshnessGuide}
-
-${scriptSceneContinuityGuide}
-
-${thumbnailAlignmentGuide}
-
-${conceptFolderGuide}
-
-${sceneFolderGuide}
-
-${styleFolderGuide}
-
-${sceneMotionGuide}
-
-${sceneOutputGuide}
-
-[SCENE PROMPTS]
-${summary}
-
-[SCRIPT]
-${currentDraft}`;
-  const actionPrompt = `${bundle.story}
-
-[GLOBAL EXECUTION RULE]
-${globalExecutionGuide}
-
-[CONCEPT LOCK]
-${conceptLock}
-
-${workflowLinkGuide}
-
-${freshnessGuide}
-
-${scriptSceneContinuityGuide}
-
-${conceptFolderGuide}
-
-${actionFolderGuide}
-
-${styleFolderGuide}
-
-${sceneMotionGuide}
-
-${actionOutputGuide}
-
-[SCENE ACTIONS]
-${summary}
-
-[SCRIPT]
-${currentDraft}`;
-  const persuasionStoryPrompt = `${bundle.story}
-
-[GLOBAL EXECUTION RULE]
-${globalExecutionGuide}
-
-[CONCEPT LOCK]
-${conceptLock}
-
-[PARAGRAPH FLOW]
-${paragraphGuide}
-
-${workflowLinkGuide}
-
-${freshnessGuide}
-
-${scriptSceneContinuityGuide}
-
-${thumbnailAlignmentGuide}
-
-${conceptFolderGuide}
-
-${scriptFolderGuide}
-
-${songProductionGuide}
-
-${options.contentType === 'music_video' ? lyricsOutputGuide : storyOutputGuide}
-
-[RECOMMENDED PHRASES]
-${bundle.recommendations.join('\n')}`;
+  const storyPrompt = joinPromptBlocks([
+    buildMarkdownSection('Base Prompt', [bundle.story], { bullet: false }),
+    buildMarkdownSection('Goal', resultIntentGuide),
+    buildMarkdownSection('Concept Direction', [conceptLock, ...conceptDirectionGuide]),
+    buildMarkdownSection('Freedom Window', freedomWindowGuide),
+    buildMarkdownSection('Global Execution Rules', splitGuideLines(globalExecutionGuide)),
+    buildMarkdownSection('Paragraph Flow', splitGuideLines(paragraphGuide)),
+    buildMarkdownSection('Step Links', splitGuideLines(workflowLinkGuide)),
+    buildMarkdownSection('Continuity Rules', splitGuideLines(scriptSceneContinuityGuide)),
+    buildMarkdownSection('Transition Rules', transitionGuide),
+    buildMarkdownSection('Similarity Control', buildSimilarityControlLines()),
+    buildMarkdownSection('Thumbnail Alignment', splitGuideLines(thumbnailAlignmentGuide)),
+    buildMarkdownSection('Prompt Folder Concept', [conceptFolderGuide], { bullet: false }),
+    buildMarkdownSection('Prompt Folder Script', [scriptFolderGuide], { bullet: false }),
+    buildMarkdownSection('Song / Rhythm Rules', splitGuideLines(songProductionGuide)),
+    buildMarkdownSection('Output Rules', splitGuideLines(storyOutputGuide)),
+    buildMarkdownKeyValueSection('Project Brief', [
+      ['Topic', options.topic || 'Untitled'],
+      ['Genre', options.selections.genre],
+      ['Mood', options.selections.mood],
+      ['Setting', options.selections.setting],
+      ['Lead', options.selections.protagonist],
+      ['Conflict', options.selections.conflict],
+      ['Ending Tone', options.selections.endingTone],
+    ]),
+    buildMarkdownSection('Current Draft', [currentDraft], { bullet: false }),
+  ]);
+  const lyricsPrompt = joinPromptBlocks([
+    buildMarkdownSection('Base Prompt', [bundle.story], { bullet: false }),
+    buildMarkdownSection('Goal', buildResultIntentGuide('music_video')),
+    buildMarkdownSection('Concept Direction', [buildConceptLock('music_video'), ...buildConceptDirectionLines('music_video', 'script')]),
+    buildMarkdownSection('Freedom Window', buildFreedomWindowGuide('music_video')),
+    buildMarkdownSection('Global Execution Rules', splitGuideLines(globalExecutionGuide)),
+    buildMarkdownSection('Paragraph Flow', splitGuideLines(buildParagraphFlowGuide('music_video'))),
+    buildMarkdownSection('Step Links', splitGuideLines(buildWorkflowLinkGuide('music_video'))),
+    buildMarkdownSection('Continuity Rules', splitGuideLines(buildScriptSceneContinuityGuide('music_video'))),
+    buildMarkdownSection('Transition Rules', buildTransitionIntentLines('music_video', 'script')),
+    buildMarkdownSection('Similarity Control', buildSimilarityControlLines()),
+    buildMarkdownSection('Thumbnail Alignment', splitGuideLines(thumbnailAlignmentGuide)),
+    buildMarkdownSection('Prompt Folder Script', [buildPromptStudioStepBlock('music_video', 'script')], { bullet: false }),
+    buildMarkdownSection('Prompt Folder Scene', [buildPromptStudioStepBlock('music_video', 'scene')], { bullet: false }),
+    buildMarkdownSection('Song / Rhythm Rules', splitGuideLines(songProductionGuide)),
+    buildMarkdownSection('Output Rules', splitGuideLines(lyricsOutputGuide)),
+    buildMarkdownKeyValueSection('Music Video Flow', [
+      ['Topic', options.topic || 'Untitled'],
+      ['Genre', options.selections.genre],
+      ['Mood', options.selections.mood],
+      ['Setting', options.selections.setting],
+      ['Lead', options.selections.protagonist],
+      ['Conflict', options.selections.conflict],
+      ['Ending Tone', options.selections.endingTone],
+    ]),
+    buildMarkdownSection('Current Draft', [currentDraft], { bullet: false }),
+  ]);
+  const characterPrompt = joinPromptBlocks([
+    buildMarkdownSection('Base Prompt', [bundle.story], { bullet: false }),
+    buildMarkdownSection('Goal', ['Design characters that stay coherent across Step4, Step6, thumbnail, and repeated generation.']),
+    buildMarkdownSection('Concept Direction', [conceptLock, ...buildConceptDirectionLines(options.contentType, 'scene')]),
+    buildMarkdownSection('Global Execution Rules', splitGuideLines(globalExecutionGuide)),
+    buildMarkdownSection('Step Links', splitGuideLines(workflowLinkGuide)),
+    buildMarkdownSection('Similarity Control', buildSimilarityControlLines()),
+    buildMarkdownSection('Continuity Rules', splitGuideLines(scriptSceneContinuityGuide)),
+    buildMarkdownSection('Prompt Folder Concept', [conceptFolderGuide], { bullet: false }),
+    buildMarkdownSection('Prompt Folder Character', [characterFolderGuide], { bullet: false }),
+    buildMarkdownSection('Prompt Folder Style', [styleFolderGuide], { bullet: false }),
+    buildMarkdownSection('Character Rules', splitGuideLines(characterGenerationGuide)),
+    buildMarkdownSection('Output Rules', splitGuideLines(characterOutputGuide)),
+    buildMarkdownSection('Character Brief', [summary], { bullet: false }),
+    buildMarkdownSection('Script', [currentDraft], { bullet: false }),
+  ]);
+  const scenePrompt = joinPromptBlocks([
+    buildMarkdownSection('Base Prompt', [bundle.story], { bullet: false }),
+    buildMarkdownSection('Goal', ['Create scene prompts that read like one connected video, not isolated unrelated shots.']),
+    buildMarkdownSection('Concept Direction', [conceptLock, ...buildConceptDirectionLines(options.contentType, 'scene')]),
+    buildMarkdownSection('Global Execution Rules', splitGuideLines(globalExecutionGuide)),
+    buildMarkdownSection('Step Links', splitGuideLines(workflowLinkGuide)),
+    buildMarkdownSection('Continuity Rules', splitGuideLines(scriptSceneContinuityGuide)),
+    buildMarkdownSection('Transition Rules', buildTransitionIntentLines(options.contentType, 'scene')),
+    buildMarkdownSection('Similarity Control', buildSimilarityControlLines()),
+    buildMarkdownSection('Thumbnail Alignment', splitGuideLines(thumbnailAlignmentGuide)),
+    buildMarkdownSection('Prompt Folder Concept', [conceptFolderGuide], { bullet: false }),
+    buildMarkdownSection('Prompt Folder Scene', [sceneFolderGuide], { bullet: false }),
+    buildMarkdownSection('Prompt Folder Style', [styleFolderGuide], { bullet: false }),
+    buildMarkdownSection('Scene / Motion Rules', splitGuideLines(sceneMotionGuide)),
+    buildMarkdownSection('Output Rules', splitGuideLines(sceneOutputGuide)),
+    buildMarkdownSection('Scene Prompt Brief', [summary], { bullet: false }),
+    buildMarkdownSection('Script', [currentDraft], { bullet: false }),
+  ]);
+  const actionPrompt = joinPromptBlocks([
+    buildMarkdownSection('Base Prompt', [bundle.story], { bullet: false }),
+    buildMarkdownSection('Goal', ['Create motion prompts that preserve continuity while making each scene feel alive and purposeful.']),
+    buildMarkdownSection('Concept Direction', [conceptLock, ...buildConceptDirectionLines(options.contentType, 'motion')]),
+    buildMarkdownSection('Global Execution Rules', splitGuideLines(globalExecutionGuide)),
+    buildMarkdownSection('Step Links', splitGuideLines(workflowLinkGuide)),
+    buildMarkdownSection('Continuity Rules', splitGuideLines(scriptSceneContinuityGuide)),
+    buildMarkdownSection('Transition Rules', buildTransitionIntentLines(options.contentType, 'motion')),
+    buildMarkdownSection('Similarity Control', buildSimilarityControlLines()),
+    buildMarkdownSection('Prompt Folder Concept', [conceptFolderGuide], { bullet: false }),
+    buildMarkdownSection('Prompt Folder Action', [actionFolderGuide], { bullet: false }),
+    buildMarkdownSection('Prompt Folder Style', [styleFolderGuide], { bullet: false }),
+    buildMarkdownSection('Scene / Motion Rules', splitGuideLines(sceneMotionGuide)),
+    buildMarkdownSection('Output Rules', splitGuideLines(actionOutputGuide)),
+    buildMarkdownSection('Scene Action Brief', [summary], { bullet: false }),
+    buildMarkdownSection('Script', [currentDraft], { bullet: false }),
+  ]);
+  const persuasionStoryPrompt = joinPromptBlocks([
+    buildMarkdownSection('Base Prompt', [bundle.story], { bullet: false }),
+    buildMarkdownSection('Goal', resultIntentGuide),
+    buildMarkdownSection('Concept Direction', [conceptLock, ...conceptDirectionGuide]),
+    buildMarkdownSection('Freedom Window', freedomWindowGuide),
+    buildMarkdownSection('Global Execution Rules', splitGuideLines(globalExecutionGuide)),
+    buildMarkdownSection('Paragraph Flow', splitGuideLines(paragraphGuide)),
+    buildMarkdownSection('Step Links', splitGuideLines(workflowLinkGuide)),
+    buildMarkdownSection('Continuity Rules', splitGuideLines(scriptSceneContinuityGuide)),
+    buildMarkdownSection('Transition Rules', transitionGuide),
+    buildMarkdownSection('Similarity Control', buildSimilarityControlLines()),
+    buildMarkdownSection('Thumbnail Alignment', splitGuideLines(thumbnailAlignmentGuide)),
+    buildMarkdownSection('Prompt Folder Concept', [conceptFolderGuide], { bullet: false }),
+    buildMarkdownSection('Prompt Folder Script', [scriptFolderGuide], { bullet: false }),
+    buildMarkdownSection('Song / Rhythm Rules', splitGuideLines(songProductionGuide)),
+    buildMarkdownSection('Output Rules', splitGuideLines(options.contentType === 'music_video' ? lyricsOutputGuide : storyOutputGuide)),
+    buildMarkdownSection('Recommended Phrases', bundle.recommendations, { bullet: true }),
+  ]);
 
   return { storyPrompt, lyricsPrompt, characterPrompt, scenePrompt, actionPrompt, persuasionStoryPrompt };
 }

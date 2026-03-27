@@ -2,6 +2,7 @@ import { CONFIG } from '../config';
 import { AspectRatio } from '../types';
 import { translatePromptToEnglish } from './promptTranslationService';
 import { createCreativeDirection, hashCreativeSeed } from '../config/creativeVariance';
+import { resolveGoogleAiStudioApiKey } from './googleAiStudioService';
 import { parseDataUrl } from '../utils/downloadHelpers';
 import { getPrimaryFreeVideoForPrompt } from './freeMediaService';
 
@@ -32,11 +33,12 @@ const GOOGLE_VIDEO_MODEL_CONFIGS: Record<string, GoogleVideoModelConfig> = {
 };
 
 export function getFalApiKey(): string | null {
-  if (typeof window === 'undefined') return process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.FAL_API_KEY || null;
-  return process.env.NEXT_PUBLIC_GEMINI_API_KEY
-    || localStorage.getItem(CONFIG.STORAGE_KEYS.FAL_API_KEY)
-    || process.env.FAL_API_KEY
-    || null;
+  return resolveGoogleAiStudioApiKey(localStorageFallbackFalKey()) || null;
+}
+
+function localStorageFallbackFalKey() {
+  if (typeof window === 'undefined') return process.env.FAL_API_KEY || null;
+  return localStorage.getItem(CONFIG.STORAGE_KEYS.FAL_API_KEY) || process.env.FAL_API_KEY || null;
 }
 
 export function setFalApiKey(key: string): void {
@@ -109,7 +111,6 @@ async function createSampleVideoFromImage(imageBase64: string, aspectRatio: Aspe
   const durationMs = 5000;
   const start = performance.now();
   const motionSeed = hashCreativeSeed(`${imageBase64.slice(0, 180)}:${aspectRatio}`);
-  const direction = createCreativeDirection(`${motionSeed}:${aspectRatio}`, 0);
   const panX = ((motionSeed % 29) - 14);
   const panY = (((Math.floor(motionSeed / 17)) % 21) - 10);
   const zoomTarget = 1.04 + ((motionSeed % 5) * 0.015);
@@ -133,11 +134,6 @@ async function createSampleVideoFromImage(imageBase64: string, aspectRatio: Aspe
       ctx.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
       ctx.fillStyle = 'rgba(15, 23, 42, 0.22)';
       ctx.fillRect(0, 0, width, height);
-      ctx.fillStyle = 'rgba(255,255,255,0.92)';
-      ctx.font = `700 ${Math.max(22, Math.round(width * 0.028))}px Arial`;
-      ctx.fillText('SAMPLE VIDEO PREVIEW · fresh motion', Math.round(width * 0.06), Math.round(height * 0.11));
-      ctx.font = `500 ${Math.max(15, Math.round(width * 0.018))}px Arial`;
-      ctx.fillText(direction.shotType.slice(0, 64), Math.round(width * 0.06), Math.round(height * 0.16));
 
       if (progress < 1) {
         window.requestAnimationFrame(drawFrame);

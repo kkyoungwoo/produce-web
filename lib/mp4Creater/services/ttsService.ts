@@ -1,10 +1,26 @@
 import { AudioPreviewAsset, SubtitleData } from '../types';
-import { generateBrowserFreeTts } from './chatterboxBrowserTtsService';
-import { createQwenTtsAsset } from './qwen3TtsService';
 import { generateAudioWithElevenLabs } from './elevenLabsService';
 import { generateAudioWithHeyGen } from './heygenService';
+import { generateAudioWithGoogleTts } from './googleTtsService';
+import { resolveGoogleAiStudioApiKey } from './googleAiStudioService';
 
 let activeRequestId = 0;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = globalThis.setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
+    }, timeoutMs);
+
+    promise.then((value) => {
+      globalThis.clearTimeout(timeoutId);
+      resolve(value);
+    }).catch((error) => {
+      globalThis.clearTimeout(timeoutId);
+      reject(error);
+    });
+  });
+}
 
 
 function buildMeaningChunks(words: SubtitleData['words']) {
@@ -42,23 +58,22 @@ function buildEstimatedSubtitleData(text: string, estimatedDuration?: number | n
 }
 
 
-function resolveSampleProvider(provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen'): 'qwen3Tts' | 'chatterbox' {
-  return provider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts';
-}
-
-function resolveLocalTtsModelId(provider: 'qwen3Tts' | 'chatterbox', freeModelId?: string | null, sourceMode?: 'ai' | 'sample') {
-  if (sourceMode === 'sample') {
-    return provider === 'chatterbox' ? 'sample-tone-fallback/chatterbox' : 'sample-tone-fallback/qwen3';
+function normalizeFreePreset(provider: 'qwen3Tts' | 'chatterbox', preset?: string | null) {
+  const normalized = `${preset || ''}`.trim();
+  if (provider === 'qwen3Tts') {
+    return normalized || 'qwen-default';
   }
-  if (typeof freeModelId === 'string' && freeModelId.trim()) return freeModelId.trim();
-  return provider === 'chatterbox' ? 'browser-free/chatterbox-heavy' : 'browser-free/chatterbox-light';
+  if (/warm|soft/i.test(normalized)) {
+    return 'qwen-soft';
+  }
+  return 'qwen-default';
 }
-
 
 export async function generateTtsAudio(options: {
   provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
   text: string;
   apiKey?: string;
+  googleApiKey?: string;
   voiceId?: string | null;
   modelId?: string | null;
   qwenPreset?: string | null;
@@ -66,7 +81,13 @@ export async function generateTtsAudio(options: {
   voiceReferenceAudioData?: string | null;
   voiceReferenceMimeType?: string | null;
 }) {
-  if (options.provider === 'elevenLabs' && options.apiKey) {
+  const normalizedProvider = options.provider === 'chatterbox' ? 'qwen3Tts' : options.provider;
+  const resolvedGoogleApiKey = resolveGoogleAiStudioApiKey(options.googleApiKey);
+  const normalizedFreePreset = normalizedProvider === 'qwen3Tts' || options.provider === 'chatterbox'
+    ? normalizeFreePreset(options.provider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts', options.qwenPreset)
+    : null;
+
+  if (normalizedProvider === 'elevenLabs' && options.apiKey) {
     return await generateAudioWithElevenLabs(
       options.text,
       options.apiKey,
@@ -75,7 +96,7 @@ export async function generateTtsAudio(options: {
     );
   }
 
-  if (options.provider === 'heygen' && options.apiKey) {
+  if (normalizedProvider === 'heygen' && options.apiKey) {
     return await generateAudioWithHeyGen(
       options.text,
       options.apiKey,
@@ -84,46 +105,35 @@ export async function generateTtsAudio(options: {
     );
   }
 
-  if (options.provider === 'qwen3Tts' || options.provider === 'chatterbox') {
-    try {
-      const freeResult = await generateBrowserFreeTts({
-        provider: options.provider,
-        text: options.text,
-        preset: options.provider === 'chatterbox' ? (options.qwenPreset || 'chatterbox-clear') : options.qwenPreset,
-        locale: options.locale,
-        voiceReferenceAudioData: options.voiceReferenceAudioData,
-        voiceReferenceMimeType: options.voiceReferenceMimeType,
-      });
-
-      return {
-        audioData: freeResult.audioData,
-        subtitleData: buildEstimatedSubtitleData(options.text, freeResult.estimatedDuration),
-        estimatedDuration: freeResult.estimatedDuration,
-        sourceMode: freeResult.sourceMode,
-        voiceId: options.voiceId || options.qwenPreset || null,
-        modelId: resolveLocalTtsModelId(options.provider, freeResult.modelId, freeResult.sourceMode),
-      };
-    } catch (error) {
-      console.warn('[ttsService] browser free tts failed, using fallback sample', error);
+  if (normalizedProvider === 'qwen3Tts') {
+    if (!resolvedGoogleApiKey) {
+      throw new Error('Free TTS requires a Google AI Studio API key.');
     }
+
+    const googlePreset = normalizeFreePreset('qwen3Tts', normalizedFreePreset);
+    const googleResult = await generateAudioWithGoogleTts({
+      apiKey: resolvedGoogleApiKey,
+      provider: 'qwen3Tts',
+      text: options.text,
+      preset: googlePreset,
+      locale: options.locale,
+    });
+
+    if (!googleResult.audioData || (googleResult.estimatedDuration || 0) <= 0.25) {
+      throw new Error('Google TTS returned no usable audio.');
+    }
+
+    return {
+      audioData: googleResult.audioData,
+      subtitleData: buildEstimatedSubtitleData(options.text, googleResult.estimatedDuration),
+      estimatedDuration: googleResult.estimatedDuration,
+      sourceMode: 'ai' as const,
+      voiceId: googlePreset || options.voiceId || null,
+      modelId: googleResult.modelId,
+    };
   }
 
-  const asset = await createQwenTtsAsset({
-    title: 'qwen3-tts',
-    text: options.text,
-    preset: options.provider === 'chatterbox' ? (options.qwenPreset || 'chatterbox-clear') : options.qwenPreset,
-    provider: resolveSampleProvider(options.provider),
-    mode: 'voice-preview',
-  });
-
-  return {
-    audioData: asset.audioData,
-    subtitleData: buildEstimatedSubtitleData(options.text, asset.duration),
-    estimatedDuration: asset.duration,
-    sourceMode: asset.sourceMode,
-    voiceId: asset.voiceId || options.qwenPreset || null,
-    modelId: asset.modelId || resolveLocalTtsModelId(resolveSampleProvider(options.provider), null, asset.sourceMode),
-  };
+  throw new Error('Unsupported TTS provider configuration.');
 }
 
 export async function createTtsPreview(options: {
@@ -132,6 +142,7 @@ export async function createTtsPreview(options: {
   text: string;
   mode: AudioPreviewAsset['mode'];
   apiKey?: string;
+  googleApiKey?: string;
   voiceId?: string | null;
   modelId?: string | null;
   qwenPreset?: string | null;
@@ -141,11 +152,13 @@ export async function createTtsPreview(options: {
 }): Promise<{ asset: AudioPreviewAsset; requestId: number }> {
   activeRequestId += 1;
   const requestId = activeRequestId;
+  const normalizedProvider = options.provider === 'chatterbox' ? 'qwen3Tts' : options.provider;
 
   const result = await generateTtsAudio({
-    provider: options.provider,
+    provider: normalizedProvider,
     text: options.text,
     apiKey: options.apiKey,
+    googleApiKey: options.googleApiKey,
     voiceId: options.voiceId,
     modelId: options.modelId,
     qwenPreset: options.qwenPreset,
@@ -158,23 +171,21 @@ export async function createTtsPreview(options: {
     return {
       requestId,
       asset: {
-        id: `${options.provider}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        id: `${normalizedProvider}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
         title: options.title,
         text: options.text,
         audioData: result.audioData,
         duration: result.estimatedDuration,
-        provider: options.provider === 'heygen' || options.provider === 'elevenLabs' || options.provider === 'chatterbox' || options.provider === 'qwen3Tts' ? options.provider : 'qwen3Tts',
+        provider: normalizedProvider === 'heygen' || normalizedProvider === 'elevenLabs' || normalizedProvider === 'qwen3Tts' ? normalizedProvider : 'qwen3Tts',
         mode: options.mode,
         sourceMode: result.sourceMode || 'ai',
         voiceId: result.voiceId || options.voiceId || null,
         modelId:
           result.modelId ||
           options.modelId ||
-          (options.provider === 'heygen'
+          (normalizedProvider === 'heygen'
             ? 'starfish'
-            : options.provider === 'chatterbox'
-              ? 'chatterbox-local'
-              : options.provider === 'qwen3Tts'
+            : normalizedProvider === 'qwen3Tts'
                 ? 'qwen3-tts'
                 : null),
         createdAt: Date.now(),
@@ -184,13 +195,19 @@ export async function createTtsPreview(options: {
 
   return {
     requestId,
-    asset: await createQwenTtsAsset({
+    asset: {
+      id: `${normalizedProvider}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       title: options.title,
       text: options.text,
-      preset: options.qwenPreset,
-      provider: resolveSampleProvider(options.provider),
+      audioData: null,
+      duration: null,
+      provider: normalizedProvider === 'heygen' || normalizedProvider === 'elevenLabs' || normalizedProvider === 'qwen3Tts' ? normalizedProvider : 'qwen3Tts',
       mode: options.mode,
-    }),
+      sourceMode: 'sample',
+      voiceId: options.voiceId || options.qwenPreset || null,
+      modelId: options.modelId || null,
+      createdAt: Date.now(),
+    },
   };
 }
 

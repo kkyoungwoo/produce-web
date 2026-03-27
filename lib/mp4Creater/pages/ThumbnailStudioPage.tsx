@@ -315,8 +315,6 @@ export default function ThumbnailStudioPage() {
   const [selectedThumbnailId, setSelectedThumbnailId] = useState<string | null>(null);
   const [activeThumbnailId, setActiveThumbnailId] = useState<string | null>(null);
   const [copyFeedbackMessage, setCopyFeedbackMessage] = useState<string | null>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
   const [studioState, setStudioState] = useState<StudioState>(() => createDefaultStudioState());
   const [showSettings, setShowSettings] = useState(false);
   const [isYoutubeModalOpen, setIsYoutubeModalOpen] = useState(false);
@@ -327,23 +325,9 @@ export default function ThumbnailStudioPage() {
   const [youtubeTitle, setYoutubeTitle] = useState('');
   const [youtubeDescription, setYoutubeDescription] = useState('');
   const [youtubeTagsInput, setYoutubeTagsInput] = useState('');
-  const stripRef = useRef<HTMLDivElement | null>(null);
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const copyFeedbackTimerRef = useRef<number | null>(null);
-  const viewportCardClass = 'xl:h-[calc(100vh-300px)] xl:max-h-[calc(100vh-300px)]';
-
-  const syncStripArrowState = useCallback(() => {
-    const container = stripRef.current;
-    if (!container) {
-      setCanScrollLeft(false);
-      setCanScrollRight(false);
-      return;
-    }
-
-    const maxScrollLeft = Math.max(0, container.scrollWidth - container.clientWidth);
-    setCanScrollLeft(container.scrollLeft > 4);
-    setCanScrollRight(container.scrollLeft < maxScrollLeft - 4);
-  }, []);
+  const viewportCardClass = 'min-h-0 xl:max-h-[calc(100dvh-220px)]';
 
   useEffect(() => {
     if (!projectId) {
@@ -413,26 +397,6 @@ export default function ThumbnailStudioPage() {
     }
   }, []);
 
-  useEffect(() => {
-    const container = stripRef.current;
-    if (!container) {
-      setCanScrollLeft(false);
-      setCanScrollRight(false);
-      return;
-    }
-
-    const handleSync = () => syncStripArrowState();
-    handleSync();
-
-    container.addEventListener('scroll', handleSync, { passive: true });
-    window.addEventListener('resize', handleSync);
-
-    return () => {
-      container.removeEventListener('scroll', handleSync);
-      window.removeEventListener('resize', handleSync);
-    };
-  }, [history.length, syncStripArrowState]);
-
   const activeThumbnail = useMemo(
     () => history.find((item) => item.id === activeThumbnailId) || null,
     [activeThumbnailId, history]
@@ -482,54 +446,11 @@ export default function ThumbnailStudioPage() {
     }
   }, [showCopyFeedback]);
 
-  const scrollStripBy = (direction: 'left' | 'right') => {
-    const container = stripRef.current;
-    if (!container || !history.length) return;
-
-    const orderedCards = history
-      .map((item, index) => ({ id: item.id, index, node: cardRefs.current[item.id] }))
-      .filter((entry): entry is { id: string; index: number; node: HTMLDivElement } => Boolean(entry.node));
-
-    if (!orderedCards.length) return;
-
-    const activeIndex = activeThumbnailId
-      ? orderedCards.findIndex((entry) => entry.id === activeThumbnailId)
-      : -1;
-
-    const currentIndex = activeIndex >= 0
-      ? activeIndex
-      : orderedCards.reduce((bestIndex, entry, entryIndex) => {
-          const bestDistance = Math.abs(orderedCards[bestIndex].node.offsetLeft - container.scrollLeft);
-          const entryDistance = Math.abs(entry.node.offsetLeft - container.scrollLeft);
-          return entryDistance < bestDistance ? entryIndex : bestIndex;
-        }, 0);
-
-    const nextIndex = direction === 'right'
-      ? Math.min(currentIndex + 1, orderedCards.length - 1)
-      : Math.max(currentIndex - 1, 0);
-
-    const nextCard = orderedCards[nextIndex];
-    setActiveThumbnailId(nextCard.id);
-    nextCard.node.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-
-    window.setTimeout(() => {
-      syncStripArrowState();
-    }, 220);
-  };
-
-  const handleStripWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-    const container = stripRef.current;
-    if (!container) return;
-    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return;
-    event.preventDefault();
-    container.scrollBy({ left: event.deltaY, behavior: 'auto' });
-  }, []);
-
   const scrollToCard = useCallback((cardId: string) => {
     const node = cardRefs.current[cardId];
     if (!node) return;
     window.requestAnimationFrame(() => {
-      node.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      node.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
     });
   }, []);
 
@@ -667,7 +588,7 @@ export default function ThumbnailStudioPage() {
       setStatusMessage(
         recommendedMeta.source === 'ai'
           ? (similarTarget ? '비슷한 결의 새 썸네일 후보와 추천 제목·내용을 자동 갱신했습니다.' : '새 썸네일 후보와 추천 제목·내용을 자동 갱신했습니다.')
-          : (similarTarget ? 'AI 연결이 없어 비슷한 결의 샘플 썸네일과 샘플 추천 제목·내용을 함께 채웠습니다.' : 'AI 연결이 없어 샘플 썸네일과 샘플 추천 제목·내용을 함께 채웠습니다.')
+          : (similarTarget ? 'AI 연결이 없어 배경 이미지 기반 샘플 썸네일과 샘플 추천 제목·내용을 함께 채웠습니다.' : 'AI 연결이 없어 배경 이미지 기반 샘플 썸네일과 샘플 추천 제목·내용을 함께 채웠습니다.')
       );
     } catch (error) {
       console.error('[ThumbnailStudio] generate failed', error);
@@ -870,6 +791,7 @@ export default function ThumbnailStudioPage() {
         currentSection="scene"
         selectedCharacterName={undefined}
         onOpenSettings={() => setShowSettings(true)}
+        liveApiCostTotal={project?.cost?.total ?? null}
       />
 
       <main className="mx-auto max-w-[1680px] px-4 py-4 sm:px-6 lg:px-8">
@@ -895,16 +817,29 @@ export default function ThumbnailStudioPage() {
 
         {project && (
           <div className="mt-4 grid items-stretch gap-4 xl:grid-cols-[400px_minmax(0,1fr)]">
-            <section className={`overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm ${viewportCardClass}`}>
-              <div className="flex h-full flex-col gap-3">
-                <div>
-                  <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">thumbnail inputs</div>
-                  <h2 className="mt-2 text-lg font-black text-slate-900 sm:text-xl">왼쪽에서 문구와 업로드 정보만 빠르게 정리</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">메인 문구와 추가 요청을 다듬고, 업로드 설정은 여기서 바로 엽니다.</p>
+            <section className={`overflow-visible rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm xl:overflow-y-auto ${viewportCardClass}`}>
+              <div className="flex h-full min-h-0 flex-col gap-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-[0.2em] text-violet-600">thumbnail inputs</div>
+                    <h2 className="mt-2 text-lg font-black text-slate-900 sm:text-xl">왼쪽에서 메인 문구와 디자인 요청을 정리합니다</h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">썸네일 메인 문구와 디자인 요청 프롬프트를 다듬은 뒤 바로 생성할 수 있습니다.</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleGenerateThumbnail(null)}
+                    disabled={isGenerating || isRecommending || !project}
+                    className="shrink-0 rounded-2xl bg-fuchsia-600 px-4 py-3 text-sm font-black text-white transition hover:bg-fuchsia-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
+                  >
+                    {isGenerating && generationTargetId === 'new' ? '썸네일 생성 중...' : '썸네일 생성'}
+                  </button>
                 </div>
                 <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <div className="text-sm font-black text-slate-800">썸네일 메인 문구</div>
+                    <div>
+                      <div className="text-sm font-black text-slate-800">썸네일 메인 문구</div>
+                      <div className="mt-1 text-[11px] leading-5 text-slate-500">유튜브에서 한눈에 읽히는 대표 문구를 짧고 강하게 입력합니다.</div>
+                    </div>
                     <button
                       type="button"
                       onClick={() => void handleRecommendHeadline()}
@@ -926,7 +861,10 @@ export default function ThumbnailStudioPage() {
 
                 <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <div className="text-sm font-black text-slate-800">추가 디자인 요청</div>
+                    <div>
+                      <div className="text-sm font-black text-slate-800">추가 디자인 요청</div>
+                      <div className="mt-1 text-[11px] leading-5 text-slate-500">강조할 인물, 구도, 대비, 색감, 감정 밀도를 자연어로 적어 주세요.</div>
+                    </div>
                     <button
                       type="button"
                       onClick={() => void handleRecommendPromptText()}
@@ -939,209 +877,173 @@ export default function ThumbnailStudioPage() {
                   <textarea
                     value={promptText}
                     onChange={(e) => setPromptText(e.target.value.slice(0, 200))}
-                    rows={6}
+                    rows={7}
                     maxLength={200}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 h-[80px] text-slate-900 outline-none transition focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100"
-                    placeholder="예: 노란 타이포, 놀란 표정 강조, 붉은 포인트 조명, 왼쪽 인물 크게"
+                    className="h-[132px] w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-fuchsia-400 focus:ring-2 focus:ring-fuchsia-100"
+                    placeholder="예: 자연스러운 한국인 주인공 클로즈업, 감정이 바로 읽히는 표정, 강한 대비 조명, 배경은 정리되고 제목이 잘 올라갈 여백 유지"
                   />
                   <div className="mt-2 text-[11px] font-medium text-slate-500">공백 포함 {promptText.length}/200자 · 추천 생성은 100자 이상으로 채웁니다.</div>
                 </div>
 
-                <div className="rounded-[24px] border border-rose-200 bg-rose-50 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-rose-600">youtube upload</div>
-                      <div className="mt-1 text-sm font-black text-slate-900">유튜브 업로드 설정</div>
-                      <p className="mt-2 text-xs leading-5 text-slate-600">썸네일 확정 후 바로 비공개 업로드 정보를 열 수 있습니다.</p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsYoutubeModalOpen(true)}
-                      className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-black text-white hover:bg-rose-500"
-                    >
-                      업로드 설정 열기
-                    </button>
-                  </div>
+                <div className="rounded-[24px] border border-dashed border-slate-200 bg-slate-50 p-4 text-[11px] leading-5 text-slate-500">
+                  AI 연결이 없으면 실제 배경 이미지 기반 샘플 썸네일 후보를 만들어 흐름을 확인할 수 있습니다.
                 </div>
               </div>
             </section>
 
-<section className={`overflow-hidden rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm ${viewportCardClass}`}>
+<section className={`overflow-visible rounded-[28px] border border-slate-200 bg-white p-4 shadow-sm xl:overflow-y-auto ${viewportCardClass}`}>
   <div className="flex h-full min-h-0 flex-col">
-    <div className="flex flex-wrap items-start justify-between gap-4">
+    <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
       <div>
         <div className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600">thumbnail generate</div>
-        <h2 className="mt-2 text-lg font-black text-slate-900 sm:text-xl">오른쪽에서 후보를 만들고 바로 대표 이미지를 고릅니다</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-600">AI가 없으면 샘플 썸네일과 샘플 워딩으로 바로 흐름을 확인할 수 있습니다.</p>
+        <h2 className="mt-2 text-lg font-black text-slate-900 sm:text-xl">오른쪽에서 후보를 비교하고 대표 이미지를 고릅니다</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">생성된 후보를 한 번에 비교하고, 마음에 드는 이미지를 바로 대표 썸네일로 저장할 수 있습니다.</p>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => void handleGenerateThumbnail(null)}
-          disabled={isGenerating || isRecommending || !project}
-          className="rounded-2xl bg-fuchsia-600 px-4 py-3 text-sm font-black text-white transition hover:bg-fuchsia-500 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-100"
-        >
-          {isGenerating && generationTargetId === 'new' ? '썸네일 생성 중...' : '썸네일 생성'}
-        </button>
+
+      <div className="rounded-[24px] border border-rose-200 bg-rose-50 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.16em] text-rose-600">youtube upload</div>
+            <div className="mt-1 text-sm font-black text-slate-900">유튜브 업로드 설정</div>
+            <p className="mt-2 text-xs leading-5 text-slate-600">썸네일을 확정한 뒤 비공개 업로드용 제목, 설명, 태그를 바로 열 수 있습니다.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsYoutubeModalOpen(true)}
+            className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-black text-white hover:bg-rose-500"
+          >
+            업로드 설정
+          </button>
+        </div>
       </div>
     </div>
 
     <div className="mt-4 flex min-h-0 w-full flex-col gap-4">
-      <div className="flex min-h-0 flex-col gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <div className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600">썸네일 후보 히스토리</div>
-            <div className="mt-1 text-sm font-black text-slate-900">후보 비교 후 대표 이미지를 고르세요</div>
-          </div>
-        </div>
-
-        <div className="relative min-h-0 flex-1">
-          {canScrollLeft ? (
-            <button
-              type="button"
-              onClick={() => scrollStripBy('left')}
-              className="absolute left-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-lg font-black text-slate-700 shadow-md backdrop-blur hover:bg-slate-50"
-              aria-label="썸네일 후보 왼쪽으로"
-            >
-              ←
-            </button>
-          ) : null}
-
-          {canScrollRight ? (
-            <button
-              type="button"
-              onClick={() => scrollStripBy('right')}
-              className="absolute right-2 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-slate-200 bg-white/95 text-lg font-black text-slate-700 shadow-md backdrop-blur hover:bg-slate-50"
-              aria-label="썸네일 후보 오른쪽으로"
-            >
-              →
-            </button>
-          ) : null}
-
-          <div
-            ref={stripRef}
-            onWheel={handleStripWheel}
-            className="flex min-h-0 flex-1 snap-x snap-mandatory gap-4 overflow-x-auto px-1 pb-2"
-          >
-            {!history.length ? (
-              <div className="flex h-full min-h-[280px] w-full items-center justify-center rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm leading-6 text-slate-500">
-                오른쪽 생성 버튼으로 첫 후보를 만들면 여기서 대표 이미지를 고를 수 있습니다.
-              </div>
-            ) : null}
-
-            {history.map((item) => {
-              const isActive = item.id === activeThumbnailId;
-              const isFinal = item.id === selectedThumbnailId;
-              const suggestedTitle = buildCardSuggestedTitle(project, item);
-              const suggestedDescription = buildCardSuggestedDescription(project, item);
-
-              return (
-                <div
-                  key={item.id}
-                  ref={(node) => {
-                    cardRefs.current[item.id] = node;
-                  }}
-                  onClick={() => setActiveThumbnailId(item.id)}
-                  className={`w-[320px] shrink-0 snap-start overflow-hidden rounded-[24px] border bg-white text-left shadow-sm transition ${
-                    isActive
-                      ? 'border-fuchsia-400 ring-2 ring-fuchsia-200'
-                      : 'border-slate-200 hover:-translate-y-0.5 hover:border-fuchsia-200'
-                  }`}
-                >
-                  <div className="group block w-full text-left">
-                    <div className="relative overflow-hidden bg-slate-100">
-                      <img
-                        src={resolveImageSrc(item.imageData)}
-                        alt={item.label}
-                        className="aspect-video w-full object-cover transition duration-200 group-hover:scale-[1.01]"
-                      />
-
-                      {isFinal ? (
-                        <div className="absolute left-3 top-3">
-                          <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-black text-white shadow-sm">
-                            대표
-                          </span>
-                        </div>
-                      ) : null}
-
-                      {isGenerating && generationTargetId === item.id ? (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/48 backdrop-blur-[2px]">
-                          <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/80 border-t-transparent" />
-                          <div className="text-xs font-black text-white">이 카드 기준으로 재생성 중...</div>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-
-                  <div className="space-y-3 p-3">
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-                      <div className="line-clamp-2 text-sm font-black leading-5 text-slate-900">
-                        {suggestedTitle}
-                      </div>
-
-                      <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-slate-700">
-                        {suggestedDescription}
-                      </p>
-
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleCopyText(suggestedTitle, '제목');
-                          }}
-                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-100"
-                        >
-                          <CopyIcon />
-                          제목 복사
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            void handleCopyText(suggestedDescription, '내용');
-                          }}
-                          className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-100"
-                        >
-                          <CopyIcon />
-                          내용 복사
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setActiveThumbnailId(item.id);
-                          void handleSelectFinalThumbnail(item);
-                        }}
-                        className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800"
-                      >
-                        대표 사진으로 지정
-                      </button>
-
-                      <button
-                        type="button"
-                        disabled={isGenerating || isRecommending}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          void handleGenerateThumbnail(item);
-                        }}
-                        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                      >
-                        {isGenerating && generationTargetId === item.id ? '재생성 중...' : '비슷하게 재생성'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <div className="text-xs font-black uppercase tracking-[0.2em] text-emerald-600">썸네일 후보 히스토리</div>
+          <div className="mt-1 text-sm font-black text-slate-900">후보 비교 후 대표 이미지를 고르세요</div>
         </div>
       </div>
+
+      {!history.length ? (
+        <div className="flex min-h-[280px] items-center justify-center rounded-[24px] border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm leading-6 text-slate-500">
+          왼쪽 입력을 다듬고 생성 버튼을 누르면 여기에서 후보를 비교할 수 있습니다.
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
+          {history.map((item) => {
+            const isActive = item.id === activeThumbnailId;
+            const isFinal = item.id === selectedThumbnailId;
+            const suggestedTitle = buildCardSuggestedTitle(project, item);
+            const suggestedDescription = buildCardSuggestedDescription(project, item);
+
+            return (
+              <div
+                key={item.id}
+                ref={(node) => {
+                  cardRefs.current[item.id] = node;
+                }}
+                onClick={() => setActiveThumbnailId(item.id)}
+                className={`overflow-hidden rounded-[24px] border bg-white text-left shadow-sm transition ${
+                  isActive
+                    ? 'border-fuchsia-400 ring-2 ring-fuchsia-200'
+                    : 'border-slate-200 hover:-translate-y-0.5 hover:border-fuchsia-200'
+                }`}
+              >
+                <div className="group block w-full text-left">
+                  <div className="relative overflow-hidden bg-slate-100">
+                    <img
+                      src={resolveImageSrc(item.imageData)}
+                      alt={item.label}
+                      className="aspect-video w-full object-cover transition duration-200 group-hover:scale-[1.01]"
+                    />
+
+                    {isFinal ? (
+                      <div className="absolute left-3 top-3">
+                        <span className="rounded-full bg-emerald-600 px-2.5 py-1 text-[10px] font-black text-white shadow-sm">
+                          대표
+                        </span>
+                      </div>
+                    ) : null}
+
+                    {isGenerating && generationTargetId === item.id ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-slate-950/48 backdrop-blur-[2px]">
+                        <div className="h-10 w-10 animate-spin rounded-full border-4 border-white/80 border-t-transparent" />
+                        <div className="text-xs font-black text-white">이 후보 기준으로 생성 중...</div>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="space-y-3 p-3">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+                    <div className="line-clamp-2 text-sm font-black leading-5 text-slate-900">
+                      {suggestedTitle}
+                    </div>
+
+                    <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-slate-700">
+                      {suggestedDescription}
+                    </p>
+
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleCopyText(suggestedTitle, '제목');
+                        }}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-100"
+                      >
+                        <CopyIcon />
+                        제목 복사
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleCopyText(suggestedDescription, '내용');
+                        }}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-100"
+                      >
+                        <CopyIcon />
+                        내용 복사
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        setActiveThumbnailId(item.id);
+                        void handleSelectFinalThumbnail(item);
+                      }}
+                      className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800"
+                    >
+                      대표 사진으로 지정
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={isGenerating || isRecommending}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void handleGenerateThumbnail(item);
+                      }}
+                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      {isGenerating && generationTargetId === item.id ? '재생성 중...' : '비슷하게 재생성'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   </div>
 </section>

@@ -10,12 +10,16 @@ import { exportAssetsToZip } from '../services/exportService';
 import { downloadProjectZip } from '../utils/csvHelper';
 import { downloadSrt } from '../services/srtService';
 import { resolveAssetPlaybackDuration } from '../services/projectEnhancementService';
+import AiOptionPickerModal from './AiOptionPickerModal';
 import HelpTip from './HelpTip';
 import SceneStudioPreviewPage from './scene-studio/SceneStudioPreviewPage';
 import { blobFromDataValue, extensionFromMime, triggerSequentialDownloads } from '../utils/downloadHelpers';
+import { AiPickerOption } from '../services/aiOptionCatalog';
+import type { SceneEditorPromptMode } from '../services/sceneEditorPromptService';
+import TtsSelectionModal, { TtsSelectionProvider } from './TtsSelectionModal';
 
 type PreviewVideoStatus = 'idle' | 'loading' | 'ready' | 'fallback' | 'error';
-type SceneEditorMode = 'narration' | 'image' | 'video';
+type SceneEditorMode = SceneEditorPromptMode;
 type ScenePreviewMode = 'image' | 'video' | 'audio';
 type ModelPickerKind = 'image' | 'video' | 'audio';
 
@@ -27,17 +31,32 @@ interface AudioHistoryEntry {
   duration?: number | null;
 }
 
-interface QuickModelOption {
-  id: string;
-  label: string;
-  helper?: string;
-}
+type QuickModelOption = AiPickerOption & { label?: string };
 
 interface QuickModelSelector {
   currentId?: string | null;
   currentLabel: string;
   options: QuickModelOption[];
   onSelect?: (id: string) => void;
+}
+
+interface AudioTtsSelectionFlow {
+  currentProvider: TtsSelectionProvider;
+  currentModelId?: string | null;
+  currentVoiceId?: string | null;
+  googleApiKey?: string | null;
+  elevenLabsApiKey?: string | null;
+  hasElevenLabsApiKey?: boolean;
+  elevenLabsVoices?: Array<{
+    voice_id: string;
+    name: string;
+    preview_url?: string;
+    labels?: { accent?: string; gender?: string; description?: string };
+  }>;
+  voiceReferenceAudioData?: string | null;
+  voiceReferenceMimeType?: string | null;
+  voiceReferenceName?: string | null;
+  onApply: (selection: { provider: TtsSelectionProvider; modelId?: string | null; voiceId?: string | null }) => void;
 }
 
 interface ResultTableProps {
@@ -51,6 +70,7 @@ interface ResultTableProps {
   onNarrationChange?: (index: number, narration: string) => void;
   onImagePromptChange?: (index: number, prompt: string) => void;
   onVideoPromptChange?: (index: number, prompt: string) => void;
+  onGenerateEditorContent?: (index: number, mode: SceneEditorMode) => void | Promise<void>;
   onSelectedVisualTypeChange?: (index: number, mode: 'image' | 'video') => void;
   onDurationChange?: (index: number, duration: number) => void;
   onAddParagraphScene?: () => void;
@@ -101,6 +121,7 @@ interface ResultTableProps {
   imageModelSelector?: QuickModelSelector;
   videoModelSelector?: QuickModelSelector;
   audioModelSelector?: QuickModelSelector;
+  audioTtsSelectionFlow?: AudioTtsSelectionFlow;
 }
 
 const formatSeconds = (value?: number | null) => (typeof value === 'number' ? `${value.toFixed(1)}초` : '-');
@@ -139,7 +160,8 @@ const resolveNarrationAudioSrc = (value?: string | null) => {
 
 const resolveBackgroundAudioSrc = (value?: string | null) => {
   if (!value?.trim()) return undefined;
-  return value.startsWith('data:') ? value : `data:audio/wav;base64,${value}`;
+  if (value.startsWith('data:') || value.startsWith('/') || value.startsWith('http') || value.startsWith('blob:')) return value;
+  return `data:audio/wav;base64,${value}`;
 };
 
 const resolveVideoSrc = (value?: string | null) => {
@@ -295,6 +317,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   onNarrationChange,
   onImagePromptChange,
   onVideoPromptChange,
+  onGenerateEditorContent,
   onSelectedVisualTypeChange,
   onDurationChange,
   onAddParagraphScene,
@@ -345,6 +368,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   imageModelSelector,
   videoModelSelector,
   audioModelSelector,
+  audioTtsSelectionFlow,
 }) => {
   const [previewOpen, setPreviewOpen] = useState(false);
   const downloadQuality: 'preview' | 'final' = 'final';
@@ -1421,6 +1445,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
           const editorMode = getSceneEditorMode(row, index);
           const editorMeta = sceneEditorMeta[editorMode];
           const editorValue = getSceneEditorValue(row, editorMode);
+          const editorGenerateKey = `editor-${index}-${editorMode}`;
+          const isEditorAiGenerating = Boolean(sceneActionLocks[editorGenerateKey]);
           const selectedVisualType = getPreferredVisualType(row);
           const previewMode = getScenePreviewMode(row, index);
 
@@ -1681,28 +1707,45 @@ const ResultTable: React.FC<ResultTableProps> = ({
                   <div className="relative mt-2">
                     <div className={`overflow-hidden transition-all duration-300 ease-out ${sceneInlineSettingsOpen[index] ? 'max-h-0 -translate-y-1 opacity-0 pointer-events-none' : 'max-h-[196px] translate-y-0 opacity-100'}`}>
                       <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-2.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {((isMuteMode ? ['image', 'video'] : ['narration', 'image', 'video']) as SceneEditorMode[]).map((mode) => {
-                            const selected = editorMode === mode;
-                            const tone = sceneEditorMeta[mode];
-                            return (
-                              <button
-                                key={`${row.sceneNumber}-${mode}`}
-                                type="button"
-                                onMouseDown={preventButtonFocusScroll}
-                                onClick={() => setSceneEditorModes((prev) => ({ ...prev, [index]: mode }))}
-                                className={`rounded-2xl px-3.5 py-2 text-sm font-black transition ${selected ? tone.badgeClass : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
-                              >
-                                {tone.label}
-                              </button>
-                            );
-                          })}
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {((isMuteMode ? ['image', 'video'] : ['narration', 'image', 'video']) as SceneEditorMode[]).map((mode) => {
+                              const selected = editorMode === mode;
+                              const tone = sceneEditorMeta[mode];
+                              return (
+                                <button
+                                  key={`${row.sceneNumber}-${mode}`}
+                                  type="button"
+                                  onMouseDown={preventButtonFocusScroll}
+                                  onClick={() => setSceneEditorModes((prev) => ({ ...prev, [index]: mode }))}
+                                  className={`rounded-2xl px-3.5 py-2 text-sm font-black transition ${selected ? tone.badgeClass : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                                >
+                                  {tone.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {onGenerateEditorContent ? (
+                            <button
+                              type="button"
+                              disabled={isEditorAiGenerating}
+                              onMouseDown={preventButtonFocusScroll}
+                              onClick={() => {
+                                void runSceneAction(editorGenerateKey, async () => {
+                                  await Promise.resolve(onGenerateEditorContent(index, editorMode));
+                                });
+                              }}
+                              className="rounded-2xl border border-blue-200 bg-white px-3.5 py-2 text-sm font-black text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+                            >
+                              {isEditorAiGenerating ? 'AI 생성 중...' : 'AI 생성'}
+                            </button>
+                          ) : null}
                         </div>
 
                         <textarea
                           value={editorValue}
                           placeholder={editorMeta.placeholder}
-                          disabled={isSceneWorking}
+                          disabled={isSceneWorking || isEditorAiGenerating}
                           onChange={(e) => handleSceneEditorChange(row, index, editorMode, e.target.value)}
                           className="mt-2 h-[88px] w-full resize-none overflow-y-auto rounded-[20px] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-900 outline-none focus:border-blue-400 disabled:bg-slate-100 disabled:text-slate-400"
                         />
@@ -1913,38 +1956,42 @@ const ResultTable: React.FC<ResultTableProps> = ({
       )}
     </div>
 
-
-      {activeModelPicker && getModelSelector(activeModelPicker.kind) && (
-        <div className="fixed inset-0 z-[66] flex items-center justify-center bg-slate-950/45 p-4" onClick={() => setActiveModelPicker(null)}>
-          <div className="w-full max-w-md rounded-[28px] border border-slate-200 bg-white p-5 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className={`inline-flex rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${activeModelPicker.kind === 'image' ? 'bg-blue-50 text-blue-700' : activeModelPicker.kind === 'video' ? 'bg-violet-50 text-violet-700' : 'bg-emerald-50 text-emerald-700'}`}>{activeModelPicker.kind === 'image' ? '이미지 AI 모델' : activeModelPicker.kind === 'video' ? '영상 AI 모델' : '오디오 / TTS 모델'}</div>
-                <div className="mt-3 text-xl font-black text-slate-900">씬 {data[activeModelPicker.index]?.sceneNumber} 모델 선택</div>
-                <div className="mt-1 text-sm leading-6 text-slate-500">생성 버튼 오른쪽 톱니바퀴에서 빠르게 바꾸는 팝업 디자인입니다. 이후 고도화할 수 있도록 단순한 선택 구조만 유지했습니다.</div>
-              </div>
-              <button type="button" onClick={() => setActiveModelPicker(null)} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50">닫기</button>
-            </div>
-
-            <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-3">
-              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">현재 선택</div>
-              <div className="mt-2 rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-900">{getModelSelector(activeModelPicker.kind)?.currentLabel}</div>
-              <select
-                value={getModelSelector(activeModelPicker.kind)?.currentId || ''}
-                onChange={(e) => getModelSelector(activeModelPicker.kind)?.onSelect?.(e.target.value)}
-                className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 outline-none focus:border-blue-400"
-              >
-                {(getModelSelector(activeModelPicker.kind)?.options || []).map((option) => (
-                  <option key={option.id} value={option.id}>{option.label}</option>
-                ))}
-              </select>
-              {getModelSelector(activeModelPicker.kind)?.options.find((item) => item.id === getModelSelector(activeModelPicker.kind)?.currentId)?.helper && (
-                <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs leading-5 text-slate-500">{getModelSelector(activeModelPicker.kind)?.options.find((item) => item.id === getModelSelector(activeModelPicker.kind)?.currentId)?.helper}</div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {activeModelPicker?.kind === 'audio' && audioTtsSelectionFlow ? (
+        <TtsSelectionModal
+          open={Boolean(activeModelPicker)}
+          title={`씬 ${data[activeModelPicker.index]?.sceneNumber} 오디오 / TTS 선택`}
+          currentProvider={audioTtsSelectionFlow.currentProvider}
+          currentModelId={audioTtsSelectionFlow.currentModelId}
+          currentVoiceId={audioTtsSelectionFlow.currentVoiceId}
+          googleApiKey={audioTtsSelectionFlow.googleApiKey}
+          elevenLabsApiKey={audioTtsSelectionFlow.elevenLabsApiKey}
+          hasElevenLabsApiKey={audioTtsSelectionFlow.hasElevenLabsApiKey}
+          allowPaid={Boolean(audioTtsSelectionFlow.hasElevenLabsApiKey)}
+          elevenLabsVoices={audioTtsSelectionFlow.elevenLabsVoices}
+          voiceReferenceAudioData={audioTtsSelectionFlow.voiceReferenceAudioData}
+          voiceReferenceMimeType={audioTtsSelectionFlow.voiceReferenceMimeType}
+          voiceReferenceName={audioTtsSelectionFlow.voiceReferenceName}
+          onApply={audioTtsSelectionFlow.onApply}
+          onClose={() => setActiveModelPicker(null)}
+        />
+      ) : activeModelPicker && getModelSelector(activeModelPicker.kind) ? (
+        <AiOptionPickerModal
+          open={Boolean(activeModelPicker)}
+          title={activeModelPicker.kind === 'image' ? `씬 ${data[activeModelPicker.index]?.sceneNumber} 이미지 모델` : activeModelPicker.kind === 'video' ? `씬 ${data[activeModelPicker.index]?.sceneNumber} 영상 모델` : `씬 ${data[activeModelPicker.index]?.sceneNumber} 오디오 / TTS 선택`}
+          description={activeModelPicker.kind === 'audio'
+            ? '비용 단계와 음성 느낌을 비교해서 고르세요. 미리듣기가 있으면 확인한 뒤 선택하면 됩니다.'
+            : '비용과 품질을 한 화면에서 비교할 수 있는 공통 카드 선택기입니다.'}
+          currentId={getModelSelector(activeModelPicker.kind)?.currentId || ''}
+          options={(getModelSelector(activeModelPicker.kind)?.options || []).map((option) => ({
+            ...option,
+            title: option.title || option.label || option.id,
+          }))}
+          onClose={() => setActiveModelPicker(null)}
+          onSelect={(id) => getModelSelector(activeModelPicker.kind)?.onSelect?.(id)}
+          requireConfirm
+          confirmLabel={activeModelPicker.kind === 'audio' ? '이 오디오 설정 선택하기' : activeModelPicker.kind === 'image' ? '이 이미지 모델 선택하기' : '이 영상 모델 선택하기'}
+        />
+      ) : null}
 
       {mediaViewer && (
         <div className="fixed inset-0 z-[65] flex items-center justify-center bg-slate-950/75 p-4" onClick={() => setMediaViewer(null)}>

@@ -659,6 +659,7 @@ export interface SavedProject {
   folderName?: string;
   folderPath?: string;
   lastSavedAt?: number;
+  schemaVersion?: number;
   settings: {
     imageModel: string;
     videoModel?: string;
@@ -675,6 +676,9 @@ export interface SavedProject {
     chatterboxVoicePreset?: string | null;
     elevenLabsVoiceId?: string | null;
     heygenVoiceId?: string | null;
+    voiceReferenceAudioData?: string | null;
+    voiceReferenceMimeType?: string | null;
+    voiceReferenceName?: string | null;
     backgroundMusicProvider?: 'google' | 'sample';
     backgroundMusicModel?: string;
     musicVideoProvider?: 'elevenLabs' | 'sample';

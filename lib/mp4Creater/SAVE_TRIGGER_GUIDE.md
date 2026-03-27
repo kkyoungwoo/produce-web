@@ -12,6 +12,8 @@
 ## 적용 위치
 - `lib/mp4Creater/components/InputSection.tsx`
   - 워크플로우 드래프트 저장 트리거 관리
+  - Step3 실행 전 최신 draft에서 `rolePrompts`를 다시 계산해 실제 모델 요청 `promptAdditions`에 붙이는 경로
+  - 긴 AI 대본 생성은 `scriptComposerService.ts` 내부 세그먼트 continuation 경로를 타므로, 관련 수정 시 한 번 생성과 확장 생성이 모두 같은 저장 기준을 유지하는지 확인
 - `lib/mp4Creater/App.tsx`
   - 프로젝트 에셋/프리뷰 믹스 저장 트리거 관리
 
@@ -37,11 +39,13 @@
   - paragraph narration/imagePrompt/videoPrompt/visual type/duration edits: immediate snapshot write + debounced project JSON save
   - autosave signature must include paragraph text/prompt changes, selected visual mode, media duration/url changes, and current cost so JSON/export/import stay aligned with the visible Step6 cards
   - Step6 save patch must refresh `workflowDraft.promptStore.rolePrompts` and `project.prompts.rolePrompts` together so prompt-role separation survives reopen/export/import
+  - Step6 scene prompt assembly must continue to read `workflowDraft.promptStore.rolePrompts` first so save/reopen 뒤에도 같은 실행 문맥을 재사용할 수 있음
   - Step6 save patch must keep `project.prompts.backgroundMusicPrompt`, `project.prompts.backgroundMusicPromptSections`, and the thumbnail representative prompt summary aligned with the latest visible scene flow
   - paragraph add/delete and audio-clear actions: immediate snapshot write + project JSON sync
   - preview/final render: must call `flushPendingSceneStudioSave(...)` before merging/exporting
   - preview invalidation after scene edits must keep the last rendered preview video payload, and only update the stale message/status until the next explicit render
   - final export must use the ffmpeg route for a finalized MP4; browser preview render is no longer the delivery path
+  - legacy browser merged-render code path must stay removed so preview/download divergence does not reappear
   - final export download headers must remain ASCII-safe with UTF-8 `filename*` support so Korean project titles do not break the render response
   - Step6 preview render must use the same ffmpeg path as final export so the visible preview and downloaded MP4 stay identical
   - when a current Step6 preview MP4 already exists, download should reuse that exact preview MP4 instead of silently building a different render
@@ -75,3 +79,19 @@
 - aspect ratio
 - current scene order
 - Preview/export persistence must not depend on placeholder SVG cards or narration-only subtitle fallbacks.
+
+## Step6 Tab AI Text Save Rules
+- Tab-level `AI 생성` updates in Step6 must be treated exactly like manual text edits for autosave.
+- `대사` AI generation must persist into the narration field only.
+- `이미지` AI generation must persist into the image prompt field only.
+- `영상` AI generation must persist into the video prompt field only.
+- Tab-level AI regeneration must not auto-save fake media results, and must not mark image/video/audio generation as completed.
+
+## IndexedDB Save Rules
+- Project persistence must start immediately in IndexedDB even when no external storage folder is configured.
+- Autosave should write the detailed project record and refresh the lightweight project index separately so gallery rendering stays cheap.
+- Summary index writes must include thumbnail, project number, lastSavedAt, cost summary, current step hints, and project-applied settings snapshot needed for gallery restore.
+- Detailed project writes must keep script, scene assets, audio/video/image results, subtitle data, thumbnail history, prompts, preview assets, and project-specific AI settings together.
+- Optional `/api/local-storage/*` sync must run only when `storageDir` is explicitly configured; otherwise save flows should remain local-cache + IndexedDB only.
+- Import/copy/delete should update both IndexedDB detail and IndexedDB summary layers in the same save transaction so project lists and reopen state do not drift apart.
+- Any future save trigger added in `App.tsx`, `SceneStudioPage.tsx`, or `projectService.ts` must preserve the split between lightweight gallery index data and detailed project payload data.

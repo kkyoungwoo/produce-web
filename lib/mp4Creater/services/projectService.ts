@@ -12,8 +12,10 @@ import { deleteStudioProjects, fetchStudioProjectById, fetchStudioProjects, getC
 import { buildSceneStudioSnapshotPayload, writeSceneStudioSnapshot } from './sceneStudioSnapshotCache';
 
 const DB_NAME = 'TubeGenAI';
-const DB_VERSION = 1;
-const STORE_NAME = 'projects';
+const DB_VERSION = 2;
+const DETAIL_STORE_NAME = 'projects';
+const INDEX_STORE_NAME = 'projectIndex';
+const PROJECT_SCHEMA_VERSION = 2;
 const STUDIO_SYNC_DEBOUNCE_MS = 120;
 
 let pendingStudioSyncProjects: SavedProject[] | null = null;
@@ -26,9 +28,25 @@ function openDB(): Promise<IDBDatabase> {
     request.onerror = () => reject(request.error);
     request.onsuccess = () => resolve(request.result);
     request.onupgradeneeded = (event) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      const upgradeRequest = event.target as IDBOpenDBRequest;
+      const db = upgradeRequest.result;
+      const transaction = upgradeRequest.transaction;
+      const detailStore = db.objectStoreNames.contains(DETAIL_STORE_NAME)
+        ? transaction?.objectStore(DETAIL_STORE_NAME) || null
+        : db.createObjectStore(DETAIL_STORE_NAME, { keyPath: 'id' });
+
+      if (!db.objectStoreNames.contains(INDEX_STORE_NAME)) {
+        const indexStore = db.createObjectStore(INDEX_STORE_NAME, { keyPath: 'id' });
+        const legacyDetails = detailStore;
+        if (legacyDetails) {
+          const getAllRequest = legacyDetails.getAll();
+          getAllRequest.onsuccess = () => {
+            const projects = Array.isArray(getAllRequest.result) ? getAllRequest.result as SavedProject[] : [];
+            projects.forEach((project) => {
+              indexStore.put(summarizeProjectForIndex(normalizeProject(project)));
+            });
+          };
+        }
       }
     };
   });
@@ -234,6 +252,7 @@ function normalizeProject(raw: any): SavedProject {
     folderName: typeof raw?.folderName === 'string' ? raw.folderName : undefined,
     folderPath: typeof raw?.folderPath === 'string' ? raw.folderPath : undefined,
     lastSavedAt: typeof raw?.lastSavedAt === 'number' ? raw.lastSavedAt : (typeof raw?.createdAt === 'number' ? raw.createdAt : Date.now()),
+    schemaVersion: typeof raw?.schemaVersion === 'number' && raw.schemaVersion > 0 ? raw.schemaVersion : PROJECT_SCHEMA_VERSION,
     settings: {
       imageModel: typeof rawSettings?.imageModel === 'string' && rawSettings.imageModel
         ? rawSettings.imageModel
@@ -254,12 +273,15 @@ function normalizeProject(raw: any): SavedProject {
       fluxStyle: typeof rawSettings?.fluxStyle === 'string' ? rawSettings.fluxStyle : undefined,
       imageProvider: rawSettings?.imageProvider === 'openrouter' || rawSettings?.imageProvider === 'custom' ? rawSettings.imageProvider : 'sample',
       videoProvider: rawSettings?.videoProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
-      ttsProvider: rawSettings?.ttsProvider === 'elevenLabs' || rawSettings?.ttsProvider === 'chatterbox' || rawSettings?.ttsProvider === 'heygen' ? rawSettings.ttsProvider : 'qwen3Tts',
-      audioProvider: rawSettings?.audioProvider === 'elevenLabs' || rawSettings?.audioProvider === 'chatterbox' || rawSettings?.audioProvider === 'heygen' ? rawSettings.audioProvider : 'qwen3Tts',
+      ttsProvider: rawSettings?.ttsProvider === 'elevenLabs' || rawSettings?.ttsProvider === 'heygen' ? rawSettings.ttsProvider : 'qwen3Tts',
+      audioProvider: rawSettings?.audioProvider === 'elevenLabs' || rawSettings?.audioProvider === 'heygen' ? rawSettings.audioProvider : 'qwen3Tts',
       qwenVoicePreset: typeof rawSettings?.qwenVoicePreset === 'string' && rawSettings.qwenVoicePreset ? rawSettings.qwenVoicePreset : 'qwen-default',
       chatterboxVoicePreset: typeof rawSettings?.chatterboxVoicePreset === 'string' && rawSettings.chatterboxVoicePreset ? rawSettings.chatterboxVoicePreset : 'chatterbox-clear',
       elevenLabsVoiceId: typeof rawSettings?.elevenLabsVoiceId === 'string' ? rawSettings.elevenLabsVoiceId : null,
       heygenVoiceId: typeof rawSettings?.heygenVoiceId === 'string' ? rawSettings.heygenVoiceId : null,
+      voiceReferenceAudioData: typeof rawSettings?.voiceReferenceAudioData === 'string' ? rawSettings.voiceReferenceAudioData : null,
+      voiceReferenceMimeType: typeof rawSettings?.voiceReferenceMimeType === 'string' ? rawSettings.voiceReferenceMimeType : null,
+      voiceReferenceName: typeof rawSettings?.voiceReferenceName === 'string' ? rawSettings.voiceReferenceName : null,
       backgroundMusicProvider: rawSettings?.backgroundMusicProvider === 'google' ? 'google' : 'sample',
       backgroundMusicModel: typeof rawSettings?.backgroundMusicModel === 'string' && rawSettings.backgroundMusicModel ? rawSettings.backgroundMusicModel : CONFIG.DEFAULT_BGM_MODEL,
       musicVideoProvider: rawSettings?.musicVideoProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
@@ -423,7 +445,7 @@ function resolveNextProjectNumber(projects: Array<Pick<SavedProject, 'projectNum
 }
 
 async function getNextProjectNumber(): Promise<number> {
-  const indexed = await readIndexedProjects();
+  const indexed = await readIndexedProjectSummaries();
   if (indexed.length) return resolveNextProjectNumber(indexed);
 
   const cachedProjects = Array.isArray(getCachedStudioState()?.projects)
@@ -432,9 +454,14 @@ async function getNextProjectNumber(): Promise<number> {
   return resolveNextProjectNumber(cachedProjects as SavedProject[]);
 }
 
+function shouldSyncStudioMirror() {
+  const cachedState = getCachedStudioState();
+  return Boolean(cachedState?.isStorageConfigured && cachedState.storageDir?.trim());
+}
+
 async function persistProjectDetailIfPossible(project: SavedProject): Promise<SavedProject> {
   const cachedState = getCachedStudioState();
-  if (!cachedState?.isStorageConfigured || !cachedState.storageDir?.trim()) {
+  if (!shouldSyncStudioMirror() || !cachedState?.storageDir?.trim()) {
     return project;
   }
 
@@ -458,6 +485,10 @@ async function syncProjectsAcrossStorage(
       if (typeof window !== 'undefined') window.clearTimeout(studioSyncTimer);
       else clearTimeout(studioSyncTimer);
       studioSyncTimer = null;
+    }
+
+    if (!shouldSyncStudioMirror()) {
+      return;
     }
 
     try {
@@ -496,6 +527,10 @@ function mergeProjectsForStudioSync(updatedProject: SavedProject, fallbackProjec
 
 async function flushStudioSyncQueue() {
   if (studioSyncInFlight || !pendingStudioSyncProjects) return;
+  if (!shouldSyncStudioMirror()) {
+    pendingStudioSyncProjects = null;
+    return;
+  }
   studioSyncInFlight = true;
 
   try {
@@ -514,6 +549,15 @@ async function flushStudioSyncQueue() {
 }
 
 function scheduleStudioSync(projects: SavedProject[]) {
+  if (!shouldSyncStudioMirror()) {
+    pendingStudioSyncProjects = null;
+    if (studioSyncTimer) {
+      if (typeof window !== 'undefined') window.clearTimeout(studioSyncTimer);
+      else clearTimeout(studioSyncTimer);
+      studioSyncTimer = null;
+    }
+    return;
+  }
   pendingStudioSyncProjects = projects;
   if (studioSyncTimer) {
     if (typeof window !== 'undefined') window.clearTimeout(studioSyncTimer);
@@ -561,28 +605,72 @@ function hasDetailedProjectPayload(project?: SavedProject | null) {
   );
 }
 
-async function readIndexedProjects(): Promise<SavedProject[]> {
+async function readAllIndexedRecords<T>(storeName: string): Promise<T[]> {
+  const db = await openDB();
+  return await new Promise<T[]>((resolve, reject) => {
+    const transaction = db.transaction([storeName], 'readonly');
+    const store = transaction.objectStore(storeName);
+    const request = store.getAll();
+    request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result as T[] : []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function readIndexedProjectDetails(): Promise<SavedProject[]> {
   try {
-    const db = await openDB();
-    return await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
-      const request = store.getAll();
-      request.onsuccess = () => resolve((request.result as SavedProject[]).map(normalizeProject));
-      request.onerror = () => reject(request.error);
-    });
+    return (await readAllIndexedRecords<SavedProject>(DETAIL_STORE_NAME))
+      .map(normalizeProject)
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   } catch {
     return [];
+  }
+}
+
+async function writeIndexedProjectIndex(projects: SavedProject[]): Promise<void> {
+  const db = await openDB();
+  await new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction([INDEX_STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(INDEX_STORE_NAME);
+    store.clear();
+    projects.forEach((project) => {
+      store.put(summarizeProjectForIndex(project));
+    });
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+async function readIndexedProjectSummaries(): Promise<SavedProject[]> {
+  try {
+    const summaries = (await readAllIndexedRecords<SavedProject>(INDEX_STORE_NAME))
+      .map(summarizeProjectForIndex)
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    if (summaries.length) return summaries;
+
+    const details = await readIndexedProjectDetails();
+    if (details.length) {
+      await writeIndexedProjectIndex(details);
+      return details.map(summarizeProjectForIndex).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    }
+    return [];
+  } catch {
+    const details = await readIndexedProjectDetails();
+    return details.map(summarizeProjectForIndex).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }
 }
 
 async function writeIndexedProjects(projects: SavedProject[]): Promise<void> {
   const db = await openDB();
   await new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    store.clear();
-    projects.forEach((project) => store.put(project));
+    const transaction = db.transaction([DETAIL_STORE_NAME, INDEX_STORE_NAME], 'readwrite');
+    const detailStore = transaction.objectStore(DETAIL_STORE_NAME);
+    const indexStore = transaction.objectStore(INDEX_STORE_NAME);
+    detailStore.clear();
+    indexStore.clear();
+    projects.forEach((project) => {
+      detailStore.put(normalizeProject(project));
+      indexStore.put(summarizeProjectForIndex(project));
+    });
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
   });
@@ -591,9 +679,9 @@ async function writeIndexedProjects(projects: SavedProject[]): Promise<void> {
 async function writeIndexedProject(project: SavedProject): Promise<void> {
   const db = await openDB();
   await new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], 'readwrite');
-    const store = transaction.objectStore(STORE_NAME);
-    store.put(project);
+    const transaction = db.transaction([DETAIL_STORE_NAME, INDEX_STORE_NAME], 'readwrite');
+    transaction.objectStore(DETAIL_STORE_NAME).put(normalizeProject(project));
+    transaction.objectStore(INDEX_STORE_NAME).put(summarizeProjectForIndex(project));
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
   });
@@ -603,8 +691,8 @@ async function readIndexedProjectById(id: string): Promise<SavedProject | null> 
   try {
     const db = await openDB();
     return await new Promise((resolve, reject) => {
-      const transaction = db.transaction([STORE_NAME], 'readonly');
-      const store = transaction.objectStore(STORE_NAME);
+      const transaction = db.transaction([DETAIL_STORE_NAME], 'readonly');
+      const store = transaction.objectStore(DETAIL_STORE_NAME);
       const request = store.get(id);
       request.onsuccess = () => resolve(request.result ? normalizeProject(request.result) : null);
       request.onerror = () => reject(request.error);
@@ -615,7 +703,7 @@ async function readIndexedProjectById(id: string): Promise<SavedProject | null> 
 }
 
 async function readProjectsForMutation(): Promise<SavedProject[]> {
-  const indexed = await readIndexedProjects();
+  const indexed = await readIndexedProjectDetails();
   if (indexed.length) {
     return indexed;
   }
@@ -680,7 +768,7 @@ export async function saveProject(
     thumbnail = await createThumbnail(firstImageAsset.imageData);
   }
 
-  const current = await readIndexedProjects();
+  const current = await readIndexedProjectDetails();
   const cachedProjects = Array.isArray(getCachedStudioState()?.projects)
     ? getCachedStudioState()!.projects
     : [];
@@ -702,6 +790,7 @@ export async function saveProject(
     createdAt: now,
     topic,
     projectNumber: nextProjectNumber,
+    schemaVersion: PROJECT_SCHEMA_VERSION,
     settings: {
       ...getCurrentSettings(),
       outputMode: extras?.outputMode || extras?.workflowDraft?.outputMode || 'video',
@@ -942,7 +1031,7 @@ export async function updateProject(
   const cachedSummaries = getCachedStudioState()?.projects || [];
   const fallbackProjects = cachedSummaries.length
     ? undefined
-    : (await readIndexedProjects()).filter((project) => project.id !== id);
+    : (await readIndexedProjectSummaries()).filter((project) => project.id !== id);
   const syncPayload = mergeProjectsForStudioSync(persistedProject, fallbackProjects);
   scheduleStudioSync(syncPayload);
   return persistedProject;
@@ -950,7 +1039,8 @@ export async function updateProject(
 
 
 export async function getSavedProjects(options?: { forceSync?: boolean; localOnly?: boolean }): Promise<SavedProject[]> {
-  const indexed = await readIndexedProjects();
+  const indexed = await readIndexedProjectSummaries();
+  const indexedDetails = options?.forceSync ? await readIndexedProjectDetails() : [];
   const cachedState = getCachedStudioState();
   const cachedProjects = Array.isArray(cachedState?.projects)
     ? cachedState.projects.map(summarizeProjectForIndex).sort((a, b) => b.createdAt - a.createdAt)
@@ -967,11 +1057,15 @@ export async function getSavedProjects(options?: { forceSync?: boolean; localOnl
     return summarizedLocal;
   }
 
+  if (!shouldSyncStudioMirror()) {
+    return summarizedLocal;
+  }
+
   try {
     const projects = (await fetchStudioProjects()).map(normalizeProject).sort((a, b) => b.createdAt - a.createdAt);
     const remoteExists = projects.length > 0;
     if (remoteExists || options?.forceSync) {
-      const mergedRemote = mergeSavedProjects(indexed, projects);
+      const mergedRemote = mergeSavedProjects(indexedDetails.length ? indexedDetails : indexed, projects);
       await writeIndexedProjects(mergedRemote);
       return mergedRemote.map(summarizeProjectForIndex).sort((a, b) => b.createdAt - a.createdAt);
     }
@@ -985,6 +1079,7 @@ export async function getProjectById(id: string, options?: { forceSync?: boolean
   const hasDirectDetail = hasDetailedProjectPayload(direct);
   if (direct && !options?.forceSync && hasDirectDetail) return direct;
   if (options?.localOnly) return hasDirectDetail ? direct : null;
+  if (!shouldSyncStudioMirror()) return hasDirectDetail ? direct : null;
 
   try {
     const remoteDetail = await fetchStudioProjectById(id);
@@ -1110,7 +1205,9 @@ export async function duplicateProject(id: string): Promise<SavedProject | null>
   const current = await readProjectsForMutation();
   const summarySource = current.find((project) => project.id === id);
   if (!summarySource) return null;
-  const remoteSource = (summarySource.assets?.length || summarySource.workflowDraft || summarySource.backgroundMusicTracks?.length) ? null : await fetchStudioProjectById(id);
+  const remoteSource = shouldSyncStudioMirror() && !(summarySource.assets?.length || summarySource.workflowDraft || summarySource.backgroundMusicTracks?.length)
+    ? await fetchStudioProjectById(id)
+    : null;
   const source = remoteSource ? normalizeProject(remoteSource) : summarySource;
 
   const nextProjectNumber = await getNextProjectNumber();

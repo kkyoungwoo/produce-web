@@ -13,6 +13,14 @@ import { runTextAi } from './textAiService';
 import { getPromptRegistry } from './promptRegistryService';
 import { buildCreativeDirectionBlock, createCreativeDirection } from '../config/creativeVariance';
 import { NO_AI_SCRIPT_MODEL_ID } from '../config';
+import {
+  buildConceptDirectionLines,
+  buildMarkdownKeyValueSection,
+  buildMarkdownSection,
+  buildSimilarityControlLines,
+  buildTransitionIntentLines,
+  joinPromptBlocks,
+} from './promptMarkdown';
 
 interface ScriptComposerOptions {
   contentType: ContentType;
@@ -20,6 +28,7 @@ interface ScriptComposerOptions {
   selections: StorySelectionState;
   template: WorkflowPromptTemplate;
   currentScript?: string;
+  continuityContext?: string;
   promptAdditions?: string[];
   model?: string;
   conversationMode?: boolean;
@@ -27,6 +36,8 @@ interface ScriptComposerOptions {
   generationIntent?: 'draft' | 'expand';
   expandByChars?: number;
   generationNonce?: string;
+  returnOnlySegment?: boolean;
+  onProgress?: (update: { percent: number; message: string }) => void;
 }
 
 export interface ScriptComposerResult {
@@ -41,6 +52,22 @@ const SCRIPT_CHARACTER_RANGE_BY_TYPE: Record<ContentType, { min: number; max: nu
   cinematic: { min: 110, max: 210 },
   info_delivery: { min: 390, max: 720 },
 };
+
+const SCRIPT_SEGMENT_TARGET_CHARS = 900;
+const SCRIPT_SEGMENT_MIN_CHARS = 320;
+const SCRIPT_SEGMENT_MAX_COUNT = 6;
+const SCRIPT_SEGMENT_CONTEXT_CHARS = 820;
+
+function emitScriptProgress(
+  options: ScriptComposerOptions,
+  percent: number,
+  message: string,
+) {
+  options.onProgress?.({
+    percent: Math.max(0, Math.min(100, Math.round(percent))),
+    message,
+  });
+}
 
 function createSeededRandom(seedText: string) {
   let seed = Array.from(seedText || 'mp4Creater').reduce((acc, char, index) => {
@@ -413,6 +440,13 @@ function resolveExpandByChars(options: ScriptComposerOptions) {
 }
 
 function buildGenerationIntentGuide(options: ScriptComposerOptions) {
+  if (options.returnOnlySegment) {
+    const target = resolveExpandByChars(options);
+    return options.contentType === 'music_video'
+      ? `전체 가사를 다시 쓰지 말고 약 ${target}자 분량의 다음 가사 블록만 이어서 작성한다. 앞 블록을 반복하거나 요약하지 말고 같은 노래의 다음 구간처럼 자연스럽게 연결한다.`
+      : `전체 대본을 다시 쓰지 말고 약 ${target}자 분량의 다음 문단 블록만 이어서 작성한다. 앞 문단을 반복하거나 요약하지 말고 현재 흐름 다음으로 자연스럽게 이어 간다.`;
+  }
+
   if (options.generationIntent === 'expand') {
     const target = resolveExpandByChars(options);
     return options.contentType === 'music_video'
@@ -426,19 +460,23 @@ function buildGenerationIntentGuide(options: ScriptComposerOptions) {
 }
 
 function buildOutputFormatReminder(options: ScriptComposerOptions) {
+  const paragraphGuide = buildParagraphCountGuide(options)
+    .replace('Target structure: ', '')
+    .replace(/\.$/, '');
+
   if (options.contentType === 'music_video') {
-    return '출력 형식: 4~6개의 짧은 가사 문단으로 쓰고 줄바꿈으로만 리듬을 만든다. 블록 제목, 괄호, 설명문, 장면 해설 없이 실제로 부를 가사 줄만 남긴다. 특정 사건을 줄거리처럼 설명하지 말고 노래 가사 자체로 감정과 훅을 만든다.';
+    return `출력 형식: ${paragraphGuide}. 줄바꿈으로만 리듬을 만들고 블록 제목, 괄호, 설명문, 장면 해설 없이 실제로 부를 가사 줄만 남긴다. 특정 사건을 줄거리처럼 설명하지 말고 노래 가사 자체로 감정과 훅을 만든다.`;
   }
 
   if (options.contentType === 'info_delivery') {
-    return '출력 형식: 4~6개의 정보 전달용 낭독 문단으로 쓰고 첫 문단은 핵심 질문, 중간은 설명/예시/비교, 마지막은 요약과 다음 행동으로 끝낸다. 대본 본문만 출력하고 장면 설명, 목표, 주제, 장르, 메모 같은 메타 문구는 본문에 쓰지 않는다.';
+    return `출력 형식: ${paragraphGuide}. 첫 문단은 핵심 질문, 중간은 설명/예시/비교, 마지막은 요약과 다음 행동으로 끝낸다. 대본 본문만 출력하고 장면 설명, 목표, 주제, 장르, 메모 같은 메타 문구는 본문에 쓰지 않는다.`;
   }
 
   if (options.contentType === 'cinematic') {
-    return '출력 형식: 4~6개의 시네마틱 낭독 문단으로 쓰되 화면 설명이 아니라 목소리로 읽힐 문장만 남긴다. 대본 본문만 출력하고 장면 제목, 카메라 지시, 메타 문구는 본문에 쓰지 않는다. 특정 상황 설명서가 아니라 낭독 가능한 본문만 남긴다.';
+    return `출력 형식: ${paragraphGuide}. 화면 설명이 아니라 목소리로 읽힐 문장만 남긴다. 대본 본문만 출력하고 장면 제목, 카메라 지시, 메타 문구는 본문에 쓰지 않는다. 특정 상황 설명서가 아니라 낭독 가능한 본문만 남긴다.`;
   }
 
-  return '출력 형식: 4~6개의 이야기형 낭독 문단으로 쓰고 각 문단이 감정과 사건을 함께 전진시켜야 한다. 대본 본문만 출력하고 장면 설명, 목표, 주제, 장르, 메모 같은 메타 문구는 본문에 쓰지 않는다. 영상 연출 지시가 아니라 실제 낭독 대본 문장만 남긴다.';
+  return `출력 형식: ${paragraphGuide}. 각 문단이 감정과 사건을 함께 전진시켜야 한다. 대본 본문만 출력하고 장면 설명, 목표, 주제, 장르, 메모 같은 메타 문구는 본문에 쓰지 않는다. 영상 연출 지시가 아니라 실제 낭독 대본 문장만 남긴다.`;
 }
 
 function buildConceptLockGuide(options: ScriptComposerOptions) {
@@ -458,19 +496,162 @@ function buildConceptLockGuide(options: ScriptComposerOptions) {
 }
 
 function buildParagraphCountGuide(options: ScriptComposerOptions) {
+  const minutes = Math.max(1, Math.min(30, Math.round(options.customSettings?.expectedDurationMinutes || 1)));
+  const baseCount = Math.max(
+    options.contentType === 'music_video' ? 4 : 3,
+    Math.min(options.contentType === 'music_video' ? 16 : 18, Math.round(minutes * 1.2)),
+  );
+  const minParagraphs = Math.max(options.contentType === 'music_video' ? 4 : 3, baseCount - 1);
+  const maxParagraphs = Math.max(minParagraphs, Math.min(options.contentType === 'music_video' ? 18 : 20, baseCount + 1));
+
   if (options.contentType === 'music_video') {
-    return 'Target structure: 4 to 6 blank-line-separated lyric paragraphs with no block labels.';
+    return `Target structure: ${minParagraphs} to ${maxParagraphs} blank-line-separated lyric paragraphs with no block labels.`;
   }
 
   if (options.contentType === 'info_delivery') {
-    return 'Target structure: 4 to 6 blank-line-separated TTS narration paragraphs.';
+    return `Target structure: ${minParagraphs} to ${maxParagraphs} blank-line-separated TTS narration paragraphs.`;
   }
 
   if (options.contentType === 'cinematic') {
-    return 'Target structure: 4 to 6 blank-line-separated cinematic narration paragraphs.';
+    return `Target structure: ${minParagraphs} to ${maxParagraphs} blank-line-separated cinematic narration paragraphs.`;
   }
 
-  return 'Target structure: 4 to 6 blank-line-separated story narration paragraphs.';
+  return `Target structure: ${minParagraphs} to ${maxParagraphs} blank-line-separated story narration paragraphs.`;
+}
+
+function buildCompactScriptContext(text: string, maxChars: number = SCRIPT_SEGMENT_CONTEXT_CHARS) {
+  const paragraphs = normalizeStoryText(text)
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  if (!paragraphs.length) return 'None';
+
+  const opening = paragraphs[0] ? trimScriptToMax(paragraphs[0], Math.min(220, maxChars)) : '';
+  const recent = trimScriptToMax(paragraphs.slice(-2).join('\n\n'), Math.max(260, Math.min(420, maxChars - 120)));
+  const middle = paragraphs.length > 3
+    ? trimScriptToMax(paragraphs.slice(1, -2).join(' '), Math.max(120, Math.min(180, maxChars - opening.length - recent.length)))
+    : '';
+
+  return [
+    opening ? `[OPENING LOCK] ${opening}` : '',
+    middle ? `[ARC SO FAR] ${middle}` : '',
+    recent ? `[LATEST FLOW] ${recent}` : '',
+  ].filter(Boolean).join('\n');
+}
+
+function resolveScriptSegmentGoal(options: ScriptComposerOptions, currentText: string) {
+  const range = getScriptCharacterRange(options.contentType, options.customSettings?.expectedDurationMinutes || 1);
+  const currentChars = countScriptCharacters(currentText);
+  const desiredTotal = options.generationIntent === 'expand'
+    ? Math.min(range.max, Math.max(currentChars + resolveExpandByChars(options), range.min))
+    : range.target;
+  const remainingChars = Math.max(0, desiredTotal - currentChars);
+  if (remainingChars < SCRIPT_SEGMENT_TARGET_CHARS) return null;
+
+  const segmentCount = Math.max(2, Math.min(SCRIPT_SEGMENT_MAX_COUNT, Math.ceil(remainingChars / SCRIPT_SEGMENT_TARGET_CHARS)));
+  const baseTarget = Math.max(SCRIPT_SEGMENT_MIN_CHARS, Math.floor(remainingChars / segmentCount));
+  const segments = Array.from({ length: segmentCount }, (_, index) => {
+    const remaining = remainingChars - (baseTarget * index);
+    const slotsLeft = segmentCount - index;
+    return Math.max(SCRIPT_SEGMENT_MIN_CHARS, Math.floor(remaining / Math.max(1, slotsLeft)));
+  });
+
+  return {
+    desiredTotal,
+    remainingChars,
+    segmentCount,
+    segments,
+  };
+}
+
+function buildSegmentPhaseGuide(options: ScriptComposerOptions, index: number, total: number) {
+  const isFirst = index === 0;
+  const isLast = index === total - 1;
+
+  if (options.contentType === 'music_video') {
+    if (isFirst) return 'Open with a memorable lyrical hook and the core emotional melody of this project. Do not spend the whole segment on setup.';
+    if (isLast) return 'Land the final hook, emotional lift, or afterglow without breaking singability. Finish like the ending of the same song, not a new song.';
+    return 'Develop the next lyrical beat, keep chorus-level memorability, and transition naturally from the prior vocal flow without repeating earlier lines.';
+  }
+
+  if (options.contentType === 'info_delivery') {
+    if (isFirst) return 'Open with the why-now question or key context, then move straight into the first clear explanation beat.';
+    if (isLast) return 'Close with the final takeaway, summary, or next action so the explanation ends cleanly.';
+    return 'Continue the explanation through order, example, comparison, or numbers. Extend understanding instead of restating the opener.';
+  }
+
+  if (options.contentType === 'cinematic') {
+    if (isFirst) return 'Open with visible tension, a concrete scene beat, and the emotional hook of the story.';
+    if (isLast) return 'Bring the emotional landing, reveal, or irreversible beat into focus and leave a cinematic aftertaste.';
+    return 'Push the scene pressure forward through reaction, movement, and emotional escalation. Continue from the prior beat like the next cut of the same film.';
+  }
+
+  if (isFirst) return 'Open with the story hook and the first emotional or action beat right away.';
+  if (isLast) return 'Deliver the final turn, choice, or afterglow so the story lands with continuity.';
+  return 'Continue the narrative by escalating conflict, reaction, and scene progression without resetting the story.';
+}
+
+function buildContinuationPromptAdditions(options: ScriptComposerOptions, currentText: string, segmentIndex: number, segmentCount: number, targetChars: number) {
+  return [
+    buildMarkdownSection('Long Script Segment', [
+      `This is segment ${segmentIndex + 1} of ${segmentCount}. Write only the newly added continuation block.`,
+      `Aim for about ${targetChars} characters of fresh body text.`,
+    ]),
+    buildMarkdownSection('Segment Phase', [
+      buildSegmentPhaseGuide(options, segmentIndex, segmentCount),
+    ]),
+    buildMarkdownSection('Continuity Rule', [
+      'Continue directly from the latest beat.',
+      'Do not restart the premise, summarize previous paragraphs, or duplicate lines that already exist.',
+      ...buildTransitionIntentLines(options.contentType, 'script'),
+    ]),
+    buildMarkdownSection('Current Draft Context', [
+      buildCompactScriptContext(currentText),
+    ], { bullet: false }),
+  ];
+}
+
+function extractUniqueContinuationParagraphs(baseText: string, candidateText: string) {
+  const baseParagraphs = normalizeStoryText(baseText)
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const candidateParagraphs = normalizeStoryText(candidateText)
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return candidateParagraphs.filter((paragraph) => {
+    const compactParagraph = paragraph.replace(/\s+/g, ' ').trim();
+    return compactParagraph && !baseParagraphs.some((baseParagraph) => {
+      const compactBase = baseParagraph.replace(/\s+/g, ' ').trim();
+      return compactBase === compactParagraph
+        || compactBase.includes(compactParagraph)
+        || compactParagraph.includes(compactBase);
+    });
+  });
+}
+
+function mergeContinuationScript(baseText: string, candidateText: string) {
+  const base = normalizeStoryText(baseText);
+  const candidate = normalizeStoryText(candidateText);
+  if (!candidate) return base;
+  if (!base) return candidate;
+
+  const baseParagraphs = base.split(/\n{2,}/).map((item) => item.trim()).filter(Boolean);
+  const candidateParagraphs = candidate.split(/\n{2,}/).map((item) => item.trim()).filter(Boolean);
+  if (
+    candidateParagraphs.length > baseParagraphs.length
+    && candidateParagraphs[0]
+    && baseParagraphs[0]
+    && candidateParagraphs[0].slice(0, 28) === baseParagraphs[0].slice(0, 28)
+  ) {
+    return candidate;
+  }
+
+  const appended = extractUniqueContinuationParagraphs(base, candidate);
+  if (!appended.length) return base;
+  return normalizeStoryText([...baseParagraphs, ...appended].join('\n\n'));
 }
 
 function createMusicVideoExpansionFallback(options: ScriptComposerOptions) {
@@ -949,8 +1130,84 @@ function buildCreativePayload(options: ScriptComposerOptions, task: 'script' | '
   });
 }
 
+function buildScriptQualityGuide(options: ScriptComposerOptions) {
+  return [
+    buildOutputFormatReminder(options),
+    buildCharacterRangeGuide(options),
+    getTtsOnlyRule(options.contentType),
+    options.contentType === 'music_video'
+      ? 'Keep each block singable and easy to split into Step6 visual moments without turning into prose explanation.'
+      : 'Keep each paragraph easy to voice, easy to scene-ify, and easy to split into Step6 scene beats.',
+    options.contentType === 'info_delivery'
+      ? 'Each paragraph should preserve at least one clear explanation beat, useful example, comparison, or takeaway.'
+      : 'Each paragraph should preserve at least one visible emotional beat, action beat, or scene change that Step6 can visualize.',
+    options.customSettings?.language === 'mute'
+      ? 'Mute mode still needs scene-ready visual beats with no spoken dialogue or narration.'
+      : 'Use mouth-shape-friendly pacing and sentence flow that can be spoken clearly in sequence.',
+  ];
+}
+
+function buildScriptRequestMarkdown(
+  options: ScriptComposerOptions,
+  currentDraftContext: string,
+  extras?: {
+    selectedPrompt?: string | null;
+    translationRule?: string | null;
+    additionalGuidance?: string[];
+  }
+) {
+  const additionalGuidance = (extras?.additionalGuidance || []).filter((item) => item.trim());
+  return joinPromptBlocks([
+    buildMarkdownSection('Goal', [buildGenerationIntentGuide(options)]),
+    buildMarkdownSection('Concept Direction', [
+      buildConceptLockGuide(options),
+      ...buildConceptDirectionLines(options.contentType, 'script'),
+    ]),
+    buildMarkdownSection('Writing Rules', buildScriptQualityGuide(options)),
+    buildMarkdownSection('Transition Rules', buildTransitionIntentLines(options.contentType, 'script')),
+    buildMarkdownSection('Similarity Control', [
+      ...buildSimilarityControlLines(),
+      buildFreshTakeGuide(options),
+    ]),
+    buildMarkdownKeyValueSection('Project Inputs', [
+      ['Content Type', options.contentType],
+      ['Topic', options.topic || 'Auto-generated topic'],
+      ['Genre', options.selections.genre],
+      ['Mood', options.selections.mood],
+      ['Setting', options.selections.setting],
+      ['Lead', options.selections.protagonist],
+      ['Conflict', options.selections.conflict],
+      ['Ending Tone', options.selections.endingTone],
+      ['Expected Duration', `${Math.max(1, Math.min(30, options.customSettings?.expectedDurationMinutes || 1))} minute(s)`],
+      ['Script Language', formatScriptLanguageEnglish(options.customSettings?.language)],
+      ['Speech Style', formatSpeechStyleEnglish(options.customSettings?.speechStyle)],
+      ['Prompt Template', options.template.name],
+      ['Prompt Template Description', options.template.description],
+      ['Reference Notes', options.customSettings?.referenceText?.trim() || 'None'],
+    ]),
+    buildMarkdownSection('Voice Only Sample', [
+      buildVoiceOnlySample(options.contentType, options.topic, options.selections),
+    ], { bullet: false }),
+    buildMarkdownSection('Creative Variance', [
+      buildCreativePayload(options),
+    ], { bullet: false }),
+    buildMarkdownSection('Current Draft Context', [
+      currentDraftContext || 'None',
+    ], { bullet: false }),
+    additionalGuidance.length ? buildMarkdownSection('Additional Guidance', additionalGuidance) : '',
+    extras?.selectedPrompt ? buildMarkdownSection('Selected Prompt', [extras.selectedPrompt], { bullet: false }) : '',
+    extras?.translationRule ? buildMarkdownSection('Translation Rule', [extras.translationRule], { bullet: false }) : '',
+  ]);
+}
+
 function buildConstitutionUserPayload(options: ScriptComposerOptions) {
+  const markdownDraftContext = options.continuityContext?.trim() || options.currentScript?.trim() || 'None';
+  return buildScriptRequestMarkdown(options, markdownDraftContext, {
+    selectedPrompt: options.template.prompt,
+    additionalGuidance: (options.promptAdditions || []).filter((item) => item.trim()).slice(0, 8),
+  });
   const additionBlock = (options.promptAdditions || []).filter((item) => item.trim()).slice(0, 8);
+  const currentDraftContext = options.continuityContext?.trim() || options.currentScript?.trim() || '없음';
   return [
     `콘텐츠 유형: ${options.contentType}`,
     `주제: ${options.topic || '자동 생성 주제'}`,
@@ -972,7 +1229,7 @@ function buildConstitutionUserPayload(options: ScriptComposerOptions) {
     buildFreshTakeGuide(options),
     `[항목별 대본 샘플]\n${buildVoiceOnlySample(options.contentType, options.topic, options.selections)}`,
     buildCreativePayload(options),
-    `현재 초안: ${options.currentScript?.trim() || '없음'}`,
+    `현재 초안/문맥: ${currentDraftContext}`,
     `참고 텍스트: ${options.customSettings?.referenceText?.trim() || '없음'}`,
     additionBlock.length ? `[추가 가이드]\n${additionBlock.map((item, index) => `${index + 1}. ${item}`).join('\n')}` : '',
     '',
@@ -981,87 +1238,48 @@ function buildConstitutionUserPayload(options: ScriptComposerOptions) {
   ].filter(Boolean).join('\n\n');
 }
 
-
-function createEmergencySampleScript(options: ScriptComposerOptions) {
-  const fallback = createFallback(options);
-  const paragraphReady = fitScriptToCharacterRange(ensureParagraphVideoScript(fallback, options), options);
-  if ((paragraphReady || '').trim()) return paragraphReady;
-
-  const voiceOnly = fitScriptToCharacterRange(
-    ensureParagraphVideoScript(buildVoiceOnlySample(options.contentType, options.topic, options.selections), options),
-    options,
+async function requestPlainScriptDraft(options: ScriptComposerOptions, fallback: string, maxTokens: number = 2200, applyRangeFit: boolean = true): Promise<ScriptComposerResult> {
+  const markdownBundle = getPromptRegistry(options.contentType);
+  const markdownDraftContext = options.continuityContext?.trim() || options.currentScript || 'None';
+  const markdownRequestPayload = await translatePromptToEnglish(
+    buildScriptRequestMarkdown(options, markdownDraftContext, {
+      selectedPrompt: options.template.prompt,
+      translationRule: markdownBundle.translateRule,
+    }),
+    { label: 'script composer request', preserveLineBreaks: true, maxChars: 12000 },
   );
-  if ((voiceOnly || '').trim()) return voiceOnly;
 
-  return formatStoryTextForEditor([
-    `${options.topic || '이번 이야기'}는 지금부터 바로 시작됩니다.`,
-    `${options.selections.protagonist || '주인공'}은 ${options.selections.setting || '익숙한 공간'}에서 ${options.selections.conflict || '남겨 둔 문제'}와 마주합니다.`,
-    `${options.selections.mood || '몰입감 있는'} 흐름으로 장면을 밀고 가며, 끝에는 ${options.selections.endingTone || '여운'}을 남깁니다.`,
-  ].join('\n\n'));
-}
+  const markdownAdditionBlock = (options.promptAdditions || []).filter((item) => item.trim()).slice(0, 10);
+  const markdownMergedPayload = markdownAdditionBlock.length
+    ? joinPromptBlocks([
+      markdownRequestPayload,
+      buildMarkdownSection('Additional Guidance', markdownAdditionBlock),
+    ])
+    : markdownRequestPayload;
 
-export function buildSampleScriptDraft(options: ScriptComposerOptions): string {
-  const selectedModel = options.customSettings?.scriptModel || options.model || '';
-  if (selectedModel === NO_AI_SCRIPT_MODEL_ID) {
-    return createNoAiModelSampleScript(options);
-  }
-  return createEmergencySampleScript(options);
-}
+  const markdownResult = await runTextAi({
+    system: `${markdownBundle.system} Follow the markdown sections by priority. Treat Concept Direction, Writing Rules, Transition Rules, Similarity Control, and Selected Prompt as the active execution rules. Output only the final script body with no headings or meta labels. When continuation guidance is present, write only the newly added continuation block instead of rewriting earlier paragraphs.`,
+    user: markdownMergedPayload,
+    model: options.model || options.customSettings?.scriptModel || 'openrouter/auto',
+    temperature: options.conversationMode || options.template.mode === 'dialogue' ? 0.98 : 0.9,
+    maxTokens,
+    fallback,
+  });
 
-export async function composeScriptDraft(options: ScriptComposerOptions): Promise<ScriptComposerResult> {
-  const selectedModel = options.customSettings?.scriptModel || options.model || '';
-  if (selectedModel === NO_AI_SCRIPT_MODEL_ID) {
-    return {
-      text: buildSampleScriptDraft(options),
-      source: 'sample',
-      analysis: options.template.engine === 'channel_constitution_v32'
-        ? buildConstitutionFallbackAnalysis(options, 'sample')
-        : null,
-    };
-  }
-
-  const fallback = createEmergencySampleScript(options);
-  const fallbackAnalysis = options.template.engine === 'channel_constitution_v32'
-    ? buildConstitutionFallbackAnalysis(options, 'sample')
-    : null;
-
-  try {
-    const bundle = getPromptRegistry(options.contentType);
-
-    if (options.template.engine === 'channel_constitution_v32') {
-      const result = await runTextAi({
-        system: '당신은 유튜브 쇼츠 채널 헌법을 집행하는 분석형 대본 작성자다. 내부적으로 검증과 타겟팅을 수행하되 최종 출력은 JSON 객체 하나만 반환한다. 입력에 없는 사실은 추정하지 않는다. 사용자가 비슷한 결과를 직접 요구하지 않는 한 최근 결과를 답습하지 말고 매번 새 관점과 새 전개를 만든다.',
-        user: buildConstitutionUserPayload(options),
-        model: options.model || options.customSettings?.scriptModel || 'openrouter/auto',
-        maxTokens: 2600,
-        temperature: 0.72,
-        fallback: JSON.stringify({
-          targetProfile: fallbackAnalysis?.targetProfile,
-          safetyReview: fallbackAnalysis?.safetyReview,
-          monetizationReview: fallbackAnalysis?.monetizationReview,
-          selectedStructure: fallbackAnalysis?.selectedStructure,
-          titles: fallbackAnalysis?.titles,
-          keywords: fallbackAnalysis?.keywords,
-          script: fallback,
-        }, null, 2),
-      });
-
-      const parsed = parseConstitutionResponse(
-        result.text || fallback,
-        fallback,
-        fallbackAnalysis || buildConstitutionFallbackAnalysis(options, result.source),
-        result.source,
-        options,
-      );
-      return {
-        text: fitScriptToCharacterRange(parsed.text || fallback, options),
-        source: result.source,
-        analysis: parsed.analysis,
-      };
-    }
-
-    const requestPayload = await translatePromptToEnglish(
-      `Content type: ${options.contentType}
+  const markdownNormalizedText = normalizeStoryText(stripPromptLikeParagraphs(extractScriptFromText(markdownResult.text || fallback) || fallback));
+  return {
+    text: options.returnOnlySegment
+      ? markdownNormalizedText
+      : applyRangeFit
+        ? fitScriptToCharacterRange(ensureParagraphVideoScript(markdownNormalizedText || fallback, options) || fallback, options)
+        : normalizeStoryText(markdownNormalizedText || fallback),
+    source: markdownResult.source,
+    analysis: null,
+  };
+  const bundle = getPromptRegistry(options.contentType);
+  const currentDraftContext = options.continuityContext?.trim() || options.currentScript || 'None';
+  const requestPayload = await translatePromptToEnglish(
+    `Content type: ${options.contentType}
 Topic: ${options.topic || 'Auto-generated'}
 Genre: ${options.selections.genre}
 Mood: ${options.selections.mood}
@@ -1094,36 +1312,194 @@ ${buildCreativePayload(options)}
 [SELECTED PROMPT]
 ${options.template.prompt}
 
-[CURRENT DRAFT]
-${options.currentScript || 'None'}
+[CURRENT DRAFT CONTEXT]
+${currentDraftContext}
 
 [TRANSLATION RULE]
 ${bundle.translateRule}`,
-      { label: 'script composer request', preserveLineBreaks: true, maxChars: 12000 },
-    );
+    { label: 'script composer request', preserveLineBreaks: true, maxChars: 12000 },
+  );
 
-    const additionBlock = (options.promptAdditions || []).filter((item) => item.trim()).slice(0, 8);
-    const mergedPayload = additionBlock.length
-      ? `${requestPayload}
+  const additionBlock = (options.promptAdditions || []).filter((item) => item.trim()).slice(0, 10);
+  const mergedPayload = additionBlock.length
+    ? `${requestPayload}
 
 [ADDITIONAL GUIDANCE PHRASES]
 ${additionBlock.map((item, index) => `${index + 1}. ${item}`).join('\n')}`
-      : requestPayload;
+    : requestPayload;
 
-    const result = await runTextAi({
-      system: `${bundle.system} Step 1 콘셉트 고정 규칙을 끝까지 유지하고, 선택된 프롬프트의 출력 형식과 예시를 우선 규칙으로 따른다. 최종 출력에는 목표, 주제, 장르, 메모 같은 메타 문구를 섞지 말고, 현재 초안이 있으면 지우지 말고 이어서 확장한다. 뮤직비디오면 가사만 쓰고 줄거리 설명이나 상황 해설을 금지한다. 그 외 유형은 실제로 읽을 대본 본문만 쓰고 제작 지시문이나 화면 설명서를 금지한다. 사용자가 비슷한 결과를 직접 원하지 않는 한 방금 전 시도와 비슷한 문장, 후킹 방식, 이미지 은유, 장면 배치를 반복하지 않는다.`,
-      user: mergedPayload,
-      model: options.model || options.customSettings?.scriptModel || 'openrouter/auto',
-      temperature: options.conversationMode || options.template.mode === 'dialogue' ? 0.98 : 0.9,
-      fallback,
-    });
+  const result = await runTextAi({
+    system: `${bundle.system} Step 1 콘셉트 고정 규칙을 끝까지 유지하고, 선택된 프롬프트의 출력 형식과 예시를 우선 규칙으로 따른다. 최종 출력에는 목표, 주제, 장르, 메모 같은 메타 문구를 섞지 말고, 현재 초안이 있으면 지우지 말고 이어서 확장한다. 뮤직비디오면 가사만 쓰고 줄거리 설명이나 상황 해설을 금지한다. 그 외 유형은 실제로 읽을 대본 본문만 쓰고 제작 지시문이나 화면 설명서를 금지한다. 사용자가 비슷한 결과를 직접 원하지 않는 한 방금 전 시도와 비슷한 문장, 후킹 방식, 이미지 은유, 장면 배치를 반복하지 않는다. When continuation-segment guidance is present, output only the newly added continuation paragraphs and do not rewrite earlier paragraphs.`,
+    user: mergedPayload,
+    model: options.model || options.customSettings?.scriptModel || 'openrouter/auto',
+    temperature: options.conversationMode || options.template.mode === 'dialogue' ? 0.98 : 0.9,
+    maxTokens,
+    fallback,
+  });
 
+  const normalizedText = normalizeStoryText(stripPromptLikeParagraphs(extractScriptFromText(result.text || fallback) || fallback));
+  return {
+    text: options.returnOnlySegment
+      ? normalizedText
+      : applyRangeFit
+        ? fitScriptToCharacterRange(ensureParagraphVideoScript(normalizedText || fallback, options) || fallback, options)
+        : normalizeStoryText(normalizedText || fallback),
+    source: result.source,
+    analysis: null,
+  };
+}
+
+async function extendScriptWithSegments(options: ScriptComposerOptions, initialText: string, source: 'ai' | 'sample') {
+  const plan = resolveScriptSegmentGoal(options, initialText);
+  if (!plan) {
+    emitScriptProgress(options, 88, 'Finalizing script length and paragraph flow.');
     return {
-      text: fitScriptToCharacterRange(ensureParagraphVideoScript(result.text || fallback, options) || fallback, options),
-      source: result.source,
+      text: fitScriptToCharacterRange(ensureParagraphVideoScript(initialText, options) || initialText, options),
+      source,
+    };
+  }
+
+  let workingText = normalizeStoryText(initialText);
+  let effectiveSource: 'ai' | 'sample' = source;
+
+  for (let index = 0; index < plan.segmentCount; index += 1) {
+    if (countScriptCharacters(workingText) >= plan.desiredTotal) break;
+    const segmentStart = 46 + Math.round((index / Math.max(1, plan.segmentCount)) * 36);
+    emitScriptProgress(options, segmentStart, `Extending script flow ${index + 1}/${plan.segmentCount}.`);
+
+    const targetChars = plan.segments[index];
+    const segmentFallback = extractUniqueContinuationParagraphs(
+      workingText,
+      createExpansionFallback({
+        ...options,
+        currentScript: workingText,
+        generationIntent: 'expand',
+        expandByChars: targetChars,
+      }),
+    ).join('\n\n') || trimScriptToMax(buildLengthPaddingParagraphs(options)[index % Math.max(1, buildLengthPaddingParagraphs(options).length)] || '', targetChars + 80);
+
+    const segmentResult = await requestPlainScriptDraft({
+      ...options,
+      currentScript: '',
+      continuityContext: buildCompactScriptContext(workingText),
+      generationIntent: 'expand',
+      expandByChars: targetChars,
+      returnOnlySegment: true,
+      promptAdditions: [
+        ...(options.promptAdditions || []),
+        ...buildContinuationPromptAdditions(options, workingText, index, plan.segmentCount, targetChars),
+      ],
+    }, normalizeStoryText(segmentFallback), 1500);
+
+    workingText = mergeContinuationScript(workingText, segmentResult.text || segmentFallback);
+    if (segmentResult.source === 'ai') effectiveSource = 'ai';
+    emitScriptProgress(
+      options,
+      segmentStart + Math.max(8, Math.round(36 / Math.max(1, plan.segmentCount))),
+      `Segment ${index + 1} applied. Keeping the story connected.`,
+    );
+  }
+
+  emitScriptProgress(options, 90, 'Polishing the final script output.');
+  return {
+    text: fitScriptToCharacterRange(ensureParagraphVideoScript(workingText, options) || workingText, options),
+    source: effectiveSource,
+  };
+}
+
+
+function createEmergencySampleScript(options: ScriptComposerOptions) {
+  const fallback = createFallback(options);
+  const paragraphReady = fitScriptToCharacterRange(ensureParagraphVideoScript(fallback, options), options);
+  if ((paragraphReady || '').trim()) return paragraphReady;
+
+  const voiceOnly = fitScriptToCharacterRange(
+    ensureParagraphVideoScript(buildVoiceOnlySample(options.contentType, options.topic, options.selections), options),
+    options,
+  );
+  if ((voiceOnly || '').trim()) return voiceOnly;
+
+  return formatStoryTextForEditor([
+    `${options.topic || '이번 이야기'}는 지금부터 바로 시작됩니다.`,
+    `${options.selections.protagonist || '주인공'}은 ${options.selections.setting || '익숙한 공간'}에서 ${options.selections.conflict || '남겨 둔 문제'}와 마주합니다.`,
+    `${options.selections.mood || '몰입감 있는'} 흐름으로 장면을 밀고 가며, 끝에는 ${options.selections.endingTone || '여운'}을 남깁니다.`,
+  ].join('\n\n'));
+}
+
+export function buildSampleScriptDraft(options: ScriptComposerOptions): string {
+  const selectedModel = options.customSettings?.scriptModel || options.model || '';
+  if (selectedModel === NO_AI_SCRIPT_MODEL_ID) {
+    return createNoAiModelSampleScript(options);
+  }
+  return createEmergencySampleScript(options);
+}
+
+export async function composeScriptDraft(options: ScriptComposerOptions): Promise<ScriptComposerResult> {
+  const selectedModel = options.customSettings?.scriptModel || options.model || '';
+  if (selectedModel === NO_AI_SCRIPT_MODEL_ID) {
+    emitScriptProgress(options, 100, 'Sample script is ready.');
+    return {
+      text: buildSampleScriptDraft(options),
+      source: 'sample',
+      analysis: options.template.engine === 'channel_constitution_v32'
+        ? buildConstitutionFallbackAnalysis(options, 'sample')
+        : null,
+    };
+  }
+
+  const fallback = createEmergencySampleScript(options);
+  const fallbackAnalysis = options.template.engine === 'channel_constitution_v32'
+    ? buildConstitutionFallbackAnalysis(options, 'sample')
+    : null;
+
+  try {
+    emitScriptProgress(options, 8, 'Preparing the script request.');
+    if (options.template.engine === 'channel_constitution_v32') {
+      emitScriptProgress(options, 18, 'Analyzing script direction and channel structure.');
+      const result = await runTextAi({
+        system: '당신은 유튜브 쇼츠 채널 헌법을 집행하는 분석형 대본 작성자다. 내부적으로 검증과 타겟팅을 수행하되 최종 출력은 JSON 객체 하나만 반환한다. 입력에 없는 사실은 추정하지 않는다. 사용자가 비슷한 결과를 직접 요구하지 않는 한 최근 결과를 답습하지 말고 매번 새 관점과 새 전개를 만든다.',
+        user: buildConstitutionUserPayload(options),
+        model: options.model || options.customSettings?.scriptModel || 'openrouter/auto',
+        maxTokens: 2600,
+        temperature: 0.72,
+        fallback: JSON.stringify({
+          targetProfile: fallbackAnalysis?.targetProfile,
+          safetyReview: fallbackAnalysis?.safetyReview,
+          monetizationReview: fallbackAnalysis?.monetizationReview,
+          selectedStructure: fallbackAnalysis?.selectedStructure,
+          titles: fallbackAnalysis?.titles,
+          keywords: fallbackAnalysis?.keywords,
+          script: fallback,
+        }, null, 2),
+      });
+
+      const parsed = parseConstitutionResponse(
+        result.text || fallback,
+        fallback,
+        fallbackAnalysis || buildConstitutionFallbackAnalysis(options, result.source),
+        result.source,
+        options,
+      );
+      emitScriptProgress(options, 42, 'First draft received. Keeping the story flow connected.');
+      const extended = await extendScriptWithSegments(options, parsed.text || fallback, result.source);
+      emitScriptProgress(options, 100, 'Script generation completed.');
+      return {
+        ...extended,
+        analysis: parsed.analysis,
+      };
+    }
+
+    emitScriptProgress(options, 20, 'Generating the first draft.');
+    const initialResult = await requestPlainScriptDraft(options, fallback, 2200, false);
+    emitScriptProgress(options, 44, 'Draft received. Extending the script with consistent flow.');
+    const extendedResult = await extendScriptWithSegments(options, initialResult.text || fallback, initialResult.source);
+    emitScriptProgress(options, 100, 'Script generation completed.');
+    return {
+      ...extendedResult,
       analysis: null,
     };
   } catch {
+    emitScriptProgress(options, 100, 'AI drafting failed, so the sample script was prepared instead.');
     return {
       text: fallback,
       source: 'sample',

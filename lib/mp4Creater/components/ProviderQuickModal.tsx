@@ -49,7 +49,7 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
     if (!open) return;
     const timer = window.setTimeout(() => {
       if (focusField === 'openRouter' || focusField === 'fal') openRouterInputRef.current?.focus();
-      if (focusField === 'elevenLabs' || focusField === 'heygen') elevenLabsInputRef.current?.focus();
+      if (focusField === 'elevenLabs') elevenLabsInputRef.current?.focus();
     }, 60);
     return () => window.clearTimeout(timer);
   }, [open, focusField]);
@@ -150,7 +150,7 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
             {renderFeedback('openRouter')}
           </label>
 
-          <label className={`rounded-2xl border p-4 ${focusField === 'elevenLabs' || focusField === 'heygen' ? 'border-blue-300 bg-blue-50/70' : 'border-slate-200 bg-slate-50'}`}>
+          <label className={`rounded-2xl border p-4 ${focusField === 'elevenLabs' ? 'border-blue-300 bg-blue-50/70' : 'border-slate-200 bg-slate-50'}`}>
             <div className="text-sm font-black text-slate-900">ElevenLabs</div>
             <div className="mt-1 text-xs leading-5 text-slate-500">음성 생성, 보이스 미리 듣기, 음악 확장 흐름에 사용합니다.</div>
             <input

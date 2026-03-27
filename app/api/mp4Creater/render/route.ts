@@ -141,6 +141,11 @@ async function runFfmpeg(args: string[], cwd: string) {
   });
 }
 
+function isMissingAudioStreamError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? '');
+  return /Stream specifier .*:a|matches no streams/i.test(message);
+}
+
 function dimsForRatio(aspectRatio: RenderBody['aspectRatio'], qualityMode: RenderBody['qualityMode']) {
   const hd = qualityMode === 'final';
   if (aspectRatio === '1:1') return hd ? { width: 1080, height: 1080 } : { width: 720, height: 720 };
@@ -152,6 +157,10 @@ function decodeDataLike(value: string | null | undefined, fallbackMime = 'applic
   if (!value) return null;
   const trimmed = value.trim();
   if (!trimmed) return null;
+
+  if (trimmed.startsWith('/')) {
+    return { kind: 'publicPath' as const, path: trimmed };
+  }
 
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return { kind: 'url' as const, url: trimmed };
@@ -190,6 +199,18 @@ function isPlaceholderSceneSvg(buffer: Buffer) {
 async function writeMedia(targetPath: string, value: string | null | undefined, fallbackMime: string) {
   const parsed = decodeDataLike(value, fallbackMime);
   if (!parsed) return null;
+  if (parsed.kind === 'publicPath') {
+    const localPath = path.join(process.cwd(), 'public', parsed.path.replace(/^\/+/, '').replace(/\//g, path.sep));
+    if (!(await isExistingFile(localPath))) return null;
+    const buffer = await fs.readFile(localPath);
+    if (fallbackMime.startsWith('image/')) {
+      if (isSvgMime(localPath) || bufferLooksLikeSvg(buffer) || isPlaceholderSceneSvg(buffer)) {
+        return null;
+      }
+    }
+    await fs.writeFile(targetPath, buffer);
+    return targetPath;
+  }
   if (parsed.kind === 'url') {
     if (fallbackMime.startsWith('image/') && /\.svg(?:$|[?#])/i.test(parsed.url)) return null;
     const response = await fetch(parsed.url, { cache: 'no-store' });
@@ -372,19 +393,40 @@ export async function POST(request: NextRequest) {
       if (writtenBgm) {
         const narrationVolume = Math.max(0, Math.min(1.5, Number(body.previewMix?.narrationVolume ?? 1)));
         const backgroundVolume = Math.max(0, Math.min(1.2, Number(body.previewMix?.backgroundMusicVolume ?? bgm.volume ?? 0.28)));
-        await runFfmpeg([
-          '-y',
-          '-i', mergedPath,
-          '-stream_loop', '-1',
-          '-i', bgmPath,
-          '-filter_complex', `[0:a]volume=${narrationVolume}[narr];[1:a]volume=${backgroundVolume}[bgm];[narr][bgm]amix=inputs=2:duration=first[aout]`,
-          '-map', '0:v',
-          '-map', '[aout]',
-          '-c:v', 'copy',
-          '-c:a', 'aac',
-          '-shortest',
-          mixedPath,
-        ], tempDir);
+        try {
+          await runFfmpeg([
+            '-y',
+            '-i', mergedPath,
+            '-stream_loop', '-1',
+            '-i', bgmPath,
+            '-filter_complex', `[0:a]volume=${narrationVolume}[narr];[1:a]volume=${backgroundVolume}[bgm];[narr][bgm]amix=inputs=2:duration=first[aout]`,
+            '-map', '0:v',
+            '-map', '[aout]',
+            '-c:v', 'copy',
+            '-c:a', 'aac',
+            '-shortest',
+            mixedPath,
+          ], tempDir);
+        } catch (error) {
+          if (!isMissingAudioStreamError(error)) {
+            throw error;
+          }
+
+          console.warn('[render-route] merged video had no narration audio stream, falling back to bgm-only mix');
+          await runFfmpeg([
+            '-y',
+            '-i', mergedPath,
+            '-stream_loop', '-1',
+            '-i', bgmPath,
+            '-filter_complex', `[1:a]volume=${backgroundVolume}[bgm]`,
+            '-map', '0:v',
+            '-map', '[bgm]',
+            '-c:v', 'copy',
+            '-c:a', 'aac',
+            '-shortest',
+            mixedPath,
+          ], tempDir);
+        }
         finalPath = mixedPath;
       }
     }

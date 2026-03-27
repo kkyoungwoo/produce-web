@@ -2,22 +2,42 @@ import { CONFIG, ImageModelId } from '../config';
 import { ScriptScene, ReferenceImages } from '../types';
 import { makeScenePlaceholderImage } from '../utils/storyHelpers';
 import { getPrimaryFreeImageForScene } from './freeMediaService';
+import { resolveGoogleAiStudioApiKey } from './googleAiStudioService';
 import { translatePromptToEnglish } from './promptTranslationService';
 import { buildCreativeDirectionBlock, buildGenerationSignature } from '../config/creativeVariance';
+import { buildMarkdownSection, buildSimilarityControlLines, joinPromptBlocks } from './promptMarkdown';
+
+const SAMPLE_STYLE_IMAGES = [
+  '/mp4Creater/samples/styles/cold_rational_architecture.png',
+  '/mp4Creater/samples/styles/dawn_of_recovery.png',
+  '/mp4Creater/samples/styles/dynamic_road_sprint.png',
+  '/mp4Creater/samples/styles/ethereal_dreamscape_fog.png',
+  '/mp4Creater/samples/styles/minimal_purity_void.png',
+  '/mp4Creater/samples/styles/mysterious_night_cityscape.png',
+  '/mp4Creater/samples/styles/nostalgic_film_fragments.png',
+  '/mp4Creater/samples/styles/radiant_nature_bliss.png',
+  '/mp4Creater/samples/styles/soft_pastel_first_blush.png',
+  '/mp4Creater/samples/styles/still_moment_dust.png',
+  '/mp4Creater/samples/styles/unyielding_landscape_grit.png',
+  '/mp4Creater/samples/styles/vibrant_festival_lights.png',
+] as const;
 
 function getGoogleAiStudioApiKey(): string {
-  if (typeof window === 'undefined') {
-    return process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY || '';
-  }
-  return process.env.NEXT_PUBLIC_GEMINI_API_KEY
-    || localStorage.getItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY)
-    || process.env.NEXT_PUBLIC_OPENROUTER_API_KEY
-    || '';
+  return resolveGoogleAiStudioApiKey();
 }
 
 function normalizeImageModel(modelId?: string | null): ImageModelId {
   const resolved = `${modelId || CONFIG.DEFAULT_IMAGE_MODEL}`.trim();
   return (resolved as ImageModelId) || CONFIG.DEFAULT_IMAGE_MODEL;
+}
+
+function hashSceneSampleSeed(value: string) {
+  return Array.from(value).reduce((acc, char, index) => ((acc * 37) + char.charCodeAt(0) + index) >>> 0, 19);
+}
+
+function pickSampleStyleImage(scene: ScriptScene) {
+  const seed = `${scene.sceneNumber}:${scene.narration || ''}:${scene.imagePrompt || scene.visualPrompt || ''}:${scene.aspectRatio || '16:9'}`;
+  return SAMPLE_STYLE_IMAGES[hashSceneSampleSeed(seed) % SAMPLE_STYLE_IMAGES.length];
 }
 
 export function isSampleImageModel(modelId?: string | null): boolean {
@@ -99,25 +119,40 @@ async function buildImagePrompt(scene: ScriptScene, referenceImages: ReferenceIm
     mode: similarityRequested ? 'similar' : 'fresh',
   });
 
-  const rawPrompt = [
-    'Create a single production-ready storyboard image for one short-form video scene.',
-    `Scene ${scene.sceneNumber}.`,
-    `[GENERATION SIGNATURE] ${buildGenerationSignature('image', `${scene.sceneNumber}:${scene.narration}`, scene.sceneNumber)}`,
-    creativeBlock,
-    similarityRequested
-      ? '[SIMILAR REGENERATION] User asked for a near-match based on the current image/reference. Keep the core identity, composition family, and styling cues, but still output a newly authored adjacent variation instead of a duplicate.'
-      : '[FRESH GENERATION] Default to a new frame with the same project continuity. Do not copy the most recent cached composition or wording.',
-    scenePrompt,
-    shouldAppendScriptLine ? `[SCRIPT LINE] ${scene.narration}` : '',
-    hasDialogueCue(scene.narration)
-      ? '[DIALOGUE TIMING] If dialogue starts in this scene, prefer the frame right before the first spoken word or the exact instant the first line lands, so the cut feels motivated by conversation timing.'
-      : '',
-    referenceHint,
-    '[VIDEO HANDOFF] The resulting image must be a strong first frame for the next video-generation step. Preserve layout, identity, and motion-readiness so the frame can animate naturally into the matching scene video.',
-    'Focus on one decisive frame. Keep continuity with the selected character and style references. No captions, subtitles, UI, watermark, logo, or split layout.',
-  ]
-    .filter(Boolean)
-    .join('\n\n');
+  const rawPrompt = joinPromptBlocks([
+    buildMarkdownSection('Goal', [
+      'Create a single production-ready storyboard image for one short-form video scene.',
+      `Scene ${scene.sceneNumber}.`,
+      `[GENERATION SIGNATURE] ${buildGenerationSignature('image', `${scene.sceneNumber}:${scene.narration}`, scene.sceneNumber)}`,
+    ]),
+    buildMarkdownSection('Similarity Control', [
+      ...buildSimilarityControlLines(),
+      similarityRequested
+        ? 'The user asked for a near-match. Keep the core identity, composition family, and styling cues while still authoring a new adjacent variation.'
+        : 'Default to a fresh frame with the same project continuity. Do not copy the most recent cached composition or wording.',
+    ]),
+    buildMarkdownSection('Scene Anchor', [
+      scenePrompt,
+      shouldAppendScriptLine ? `[SCRIPT LINE] ${scene.narration}` : '',
+      'Follow the concept direction and continuity already embedded in the scene prompt.',
+      'Focus on one decisive frame with a clear visible action, reaction, or emotional shift.',
+    ], { bullet: false }),
+    buildMarkdownSection('Transition Rules', [
+      hasDialogueCue(scene.narration)
+        ? 'If dialogue starts in this scene, prefer the frame right before the first spoken word or the exact instant the first line lands so the cut feels motivated by speech timing.'
+        : 'Leave enough arrival or exit energy for the later cut to feel natural instead of frozen.',
+      '[VIDEO HANDOFF] The resulting image must be a strong first frame for the next video-generation step. Preserve layout, identity, and motion-readiness so the frame can animate naturally into the matching scene video.',
+    ]),
+    buildMarkdownSection('Reference Continuity', [
+      referenceHint,
+      'Keep continuity with the selected character and style references.',
+    ]),
+    buildMarkdownSection('Creative Variance', [creativeBlock], { bullet: false }),
+    buildMarkdownSection('Do Not', [
+      'No captions, subtitles, UI, watermark, logo, split layout, readable signs, readable storefront text, poster text, packaging text, billboard text, or decorative typography anywhere in the frame.',
+      'Background elements must support action and mood, not text reading. If signage or labels are unavoidable, keep them abstract, blurred, cropped, or unreadable.',
+    ]),
+  ]);
 
   return translatePromptToEnglish(rawPrompt, {
     label: 'scene image prompt',
@@ -151,8 +186,7 @@ export async function generateImage(
   const apiKey = getGoogleAiStudioApiKey();
 
   if (isSampleImageModel(modelId) || !apiKey) {
-    const freeImage = await getPrimaryFreeImageForScene(scene).catch(() => null);
-    return freeImage || fallback;
+    return pickSampleStyleImage(scene) || fallback;
   }
 
   try {

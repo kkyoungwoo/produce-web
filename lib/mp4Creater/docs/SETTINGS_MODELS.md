@@ -1,5 +1,72 @@
 # SETTINGS / MODELS
 
+## Shared Picker Rules
+- Settings must be the source of truth for project-default text, image, video, and TTS routing.
+- Model / TTS cards must use `lib/mp4Creater/services/aiOptionCatalog.ts`.
+- The card modal UI must use `lib/mp4Creater/components/AiOptionPickerModal.tsx`.
+- Step3 and Step6 should read the same option metadata instead of hardcoding separate cost / quality labels.
+
+## TTS Consistency Guard
+- `lib/mp4Creater/components/SettingsDrawer.tsx` sets the project default TTS provider, default voice, and default premium TTS model.
+- Header Settings should expose TTS through one `기본 TTS` entry card only. Provider/model/voice sub-panels should not be duplicated outside the shared popup.
+- Step3 should surface the same default summary and allow cast-level overrides through the shared picker modal.
+- Step6 audio quick selection should reuse the same option catalog so quality / cost labels stay aligned with Settings.
+- If voice badges, descriptions, or quality tiers change, update `aiOptionCatalog.ts` first.
+- TTS provider / voice / model pickers should stage the choice first and only apply it after the modal confirm button is pressed.
+- Settings, Step3, and Step6 should all use `lib/mp4Creater/components/TtsSelectionModal.tsx` for the final `provider -> model -> voice` flow instead of maintaining separate voice pickers.
+- HeyGen is no longer part of the active TTS picker flow. The supported TTS choices are `Qwen3-TTS` and `ElevenLabs`.
+- The shared picker should show estimated dollar cost from `aiOptionCatalog.ts` and allow preview playback when the option has a preview clip or the Settings preview callback can generate one.
+- TTS Settings flow should guide the user in this order: provider -> model -> voice. When ElevenLabs is chosen, the model picker should reopen into the voice picker after confirm.
+- Choosing a TTS model does not finalize the narrator. The final TTS voice is only fixed after the voice picker confirm step.
+- For TTS specifically, clicking a model card should move the same modal directly into that model's voice list. The save/confirm button is only required on the final voice step.
+- TTS model cards should keep paid providers visible for comparison, but disable them with a Korean reason message when API keys or paid mode are not ready.
+- TTS card descriptions, helper copy, and action labels should be written in Korean for the user-facing UI. English model names may stay as-is.
+- TTS price labels should use the user-friendly tiers `무료 / 보통 / 높음`, while `costHint` can still show the approximate dollar estimate.
+- Voice cards should expose the essentials needed for the final choice: `이름 / 설명 / 특징 / 가격 수준 / 미리듣기`.
+- Preview playback should be shown on voice cards, not on the model cards themselves.
+- Free voice preview should use the Google AI Studio speech path when that key is connected. Only when it is missing or fails should the picker fall back to local/sample preview.
+- If a free preview falls back to the sample-tone path, the picker should prefer a browser speech preview over exposing only a tone-like sample.
+- The shared picker cards should keep all visible content inside the 16:9 card frame without hover-only overflow.
+- Shared picker modals should render above the full page through the common modal layer so they do not get pinned inside a scrolled step container.
+- The selected free-voice id must stay consistent across Settings, Step3 cast preview, Step6 scene preview, and actual Step6 audio generation.
+- Unstable custom-voice/free local TTS paths should stay hidden from the active picker until they produce the same spoken result in preview and real scene generation.
+- Header Settings should remain the default template for future/new projects. Per-project detailed routing changes should be handled inside the project flow, not by overwriting the global defaults from the header.
+- Step3 cast voice changes and Step6 scene audio changes must reuse the same `TtsSelectionModal.tsx` flow while staying scoped to the current project / cast / scene override.
+- Step3 should keep character-level `TTS 선택` buttons on each cast card as the primary entry point. Do not move detailed voice selection back to a top-of-page shared card.
+- Image / video model pickers should also wait for the modal confirm button before saving and closing.
+- Settings cards that only open modals should use plain block containers instead of nested `<label>` wrappers when click conflicts appear.
+
+## Recent UI Notes
+- TTS voice cards should stay in a one-row list layout instead of the generic multi-column AI model grid.
+- Header Settings background music selection should reuse the shared AI picker card flow so users compare BGM model options with the same interaction pattern as text/image/video model selection.
+- Sample background-music preview should reuse `public/mp4Creater/samples/audio/loop_main.wav`.
+- `Google Lyria 2 (lyria-002)` should be visible in the background-music picker and become selectable only when the Google AI Studio key is connected.
+
+## 2026-03 Runtime Notes
+- `lib/mp4Creater/services/googleAiStudioService.ts` is the shared Google key resolver used by script, image, video, and Google background-music flows.
+- Background-music model routing is execution-based, not UI-only:
+- sample background-music models => `createSampleBackgroundTrack(...)`
+- `lyria-002` / `lyria-3-clip-preview` / `lyria-3-pro-preview` => `createBackgroundMusicTrack(...)` live Google music path
+- If Google background-music generation fails or no Google key exists, the runtime must fall back to the sample loop track without breaking Settings preview or Step6 export.
+- Sample background-music defaults are now intentionally reduced to one baseline sample model. Older removed sample ids should normalize back to `sample-ambient-v1`.
+- Free TTS providers should prefer the live Google TTS route when the Google AI Studio key is connected, because that is the stable real-speech path for current runtime.
+- When Google TTS is available, the selected free provider/preset must still decide which mapped live voice is used. Do not collapse all free presets into one live narrator.
+- Free TTS presets should stay audibly distinct so `qwen-default / qwen-soft` do not collapse into one identical narrator.
+- Google live TTS preview audio arrives as `audio/L16;codec=pcm;rate=24000`, and the runtime must wrap it using the same `s16le` interpretation as the official Google example. Byte-swapping that payload produces noise instead of speech.
+- If no Google key is available, free preview should prefer browser speech preview rather than exposing a tone-like fallback.
+- Hidden local/custom free TTS experiments must not reappear in the active picker until they produce the same spoken output quality as live generation.
+- Adding a new model requires three aligned updates:
+- user-facing option metadata: `lib/mp4Creater/services/aiOptionCatalog.ts`
+- persisted default id / constants: `lib/mp4Creater/config.ts`
+- real execution service: one of `textAiService.ts`, `imageService.ts`, `falService.ts`, `musicService.ts`, `ttsService.ts`
+
+## Step6 Tab AI Routing
+- `대사` tab AI generation uses `draft.customScriptSettings.scriptModel`, then `routing.scriptModel`, then `routing.textModel`.
+- `이미지` tab AI generation uses `routing.imagePromptModel`, then `routing.sceneModel`, then the Step3 script model chain.
+- `영상` tab AI generation uses `routing.motionPromptModel`, then `routing.sceneModel`, then the Step3 script model chain.
+- Shared option labels still come from `lib/mp4Creater/services/aiOptionCatalog.ts`.
+- Step6 tab-level prompt generation logic lives in `lib/mp4Creater/services/sceneEditorPromptService.ts`.
+
 목표: 설정에서 고른 모델이 실제 라우팅에 반영되고, 오래된 값이나 잘못된 값은 안전한 기본값으로 정리되게 유지합니다.
 
 ## 먼저 읽을 파일

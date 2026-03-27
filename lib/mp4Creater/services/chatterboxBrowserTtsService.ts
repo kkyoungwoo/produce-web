@@ -25,6 +25,13 @@ type CachedModelEntry = {
   defaultSpeakerEmbeddings: any | null;
 };
 
+type ToneShapingProfile = {
+  pitchScale: number;
+  brightness: number;
+  body: number;
+  gain: number;
+};
+
 const modelCache = new Map<string, Promise<CachedModelEntry>>();
 
 function isBrowser() {
@@ -153,6 +160,122 @@ function resolveExaggeration(provider: FreeTtsProvider, preset?: string | null) 
   const normalized = (preset || '').trim().toLowerCase();
   if (normalized.includes('warm') || normalized.includes('soft')) return provider === 'chatterbox' ? 0.72 : 0.64;
   return provider === 'chatterbox' ? 0.52 : 0.46;
+}
+
+function resolveToneShapingProfile(
+  provider: FreeTtsProvider,
+  preset?: string | null,
+  hasVoiceReference: boolean = false,
+): ToneShapingProfile {
+  if (provider === 'chatterbox' && hasVoiceReference) {
+    return {
+      pitchScale: 1,
+      brightness: 0.02,
+      body: 0.08,
+      gain: 1,
+    };
+  }
+
+  const normalized = (preset || '').trim().toLowerCase();
+  if (provider === 'qwen3Tts') {
+    if (normalized.includes('soft')) {
+      return {
+        pitchScale: 1.08,
+        brightness: 0.16,
+        body: -0.02,
+        gain: 0.98,
+      };
+    }
+    return {
+      pitchScale: 0.93,
+      brightness: -0.05,
+      body: 0.12,
+      gain: 1.02,
+    };
+  }
+
+  if (normalized.includes('warm')) {
+    return {
+      pitchScale: 1.03,
+      brightness: 0.03,
+      body: 0.1,
+      gain: 1,
+    };
+  }
+
+  return {
+    pitchScale: 0.96,
+    brightness: 0.06,
+    body: 0.04,
+    gain: 1,
+  };
+}
+
+function resizeFloat32Linear(input: Float32Array, targetLength: number) {
+  if (!input.length || targetLength <= 0) return new Float32Array();
+  if (input.length === targetLength) return input.slice();
+  const output = new Float32Array(targetLength);
+  const lastIndex = Math.max(0, input.length - 1);
+  for (let index = 0; index < targetLength; index += 1) {
+    const position = targetLength === 1 ? 0 : (index / (targetLength - 1)) * lastIndex;
+    const left = Math.floor(position);
+    const right = Math.min(lastIndex, left + 1);
+    const mix = position - left;
+    output[index] = input[left] * (1 - mix) + input[right] * mix;
+  }
+  return output;
+}
+
+function shiftPitchPreserveDuration(input: Float32Array, pitchScale: number) {
+  if (!input.length || !Number.isFinite(pitchScale) || Math.abs(pitchScale - 1) < 0.01) {
+    return input.slice();
+  }
+  const shiftedLength = Math.max(1, Math.round(input.length / Math.max(0.65, Math.min(1.35, pitchScale))));
+  const shifted = resizeFloat32Linear(input, shiftedLength);
+  return resizeFloat32Linear(shifted, input.length);
+}
+
+function lowPassFilter(input: Float32Array, smoothing: number) {
+  if (!input.length) return new Float32Array();
+  const alpha = Math.max(0.01, Math.min(0.35, smoothing));
+  const output = new Float32Array(input.length);
+  let previous = input[0] || 0;
+  output[0] = previous;
+  for (let index = 1; index < input.length; index += 1) {
+    previous += alpha * ((input[index] || 0) - previous);
+    output[index] = previous;
+  }
+  return output;
+}
+
+function normalizePeak(input: Float32Array, targetPeak: number = 0.92) {
+  if (!input.length) return input;
+  let peak = 0;
+  for (let index = 0; index < input.length; index += 1) {
+    const magnitude = Math.abs(input[index] || 0);
+    if (magnitude > peak) peak = magnitude;
+  }
+  if (!peak || peak <= targetPeak) return input;
+  const scale = targetPeak / peak;
+  const output = new Float32Array(input.length);
+  for (let index = 0; index < input.length; index += 1) {
+    output[index] = input[index] * scale;
+  }
+  return output;
+}
+
+function applyToneShaping(input: Float32Array, profile: ToneShapingProfile) {
+  if (!input.length) return input;
+  const pitchShifted = shiftPitchPreserveDuration(input, profile.pitchScale);
+  const low = lowPassFilter(pitchShifted, 0.08);
+  const output = new Float32Array(pitchShifted.length);
+  for (let index = 0; index < pitchShifted.length; index += 1) {
+    const sample = pitchShifted[index] || 0;
+    const lowSample = low[index] || 0;
+    const highSample = sample - lowSample;
+    output[index] = (sample + lowSample * profile.body + highSample * profile.brightness) * profile.gain;
+  }
+  return normalizePeak(output);
 }
 
 function float32ToBase64Wav(samples: Float32Array, sampleRate = DEFAULT_SAMPLE_RATE) {
@@ -353,6 +476,11 @@ export async function generateBrowserFreeTts(options: {
     voiceReferenceMimeType: options.voiceReferenceMimeType,
   });
   const exaggeration = resolveExaggeration(options.provider, options.preset);
+  const toneShaping = resolveToneShapingProfile(
+    options.provider,
+    options.preset,
+    Boolean(options.voiceReferenceAudioData),
+  );
   const waveforms: Float32Array[] = [];
 
   for (const chunk of chunks) {
@@ -361,11 +489,12 @@ export async function generateBrowserFreeTts(options: {
   }
 
   const merged = concatWaveforms(waveforms, entry.sampleRate);
-  const wav = float32ToBase64Wav(merged, entry.sampleRate);
+  const shaped = applyToneShaping(merged, toneShaping);
+  const wav = float32ToBase64Wav(shaped, entry.sampleRate);
 
   return {
     audioData: wav.dataUrl,
-    estimatedDuration: merged.length / entry.sampleRate,
+    estimatedDuration: shaped.length / entry.sampleRate,
     sourceMode: 'ai' as const,
     modelId: entry.modelId,
     usedLocale: normalizeLocale(options.locale),

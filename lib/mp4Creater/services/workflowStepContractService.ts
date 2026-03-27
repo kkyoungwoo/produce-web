@@ -239,7 +239,7 @@ function buildRolePromptStore(options: {
       label: '대본 프롬프트',
       stepSources: ['step1', 'step2', 'step3'],
       basePrompt: joinUniqueBlocks([selectedTemplate?.prompt, draft.promptPack?.storyPrompt]),
-      finalPrompt: joinUniqueBlocks([projectPrompts?.scriptPrompt, draft.promptPack?.storyPrompt]),
+      finalPrompt: joinUniqueBlocks([selectedTemplate?.prompt, projectPrompts?.scriptPrompt, draft.promptPack?.storyPrompt]),
       resultHint: finalScript,
       sections: {
         template: selectedTemplate?.prompt || '',
@@ -272,7 +272,7 @@ function buildRolePromptStore(options: {
       label: '장면 프롬프트',
       stepSources: ['step2', 'step3', 'step5', 'step6'],
       basePrompt: sceneBasePrompt,
-      finalPrompt: joinUniqueBlocks([projectPrompts?.imagePrompt, finalImagePrompt]),
+      finalPrompt: joinUniqueBlocks([sceneBasePrompt, projectPrompts?.imagePrompt, finalImagePrompt]),
       resultHint: assets.map((asset) => asset.narration).filter(Boolean).slice(0, 3).join(' / '),
       sections: {
         scene: draft.promptPack?.scenePrompt || '',
@@ -283,7 +283,7 @@ function buildRolePromptStore(options: {
       label: '영상 프롬프트',
       stepSources: ['step3', 'step4', 'step5', 'step6'],
       basePrompt: videoBasePrompt,
-      finalPrompt: joinUniqueBlocks([projectPrompts?.videoPrompt, finalVideoPrompt]),
+      finalPrompt: joinUniqueBlocks([videoBasePrompt, projectPrompts?.videoPrompt, finalVideoPrompt]),
       resultHint: assets.map((asset) => asset.videoPrompt || '').filter(Boolean).slice(0, 3).join(' / '),
       sections: {
         motion: draft.promptPack?.actionPrompt || '',

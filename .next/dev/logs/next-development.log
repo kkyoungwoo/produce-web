@@ -1,6 +1,3 @@
-[00:00:01.493] Server  LOG     ✓ Ready in 1269ms
-[00:00:03.532] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:00:23.012] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:01:37.602] Browser WARN    [ttsService] browser free tts failed, using fallback sample {}
-[00:01:39.388] Browser ERROR   [SceneStudioPage] ffmpeg scene render failed {}
-[00:03:33.144] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:01.530] Server  LOG     ✓ Ready in 1299ms
+[00:00:04.926] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:32.014] Server  WARN    [render-route] merged video had no narration audio stream, falling back to bgm-only mix

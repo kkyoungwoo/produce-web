@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { StudioState } from '../types';
 import { pickFolderPath } from '../services/folderPicker';
 import {
   BGM_MODEL_OPTIONS,
-  CHATTERBOX_TTS_PRESET_OPTIONS,
+  CHATTERBOX_CUSTOM_VOICE_ID,
   CONFIG,
   ELEVENLABS_MODELS,
   IMAGE_MODELS,
@@ -13,10 +14,23 @@ import {
   SCRIPT_MODEL_OPTIONS,
   VIDEO_MODEL_OPTIONS,
 } from '../config';
+import AiOptionPickerModal from './AiOptionPickerModal';
+import TtsSelectionModal from './TtsSelectionModal';
 import { validateProviderConnection } from '../services/providerValidationService';
 import { createTtsPreview } from '../services/ttsService';
-import { createSampleBackgroundTrack } from '../services/musicService';
+import { createBackgroundMusicTrack, isGoogleBackgroundMusicModel } from '../services/musicService';
 import { fetchElevenLabsVoices } from '../services/elevenLabsService';
+import { resolveGoogleAiStudioApiKey } from '../services/googleAiStudioService';
+import {
+  AiPickerOption,
+  getElevenLabsModelPickerOptions,
+  getElevenLabsVoicePickerOptions,
+  getImageModelPickerOptions,
+  getQwenVoicePickerOptions,
+  getScriptModelPickerOptions,
+  getTtsProviderPickerOptions,
+  getVideoModelPickerOptions,
+} from '../services/aiOptionCatalog';
 
 interface SettingsDrawerProps {
   open: boolean;
@@ -27,10 +41,22 @@ interface SettingsDrawerProps {
 }
 
 type InlineFeedback = { tone: 'success' | 'error' | 'info'; message: string } | null;
+type SettingsPickerConfig = {
+  title: string;
+  description: string;
+  currentId: string;
+  options: AiPickerOption[];
+  onSelect: (id: string) => void;
+  requireConfirm?: boolean;
+  confirmLabel?: string;
+  emptyMessage?: string;
+  onPreviewOption?: (id: string) => Promise<string | null>;
+  extraPanel?: React.ReactNode;
+};
 
 const cardClass = 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm';
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400';
-const isGoogleBgmModel = (modelId?: string | null) => (modelId || '').trim() === 'lyria-002';
+const isGoogleBgmModel = (modelId?: string | null) => isGoogleBackgroundMusicModel(modelId);
 const isPaidScriptModel = (modelId?: string | null) => SCRIPT_MODEL_OPTIONS.find((item) => item.id === modelId)?.tier === 'paid';
 const isPaidImageModel = (modelId?: string | null) => IMAGE_MODELS.find((item) => item.id === modelId)?.tier === 'paid';
 const isPaidVideoModel = (modelId?: string | null) => VIDEO_MODEL_OPTIONS.find((item) => item.id === modelId)?.tier === 'paid';
@@ -38,6 +64,152 @@ const freeScriptModel = SCRIPT_MODEL_OPTIONS.find((item) => item.tier !== 'paid'
 const freeImageModel = IMAGE_MODELS.find((item) => item.tier !== 'paid')?.id || CONFIG.DEFAULT_IMAGE_MODEL;
 const freeVideoModel = VIDEO_MODEL_OPTIONS.find((item) => item.tier !== 'paid')?.id || CONFIG.DEFAULT_VIDEO_MODEL;
 const VOICE_SAMPLE_MAX_SECONDS = 15;
+const GOOGLE_MODEL_DISABLED_REASON = 'Google AI Studio API 키를 연결하면 선택할 수 있습니다.';
+
+function markApiLockedOptions(options: AiPickerOption[], enabled: boolean, disabledReason: string) {
+  return options.map((option) => (
+    option.group === 'sample' || enabled
+      ? { ...option, disabled: false, disabledReason: undefined }
+      : { ...option, disabled: true, disabledReason }
+  ));
+}
+
+function resolveAudioPreviewSrc(value?: string | null, fallbackMime = 'audio/mpeg') {
+  const normalized = `${value || ''}`.trim();
+  if (!normalized) return '';
+  if (
+    normalized.startsWith('data:')
+    || normalized.startsWith('blob:')
+    || normalized.startsWith('http://')
+    || normalized.startsWith('https://')
+    || normalized.startsWith('/')
+  ) {
+    return normalized;
+  }
+  return `data:${fallbackMime};base64,${normalized}`;
+}
+
+function getAudioContextConstructor() {
+  if (typeof window === 'undefined') return null;
+  return (window.AudioContext || (window as Window & typeof globalThis & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext || null);
+}
+
+function fileNameWithWavExtension(fileName?: string | null) {
+  const normalized = `${fileName || 'voice-reference'}`.trim() || 'voice-reference';
+  return normalized.replace(/\.[^./\\]+$/, '') + '.wav';
+}
+
+function mixAudioBufferToMono(buffer: AudioBuffer) {
+  const channelCount = Math.max(1, buffer.numberOfChannels);
+  const output = new Float32Array(buffer.length);
+  for (let channelIndex = 0; channelIndex < channelCount; channelIndex += 1) {
+    const channel = buffer.getChannelData(channelIndex);
+    for (let sampleIndex = 0; sampleIndex < buffer.length; sampleIndex += 1) {
+      output[sampleIndex] += channel[sampleIndex] / channelCount;
+    }
+  }
+  return output;
+}
+
+function encodeMonoSamplesToWavBase64(samples: Float32Array, sampleRate: number) {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const writeText = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) {
+      view.setUint8(offset + index, value.charCodeAt(index));
+    }
+  };
+
+  writeText(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeText(8, 'WAVE');
+  writeText(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeText(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+
+  let offset = 44;
+  for (let index = 0; index < samples.length; index += 1) {
+    const sample = Math.max(-1, Math.min(1, samples[index] || 0));
+    view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+    offset += 2;
+  }
+
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let index = 0; index < bytes.length; index += 1) {
+    binary += String.fromCharCode(bytes[index]);
+  }
+  return btoa(binary);
+}
+
+async function readBlobAsDataUrl(blob: Blob) {
+  const result = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+    reader.onerror = () => reject(new Error('blob-read-failed'));
+    reader.readAsDataURL(blob);
+  });
+  const base64 = result.includes(',') ? result.split(',')[1] || '' : '';
+  return {
+    base64,
+    mimeType: blob.type || 'audio/webm',
+  };
+}
+
+async function readAudioDurationFromBlob(blob: Blob) {
+  if (typeof window === 'undefined') return 0;
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    return await new Promise<number>((resolve) => {
+      const audio = document.createElement('audio');
+      audio.preload = 'metadata';
+      audio.onloadedmetadata = () => resolve(Number.isFinite(audio.duration) ? audio.duration : 0);
+      audio.onerror = () => resolve(0);
+      audio.src = objectUrl;
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+async function normalizeVoiceReferenceBlob(blob: Blob, fileName?: string | null) {
+  const original = await readBlobAsDataUrl(blob);
+  const originalDurationSeconds = await readAudioDurationFromBlob(blob);
+  const AudioContextCtor = getAudioContextConstructor();
+  if (!AudioContextCtor) {
+    return {
+      ...original,
+      fileName: fileName || 'voice-reference.webm',
+      durationSeconds: originalDurationSeconds,
+    };
+  }
+
+  const context = new AudioContextCtor();
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    const decoded = await context.decodeAudioData(arrayBuffer.slice(0));
+    return {
+      ...original,
+      fileName: fileName || 'voice-reference.webm',
+      durationSeconds: originalDurationSeconds || decoded.duration || 0,
+    };
+  } catch {
+    return {
+      ...original,
+      fileName: fileName || 'voice-reference.webm',
+      durationSeconds: originalDurationSeconds,
+    };
+  } finally {
+    await context.close().catch(() => undefined);
+  }
+}
 
 const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onClose, onSave, youtubeSectionVariant = 'default' }) => {
   const [storageDir, setStorageDir] = useState('');
@@ -123,11 +295,15 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const [isVoicePreviewing, setIsVoicePreviewing] = useState(false);
   const [voicePreviewMessage, setVoicePreviewMessage] = useState('');
   const [isRecordingVoiceSample, setIsRecordingVoiceSample] = useState(false);
+  const [isVoiceSampleProcessing, setIsVoiceSampleProcessing] = useState(false);
   const [voiceSampleModalOpen, setVoiceSampleModalOpen] = useState(false);
   const [voiceSampleSecondsLeft, setVoiceSampleSecondsLeft] = useState(VOICE_SAMPLE_MAX_SECONDS);
   const [isBgmPreviewing, setIsBgmPreviewing] = useState(false);
   const [bgmPreviewMessage, setBgmPreviewMessage] = useState('');
-  const [isPaidMode, setIsPaidMode] = useState(false);
+  const [ttsSelectionModalOpen, setTtsSelectionModalOpen] = useState(false);
+  const [settingsPicker, setSettingsPicker] = useState<null | {
+    kind: 'tts-provider' | 'tts-voice' | 'tts-model' | 'script-model' | 'prompt-model' | 'image-model' | 'video-model' | 'bgm-model';
+  }>(null);
   const [elevenLabsVoices, setElevenLabsVoices] = useState<Array<{ voice_id: string; name: string; preview_url?: string; labels?: { accent?: string; gender?: string; description?: string } }>>([]);
   const [isLoadingVoices, setIsLoadingVoices] = useState(false);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -138,23 +314,16 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   const voiceRecorderChunksRef = useRef<Blob[]>([]);
   const voiceRecorderStopTimerRef = useRef<number | null>(null);
   const voiceRecorderCountdownRef = useRef<number | null>(null);
+  const voiceRecorderFinalizeTimerRef = useRef<number | null>(null);
   const voicePreviewKeyRef = useRef('');
   const bgmPreviewKeyRef = useRef('');
   const youtubePopupRef = useRef<Window | null>(null);
   const youtubePopupPollRef = useRef<number | null>(null);
 
-  const visibleScriptModels = useMemo(
-    () => (isPaidMode ? SCRIPT_MODEL_OPTIONS : SCRIPT_MODEL_OPTIONS.filter((item) => item.tier !== 'paid')),
-    [isPaidMode],
-  );
-  const visibleImageModels = useMemo(
-    () => (isPaidMode ? IMAGE_MODELS : IMAGE_MODELS.filter((item) => item.tier !== 'paid')),
-    [isPaidMode],
-  );
-  const visibleVideoModels = useMemo(
-    () => (isPaidMode ? VIDEO_MODEL_OPTIONS : VIDEO_MODEL_OPTIONS.filter((item) => item.tier !== 'paid')),
-    [isPaidMode],
-  );
+  const visibleScriptModels = useMemo(() => SCRIPT_MODEL_OPTIONS, []);
+  const visibleImageModels = useMemo(() => IMAGE_MODELS, []);
+  const visibleVideoModels = useMemo(() => VIDEO_MODEL_OPTIONS, []);
+  const backgroundMusicModelOptions = useMemo(() => BGM_MODEL_OPTIONS, []);
 
   useEffect(() => {
     if (!open || !studioState) return;
@@ -173,8 +342,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       motionPromptModel: studioState.routing?.motionPromptModel || studioState.routing?.sceneModel || CONFIG.DEFAULT_SCRIPT_MODEL,
       imageModel: studioState.routing?.imageModel || CONFIG.DEFAULT_IMAGE_MODEL,
       videoModel: studioState.routing?.videoModel || CONFIG.DEFAULT_VIDEO_MODEL,
-      ttsProvider: studioState.routing?.ttsProvider === 'elevenLabs' ? 'elevenLabs' : studioState.routing?.ttsProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
-      audioProvider: studioState.routing?.audioProvider === 'elevenLabs' ? 'elevenLabs' : studioState.routing?.audioProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
+      ttsProvider: studioState.routing?.ttsProvider === 'elevenLabs' ? 'elevenLabs' : 'qwen3Tts',
+      audioProvider: studioState.routing?.audioProvider === 'elevenLabs' ? 'elevenLabs' : 'qwen3Tts',
       backgroundMusicProvider: studioState.routing?.backgroundMusicProvider === 'google' || studioState.routing?.backgroundMusicModel === 'lyria-002' ? 'google' : 'sample',
       musicVideoProvider: studioState.routing?.musicVideoProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
       musicVideoMode: studioState.routing?.musicVideoMode || 'sample',
@@ -187,17 +356,11 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setVoicePreviewMessage('');
     setIsVoicePreviewing(false);
     setIsRecordingVoiceSample(false);
+    setIsVoiceSampleProcessing(false);
     setVoiceSampleModalOpen(false);
+    setTtsSelectionModalOpen(false);
     setBgmPreviewMessage('');
     setIsBgmPreviewing(false);
-    setIsPaidMode(Boolean(
-      studioState.routing?.paidModeEnabled
-      || studioState.routing?.ttsProvider === 'elevenLabs'
-      || isPaidScriptModel(studioState.routing?.scriptModel || studioState.routing?.textModel)
-      || isPaidScriptModel(studioState.routing?.sceneModel)
-      || isPaidImageModel(studioState.routing?.imageModel)
-      || isPaidVideoModel(studioState.routing?.videoModel)
-    ));
     setProviderFeedback({});
     setIsCheckingProviders({});
     setYoutubeConnectionState(null);
@@ -299,47 +462,239 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     [elevenLabsVoices, routing.elevenLabsVoiceId],
   );
 
-  const selectedChatterboxVoice = useMemo(
-    () => CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.chatterboxVoicePreset || 'chatterbox-clear')) || CHATTERBOX_TTS_PRESET_OPTIONS[0],
-    [routing.chatterboxVoicePreset],
+  const selectedQwenVoice = useMemo(
+    () => QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.qwenVoicePreset || 'qwen-default')) || QWEN_TTS_PRESET_OPTIONS[0],
+    [routing.qwenVoicePreset],
   );
+  const hasGoogleApiKey = Boolean(resolveGoogleAiStudioApiKey(providerValues.openRouterApiKey.trim()));
+  const hasElevenLabsApiKey = Boolean(providerValues.elevenLabsApiKey.trim());
+  const hasAnyConnectedApi = hasGoogleApiKey || hasElevenLabsApiKey;
+  const visibleTtsProvider = routing.ttsProvider === 'elevenLabs' && hasElevenLabsApiKey
+    ? 'elevenLabs'
+    : 'qwen3Tts';
+  const scriptPickerOptions = useMemo(
+    () => markApiLockedOptions(
+      getScriptModelPickerOptions(false).filter((item) => visibleScriptModels.some((model) => model.id === item.id)),
+      hasGoogleApiKey,
+      GOOGLE_MODEL_DISABLED_REASON,
+    ),
+    [hasGoogleApiKey, visibleScriptModels],
+  );
+  const imagePickerOptions = useMemo(
+    () => markApiLockedOptions(
+      getImageModelPickerOptions().filter((item) => visibleImageModels.some((model) => model.id === item.id)),
+      hasGoogleApiKey,
+      GOOGLE_MODEL_DISABLED_REASON,
+    ),
+    [hasGoogleApiKey, visibleImageModels],
+  );
+  const videoPickerOptions = useMemo(
+    () => markApiLockedOptions(
+      getVideoModelPickerOptions().filter((item) => visibleVideoModels.some((model) => model.id === item.id)),
+      hasGoogleApiKey,
+      GOOGLE_MODEL_DISABLED_REASON,
+    ),
+    [hasGoogleApiKey, visibleVideoModels],
+  );
+  /* const legacyBackgroundMusicPickerOptions = useMemo<AiPickerOption[]>(() => (
+    backgroundMusicModelOptions.map((item) => {
+      const isElevenLabsMusic = item.id === 'elevenlabs-music-auto';
+      const isGoogleMusic = isGoogleBgmModel(item.id);
+      return {
+        id: item.id,
+        title: item.name,
+        provider: isGoogleMusic ? 'Google AI Studio' : isElevenLabsMusic ? 'ElevenLabs' : 'Sample',
+        description: isElevenLabsMusic
+          ? 'ElevenLabs 기반 배경음 생성 경로입니다. API가 연결되어 있으면 프로젝트 기본 배경음 모델로 바로 사용할 수 있습니다.'
+          : 'API 없이도 바로 테스트할 수 있는 기본 배경음 샘플입니다. 콘셉트 방향만 빠르게 맞출 때 좋습니다.',
+        badge: isElevenLabsMusic ? '유료' : '무료',
+        priceLabel: isElevenLabsMusic ? '보통' : '무료',
+        qualityLabel: isElevenLabsMusic ? 'AI 생성' : '샘플',
+        speedLabel: isElevenLabsMusic ? '보통' : '즉시',
+        helper: isElevenLabsMusic ? 'ElevenLabs API 연결 시 사용 가능' : '즉시 미리듣기 가능',
+        avatarLabel: isElevenLabsMusic ? '11' : 'BG',
+        tone: isElevenLabsMusic ? 'amber' : 'slate',
+        group: isElevenLabsMusic ? 'premium' : 'sample',
+        tier: isElevenLabsMusic ? 'paid' : 'free',
+        disabled: isElevenLabsMusic && !hasElevenLabsApiKey,
+        disabledReason: isElevenLabsMusic && !hasElevenLabsApiKey
+          ? 'ElevenLabs API를 연결하면 선택할 수 있습니다.'
+          : undefined,
+      } satisfies AiPickerOption;
+    })
+  ), [hasElevenLabsApiKey]);
+  */
+  /* const backgroundMusicPickerOptions = useMemo<AiPickerOption[]>(() => (
+    backgroundMusicModelOptions.map((item) => {
+      const isElevenLabsMusic = item.id === 'elevenlabs-music-auto';
+      const isGoogleMusic = isGoogleBgmModel(item.id);
+      return {
+        id: item.id,
+        title: item.name,
+        provider: isGoogleMusic ? 'Google AI Studio' : isElevenLabsMusic ? 'ElevenLabs' : 'Sample',
+        description: isGoogleMusic
+          ? 'Google AI Studio가 연결되어 있으면 기본 배경음 모델로 선택할 수 있습니다.'
+          : isElevenLabsMusic
+            ? 'ElevenLabs 연결 시 프롬프트 기반 배경음 모델로 사용할 수 있습니다.'
+            : 'API 없이 바로 확인할 수 있는 기본 샘플 배경음입니다.',
+        badge: isGoogleMusic ? 'Google AI' : isElevenLabsMusic ? '유료' : '무료',
+        priceLabel: isGoogleMusic || isElevenLabsMusic ? '보통' : '무료',
+        qualityLabel: isGoogleMusic || isElevenLabsMusic ? 'AI 생성' : '샘플',
+        speedLabel: isGoogleMusic || isElevenLabsMusic ? '보통' : '즉시',
+        helper: isGoogleMusic ? 'Google API 연결 후 선택 가능' : isElevenLabsMusic ? 'ElevenLabs API 연결 후 선택 가능' : '즉시 미리듣기 가능',
+          ? 'Google API 연결 후 선택 가능'
+          : isElevenLabsMusic
+            ? 'ElevenLabs API 연결 후 선택 가능'
+            : '즉시 미리듣기 가능',
+        avatarLabel: isGoogleMusic ? 'G' : isElevenLabsMusic ? '11' : 'BG',
+        tone: isGoogleMusic ? 'blue' : isElevenLabsMusic ? 'amber' : 'slate',
+        group: isGoogleMusic || isElevenLabsMusic ? 'premium' : 'sample',
+        tier: isGoogleMusic || isElevenLabsMusic ? 'paid' : 'free',
+        disabled: isGoogleMusic ? !hasGoogleApiKey : isElevenLabsMusic ? !hasElevenLabsApiKey : false,
+        disabledReason: isGoogleMusic
+          ? (!hasGoogleApiKey ? 'Google AI Studio API를 연결하면 선택할 수 있습니다.' : undefined)
+          : isElevenLabsMusic
+            ? (!hasElevenLabsApiKey ? 'ElevenLabs API를 연결하면 선택할 수 있습니다.' : undefined)
+            : undefined,
+      } satisfies AiPickerOption;
+    })
+  ), [backgroundMusicModelOptions, hasElevenLabsApiKey, hasGoogleApiKey]);
+  */
+  const backgroundMusicPickerOptions = useMemo<AiPickerOption[]>(() => (
+    backgroundMusicModelOptions.map((item) => {
+      const isElevenLabsMusic = item.id === 'elevenlabs-music-auto';
+      const isGoogleMusic = isGoogleBgmModel(item.id);
+      return {
+        id: item.id,
+        title: item.name,
+        provider: isGoogleMusic ? 'Google AI Studio' : isElevenLabsMusic ? 'ElevenLabs' : 'Sample',
+        description: isGoogleMusic
+          ? 'Google AI Studio가 연결되어 있으면 프로젝트 기본 배경음 모델로 선택할 수 있습니다.'
+          : isElevenLabsMusic
+            ? 'ElevenLabs API가 연결되어 있으면 배경음 모델로 선택할 수 있습니다.'
+            : 'API 없이 바로 확인할 수 있는 샘플 배경음입니다.',
+        badge: isGoogleMusic ? 'Google AI' : isElevenLabsMusic ? '유료' : '무료',
+        priceLabel: isGoogleMusic || isElevenLabsMusic ? '보통' : '무료',
+        qualityLabel: isGoogleMusic || isElevenLabsMusic ? 'AI 생성' : '샘플',
+        speedLabel: isGoogleMusic || isElevenLabsMusic ? '보통' : '즉시',
+        helper: isGoogleMusic ? 'Google API required' : isElevenLabsMusic ? 'ElevenLabs API required' : 'Instant preview',
+        avatarLabel: isGoogleMusic ? 'G' : isElevenLabsMusic ? '11' : 'BG',
+        tone: isGoogleMusic ? 'blue' : isElevenLabsMusic ? 'amber' : 'slate',
+        group: isGoogleMusic || isElevenLabsMusic ? 'premium' : 'sample',
+        tier: isGoogleMusic || isElevenLabsMusic ? 'paid' : 'free',
+        disabled: isGoogleMusic ? !hasGoogleApiKey : isElevenLabsMusic ? !hasElevenLabsApiKey : false,
+        disabledReason: isGoogleMusic
+          ? (!hasGoogleApiKey ? 'Google AI Studio API를 연결하면 선택할 수 있습니다.' : undefined)
+          : isElevenLabsMusic
+            ? (!hasElevenLabsApiKey ? 'ElevenLabs API를 연결하면 선택할 수 있습니다.' : undefined)
+            : undefined,
+      } satisfies AiPickerOption;
+    })
+  ), [backgroundMusicModelOptions, hasElevenLabsApiKey, hasGoogleApiKey]);
+  const ttsProviderPickerOptions = useMemo(
+    () => getTtsProviderPickerOptions().filter((item) => {
+      if (item.id === 'heygen') return false;
+      if (item.id === 'chatterbox') return false;
+      if (item.id === 'elevenLabs') return hasElevenLabsApiKey;
+      return true;
+    }),
+    [hasElevenLabsApiKey],
+  );
+  const ttsVoicePickerOptions = useMemo<AiPickerOption[]>(() => {
+    if (routing.ttsProvider === 'elevenLabs') {
+      return hasElevenLabsApiKey ? getElevenLabsVoicePickerOptions(elevenLabsVoices) : [];
+    }
+    if (routing.ttsProvider === 'heygen') return [];
+    return getQwenVoicePickerOptions();
+  }, [elevenLabsVoices, hasElevenLabsApiKey, routing.ttsProvider]);
+  const ttsModelPickerOptions = useMemo(
+    () => (hasElevenLabsApiKey ? getElevenLabsModelPickerOptions() : []),
+    [hasElevenLabsApiKey],
+  );
+  const selectedElevenModel = useMemo(
+    () => ttsModelPickerOptions.find((item) => item.id === (routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL)) || ttsModelPickerOptions[0] || null,
+    [routing.audioModel, routing.elevenLabsModelId, ttsModelPickerOptions],
+  );
+  const ttsProviderPickerCurrentId = useMemo(() => {
+    const availableProviderIds = new Set(ttsProviderPickerOptions.map((item) => item.id));
+    const currentProvider = routing.ttsProvider || 'qwen3Tts';
+    if (availableProviderIds.has(currentProvider)) return currentProvider;
+    if (availableProviderIds.has('qwen3Tts')) return 'qwen3Tts';
+    return ttsProviderPickerOptions[0]?.id || '';
+  }, [routing.ttsProvider, ttsProviderPickerOptions]);
+  const queueSettingsPicker = useCallback((kind: 'tts-provider' | 'tts-voice' | 'tts-model' | 'script-model' | 'prompt-model' | 'image-model' | 'video-model' | 'bgm-model') => {
+    window.setTimeout(() => setSettingsPicker({ kind }), 0);
+  }, []);
+  const previewSettingsTtsOption = useCallback(async (id: string) => {
+    if (!settingsPicker || !settingsPicker.kind.startsWith('tts-')) return null;
 
+    const provider = settingsPicker.kind === 'tts-provider'
+      ? id as 'qwen3Tts' | 'elevenLabs'
+      : ((routing.ttsProvider === 'elevenLabs' ? 'elevenLabs' : 'qwen3Tts') as 'qwen3Tts' | 'elevenLabs');
+
+    const elevenLabsApiKey = providerValues.elevenLabsApiKey.trim();
+    if (provider === 'elevenLabs' && !elevenLabsApiKey) return null;
+
+    const resolvedVoiceId = provider === 'elevenLabs'
+      ? (settingsPicker.kind === 'tts-voice'
+          ? id
+          : (routing.elevenLabsVoiceId || selectedElevenVoice?.voice_id || CONFIG.DEFAULT_VOICE_ID))
+      : (settingsPicker.kind === 'tts-voice' ? id : (routing.qwenVoicePreset || 'qwen-default'));
+
+    const resolvedModelId = provider === 'elevenLabs'
+      ? (settingsPicker.kind === 'tts-model' ? id : (routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL))
+      : (routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL);
+
+    const resolvedPreset = settingsPicker.kind === 'tts-voice' && provider === 'qwen3Tts'
+      ? id
+      : (routing.qwenVoicePreset || 'qwen-default');
+
+    const { asset } = await createTtsPreview({
+      provider,
+      title: 'Settings voice preview',
+      text: '안녕하세요. 지금 선택한 음성과 모델의 미리듣기를 확인하고 있습니다.',
+      mode: 'voice-preview',
+      apiKey: elevenLabsApiKey,
+      googleApiKey: providerValues.openRouterApiKey.trim(),
+      voiceId: resolvedVoiceId,
+      modelId: resolvedModelId,
+      qwenPreset: resolvedPreset,
+      locale: 'ko',
+      voiceReferenceAudioData: null,
+      voiceReferenceMimeType: null,
+    });
+
+    if (!asset.audioData) return null;
+    return asset.audioData.startsWith('data:')
+      ? asset.audioData
+      : `data:audio/mpeg;base64,${asset.audioData}`;
+  }, [
+    providerValues.elevenLabsApiKey,
+    routing.audioModel,
+    routing.chatterboxVoicePreset,
+    routing.elevenLabsModelId,
+    routing.elevenLabsVoiceId,
+    routing.qwenVoicePreset,
+    routing.ttsProvider,
+    routing.voiceReferenceAudioData,
+    routing.voiceReferenceMimeType,
+    selectedElevenVoice?.voice_id,
+    settingsPicker,
+  ]);
   const recordedVoiceSampleUrl = useMemo(() => {
     if (!routing.voiceReferenceAudioData || !routing.voiceReferenceMimeType) return '';
     return `data:${routing.voiceReferenceMimeType};base64,${routing.voiceReferenceAudioData}`;
   }, [routing.voiceReferenceAudioData, routing.voiceReferenceMimeType]);
-
-  const clearVoiceRecorderTimers = useCallback(() => {
-    if (voiceRecorderStopTimerRef.current !== null) {
-      window.clearTimeout(voiceRecorderStopTimerRef.current);
-      voiceRecorderStopTimerRef.current = null;
-    }
-    if (voiceRecorderCountdownRef.current !== null) {
-      window.clearInterval(voiceRecorderCountdownRef.current);
-      voiceRecorderCountdownRef.current = null;
-    }
-    setVoiceSampleSecondsLeft(VOICE_SAMPLE_MAX_SECONDS);
-  }, []);
-
-  const stopVoiceRecorderStream = useCallback(() => {
-    clearVoiceRecorderTimers();
-    voiceRecorderStreamRef.current?.getTracks().forEach((track) => track.stop());
-    voiceRecorderStreamRef.current = null;
-    voiceRecorderRef.current = null;
-    voiceRecorderChunksRef.current = [];
-    setIsRecordingVoiceSample(false);
-  }, [clearVoiceRecorderTimers]);
-
   const clearRecordedVoiceSample = useCallback(() => {
     setRouting((prev) => ({
       ...prev,
       voiceReferenceAudioData: null,
       voiceReferenceMimeType: null,
       voiceReferenceName: null,
+      chatterboxVoicePreset: prev.chatterboxVoicePreset === CHATTERBOX_CUSTOM_VOICE_ID ? 'chatterbox-clear' : prev.chatterboxVoicePreset,
+      ttsNarratorId: prev.ttsNarratorId === CHATTERBOX_CUSTOM_VOICE_ID ? 'chatterbox-clear' : prev.ttsNarratorId,
     }));
   }, []);
-
-
   const stopVoicePreview = useCallback(() => {
     if (previewAudioRef.current) {
       previewAudioRef.current.pause();
@@ -353,6 +708,251 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setIsVoicePreviewing(false);
     setVoicePreviewMessage('미리 듣기를 정지했습니다.');
   }, []);
+  const playRecordedVoiceSample = useCallback(async () => {
+    if (!recordedVoiceSampleUrl) {
+      setVoicePreviewMessage('저장된 목소리 샘플이 없습니다. 먼저 녹음해 주세요.');
+      return;
+    }
+    stopVoicePreview();
+    setIsVoicePreviewing(true);
+    const audio = new Audio(recordedVoiceSampleUrl);
+    previewAudioRef.current = audio;
+    audio.onended = () => {
+      setIsVoicePreviewing(false);
+      setVoicePreviewMessage('저장된 목소리 샘플 재생이 끝났습니다.');
+    };
+    audio.onerror = () => {
+      setIsVoicePreviewing(false);
+      setVoicePreviewMessage('저장된 목소리 샘플 재생에 실패했습니다.');
+    };
+    await audio.play().catch(() => {
+      setIsVoicePreviewing(false);
+      setVoicePreviewMessage('저장된 목소리 샘플 재생에 실패했습니다.');
+    });
+    setVoicePreviewMessage(`저장된 목소리 샘플 (${routing.voiceReferenceName || 'recorded-voice.webm'}) 재생 중입니다.`);
+  }, [recordedVoiceSampleUrl, routing.voiceReferenceName, stopVoicePreview]);
+  const ttsVoiceExtraPanel = null;
+  const activeSettingsPicker = useMemo<SettingsPickerConfig | null>(() => {
+    if (!settingsPicker) return null;
+    if (settingsPicker.kind === 'tts-provider') {
+      return {
+        title: '기본 TTS 모델 선택',
+        description: '먼저 사용할 TTS 모델 계열을 고르세요. 선택 후 다음 단계에서 최종 목소리를 따로 정합니다.',
+        currentId: ttsProviderPickerCurrentId,
+        options: ttsProviderPickerOptions,
+        onSelect: (id: string) => {
+          setRouting((prev) => ({ ...prev, ttsProvider: id as 'qwen3Tts' | 'elevenLabs', audioProvider: id as 'qwen3Tts' | 'elevenLabs' }));
+          queueSettingsPicker(id === 'elevenLabs' ? 'tts-model' : 'tts-voice');
+        },
+        requireConfirm: true,
+        confirmLabel: '이 모델 계열 선택하기',
+        emptyMessage: '지금 바로 사용할 수 있는 TTS 모델 계열이 없습니다. API 연결이나 무료 모델 상태를 확인해 주세요.',
+      };
+    }
+    if (settingsPicker.kind === 'tts-voice') {
+      return {
+        title: routing.ttsProvider === 'elevenLabs'
+          ? `${selectedElevenModel?.title || 'ElevenLabs'} 음성 선택`
+          : 'Qwen 음성 선택',
+        description: routing.ttsProvider === 'elevenLabs'
+          ? '선택한 ElevenLabs 모델 안에서 사용할 최종 목소리를 고르세요. 모델만 선택해도 목소리는 아직 정해지지 않습니다.'
+          : '이 단계에서 최종 목소리를 고르세요. 카드 설명과 미리듣기를 보고 확정하면 기본 TTS 목소리로 저장됩니다.',
+        currentId: routing.ttsProvider === 'elevenLabs'
+          ? (routing.elevenLabsVoiceId || selectedElevenVoice?.voice_id || CONFIG.DEFAULT_VOICE_ID)
+          : (routing.qwenVoicePreset || 'qwen-default'),
+        options: ttsVoicePickerOptions,
+        onSelect: (id: string) => {
+          if (routing.ttsProvider === 'elevenLabs') {
+            setRouting((prev) => ({ ...prev, elevenLabsVoiceId: id }));
+            return;
+          }
+          setRouting((prev) => ({ ...prev, qwenVoicePreset: id, ttsNarratorId: id }));
+        },
+        requireConfirm: true,
+        confirmLabel: '이 목소리로 설정하기',
+        emptyMessage: routing.ttsProvider === 'elevenLabs'
+          ? '연결된 ElevenLabs 모델에서 고를 수 있는 목소리가 아직 없습니다. API 연결과 음성 목록을 확인해 주세요.'
+          : '선택할 수 있는 목소리가 아직 없습니다.',
+        onPreviewOption: previewSettingsTtsOption,
+      };
+    }
+    if (settingsPicker.kind === 'tts-model') {
+      return {
+        title: 'ElevenLabs 모델 선택',
+        description: '모델마다 속도와 표현력이 다릅니다. 여기서는 목소리가 아직 정해지지 않고, 확인 후 다음 화면에서 최종 목소리를 고릅니다.',
+        currentId: routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+        options: ttsModelPickerOptions,
+        onSelect: (id: string) => {
+          setRouting((prev) => ({ ...prev, elevenLabsModelId: id, audioModel: id }));
+          queueSettingsPicker('tts-voice');
+        },
+        requireConfirm: true,
+        confirmLabel: '이 모델 선택하기',
+        emptyMessage: 'ElevenLabs API를 연결하면 선택 가능한 유료 TTS 모델이 여기에 표시됩니다.',
+      };
+    }
+    if (settingsPicker.kind === 'script-model') {
+      return {
+        title: '대본 생성 모델',
+        description: 'Step3 대본 생성에 사용할 기본 모델입니다. 카드를 고른 뒤 확인하면 저장됩니다.',
+        currentId: routing.scriptModel || routing.textModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+        options: scriptPickerOptions,
+        onSelect: (id: string) => setRouting((prev) => ({ ...prev, scriptModel: id, textModel: id })),
+        requireConfirm: true,
+        confirmLabel: '이 모델 선택하기',
+      };
+    }
+    if (settingsPicker.kind === 'prompt-model') {
+      return {
+        title: '프롬프트 생성 모델',
+        description: '씬, 이미지 프롬프트, 모션 프롬프트를 만들 때 사용할 기본 모델입니다.',
+        currentId: routing.sceneModel || routing.imagePromptModel || routing.motionPromptModel || CONFIG.DEFAULT_SCRIPT_MODEL,
+        options: scriptPickerOptions,
+        onSelect: (id: string) => setRouting((prev) => ({ ...prev, sceneModel: id, imagePromptModel: id, motionPromptModel: id })),
+        requireConfirm: true,
+        confirmLabel: '이 모델 선택하기',
+      };
+    }
+    if (settingsPicker.kind === 'image-model') {
+      return {
+        title: '이미지 생성 모델',
+        description: '이미지 품질, 속도, 비용 단계를 비교한 뒤 확인하면 저장됩니다.',
+        currentId: routing.imageModel || CONFIG.DEFAULT_IMAGE_MODEL,
+        options: imagePickerOptions,
+        onSelect: (id: string) => setRouting((prev) => ({ ...prev, imageModel: id, imageProvider: id === freeImageModel ? 'sample' : 'openrouter' })),
+        requireConfirm: true,
+        confirmLabel: '이 모델 선택하기',
+      };
+    }
+    if (settingsPicker.kind === 'bgm-model') {
+      return {
+        title: '배경 음악 모델',
+        description: '프로젝트 기본 배경음 생성에 사용할 모델을 고르세요. 연결된 API가 없으면 샘플 배경음만 선택할 수 있습니다.',
+        currentId: routing.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL,
+        options: backgroundMusicPickerOptions,
+        onSelect: (id: string) => setRouting((prev) => ({
+          ...prev,
+          backgroundMusicModel: id,
+          backgroundMusicProvider: isGoogleBgmModel(id) ? 'google' : 'sample',
+        })),
+        requireConfirm: true,
+        confirmLabel: '이 배경음 모델 선택하기',
+        emptyMessage: '사용 가능한 배경음 모델이 없습니다.',
+      };
+    }
+    return {
+      title: '영상 생성 모델',
+      description: '영상 품질과 비용 단계를 비교한 뒤 확인하면 저장됩니다.',
+      currentId: routing.videoModel || CONFIG.DEFAULT_VIDEO_MODEL,
+      options: videoPickerOptions,
+      onSelect: (id: string) => setRouting((prev) => ({ ...prev, videoModel: id, videoProvider: id === freeVideoModel ? 'sample' : 'elevenLabs' })),
+      requireConfirm: true,
+      confirmLabel: '이 모델 선택하기',
+    };
+  }, [
+    settingsPicker,
+    routing.ttsProvider,
+    routing.elevenLabsVoiceId,
+    routing.chatterboxVoicePreset,
+    routing.qwenVoicePreset,
+    routing.elevenLabsModelId,
+    routing.audioModel,
+    routing.scriptModel,
+    routing.textModel,
+    routing.sceneModel,
+    routing.imagePromptModel,
+    routing.motionPromptModel,
+    routing.imageModel,
+    routing.videoModel,
+    routing.backgroundMusicModel,
+    ttsProviderPickerOptions,
+    ttsVoicePickerOptions,
+    ttsModelPickerOptions,
+    scriptPickerOptions,
+    imagePickerOptions,
+    videoPickerOptions,
+    backgroundMusicPickerOptions,
+    previewSettingsTtsOption,
+    queueSettingsPicker,
+    recordedVoiceSampleUrl,
+    selectedElevenModel?.title,
+    selectedElevenVoice?.voice_id,
+    ttsProviderPickerCurrentId,
+    ttsVoiceExtraPanel,
+  ]);
+
+  const clearVoiceRecorderTimers = useCallback(() => {
+    if (voiceRecorderStopTimerRef.current !== null) {
+      window.clearTimeout(voiceRecorderStopTimerRef.current);
+      voiceRecorderStopTimerRef.current = null;
+    }
+    if (voiceRecorderCountdownRef.current !== null) {
+      window.clearInterval(voiceRecorderCountdownRef.current);
+      voiceRecorderCountdownRef.current = null;
+    }
+    if (voiceRecorderFinalizeTimerRef.current !== null) {
+      window.clearTimeout(voiceRecorderFinalizeTimerRef.current);
+      voiceRecorderFinalizeTimerRef.current = null;
+    }
+    setVoiceSampleSecondsLeft(VOICE_SAMPLE_MAX_SECONDS);
+  }, []);
+
+  const stopVoiceRecorderStream = useCallback(() => {
+    clearVoiceRecorderTimers();
+    voiceRecorderStreamRef.current?.getTracks().forEach((track) => track.stop());
+    voiceRecorderStreamRef.current = null;
+    voiceRecorderRef.current = null;
+    voiceRecorderChunksRef.current = [];
+    setIsRecordingVoiceSample(false);
+  }, [clearVoiceRecorderTimers]);
+
+  const finalizeVoiceRecorderStop = useCallback((message?: string) => {
+    const recorder = voiceRecorderRef.current;
+    if (!recorder || recorder.state === 'inactive') return;
+    if (message) setVoicePreviewMessage(message);
+    recorder.requestData?.();
+    if (voiceRecorderFinalizeTimerRef.current !== null) {
+      window.clearTimeout(voiceRecorderFinalizeTimerRef.current);
+    }
+    voiceRecorderFinalizeTimerRef.current = window.setTimeout(() => {
+      if (recorder.state !== 'inactive') {
+        recorder.stop();
+      }
+    }, 180);
+  }, []);
+
+  const closeVoiceSampleModal = useCallback(() => {
+    stopVoiceRecorderStream();
+    setVoiceSampleModalOpen(false);
+  }, [stopVoiceRecorderStream]);
+
+  const persistVoiceReferenceBlob = useCallback(async (blob: Blob, fileName?: string | null) => {
+    setIsVoiceSampleProcessing(true);
+    setVoicePreviewMessage('목소리 샘플을 정리하고 있습니다. 처음 등록할 때는 잠시만 기다려 주세요.');
+    try {
+      const normalized = await normalizeVoiceReferenceBlob(blob, fileName);
+      if (normalized.durationSeconds > VOICE_SAMPLE_MAX_SECONDS + 0.1) {
+        setVoicePreviewMessage(`목소리 파일은 ${VOICE_SAMPLE_MAX_SECONDS}초 이하만 등록할 수 있습니다. 현재 파일은 약 ${Math.ceil(normalized.durationSeconds)}초입니다.`);
+        return false;
+      }
+      setRouting((prev) => ({
+        ...prev,
+        voiceReferenceAudioData: normalized.base64 || null,
+        voiceReferenceMimeType: normalized.mimeType || blob.type || 'audio/webm',
+        voiceReferenceName: normalized.fileName || fileName || 'voice-reference.webm',
+        chatterboxVoicePreset: prev.ttsProvider === 'chatterbox' ? CHATTERBOX_CUSTOM_VOICE_ID : prev.chatterboxVoicePreset,
+        ttsNarratorId: prev.ttsProvider === 'chatterbox' ? CHATTERBOX_CUSTOM_VOICE_ID : prev.ttsNarratorId,
+      }));
+      closeVoiceSampleModal();
+      setVoicePreviewMessage(`${normalized.fileName || fileName || 'voice-reference.webm'} 샘플을 저장했습니다. Chatterbox에서 맞춤 목소리로 바로 선택할 수 있습니다.`);
+      return true;
+    } catch {
+      setVoicePreviewMessage('목소리 샘플 저장에 실패했습니다. 다시 시도해 주세요.');
+      return false;
+    } finally {
+      setIsVoiceSampleProcessing(false);
+    }
+  }, [closeVoiceSampleModal]);
 
   const stopBgmPreview = useCallback(() => {
     if (bgmAudioRef.current) {
@@ -365,20 +965,15 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   }, []);
 
   const playVoicePreview = useCallback(async () => {
-    const provider = routing.ttsProvider === 'elevenLabs'
+    const provider = visibleTtsProvider === 'elevenLabs'
       ? 'elevenLabs'
-      : routing.ttsProvider === 'chatterbox'
-        ? 'chatterbox'
-        : 'qwen3Tts';
+      : 'qwen3Tts';
     const voicePreviewKey = [
       provider,
       routing.qwenVoicePreset || 'qwen-default',
-      routing.chatterboxVoicePreset || 'chatterbox-clear',
       routing.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID,
       routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
-      routing.voiceReferenceName || '',
     ].join('|');
-    const canUseVoiceReference = provider === 'chatterbox';
 
     if (isVoicePreviewing && voicePreviewKeyRef.current === voicePreviewKey) {
       stopVoicePreview();
@@ -388,76 +983,109 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     stopVoicePreview();
     voicePreviewKeyRef.current = voicePreviewKey;
     setIsVoicePreviewing(true);
-    setVoicePreviewMessage('선택한 모델로 실제 음성을 준비 중입니다. 무료 모델은 처음 로드 시 시간이 더 걸릴 수 있습니다.');
+    setVoicePreviewMessage('음성 미리듣기를 준비하고 있습니다. 잠시만 기다려 주세요.');
 
     const elevenLabsApiKey = providerValues.elevenLabsApiKey.trim();
+    const googleApiKey = resolveGoogleAiStudioApiKey(providerValues.openRouterApiKey.trim());
+    const resolvedVoiceId = provider === 'elevenLabs'
+      ? (routing.elevenLabsVoiceId || selectedElevenVoice?.voice_id || CONFIG.DEFAULT_VOICE_ID)
+      : (routing.qwenVoicePreset || 'qwen-default');
+
     if (provider === 'elevenLabs' && !elevenLabsApiKey) {
       setIsVoicePreviewing(false);
-      setVoicePreviewMessage('ElevenLabs API가 연결되지 않았습니다. 먼저 API 연결 확인을 해주세요.');
+      setVoicePreviewMessage('ElevenLabs API가 연결되지 않았습니다. 먼저 API 키를 설정해 주세요.');
+      return;
+    }
+
+    if (provider === 'qwen3Tts' && !googleApiKey) {
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+        setIsVoicePreviewing(false);
+        setVoicePreviewMessage('이 브라우저에서는 음성 미리듣기를 지원하지 않습니다.');
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance('안녕하세요. 지금 선택한 목소리를 확인하고 있습니다.');
+      utterance.lang = 'ko-KR';
+      utterance.rate = 1;
+      utterance.pitch = resolvedVoiceId === 'qwen-soft' ? 1.08 : 0.96;
+      const voices = window.speechSynthesis.getVoices();
+      const koreanVoices = voices.filter((voice) => voice.lang.toLowerCase().startsWith('ko'));
+      const preferredVoice = resolvedVoiceId === 'qwen-soft'
+        ? (koreanVoices.find((voice) => /female|woman|yuna|sunhi/i.test(`${voice.name} ${voice.voiceURI}`)) || koreanVoices[0])
+        : (koreanVoices.find((voice) => /male|man|inho|hyunsu/i.test(`${voice.name} ${voice.voiceURI}`)) || koreanVoices[0]);
+      if (preferredVoice) utterance.voice = preferredVoice;
+      previewUtteranceRef.current = utterance;
+      utterance.onend = () => {
+        setIsVoicePreviewing(false);
+        setVoicePreviewMessage('음성 재생이 끝났습니다.');
+      };
+      utterance.onerror = () => {
+        setIsVoicePreviewing(false);
+        setVoicePreviewMessage('음성 재생에 실패했습니다.');
+      };
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(utterance);
+      setVoicePreviewMessage('Qwen3-TTS 음성을 브라우저 음성으로 미리 재생 중입니다.');
       return;
     }
 
     try {
       const { asset } = await createTtsPreview({
         provider,
-        title: '설정 미리 듣기',
-        text: '안녕하세요. 지금 선택한 기본 목소리를 확인합니다.',
+        title: '기본 TTS 미리듣기',
+        text: '안녕하세요. 지금 선택한 목소리를 확인하고 있습니다.',
         mode: 'voice-preview',
         apiKey: elevenLabsApiKey,
-        voiceId: provider === 'elevenLabs'
-          ? (routing.elevenLabsVoiceId || selectedElevenVoice?.voice_id || CONFIG.DEFAULT_VOICE_ID)
-          : provider === 'chatterbox'
-            ? (routing.chatterboxVoicePreset || 'chatterbox-clear')
-            : (routing.qwenVoicePreset || 'qwen-default'),
+        googleApiKey,
+        voiceId: resolvedVoiceId,
         modelId: routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
-        qwenPreset: provider === 'chatterbox' ? (routing.chatterboxVoicePreset || 'chatterbox-clear') : (routing.qwenVoicePreset || 'qwen-default'),
+        qwenPreset: routing.qwenVoicePreset || 'qwen-default',
         locale: 'ko',
-        voiceReferenceAudioData: canUseVoiceReference ? (routing.voiceReferenceAudioData || null) : null,
-        voiceReferenceMimeType: canUseVoiceReference ? (routing.voiceReferenceMimeType || null) : null,
+        voiceReferenceAudioData: null,
+        voiceReferenceMimeType: null,
       });
 
-      const audioSrc = asset.audioData?.startsWith('data:') ? asset.audioData : `data:audio/mpeg;base64,${asset.audioData}`;
+      const audioSrc = resolveAudioPreviewSrc(asset.audioData, 'audio/mpeg');
+      if (!audioSrc) {
+        setIsVoicePreviewing(false);
+        setVoicePreviewMessage('음성 데이터를 준비하지 못했습니다.');
+        return;
+      }
       const audio = new Audio(audioSrc);
       previewAudioRef.current = audio;
       audio.onended = () => {
         setIsVoicePreviewing(false);
-        setVoicePreviewMessage('음성 미리 듣기가 끝났습니다.');
+        setVoicePreviewMessage('음성 재생이 끝났습니다.');
       };
       audio.onerror = () => {
         setIsVoicePreviewing(false);
-        setVoicePreviewMessage('음성 미리 듣기에 실패했습니다. 브라우저 메모리나 모델 캐시 상태를 확인해 주세요.');
+        setVoicePreviewMessage('음성 재생에 실패했습니다. 다시 시도하거나 다른 목소리를 선택해 주세요.');
       };
       await audio.play();
 
-      if (provider === 'chatterbox') {
-        setVoicePreviewMessage(routing.voiceReferenceName
-          ? `Chatterbox 고품질 무료 모델로 ${routing.voiceReferenceName} 목소리를 반영한 미리 듣기 중입니다.`
-          : 'Chatterbox 고품질 무료 모델로 한국어 기본 보이스 미리 듣기 중입니다.');
-        return;
-      }
-
       if (provider === 'qwen3Tts') {
-        setVoicePreviewMessage('경량 무료 모델로 한국어 기본 보이스 미리 듣기 중입니다.');
+        setVoicePreviewMessage('Qwen3-TTS 음성을 재생 중입니다.');
         return;
       }
 
-      setVoicePreviewMessage(`ElevenLabs (${selectedElevenVoice?.name || asset.voiceId || '기본 보이스'}) 미리 듣기 중입니다.`);
+      setVoicePreviewMessage(`ElevenLabs (${selectedElevenVoice?.name || asset.voiceId || '기본 보이스'}) 음성을 재생 중입니다.`);
     } catch {
       setIsVoicePreviewing(false);
-      setVoicePreviewMessage('음성 미리 듣기에 실패했습니다. 무료 모델은 @huggingface/transformers 설치 및 브라우저 리소스를 확인해 주세요.');
+      setVoicePreviewMessage('음성 재생에 실패했습니다. 다시 시도하거나 API 연결 상태를 확인해 주세요.');
     }
   }, [
     isVoicePreviewing,
     providerValues.elevenLabsApiKey,
+    providerValues.openRouterApiKey,
+    recordedVoiceSampleUrl,
     routing,
     selectedElevenVoice,
     stopVoicePreview,
+    visibleTtsProvider,
   ]);
-
 
   const handleToggleVoiceSampleRecording = useCallback(async () => {
     if (isRecordingVoiceSample && voiceRecorderRef.current) {
-      voiceRecorderRef.current.stop();
+      finalizeVoiceRecorderStop('녹음을 정리하고 있습니다. 마지막 구간까지 저장한 뒤 샘플에 반영합니다.');
       return;
     }
 
@@ -484,33 +1112,28 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(voiceRecorderChunksRef.current, { type: recorder.mimeType || mimeType || 'audio/webm' });
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          const result = typeof reader.result === 'string' ? reader.result : '';
-          const base64 = result.includes(',') ? result.split(',')[1] || '' : '';
-          setRouting((prev) => ({
-            ...prev,
-            voiceReferenceAudioData: base64 || null,
-            voiceReferenceMimeType: blob.type || recorder.mimeType || mimeType || 'audio/webm',
-            voiceReferenceName: `voice-reference.${(blob.type || recorder.mimeType || mimeType || 'audio/webm').includes('mp4') ? 'm4a' : 'webm'}`,
-          }));
-          setVoicePreviewMessage(base64
-            ? '녹음한 목소리 샘플을 저장했습니다. 무료 TTS 생성에 바로 사용할 수 있습니다.'
-            : '녹음 저장에 실패했습니다. 다시 시도해 주세요.');
+        if (!voiceRecorderChunksRef.current.length) {
           stopVoiceRecorderStream();
-        };
-        reader.readAsDataURL(blob);
+          setVoicePreviewMessage('녹음된 샘플을 찾지 못했습니다. 다시 시도해 주세요.');
+          return;
+        }
+        const blob = new Blob(voiceRecorderChunksRef.current, { type: recorder.mimeType || mimeType || 'audio/webm' });
+        void persistVoiceReferenceBlob(
+          blob,
+          `voice-reference.${(blob.type || recorder.mimeType || mimeType || 'audio/webm').includes('mp4') ? 'm4a' : 'webm'}`,
+        ).finally(() => {
+          stopVoiceRecorderStream();
+        });
       };
 
-      recorder.start();
+      recorder.start(250);
       setIsRecordingVoiceSample(true);
       setVoiceSampleSecondsLeft(VOICE_SAMPLE_MAX_SECONDS);
       setVoicePreviewMessage('녹음 중입니다. 15초 안에서 또렷하게 읽으면 자동 저장됩니다.');
 
       voiceRecorderStopTimerRef.current = window.setTimeout(() => {
         if (voiceRecorderRef.current && voiceRecorderRef.current.state !== 'inactive') {
-          voiceRecorderRef.current.stop();
+          finalizeVoiceRecorderStop('녹음 시간을 다 채워 샘플을 저장하고 있습니다.');
         }
       }, VOICE_SAMPLE_MAX_SECONDS * 1000);
 
@@ -524,7 +1147,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       stopVoiceRecorderStream();
       setVoicePreviewMessage('마이크 권한을 확인한 뒤 다시 시도해 주세요.');
     }
-  }, [clearVoiceRecorderTimers, isRecordingVoiceSample, stopVoiceRecorderStream]);
+  }, [clearVoiceRecorderTimers, finalizeVoiceRecorderStop, isRecordingVoiceSample, persistVoiceReferenceBlob, stopVoiceRecorderStream]);
 
   const handleVoiceSampleFileChange = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -547,7 +1170,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
         return;
       }
 
-      const reader = new FileReader();
+      await persistVoiceReferenceBlob(file, file.name);
+      return;
+
+      /* const reader = new FileReader();
       reader.onloadend = () => {
         const result = typeof reader.result === 'string' ? reader.result : '';
         const base64 = result.includes(',') ? result.split(',')[1] || '' : '';
@@ -557,39 +1183,16 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
           voiceReferenceMimeType: file.type || 'audio/webm',
           voiceReferenceName: file.name,
         }));
+        if (base64) {
+          closeVoiceSampleModal();
+        }
         setVoicePreviewMessage(base64 ? `${file.name} 파일을 목소리 샘플로 저장했습니다.` : '목소리 파일 저장에 실패했습니다.');
       };
-      reader.readAsDataURL(file);
+      reader.readAsDataURL(file); */
     } catch {
       setVoicePreviewMessage('목소리 파일을 불러오지 못했습니다. 다른 파일로 다시 시도해 주세요.');
     }
-  }, []);
-
-
-  const playRecordedVoiceSample = useCallback(async () => {
-    if (!recordedVoiceSampleUrl) {
-      setVoicePreviewMessage('저장된 목소리 샘플이 없습니다. 먼저 녹음해 주세요.');
-      return;
-    }
-    stopVoicePreview();
-    setIsVoicePreviewing(true);
-    const audio = new Audio(recordedVoiceSampleUrl);
-    previewAudioRef.current = audio;
-    audio.onended = () => {
-      setIsVoicePreviewing(false);
-      setVoicePreviewMessage('저장된 목소리 샘플 재생이 끝났습니다.');
-    };
-    audio.onerror = () => {
-      setIsVoicePreviewing(false);
-      setVoicePreviewMessage('저장된 목소리 샘플 재생에 실패했습니다.');
-    };
-    await audio.play().catch(() => {
-      setIsVoicePreviewing(false);
-      setVoicePreviewMessage('저장된 목소리 샘플 재생에 실패했습니다.');
-    });
-    setVoicePreviewMessage(`저장된 목소리 샘플 (${routing.voiceReferenceName || 'recorded-voice.webm'}) 재생 중입니다.`);
-  }, [recordedVoiceSampleUrl, routing.voiceReferenceName, stopVoicePreview]);
-
+  }, [closeVoiceSampleModal]);
   const playBgmPreview = useCallback(async () => {
     const bgmPreviewKey = [
       routing.backgroundMusicProvider || 'sample',
@@ -606,36 +1209,49 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setIsBgmPreviewing(true);
     setBgmPreviewMessage('배경 음악 미리 듣기를 준비 중입니다.');
 
-    const selectedBgmModel = routing.backgroundMusicModel || 'sample-ambient-v1';
-
     try {
-      const previewTrack = createSampleBackgroundTrack({
-        id: 'settings-preview',
-        version: 1,
-        contentType: 'story',
-        outputMode: 'video',
-        topic: '설정 미리 듣기',
-        script: '배경 음악 미리 듣기',
-        aspectRatio: '16:9',
-        activeStage: 'draft',
-        completedSteps: { step1: true, step2: true, step3: true, step4: true },
-        selections: {
-          mood: routing.backgroundMusicModel?.includes('news')
-            ? 'news'
-            : routing.backgroundMusicModel?.includes('cinematic')
-              ? 'cinematic'
-              : 'ambient',
-        },
-        promptTemplates: [],
-        selectedPromptTemplateId: null,
-        selectedCharacterIds: [],
-        selectedStyleImageId: null,
-        extractedCharacters: [],
-        styleImages: [],
-        updatedAt: Date.now(),
-      } as any, routing.backgroundMusicModel || 'sample-ambient-v1', 'preview');
+      const previewTrack = await createBackgroundMusicTrack({
+        draft: {
+          id: 'settings-preview',
+          version: 1,
+          contentType: 'story',
+          outputMode: 'video',
+          topic: '?? ?? ??',
+          script: '?? ?? ?? ??',
+          aspectRatio: '16:9',
+          activeStage: 'draft',
+          completedSteps: { step1: true, step2: true, step3: true, step4: true },
+          selections: {
+            mood: routing.backgroundMusicModel?.includes('news')
+              ? 'news'
+              : routing.backgroundMusicModel?.includes('cinematic')
+                ? 'cinematic'
+                : 'ambient',
+          },
+          promptTemplates: [],
+          selectedPromptTemplateId: null,
+          selectedCharacterIds: [],
+          selectedStyleImageId: null,
+          extractedCharacters: [],
+          styleImages: [],
+          updatedAt: Date.now(),
+        } as any,
+        modelId: routing.backgroundMusicModel || 'sample-ambient-v1',
+        mode: 'preview',
+        provider: isGoogleBgmModel(routing.backgroundMusicModel) ? 'google' : 'sample',
+        googleApiKey: providerValues.openRouterApiKey.trim(),
+        durationSeconds: 20,
+        title: 'Settings background music preview',
+      });
 
-      const audio = new Audio(`data:audio/wav;base64,${previewTrack.audioData}`);
+      const audioSrc = resolveAudioPreviewSrc(previewTrack.audioData, 'audio/wav');
+      if (!audioSrc) {
+        setIsBgmPreviewing(false);
+        setBgmPreviewMessage('배경 음악 샘플을 준비하지 못했습니다.');
+        return;
+      }
+      const audio = new Audio(audioSrc);
+      audio.loop = Boolean(previewTrack.sourceMode === 'sample');
       bgmAudioRef.current = audio;
       audio.onended = () => {
         setIsBgmPreviewing(false);
@@ -651,7 +1267,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       setIsBgmPreviewing(false);
       setBgmPreviewMessage('배경 음악 미리 듣기에 실패했습니다.');
     }
-  }, [isBgmPreviewing, routing.backgroundMusicModel, routing.backgroundMusicProvider, stopBgmPreview]);
+  }, [isBgmPreviewing, providerValues.openRouterApiKey, routing.backgroundMusicModel, routing.backgroundMusicProvider, stopBgmPreview]);
 
   useEffect(() => {
     if (!open) {
@@ -660,33 +1276,6 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       stopVoiceRecorderStream();
     }
   }, [open, stopVoicePreview, stopBgmPreview, stopVoiceRecorderStream]);
-
-  useEffect(() => {
-    if (isPaidMode) return;
-    setRouting((prev) => ({
-      ...prev,
-      scriptModel: isPaidScriptModel(prev.scriptModel || prev.textModel) ? freeScriptModel : (prev.scriptModel || freeScriptModel),
-      textModel: isPaidScriptModel(prev.textModel || prev.scriptModel) ? freeScriptModel : (prev.textModel || prev.scriptModel || freeScriptModel),
-      sceneModel: isPaidScriptModel(prev.sceneModel || prev.imagePromptModel) ? freeScriptModel : (prev.sceneModel || prev.imagePromptModel || freeScriptModel),
-      imagePromptModel: isPaidScriptModel(prev.imagePromptModel || prev.sceneModel) ? freeScriptModel : (prev.imagePromptModel || prev.sceneModel || freeScriptModel),
-      motionPromptModel: isPaidScriptModel(prev.motionPromptModel || prev.sceneModel) ? freeScriptModel : (prev.motionPromptModel || prev.sceneModel || freeScriptModel),
-      imageModel: isPaidImageModel(prev.imageModel) ? freeImageModel : (prev.imageModel || freeImageModel),
-      imageProvider: 'sample',
-      ttsProvider: prev.ttsProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
-      audioProvider: prev.audioProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts',
-      backgroundMusicProvider: 'sample',
-      videoProvider: 'sample',
-      videoModel: isPaidVideoModel(prev.videoModel) ? freeVideoModel : (prev.videoModel || freeVideoModel),
-      musicVideoProvider: 'sample',
-      musicVideoMode: 'sample',
-      backgroundMusicModel: prev.backgroundMusicModel === 'lyria-002' ? 'sample-ambient-v1' : prev.backgroundMusicModel,
-      paidModeEnabled: false,
-    }));
-  }, [isPaidMode]);
-
-  const handleTogglePaidMode = useCallback(() => {
-    setIsPaidMode((prev) => !prev);
-  }, []);
 
 
   const refreshYoutubeConfigState = useCallback(async () => {
@@ -1051,11 +1640,16 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     const nextPromptModel = routing.sceneModel || nextScriptModel;
     const nextImageModel = routing.imageModel || freeImageModel;
     const nextVideoModel = routing.videoModel || freeVideoModel;
-    const wantsElevenTts = isPaidMode && routing.ttsProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
-    const wantsChatterboxTts = routing.ttsProvider === 'chatterbox';
+    const wantsElevenTts = routing.ttsProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
     const wantsGoogleBgm = false;
-    const wantsPaidImage = isPaidMode && nextImageModel !== freeImageModel && Boolean(googleApiKey);
-    const wantsPaidVideo = isPaidMode && nextVideoModel !== freeVideoModel && Boolean(googleApiKey);
+    const wantsPaidImage = nextImageModel !== freeImageModel && Boolean(googleApiKey);
+    const wantsPaidVideo = nextVideoModel !== freeVideoModel && Boolean(googleApiKey);
+    const paidModeEnabled =
+      wantsElevenTts
+      || isPaidScriptModel(nextScriptModel)
+      || isPaidScriptModel(nextPromptModel)
+      || isPaidImageModel(nextImageModel)
+      || isPaidVideoModel(nextVideoModel);
 
     const normalizedRouting = {
       ...routing,
@@ -1066,15 +1660,15 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       motionPromptModel: routing.motionPromptModel || nextPromptModel,
       imageModel: nextImageModel,
       imageProvider: wantsPaidImage ? 'openrouter' : 'sample',
-      ttsProvider: wantsElevenTts ? 'elevenLabs' : wantsChatterboxTts ? 'chatterbox' : 'qwen3Tts',
-      audioProvider: wantsElevenTts ? 'elevenLabs' : wantsChatterboxTts ? 'chatterbox' : 'qwen3Tts',
+      ttsProvider: wantsElevenTts ? 'elevenLabs' : 'qwen3Tts',
+      audioProvider: wantsElevenTts ? 'elevenLabs' : 'qwen3Tts',
       backgroundMusicProvider: wantsGoogleBgm ? 'google' : 'sample',
       videoProvider: wantsPaidVideo ? 'elevenLabs' : 'sample',
       videoModel: nextVideoModel,
       musicVideoProvider: wantsPaidVideo ? 'elevenLabs' : 'sample',
       musicVideoMode: wantsPaidVideo ? 'auto' : 'sample',
       backgroundMusicModel: wantsGoogleBgm ? routing.backgroundMusicModel : (isGoogleBgmModel(routing.backgroundMusicModel) ? 'sample-ambient-v1' : routing.backgroundMusicModel),
-      paidModeEnabled: isPaidMode,
+      paidModeEnabled,
     } as StudioState['routing'];
 
     if (googleClientId || googleClientSecret || youtubeConfigState.source === 'saved') {
@@ -1354,101 +1948,73 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">기본 API 선택</h3>
-                <p className="mt-1 text-xs text-slate-600">기본은 무료 모드로 저장되지만, 모델 목록은 항상 모두 보입니다. 유료 모델을 골라도 키가 없으면 실제 생성은 무료/샘플 흐름으로 안전하게 동작합니다.</p>
+                <p className="mt-1 text-xs text-slate-600">API 키가 연결되면 해당 모델이 바로 선택 가능해지고, 연결되지 않은 항목은 회색 비활성 카드로만 보여 드립니다. 헤더 설정은 새 프로젝트 기본값만 바꾸고, 프로젝트 안에서는 Step3/Step6에서 개별로 다시 조정할 수 있습니다.</p>
               </div>
-              <button
-                type="button"
-                onClick={handleTogglePaidMode}
-                className={`rounded-xl border px-3 py-2 text-xs font-bold ${isPaidMode ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-100'}`}
-              >
-                {isPaidMode ? '유료 기능 끄기' : '유료 기능 켜기'}
-              </button>
+              <span className={`rounded-full px-3 py-1 text-[11px] font-black ${hasAnyConnectedApi ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                {hasAnyConnectedApi ? 'API 연결됨' : '샘플 기본 세팅'}
+              </span>
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-black text-slate-900">음성</div>
-                <label className="mt-2 block">
-                  <div className="mb-1 text-xs font-bold text-slate-700">음성 공급자</div>
-                  <select value={routing.ttsProvider === 'elevenLabs' && isPaidMode ? 'elevenLabs' : routing.ttsProvider === 'chatterbox' ? 'chatterbox' : 'qwen3Tts'} onChange={(e) => setRouting((prev) => ({ ...prev, ttsProvider: e.target.value as 'qwen3Tts' | 'chatterbox' | 'elevenLabs', audioProvider: e.target.value as 'qwen3Tts' | 'chatterbox' | 'elevenLabs' }))} className={inputClass}>
-                    <option value="qwen3Tts">🆓 qwen3-tts 경량 모델</option>
-                    <option value="chatterbox">🆓 Chatterbox 고품질 모델</option>
-                    <option value="elevenLabs">💳 ElevenLabs</option>
+                <div className="mt-2">
+                  <div className="mb-1 text-xs font-bold text-slate-700">기본 TTS</div>
+                  <button
+                    type="button"
+                    onClick={() => setTtsSelectionModalOpen(true)}
+                    className="mb-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
+                  >
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">모델 / 목소리 변경</div>
+                    <div className="mt-1 text-sm font-black text-slate-900">
+                      {visibleTtsProvider === 'elevenLabs'
+                        ? `${selectedElevenModel?.title || 'ElevenLabs'} · ${selectedElevenVoice?.name || '기본 목소리'}`
+                          : `Qwen3-TTS · ${selectedQwenVoice?.name || 'qwen3-tts 기본 보이스'}`}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">기본은 무료 모델입니다. 같은 팝업 안에서 모델을 고르고, 그 모델의 실제 목소리를 들어본 뒤 확인합니다.</div>
+                  </button>
+                  <select value={ttsProviderPickerCurrentId} onChange={(e) => setRouting((prev) => ({ ...prev, ttsProvider: e.target.value as 'qwen3Tts' | 'elevenLabs', audioProvider: e.target.value as 'qwen3Tts' | 'elevenLabs' }))} className={`${inputClass} hidden`}>
+                    {ttsProviderPickerOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.priceLabel === '무료' ? `🆓 ${item.title}` : `💳 ${item.title}`}
+                      </option>
+                    ))}
                   </select>
-                </label>
-                {routing.ttsProvider === 'qwen3Tts' ? (
-                  <label className="mt-2 block">
-                    <div className="mb-1 text-xs font-bold text-slate-700">qwen3-tts 보이스 프리셋 · 경량 무료 모델</div>
-                    <select value={routing.qwenVoicePreset || 'qwen-default'} onChange={(e) => setRouting((prev) => ({ ...prev, qwenVoicePreset: e.target.value, ttsNarratorId: e.target.value }))} className={inputClass}>
-                      {QWEN_TTS_PRESET_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                    </select>
-                  </label>
-                ) : null}
-                {routing.ttsProvider === 'chatterbox' ? (
-                  <label className="mt-2 block">
-                    <div className="mb-1 text-xs font-bold text-slate-700">Chatterbox 프리셋 · 고품질 무료 모델</div>
-                    <select value={routing.chatterboxVoicePreset || 'chatterbox-clear'} onChange={(e) => setRouting((prev) => ({ ...prev, chatterboxVoicePreset: e.target.value, ttsNarratorId: e.target.value }))} className={inputClass}>
-                      {CHATTERBOX_TTS_PRESET_OPTIONS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                    </select>
-                  </label>
-                ) : null}
-                {routing.ttsProvider === 'chatterbox' ? (
-                  <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="text-xs font-black text-slate-900">목소리 등록</div>
-                        <p className="mt-1 text-[11px] leading-5 text-slate-500">녹음 예시 문장, 녹음 등록, 저장 샘플 재생/삭제는 팝업에서 한 번에 관리합니다.</p>
-                      </div>
-                      <button type="button" onClick={() => setVoiceSampleModalOpen(true)} className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
-                        목소리 녹음하기
-                      </button>
-                    </div>
-                    <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
-                      {recordedVoiceSampleUrl
-                        ? `저장된 파일: ${routing.voiceReferenceName || 'recorded-voice.webm'} · 무료 TTS 생성에 바로 사용됩니다.`
-                        : '아직 저장된 샘플이 없습니다. 버튼을 눌러 녹음하거나 파일을 등록해 주세요.'}
-                    </div>
-                  </div>
-                ) : null}
-                {routing.ttsProvider === 'elevenLabs' ? (
-                  <>
-                    <label className="mt-2 block">
-                      <div className="mb-1 text-xs font-bold text-slate-700">ElevenLabs 보이스</div>
-                      <select value={routing.elevenLabsVoiceId || selectedElevenVoice?.voice_id || CONFIG.DEFAULT_VOICE_ID} onChange={(e) => setRouting((prev) => ({ ...prev, elevenLabsVoiceId: e.target.value }))} className={inputClass}>
-                        {elevenLabsVoices.map((item) => <option key={item.voice_id} value={item.voice_id}>{item.name}</option>)}
-                      </select>
-                    </label>
-                    <label className="mt-2 block">
-                      <div className="mb-1 text-xs font-bold text-slate-700">ElevenLabs 모델</div>
-                      <select value={routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL} onChange={(e) => setRouting((prev) => ({ ...prev, elevenLabsModelId: e.target.value, audioModel: e.target.value }))} className={inputClass}>
-                        {ELEVENLABS_MODELS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-                      </select>
-                    </label>
-                  </>
-                ) : null}
+                </div>
                 <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
-                  {routing.ttsProvider === 'elevenLabs'
-                    ? `현재 기본 보이스: ${selectedElevenVoice?.name || 'ElevenLabs 기본 보이스'}${selectedElevenVoice?.labels?.gender ? ` · ${selectedElevenVoice.labels.gender}` : ''}`
-                    : routing.ttsProvider === 'chatterbox'
-                      ? `현재 기본 보이스: ${selectedChatterboxVoice?.name || 'Chatterbox 클리어'} · 고품질 무료 모델${routing.voiceReferenceName ? ` · 등록 샘플 ${routing.voiceReferenceName}` : ''}`
-                      : `현재 기본 보이스: ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (routing.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'} · 경량 무료 모델`}
+                  {visibleTtsProvider === 'elevenLabs'
+                    ? `현재 기본 TTS: ${selectedElevenModel?.title || 'ElevenLabs 모델'} · ${selectedElevenVoice?.name || 'ElevenLabs 기본 목소리'}${selectedElevenVoice?.labels?.gender ? ` · ${selectedElevenVoice.labels.gender}` : ''}`
+                      : `현재 기본 TTS: ${selectedQwenVoice?.name || 'qwen3-tts 기본 보이스'} · 경량 무료 모델`}
+                </div>
+                <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
+                  Qwen, ElevenLabs 목소리는 모두 위의 `모델 / 목소리 변경` 팝업 안에서 선택합니다.
+                  헤더 설정은 새 프로젝트 기본값만 바꾸고, 프로젝트 안에서는 Step3/Step6에서 다시 덮어쓸 수 있습니다.
                 </div>
                 <button type="button" onClick={() => void playVoicePreview()} className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
                   {isVoicePreviewing ? '음성 정지' : '음성 재생'}
                 </button>
                 {voicePreviewMessage ? <p className="mt-2 text-xs text-slate-500">{voicePreviewMessage}</p> : null}
-                {routing.ttsProvider === 'elevenLabs' && !providerValues.elevenLabsApiKey.trim() ? (
+                {visibleTtsProvider === 'elevenLabs' && !providerValues.elevenLabsApiKey.trim() ? (
                   <p className="mt-2 text-xs text-amber-600">선택한 음성 모델은 API 연결이 필요합니다. API 등록 후 다시 시도해 주세요.</p>
-                ) : routing.ttsProvider === 'chatterbox' ? (
-                  <p className="mt-2 text-xs text-emerald-600">무료 모델은 브라우저에서 직접 생성됩니다. qwen3-tts는 경량, Chatterbox는 고품질 모드로 저장되며 녹음/업로드한 샘플은 함께 저장됩니다.</p>
                 ) : null}
                 {isLoadingVoices ? <p className="mt-2 text-xs text-slate-500">보이스 목록을 불러오는 중입니다.</p> : null}
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-black text-slate-900">배경 음악</div>
-                <label className="mt-2 block">
+                <div className="mt-2">
                   <div className="mb-1 text-xs font-bold text-slate-700">배경 음악 모델</div>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsPicker({ kind: 'bgm-model' })}
+                    className="mb-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
+                  >
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Model picker</div>
+                    <div className="mt-1 text-sm font-black text-slate-900">
+                      {backgroundMusicPickerOptions.find((item) => item.id === (routing.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL))?.title || (routing.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL)}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">배경음 모델별 비용 수준과 생성 방식을 같은 카드 UI에서 비교하고 선택할 수 있습니다.</div>
+                  </button>
                   <select
                     value={routing.backgroundMusicModel || 'sample-ambient-v1'}
                     onChange={(e) => {
@@ -1459,15 +2025,15 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                         backgroundMusicProvider: isGoogleBgmModel(nextModel) ? 'google' : 'sample',
                       }));
                     }}
-                    className={inputClass}
+                    className={`${inputClass} hidden`}
                   >
-                    {BGM_MODEL_OPTIONS.map((item) => (
+                    {backgroundMusicModelOptions.map((item) => (
                       <option key={item.id} value={item.id}>
                         {`🆓 ${item.name}`}
                       </option>
                     ))}
                   </select>
-                </label>
+                </div>
                 <button type="button" onClick={() => void playBgmPreview()} className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
                   {isBgmPreviewing ? '배경 음악 정지' : '배경 음악 재생'}
                 </button>
@@ -1485,26 +2051,44 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 <h3 className="text-base font-black text-slate-900">텍스트 · 이미지 · 영상 모델</h3>
                 <p className="mt-1 text-xs text-slate-600">Google AI Studio 모델은 무료/유료를 구분해 드롭다운으로 제공합니다. 무료 API가 없는 항목은 샘플 모델로 최종 출력까지 테스트할 수 있습니다.</p>
               </div>
-              <span className={`rounded-full px-3 py-1 text-[11px] font-black ${isPaidMode ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                {isPaidMode ? '유료 기능 사용 가능' : '무료 기본 세팅'}
+              <span className={`rounded-full px-3 py-1 text-[11px] font-black ${hasGoogleApiKey ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                {hasGoogleApiKey ? 'Google API 연결됨' : '샘플 모델 기본 세팅'}
               </span>
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-black text-slate-900">텍스트 생성 모델</div>
-                <label className="mt-2 block">
+                <div className="mt-2">
                   <div className="mb-1 text-xs font-bold text-slate-700">대본 생성</div>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsPicker({ kind: 'script-model' })}
+                    className="mb-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
+                  >
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Model picker</div>
+                    <div className="mt-1 text-sm font-black text-slate-900">{scriptPickerOptions.find((item) => item.id === (routing.scriptModel || routing.textModel || freeScriptModel))?.title || (routing.scriptModel || routing.textModel || freeScriptModel)}</div>
+                    <div className="mt-1 text-xs text-slate-500">Compare value, quality, and speed for Step3 script generation.</div>
+                  </button>
                   <select
                     value={visibleScriptModels.some((item) => item.id === (routing.scriptModel || routing.textModel)) ? (routing.scriptModel || routing.textModel || freeScriptModel) : freeScriptModel}
                     onChange={(e) => setRouting((prev) => ({ ...prev, scriptModel: e.target.value, textModel: e.target.value }))}
-                    className={inputClass}
+                    className={`${inputClass} hidden`}
                   >
                     {visibleScriptModels.map((item) => <option key={`script-${item.id}`} value={item.id}>{item.tier === 'paid' ? `💳 ${item.name}` : `🆓 ${item.name}`}</option>)}
                   </select>
-                </label>
-                <label className="mt-2 block">
+                </div>
+                <div className="mt-2">
                   <div className="mb-1 text-xs font-bold text-slate-700">프롬프트 생성</div>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsPicker({ kind: 'prompt-model' })}
+                    className="mb-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
+                  >
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Model picker</div>
+                    <div className="mt-1 text-sm font-black text-slate-900">{scriptPickerOptions.find((item) => item.id === (routing.sceneModel || routing.imagePromptModel || routing.motionPromptModel || freeScriptModel))?.title || (routing.sceneModel || routing.imagePromptModel || routing.motionPromptModel || freeScriptModel)}</div>
+                    <div className="mt-1 text-xs text-slate-500">Used for scene planning, image prompts, and motion prompts.</div>
+                  </button>
                   <select
                     value={visibleScriptModels.some((item) => item.id === (routing.sceneModel || routing.imagePromptModel || routing.motionPromptModel)) ? (routing.sceneModel || routing.imagePromptModel || routing.motionPromptModel || freeScriptModel) : freeScriptModel}
                     onChange={(e) => setRouting((prev) => ({
@@ -1513,11 +2097,11 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                       imagePromptModel: e.target.value,
                       motionPromptModel: e.target.value,
                     }))}
-                    className={inputClass}
+                    className={`${inputClass} hidden`}
                   >
                     {visibleScriptModels.map((item) => <option key={`prompt-${item.id}`} value={item.id}>{item.tier === 'paid' ? `💳 ${item.name}` : `🆓 ${item.name}`}</option>)}
                   </select>
-                </label>
+                </div>
                 {!providerValues.openRouterApiKey.trim() ? (
                   <p className="mt-2 text-xs text-amber-600">Google AI Studio 키가 없어도 샘플/무료 흐름 점검은 가능하지만, 실제 호출은 키를 저장해야 적용됩니다.</p>
                 ) : (
@@ -1527,8 +2111,17 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-black text-slate-900">이미지 · 영상 생성 모델</div>
-                <label className="mt-2 block">
+                <div className="mt-2">
                   <div className="mb-1 text-xs font-bold text-slate-700">이미지 모델</div>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsPicker({ kind: 'image-model' })}
+                    className="mb-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
+                  >
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Model picker</div>
+                    <div className="mt-1 text-sm font-black text-slate-900">{imagePickerOptions.find((item) => item.id === (routing.imageModel || freeImageModel))?.title || (routing.imageModel || freeImageModel)}</div>
+                    <div className="mt-1 text-xs text-slate-500">Compare image quality, price, and speed at a glance.</div>
+                  </button>
                   <select
                     value={visibleImageModels.some((item) => item.id === routing.imageModel) ? (routing.imageModel || freeImageModel) : freeImageModel}
                     onChange={(e) => setRouting((prev) => ({
@@ -1536,21 +2129,30 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                       imageModel: e.target.value,
                       imageProvider: e.target.value === freeImageModel ? 'sample' : 'openrouter',
                     }))}
-                    className={inputClass}
+                    className={`${inputClass} hidden`}
                   >
                     {visibleImageModels.map((item) => <option key={item.id} value={item.id}>{item.tier === 'paid' ? `💳 ${item.name}` : `🆓 ${item.name}`}</option>)}
                   </select>
-                </label>
-                <label className="mt-2 block">
+                </div>
+                <div className="mt-2">
                   <div className="mb-1 text-xs font-bold text-slate-700">영상 모델</div>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsPicker({ kind: 'video-model' })}
+                    className="mb-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
+                  >
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Model picker</div>
+                    <div className="mt-1 text-sm font-black text-slate-900">{videoPickerOptions.find((item) => item.id === (routing.videoModel || freeVideoModel))?.title || (routing.videoModel || freeVideoModel)}</div>
+                    <div className="mt-1 text-xs text-slate-500">Compare motion quality, speed, and price tier.</div>
+                  </button>
                   <select
                     value={visibleVideoModels.some((item) => item.id === routing.videoModel) ? (routing.videoModel || freeVideoModel) : freeVideoModel}
                     onChange={(e) => setRouting((prev) => ({ ...prev, videoModel: e.target.value, videoProvider: e.target.value === freeVideoModel ? 'sample' : 'elevenLabs' }))}
-                    className={inputClass}
+                    className={`${inputClass} hidden`}
                   >
                     {visibleVideoModels.map((item) => <option key={item.id} value={item.id}>{item.tier === 'paid' ? `💳 ${item.name}` : `🆓 ${item.name}`}</option>)}
                   </select>
-                </label>
+                </div>
                 <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
                   무료 API가 없는 항목은 샘플 모델로도 화면 흐름, 씬 생성, 최종 출력 테스트가 되도록 유지됩니다.
                 </div>
@@ -1560,13 +2162,12 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
           {youtubeSectionVariant === 'collapsed-bottom' ? youtubeOAuthSection : null}
         </div>
 
-        {voiceSampleModalOpen ? (
+        {voiceSampleModalOpen && typeof document !== 'undefined' ? createPortal((
           <div
-            className="fixed inset-0 z-[115] flex items-center justify-center bg-slate-950/45 px-5"
+            className="fixed inset-0 z-[170] flex items-center justify-center bg-slate-950/55 px-5"
             onMouseDown={(event) => {
               if (event.target === event.currentTarget) {
-                stopVoiceRecorderStream();
-                setVoiceSampleModalOpen(false);
+                closeVoiceSampleModal();
               }
             }}
           >
@@ -1577,7 +2178,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                   <h3 className="mt-2 text-xl font-black text-slate-900">녹음 예시문장과 샘플 관리</h3>
                   <p className="mt-2 text-sm leading-6 text-slate-600">15초 이하, 또렷한 단일 화자 음성으로 등록해 주세요. 무료 TTS 생성에 바로 연결됩니다.</p>
                 </div>
-                <button type="button" onClick={() => { stopVoiceRecorderStream(); setVoiceSampleModalOpen(false); }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">닫기</button>
+                <button type="button" onClick={closeVoiceSampleModal} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100">닫기</button>
               </div>
 
               <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-[13px] leading-6 text-slate-700">
@@ -1587,17 +2188,17 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
-                <button type="button" onClick={() => void handleToggleVoiceSampleRecording()} className={`rounded-xl px-3 py-2 text-xs font-black ${isRecordingVoiceSample ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-slate-900 text-white hover:bg-slate-800'}`}>
+                <button type="button" disabled={isVoiceSampleProcessing} onClick={() => void handleToggleVoiceSampleRecording()} className={`rounded-xl px-3 py-2 text-xs font-black ${isRecordingVoiceSample ? 'bg-rose-600 text-white hover:bg-rose-500' : 'bg-slate-900 text-white hover:bg-slate-800'} disabled:cursor-not-allowed disabled:bg-slate-300`}>
                   {isRecordingVoiceSample ? `녹음 저장 (${voiceSampleSecondsLeft}s)` : '녹음 시작'}
                 </button>
-                <label className="inline-flex cursor-pointer items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100">
+                <label className={`inline-flex items-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 ${isVoiceSampleProcessing ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
                   파일 등록
-                  <input type="file" accept="audio/*" className="hidden" onChange={(e) => void handleVoiceSampleFileChange(e)} />
+                  <input type="file" accept="audio/*" className="hidden" onChange={(e) => void handleVoiceSampleFileChange(e)} disabled={isVoiceSampleProcessing} />
                 </label>
-                <button type="button" onClick={() => void playRecordedVoiceSample()} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400">
+                <button type="button" onClick={() => void playRecordedVoiceSample()} disabled={!recordedVoiceSampleUrl || isVoiceSampleProcessing} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:bg-slate-100 disabled:text-slate-400">
                   저장된 샘플 듣기
                 </button>
-                <button type="button" onClick={clearRecordedVoiceSample} disabled={!recordedVoiceSampleUrl} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:border-slate-200 disabled:text-slate-400">
+                <button type="button" onClick={clearRecordedVoiceSample} disabled={!recordedVoiceSampleUrl || isVoiceSampleProcessing} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 disabled:border-slate-200 disabled:text-slate-400">
                   샘플 삭제
                 </button>
               </div>
@@ -1610,6 +2211,66 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
               {voicePreviewMessage ? <p className="mt-3 text-xs text-slate-500">{voicePreviewMessage}</p> : null}
             </div>
           </div>
+        ), document.body) : null}
+
+        <TtsSelectionModal
+          open={ttsSelectionModalOpen}
+          title="기본 TTS 모델 / 목소리 선택"
+          currentProvider={visibleTtsProvider}
+          currentModelId={routing.elevenLabsModelId || routing.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL}
+          currentVoiceId={
+            visibleTtsProvider === 'elevenLabs'
+              ? (routing.elevenLabsVoiceId || selectedElevenVoice?.voice_id || CONFIG.DEFAULT_VOICE_ID)
+                : (routing.qwenVoicePreset || 'qwen-default')
+          }
+          googleApiKey={providerValues.openRouterApiKey}
+          elevenLabsApiKey={providerValues.elevenLabsApiKey}
+          hasElevenLabsApiKey={hasElevenLabsApiKey}
+          allowPaid
+          elevenLabsVoices={elevenLabsVoices}
+          voiceReferenceAudioData={routing.voiceReferenceAudioData}
+          voiceReferenceMimeType={routing.voiceReferenceMimeType}
+          voiceReferenceName={routing.voiceReferenceName}
+          extraVoicePanel={ttsVoiceExtraPanel}
+          onApply={(selection) => {
+            setRouting((prev) => {
+              if (selection.provider === 'elevenLabs') {
+                return {
+                  ...prev,
+                  ttsProvider: 'elevenLabs',
+                  audioProvider: 'elevenLabs',
+                  audioModel: selection.modelId || prev.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+                  elevenLabsModelId: selection.modelId || prev.elevenLabsModelId || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+                  elevenLabsVoiceId: selection.voiceId || prev.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID,
+                };
+              }
+              return {
+                ...prev,
+                ttsProvider: 'qwen3Tts',
+                audioProvider: 'qwen3Tts',
+                qwenVoicePreset: selection.voiceId || prev.qwenVoicePreset || 'qwen-default',
+                ttsNarratorId: selection.voiceId || prev.ttsNarratorId || 'qwen-default',
+              };
+            });
+          }}
+          onClose={() => setTtsSelectionModalOpen(false)}
+        />
+
+        {activeSettingsPicker ? (
+          <AiOptionPickerModal
+            open={Boolean(activeSettingsPicker)}
+            title={activeSettingsPicker.title}
+            description={activeSettingsPicker.description}
+            currentId={activeSettingsPicker.currentId}
+            options={activeSettingsPicker.options}
+            onClose={() => setSettingsPicker(null)}
+            onSelect={activeSettingsPicker.onSelect}
+            emptyMessage={activeSettingsPicker.emptyMessage}
+            requireConfirm={activeSettingsPicker.requireConfirm}
+            confirmLabel={activeSettingsPicker.confirmLabel}
+            onPreviewOption={activeSettingsPicker.onPreviewOption}
+            extraPanel={activeSettingsPicker.extraPanel}
+          />
         ) : null}
 
         {youtubeConnectOverlay.active ? (

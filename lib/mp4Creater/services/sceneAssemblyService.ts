@@ -1,4 +1,4 @@
-import { AspectRatio, GeneratedAsset, ScriptScene, StorySelectionState, WorkflowDraft } from '../types';
+import { AspectRatio, GeneratedAsset, ScriptScene, StorySelectionState, WorkflowDraft, WorkflowRolePromptBundle } from '../types';
 import { buildFreshIdeaRule, createCreativeDirection } from '../config/creativeVariance';
 import {
   buildLocalVisualPrompt,
@@ -6,6 +6,13 @@ import {
   makeScenePlaceholderImage,
   splitStoryIntoParagraphScenes,
 } from '../utils/storyHelpers';
+import {
+  buildConceptDirectionLines,
+  buildMarkdownSection,
+  buildSimilarityControlLines,
+  buildTransitionIntentLines,
+  joinPromptBlocks,
+} from './promptMarkdown';
 
 const SILENT_SCENE_MIN_SECONDS = 3;
 const SILENT_SCENE_MAX_SECONDS = 6;
@@ -100,6 +107,23 @@ function buildVisualTextureGuide(draft: WorkflowDraft) {
   return 'Keep the selected art style consistent across scenes, with clean silhouette, readable face, stable lighting logic, and texture detail that still feels natural in motion video.';
 }
 
+function buildNoTextVisualGuide() {
+  return 'Do not make the shot depend on readable text. Avoid captions, signage, storefront lettering, poster copy, packaging labels, UI, watermark, logo marks, and decorative typography. If background text cannot be avoided, keep it blurred, cropped, or unreadable.';
+}
+
+function buildActionPriorityGuide(draft: WorkflowDraft) {
+  if (draft.contentType === 'music_video') {
+    return 'Prioritize body rhythm, performance beats, gaze changes, and emotional motion over props or background details.';
+  }
+  if (draft.contentType === 'info_delivery') {
+    return 'Prioritize visible explanation beats, object interaction, emphasis gestures, and scene progression over text-heavy props or written information.';
+  }
+  if (draft.contentType === 'cinematic') {
+    return 'Prioritize tension, reaction, blocking, and emotional movement over text-bearing set decoration.';
+  }
+  return 'Prioritize character action, reaction, and scene progression over text-bearing background details.';
+}
+
 function buildMuteSceneNarration(draft: WorkflowDraft, index: number, total: number) {
   const topic = draft.topic?.trim() || '새 프로젝트';
   const selections: StorySelectionState = draft.selections || { genre: '', mood: '', endingTone: '', setting: '', protagonist: '', conflict: '' };
@@ -144,35 +168,78 @@ function buildDialogueTransitionGuide(currentNarration: string, previousNarratio
 function buildLocalVideoPrompt(narration: string, sceneNumber: number, draft: WorkflowDraft, targetDuration: number) {
   const direction = createCreativeDirection(`${draft.contentType}:local-motion:${sceneNumber}:${narration}`, sceneNumber, draft.contentType);
   const contentGuide = getContentModeGuide(draft);
-  return [
-    `${contentGuide}. Scene ${sceneNumber}.`,
-    `Create a ${targetDuration.toFixed(1)} second motion beat that starts from this narration: ${narration}`,
-    buildFreshIdeaRule('motion'),
-    `Use ${direction.shotType}. ${direction.cameraLanguage}`,
-    `Movement focus: ${direction.transitionBeat}`,
-    `Lighting: ${direction.lightingDirection}. Palette: ${direction.paletteDirection}.`,
-    buildLipSyncGuide(draft),
-    buildVisualTextureGuide(draft),
-    'Show one clear action or emotional shift, keep the main subject readable, and avoid subtitle dependence or watermark.',
-    'Keep character identity and visual continuity consistent with the previous and next scenes.',
-  ].join(' ');
+  return joinPromptBlocks([
+    buildMarkdownSection('Goal', [
+      `${contentGuide}. Scene ${sceneNumber}.`,
+      `Create a ${targetDuration.toFixed(1)} second motion beat that starts from this narration: ${narration}`,
+    ]),
+    buildMarkdownSection('Concept Direction', buildConceptDirectionLines(draft.contentType, 'motion')),
+    buildMarkdownSection('Motion Rules', [
+      buildFreshIdeaRule('motion'),
+      `Use ${direction.shotType}. ${direction.cameraLanguage}`,
+      `Movement focus: ${direction.transitionBeat}`,
+      `Lighting: ${direction.lightingDirection}. Palette: ${direction.paletteDirection}.`,
+      buildLipSyncGuide(draft),
+      buildVisualTextureGuide(draft),
+      buildActionPriorityGuide(draft),
+      'Show one clear action or emotional shift, keep the main subject readable, and avoid subtitle dependence or watermark.',
+      'Keep character identity and visual continuity consistent with the previous and next scenes.',
+    ]),
+    buildMarkdownSection('Transition Rules', buildTransitionIntentLines(draft.contentType, 'motion')),
+    buildMarkdownSection('Similarity Control', buildSimilarityControlLines()),
+    buildMarkdownSection('Do Not', [buildNoTextVisualGuide()]),
+  ]);
 }
 
 function buildMuteVideoPrompt(narration: string, sceneNumber: number, draft: WorkflowDraft, targetDuration: number) {
   const direction = createCreativeDirection(`${draft.contentType}:motion:${sceneNumber}:${narration}`, sceneNumber, draft.contentType);
   const style = getContentModeGuide(draft);
-  return [
-    `${style}. Scene ${sceneNumber}.`,
-    `Create a ${targetDuration.toFixed(1)} second motion beat with no spoken dialogue or narration.`,
-    `Base the action on this visual beat: ${narration}`,
-    buildFreshIdeaRule('motion'),
-    `Use ${direction.shotType}. ${direction.cameraLanguage}`,
-    `Movement focus: ${direction.transitionBeat}`,
-    `Lighting: ${direction.lightingDirection}. Palette: ${direction.paletteDirection}.`,
-    buildVisualTextureGuide(draft),
-    'The motion must read clearly even on mute, relying on body movement, object interaction, environment change, rhythm, and camera movement only.',
-    'No lip-synced speech, no subtitle dependence, no text overlay, keep character identity consistent across scenes.',
-  ].join(' ');
+  return joinPromptBlocks([
+    buildMarkdownSection('Goal', [
+      `${style}. Scene ${sceneNumber}.`,
+      `Create a ${targetDuration.toFixed(1)} second motion beat with no spoken dialogue or narration.`,
+      `Base the action on this visual beat: ${narration}`,
+    ]),
+    buildMarkdownSection('Concept Direction', buildConceptDirectionLines(draft.contentType, 'motion')),
+    buildMarkdownSection('Motion Rules', [
+      buildFreshIdeaRule('motion'),
+      `Use ${direction.shotType}. ${direction.cameraLanguage}`,
+      `Movement focus: ${direction.transitionBeat}`,
+      `Lighting: ${direction.lightingDirection}. Palette: ${direction.paletteDirection}.`,
+      buildVisualTextureGuide(draft),
+      buildActionPriorityGuide(draft),
+      'The motion must read clearly even on mute, relying on body movement, object interaction, environment change, rhythm, and camera movement only.',
+      'No lip-synced speech, no subtitle dependence, no text overlay, keep character identity consistent across scenes.',
+    ]),
+    buildMarkdownSection('Transition Rules', buildTransitionIntentLines(draft.contentType, 'motion')),
+    buildMarkdownSection('Similarity Control', buildSimilarityControlLines()),
+    buildMarkdownSection('Do Not', [buildNoTextVisualGuide()]),
+  ]);
+}
+
+function compactPromptText(value?: string | null, max = 420) {
+  const normalized = `${value || ''}`.replace(/\s+/g, ' ').trim();
+  if (!normalized) return '';
+  if (normalized.length <= max) return normalized;
+
+  const sliced = normalized.slice(0, max).trim();
+  const punctuationIndex = Math.max(
+    sliced.lastIndexOf('.'),
+    sliced.lastIndexOf('!'),
+    sliced.lastIndexOf('?'),
+    sliced.lastIndexOf(','),
+    sliced.lastIndexOf(';'),
+  );
+
+  return `${(punctuationIndex > Math.floor(max * 0.55) ? sliced.slice(0, punctuationIndex + 1) : sliced).trim()}...`;
+}
+
+function buildRolePromptExecutionText(bundle?: WorkflowRolePromptBundle | null, max = 420) {
+  if (!bundle) return '';
+  const sectionSummary = bundle.sections
+    ? Object.values(bundle.sections).filter(Boolean).join(' ')
+    : '';
+  return compactPromptText(bundle.finalPrompt || sectionSummary || bundle.basePrompt, max);
 }
 
 function buildAutoMuteScene(draft: WorkflowDraft, index: number, total: number): ScriptScene {
@@ -225,6 +292,7 @@ export function createLocalScenesFromDraft(draft: WorkflowDraft): ScriptScene[] 
 }
 
 export function buildSelectedPromptContextFromDraft(draft: WorkflowDraft) {
+  const rolePrompts = draft.promptStore?.rolePrompts || null;
   const resolvedCharacterIds = (draft.selectedCharacterIds && draft.selectedCharacterIds.length)
     ? draft.selectedCharacterIds
     : (draft.extractedCharacters || []).map((item) => item.id);
@@ -254,15 +322,15 @@ export function buildSelectedPromptContextFromDraft(draft: WorkflowDraft) {
 
   return {
     characterPromptBlock,
-    characterStylePrompt: draft.selectedCharacterStylePrompt || '',
+    characterStylePrompt: buildRolePromptExecutionText(rolePrompts?.character, 420) || draft.selectedCharacterStylePrompt || '',
     characterStyleLabel: draft.selectedCharacterStyleLabel || '',
-    stylePrompt: selectedStyle?.prompt || '',
+    stylePrompt: buildRolePromptExecutionText(rolePrompts?.style, 320) || selectedStyle?.prompt || '',
     styleLabel: selectedStyle?.groupLabel || selectedStyle?.label || '',
     promptTemplateName: selectedPromptTemplate?.name || '',
-    promptTemplatePrompt: selectedPromptTemplate?.prompt || '',
-    scenePrompt: draft.promptPack?.scenePrompt || '',
-    actionPrompt: draft.promptPack?.actionPrompt || '',
-    storyPrompt: draft.promptPack?.storyPrompt || '',
+    promptTemplatePrompt: buildRolePromptExecutionText(rolePrompts?.script, 720) || selectedPromptTemplate?.prompt || '',
+    scenePrompt: buildRolePromptExecutionText(rolePrompts?.scene, 620) || draft.promptPack?.scenePrompt || '',
+    actionPrompt: buildRolePromptExecutionText(rolePrompts?.video, 420) || draft.promptPack?.actionPrompt || '',
+    storyPrompt: buildRolePromptExecutionText(rolePrompts?.script, 620) || draft.promptPack?.storyPrompt || '',
   };
 }
 
@@ -281,58 +349,69 @@ export function applySelectionPromptsToScenes(scenes: ScriptScene[], draft: Work
     const nextScene = scenes[index + 1];
     const direction = createCreativeDirection(`${draft.contentType}:${scene.sceneNumber}:${scene.narration}`, index, draft.contentType);
     const dialogueTransitionGuide = buildDialogueTransitionGuide(scene.narration, previousScene?.narration);
-    const visualPrompt = [
-      scene.imagePrompt || scene.visualPrompt,
-      '[SCENE CORE] Treat the exact instant, emotion, and action in this narration as the top priority. Focus on one decisive beat instead of summarizing the whole project.',
-      promptContext.characterPromptBlock ? `[CHARACTER CONTINUITY]
-${promptContext.characterPromptBlock}` : '',
-      promptContext.stylePrompt ? `[STYLE CONTINUITY]
-${promptContext.stylePrompt}` : '',
-      selectionSummary,
-      promptContext.promptTemplateName ? `[SELECTED SCRIPT TEMPLATE] ${promptContext.promptTemplateName}` : '',
-      promptContext.scenePrompt ? `[SCENE PROMPT]
-${promptContext.scenePrompt}` : '',
-      promptContext.actionPrompt ? `[ACTION HINT]
-${promptContext.actionPrompt}` : '',
-      !promptContext.scenePrompt && promptContext.storyPrompt ? `[STORY PROMPT]
-${promptContext.storyPrompt}` : '',
-      draft.contentType === 'music_video' ? '[MUSIC VIDEO IMAGE RULE] One image = one key moment. Keep scene order chronological. When a character appears, prefer the phrase based on reference images instead of rewriting appearance in detail. Avoid readable signs, logo-like graphics, and unnecessary background clutter unless the story explicitly needs them.' : '',
-      promptContext.styleLabel ? `[STYLE LABEL] ${promptContext.styleLabel}` : '',
-      buildFreshIdeaRule('scene'),
-      `[SCENE ANGLE] ${direction.narrativeAngle}`,
-      `[SHOT TYPE] ${direction.shotType}`,
-      `[LIGHTING / PALETTE] ${direction.lightingDirection} / ${direction.paletteDirection}`,
-      `[VISUAL HOOK] ${direction.visualHook}`,
-      previousScene?.narration ? `[PREVIOUS SCENE CONTEXT] ${previousScene.narration}` : '',
-      nextScene?.narration ? `[NEXT SCENE CONTEXT] ${nextScene.narration}` : '',
-      dialogueTransitionGuide ? `[DIALOGUE TRANSITION] ${dialogueTransitionGuide}` : '',
-      `[SCENE RULE] Scene ${index + 1} must keep the selected character roles, selected prompt template, and selected style prompt consistent, but it must not reuse the exact same framing or visual hook as the previous scene.`,
-      '[SCRIPT ALIGNMENT] Match the exact script beat, emotion, and moment order from the narration. Do not invent a different event or unrelated action.',
-      draft.contentType === 'music_video' ? `[MOTION RULE] Motion for scene ${index + 1} should feel like one short, copy-ready action line. Avoid restating clothing, hairstyle, or background details unless absolutely necessary.` : '',
-    ]
-      .filter(Boolean)
-      .join('\n\n');
+    const visualPrompt = joinPromptBlocks([
+      buildMarkdownSection('Scene Goal', [
+        scene.imagePrompt || scene.visualPrompt,
+        'Treat the exact instant, emotion, and action in this narration as the top priority.',
+        'Focus on one decisive beat instead of summarizing the whole project.',
+      ], { bullet: false }),
+      buildMarkdownSection('Concept Direction', buildConceptDirectionLines(draft.contentType, 'scene')),
+      promptContext.characterPromptBlock ? buildMarkdownSection('Character Continuity', [promptContext.characterPromptBlock], { bullet: false }) : '',
+      promptContext.stylePrompt ? buildMarkdownSection('Style Continuity', [promptContext.stylePrompt], { bullet: false }) : '',
+      buildMarkdownSection('Project Context', [selectionSummary], { bullet: false }),
+      promptContext.promptTemplateName ? buildMarkdownSection('Selected Script Template', [promptContext.promptTemplateName], { bullet: false }) : '',
+      promptContext.storyPrompt ? buildMarkdownSection('Script Role', [promptContext.storyPrompt], { bullet: false }) : '',
+      promptContext.scenePrompt ? buildMarkdownSection('Scene Role', [promptContext.scenePrompt], { bullet: false }) : '',
+      promptContext.actionPrompt ? buildMarkdownSection('Action Hint', [promptContext.actionPrompt], { bullet: false }) : '',
+      buildMarkdownSection('Scene Rules', [
+        buildActionPriorityGuide(draft),
+        draft.contentType === 'music_video' ? 'One image equals one key moment. Keep scene order chronological and prefer reference-based identity continuity.' : '',
+        promptContext.styleLabel ? `Style label: ${promptContext.styleLabel}` : '',
+        buildFreshIdeaRule('scene'),
+        `Scene angle: ${direction.narrativeAngle}`,
+        `Shot type: ${direction.shotType}`,
+        `Lighting / palette: ${direction.lightingDirection} / ${direction.paletteDirection}`,
+        `Visual hook: ${direction.visualHook}`,
+        `Scene ${index + 1} must keep the selected character roles, selected prompt template, and selected style prompt consistent without reusing the exact same framing or visual hook as the previous scene.`,
+        'Match the exact script beat, emotion, and moment order from the narration. Do not invent a different event or unrelated action.',
+      ]),
+      previousScene?.narration ? buildMarkdownSection('Previous Scene Context', [previousScene.narration], { bullet: false }) : '',
+      nextScene?.narration ? buildMarkdownSection('Next Scene Context', [nextScene.narration], { bullet: false }) : '',
+      dialogueTransitionGuide ? buildMarkdownSection('Dialogue Transition', [dialogueTransitionGuide], { bullet: false }) : '',
+      buildMarkdownSection('Transition Rules', buildTransitionIntentLines(draft.contentType, 'scene')),
+      buildMarkdownSection('Similarity Control', buildSimilarityControlLines()),
+      buildMarkdownSection('Do Not', [buildNoTextVisualGuide()]),
+    ]);
 
-    const imagePrompt = [
+    const imagePrompt = joinPromptBlocks([
       visualPrompt,
-      '[IMAGE MOMENT] Build the frame around the strongest visual beat from this exact narration, while keeping the selected tone and story flow intact.',
-      dialogueTransitionGuide ? '[IMAGE DIALOGUE RULE] If speech starts here, prefer a frame that feels like the breath right before the first spoken word or the exact instant the first line lands.' : '',
-    ]
-      .filter(Boolean)
-      .join('\n\n');
+      buildMarkdownSection('Image Moment', [
+        'Build the frame around the strongest visual beat from this exact narration while keeping the selected tone and story flow intact.',
+        dialogueTransitionGuide ? 'If speech starts here, prefer a frame that feels like the breath right before the first spoken word or the exact instant the first line lands.' : '',
+      ]),
+    ]);
 
-    const videoPrompt = [
-      scene.videoPrompt || '',
-      promptContext.actionPrompt ? `[ACTION PROMPT]\n${promptContext.actionPrompt}` : '',
-      promptContext.characterPromptBlock ? `[CHARACTER CONTINUITY]\n${promptContext.characterPromptBlock}` : '',
-      promptContext.stylePrompt ? `[STYLE CONTINUITY]\n${promptContext.stylePrompt}` : '',
-      previousScene?.narration ? `[PREVIOUS SCENE CONTEXT] ${previousScene.narration}` : '',
-      nextScene?.narration ? `[NEXT SCENE CONTEXT] ${nextScene.narration}` : '',
-      dialogueTransitionGuide ? `[DIALOGUE TRANSITION] ${dialogueTransitionGuide}` : '',
-      '[VIDEO ALIGNMENT] Keep motion, screen transition timing, and emotional emphasis locked to this script beat. Transitions must feel motivated by narration or dialogue timing, not random movement.',
-    ]
-      .filter(Boolean)
-      .join('\n\n');
+    const videoPrompt = joinPromptBlocks([
+      buildMarkdownSection('Motion Goal', [
+        scene.videoPrompt || '',
+      ], { bullet: false }),
+      buildMarkdownSection('Concept Direction', buildConceptDirectionLines(draft.contentType, 'motion')),
+      promptContext.storyPrompt ? buildMarkdownSection('Script Role', [promptContext.storyPrompt], { bullet: false }) : '',
+      promptContext.actionPrompt ? buildMarkdownSection('Action Role', [promptContext.actionPrompt], { bullet: false }) : '',
+      promptContext.characterPromptBlock ? buildMarkdownSection('Character Continuity', [promptContext.characterPromptBlock], { bullet: false }) : '',
+      promptContext.stylePrompt ? buildMarkdownSection('Style Continuity', [promptContext.stylePrompt], { bullet: false }) : '',
+      buildMarkdownSection('Motion Rules', [
+        buildActionPriorityGuide(draft),
+        'Keep motion, screen transition timing, and emotional emphasis locked to this script beat.',
+        'Transitions must feel motivated by narration or dialogue timing, not random movement.',
+      ]),
+      previousScene?.narration ? buildMarkdownSection('Previous Scene Context', [previousScene.narration], { bullet: false }) : '',
+      nextScene?.narration ? buildMarkdownSection('Next Scene Context', [nextScene.narration], { bullet: false }) : '',
+      dialogueTransitionGuide ? buildMarkdownSection('Dialogue Transition', [dialogueTransitionGuide], { bullet: false }) : '',
+      buildMarkdownSection('Transition Rules', buildTransitionIntentLines(draft.contentType, 'motion')),
+      buildMarkdownSection('Similarity Control', buildSimilarityControlLines()),
+      buildMarkdownSection('Do Not', [buildNoTextVisualGuide()]),
+    ]);
 
     return {
       ...scene,

@@ -18,18 +18,25 @@
 - 문단별 이미지와 영상은 서로 분리된 결과가 아니라 같은 씬의 연속 작업으로 다룹니다.
 - 대본 / 캐릭터 / 스타일 / 장면 / 영상 / 배경음 / 썸네일 프롬프트를 섞지 않고 `rolePrompts`로 역할별 분리 저장합니다.
 - Step6 저장 시 `workflowDraft.promptStore.rolePrompts`와 `project.prompts.rolePrompts`가 함께 갱신되어야 저장/복원/내보내기/썸네일 진입 시 같은 기준을 재사용할 수 있습니다.
+- `rolePrompts`는 저장 구조만의 필드가 아니라 Step3 실행 prompt 추가 문맥과 Step6 씬 prompt 조립의 1차 소스여야 합니다.
+- 긴 Step3 AI 대본은 한 번에 큰 본문을 요청하지 않고, 현재 draft 문맥 요약과 세그먼트 phase guide를 이용해 여러 구간으로 이어 쓰는 구조를 유지합니다.
 
 ## 실제 로직 맵
 - Step1~5 프롬프트 상세 규칙: `workflowPromptBuilder.ts`
   - 대본, 캐릭터, 씬, 액션, 썸네일 연계 규칙을 한 번에 묶습니다.
 - 역할별 최종 prompt 번들 + Step 연결 요약: `workflowStepContractService.ts`
   - `rolePrompts`에 역할별 base/final prompt와 step source를 넣고, Step6 summary/export JSON까지 연결합니다.
+- Step3 실제 대본 생성 입력: `InputSection.tsx` + `scriptComposerService.ts`
+  - 최신 draft에서 계산한 `rolePrompts`를 compact한 `promptAdditions`로 변환해 실제 모델 요청에 넣습니다.
+  - 긴 분량은 세그먼트 continuation helper로 분할 생성하고 마지막에만 전체 길이를 맞춥니다.
 - Step2 추천 새로움: `storyRecommendationService.ts`
   - 최근 추천 히스토리를 보고 같은 주제여도 새 표현을 우선합니다.
 - Step4 캐릭터 유사 재생성: `InputSection.tsx` + `characterStudioService.ts`
   - 업로드 이미지는 이미지 기반 설명으로 흡수하고, `비슷하게 재생성`은 `similar` 모드로만 생성합니다.
-- Step6 씬 이미지/영상: `SceneStudioPage.tsx` + `imageService.ts` + `ResultTable.tsx`
+- Step6 씬 이미지/영상: `sceneAssemblyService.ts` + `SceneStudioPage.tsx` + `imageService.ts` + `ResultTable.tsx`
+  - Step6 씬 prompt 조립은 `workflowDraft.promptStore.rolePrompts`를 우선 사용하고, 필요한 부분만 compact하게 잘라 토큰을 억제합니다.
   - 이미지 프롬프트는 새 컷을 만들되 영상 시작 프레임으로 쓰기 좋게 만들고, 영상 프롬프트는 현재 이미지와 이전/다음 씬을 함께 참고합니다.
+  - 배경 텍스트가 메인이 되지 않도록 간판/포스터/UI/라벨/로고/자막 생성 금지 규칙을 공통으로 유지합니다.
 - 배경음: `musicService.ts`
   - Step2 분위기, Step3 대본 감정, Step6 scene flow를 따로 묶어 `backgroundMusicPromptSections`와 최종 prompt로 저장합니다.
 - 썸네일: `thumbnailService.ts`
@@ -42,7 +49,18 @@
 - 상세 연결용: `workflowDraft.promptStore`
   - `stepPrompts`는 Step 편집 재진입용
   - `finalPrompts`는 Step6에서 실제로 묶인 최종 대본/이미지/영상 prompt
-  - `rolePrompts`는 역할별 분리 저장과 export 요약용
+  - `rolePrompts`는 역할별 분리 저장, Step3 실행 추가 문맥, Step6 씬 prompt 조립, export 요약용
+
+## 개별 수정 경로
+- 전역 Step1~5 시스템 prompt 규칙: `lib/mp4Creater/services/workflowPromptBuilder.ts`
+- 역할별 prompt 번들 조립과 `finalPrompt` 우선순위: `lib/mp4Creater/services/workflowStepContractService.ts`
+- Step3 실행 시 `rolePrompts`를 모델 입력에 붙이는 경로: `lib/mp4Creater/components/InputSection.tsx`
+- Step3 실제 API 요청 본문 조립: `lib/mp4Creater/services/scriptComposerService.ts`
+- Step6 씬별 이미지/영상 prompt 조립: `lib/mp4Creater/services/sceneAssemblyService.ts`
+- Step6 이미지 생성 래퍼: `lib/mp4Creater/services/imageService.ts`
+- Step6 영상/모션 생성 트리거: `lib/mp4Creater/pages/SceneStudioPage.tsx`
+- 배경음 prompt 조립: `lib/mp4Creater/services/musicService.ts`
+- 썸네일 대표 prompt 조립: `lib/mp4Creater/services/thumbnailService.ts`
 
 ## 점검 포인트
 - Step2 추천이 연속 클릭 때도 같은 문구로 고정되지 않는지
@@ -66,3 +84,39 @@
 - Snapshot persistence: `lib/mp4Creater/services/sceneStudioSnapshotCache.ts`
 - Navigation handoff cache: `lib/mp4Creater/services/projectNavigationCache.ts`
 - Project import snapshot rebuild: `lib/mp4Creater/services/projectService.ts`
+
+## Step6 Tab AI Paths
+- Tab-level prompt templates: `lib/mp4Creater/services/sceneEditorPromptService.ts`
+- This file controls the AI prompt that rewrites only one Step6 field at a time.
+- `narration` mode controls spoken scene text generation.
+- `image` mode controls image prompt text regeneration.
+- `video` mode controls motion prompt text regeneration.
+- Continuity source: current scene + previous scene + next scene + compact `workflowDraft.promptStore.rolePrompts`.
+- Step6 UI button path: `lib/mp4Creater/components/ResultTable.tsx`
+- Step6 execution/model routing path: `lib/mp4Creater/pages/SceneStudioPage.tsx`
+- Keep this path separate from media generation. It rewrites prompt text only and must not auto-trigger image/video/audio generation.
+
+## Latest Markdown Prompt Chain
+- Active shared markdown helper path: `lib/mp4Creater/services/promptMarkdown.ts`
+- Global prompt-pack composition path: `lib/mp4Creater/services/workflowPromptBuilder.ts`
+- Step3 live request payload path: `lib/mp4Creater/services/scriptComposerService.ts`
+- Step3 role-prompt merge path: `lib/mp4Creater/components/InputSection.tsx`
+- Step6 scene image/video continuity assembly path: `lib/mp4Creater/services/sceneAssemblyService.ts`
+- Step6 image generation payload path: `lib/mp4Creater/services/imageService.ts`
+- Step6 motion fallback/base prompt path: `lib/mp4Creater/services/geminiService.ts`
+- Step6 final motion handoff path: `lib/mp4Creater/pages/SceneStudioPage.tsx`
+- Background music prompt assembly path: `lib/mp4Creater/services/musicService.ts`
+- Thumbnail representative-cut prompt path: `lib/mp4Creater/services/thumbnailService.ts`
+
+## Prompt Structure Rules
+- Prompt strings should now prefer markdown sections such as `# Goal`, `## Concept Direction`, `## Writing Rules`, `## Transition Rules`, `## Similarity Control`, and `## Do Not`.
+- The markdown structure exists for model parsing quality, not visual prettiness.
+- Step3, Step6 scene prompts, thumbnail prompts, and background-music prompts should keep the same hierarchy style so maintenance stays predictable.
+- Concept fit must be obvious in output quality:
+- `music_video`: rhythm, hook, performance, mood, visual punch
+- `cinematic`: atmosphere, composition, lingering emotion, motivated transition
+- `info_delivery`: clarity, structure, explanation readability, viewer understanding
+- `story`: event flow, character reaction, emotional continuity, scene progression
+- Freedom must remain inside the concept. Do not turn concept alignment into rigid repeated templates.
+- Similarity should only tighten when the user explicitly asks for a similar result.
+- Paragraph endings and scene endings should leave a natural handoff into the next beat instead of hard-stopping by default.

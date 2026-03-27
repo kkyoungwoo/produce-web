@@ -1,4 +1,5 @@
 import { CONFIG } from '../config';
+import { resolveGoogleAiStudioApiKey } from './googleAiStudioService';
 import { runOpenRouterText } from './openRouterService';
 
 export async function runTextAi(options: {
@@ -9,11 +10,7 @@ export async function runTextAi(options: {
   temperature?: number;
   fallback: string;
 }): Promise<{ text: string; source: 'ai' | 'sample' }> {
-  const apiKey =
-    (typeof window !== 'undefined' && localStorage.getItem(CONFIG.STORAGE_KEYS.OPENROUTER_API_KEY)) ||
-    process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
-    process.env.NEXT_PUBLIC_OPENROUTER_API_KEY ||
-    '';
+  const apiKey = resolveGoogleAiStudioApiKey();
 
   if (!apiKey) return { text: options.fallback, source: 'sample' };
 

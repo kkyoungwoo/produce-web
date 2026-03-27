@@ -1,6 +1,14 @@
 import { CONFIG } from '../config';
 import { AiRoutingSettings, SavedProject, WorkflowDraft } from '../types';
 
+function normalizeBackgroundMusicModel(modelId?: string | null) {
+  const normalized = `${modelId || ''}`.trim();
+  if (normalized === 'sample-cinematic-v1' || normalized === 'sample-news-v1') {
+    return 'sample-ambient-v1';
+  }
+  return normalized || CONFIG.DEFAULT_BGM_MODEL;
+}
+
 /**
  * 프로젝트별 AI 설정 스냅샷
  * - 설정창에서 저장한 현재 라우팅 값을 프로젝트에도 같이 남겨 둡니다.
@@ -19,7 +27,7 @@ export function buildProjectSettingsSnapshot(options: {
   const audioModel = routing.elevenLabsModelId || routing.audioModel || fallback.elevenLabsModel || CONFIG.DEFAULT_ELEVENLABS_MODEL;
   const imageModel = routing.imageModel || fallback.imageModel || CONFIG.DEFAULT_IMAGE_MODEL;
   const videoModel = routing.videoModel || fallback.videoModel || CONFIG.DEFAULT_VIDEO_MODEL;
-  const backgroundMusicModel = routing.backgroundMusicModel || fallback.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL;
+  const backgroundMusicModel = normalizeBackgroundMusicModel(routing.backgroundMusicModel || fallback.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL);
   const backgroundMusicProvider = backgroundMusicModel === 'lyria-002'
     ? 'google'
     : (routing.backgroundMusicProvider || fallback.backgroundMusicProvider || 'sample');
@@ -40,6 +48,9 @@ export function buildProjectSettingsSnapshot(options: {
     chatterboxVoicePreset: routing.chatterboxVoicePreset || fallback.chatterboxVoicePreset || 'chatterbox-clear',
     elevenLabsVoiceId: routing.elevenLabsVoiceId || fallback.elevenLabsVoiceId || null,
     heygenVoiceId: routing.heygenVoiceId || fallback.heygenVoiceId || null,
+    voiceReferenceAudioData: routing.voiceReferenceAudioData || fallback.voiceReferenceAudioData || null,
+    voiceReferenceMimeType: routing.voiceReferenceMimeType || fallback.voiceReferenceMimeType || null,
+    voiceReferenceName: routing.voiceReferenceName || fallback.voiceReferenceName || null,
     backgroundMusicProvider,
     backgroundMusicModel,
     musicVideoProvider: routing.musicVideoProvider || fallback.musicVideoProvider || 'sample',
@@ -57,7 +68,7 @@ export function applyProjectSettingsToRouting(baseRouting: AiRoutingSettings, se
   const scriptModel = settings.scriptModel || baseRouting.scriptModel || baseRouting.textModel || CONFIG.DEFAULT_SCRIPT_MODEL;
   const sceneModel = settings.sceneModel || baseRouting.sceneModel || baseRouting.imagePromptModel || scriptModel;
   const elevenLabsModel = settings.elevenLabsModel || baseRouting.elevenLabsModelId || baseRouting.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL;
-  const backgroundMusicModel = settings.backgroundMusicModel || baseRouting.backgroundMusicModel;
+  const backgroundMusicModel = normalizeBackgroundMusicModel(settings.backgroundMusicModel || baseRouting.backgroundMusicModel);
   const backgroundMusicProvider = backgroundMusicModel === 'lyria-002'
     ? 'google'
     : (settings.backgroundMusicProvider || baseRouting.backgroundMusicProvider);
@@ -81,6 +92,9 @@ export function applyProjectSettingsToRouting(baseRouting: AiRoutingSettings, se
     chatterboxVoicePreset: settings.chatterboxVoicePreset || baseRouting.chatterboxVoicePreset,
     elevenLabsVoiceId: settings.elevenLabsVoiceId ?? baseRouting.elevenLabsVoiceId,
     heygenVoiceId: settings.heygenVoiceId ?? baseRouting.heygenVoiceId,
+    voiceReferenceAudioData: settings.voiceReferenceAudioData ?? baseRouting.voiceReferenceAudioData,
+    voiceReferenceMimeType: settings.voiceReferenceMimeType ?? baseRouting.voiceReferenceMimeType,
+    voiceReferenceName: settings.voiceReferenceName ?? baseRouting.voiceReferenceName,
     backgroundMusicProvider,
     backgroundMusicModel,
     musicVideoProvider: settings.musicVideoProvider || baseRouting.musicVideoProvider,

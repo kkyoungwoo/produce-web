@@ -4,7 +4,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AnimatePresence, motion, type Transition } from 'framer-motion';
 import { SavedProject } from '../types';
-import { formatKRW } from '../config';
 import { rememberProjectNavigationProject } from '../services/projectNavigationCache';
 import { resolveAssetPlaybackDuration } from '../services/projectEnhancementService';
 import { buildProjectsExportPayload, getProjectById } from '../services/projectService';
@@ -32,6 +31,12 @@ const clampProjectName = (value: string) => value.slice(0, getProjectNameLimit(v
 const getProjectCreatedAt = (project: SavedProject) => (
   typeof project?.createdAt === 'number' ? project.createdAt : 0
 );
+
+const formatUsdCost = (value?: number | null) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return null;
+  if (value <= 0) return '$0.00';
+  return `$${value.toFixed(value < 0.01 ? 4 : value < 1 ? 3 : 2)}`;
+};
 
 const getNextAutoProjectName = (projects: SavedProject[]) => {
   const usedNumbers = new Set(
@@ -386,6 +391,7 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
   const renderProjectCard = (project: SavedProject) => {
     const thumbSrc = resolveImageSrc(resolveProjectCardThumbnail(project));
     const totalCost = project.cost?.total;
+    const formattedTotalCost = formatUsdCost(totalCost);
     const cardBackground = resolveThumbnailBackground(project);
     const completedMinutes = getCompletedMinutesLabel(project);
     const isChecked = selectedProjectIds.includes(project.id);
@@ -501,9 +507,9 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                 </span>
               ) : null}
 
-              {totalCost !== undefined ? (
+              {formattedTotalCost ? (
                 <span className="rounded-full border border-blue-100 bg-white px-2.5 py-1 font-bold text-blue-700">
-                  {formatKRW(totalCost)}
+                  {`Est. ${formattedTotalCost}`}
                 </span>
               ) : null}
             </div>

@@ -8,6 +8,13 @@ import {
 import { getScriptGenerationPrompt } from './prompts';
 import { runTextAi } from './textAiService';
 import { buildCreativeDirectionBlock, createCreativeDirection } from '../config/creativeVariance';
+import {
+  buildConceptDirectionLines,
+  buildMarkdownSection,
+  buildSimilarityControlLines,
+  buildTransitionIntentLines,
+  joinPromptBlocks,
+} from './promptMarkdown';
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -215,22 +222,34 @@ export const splitSubtitleByMeaning = async (
 
 export const generateMotionPrompt = async (
   narration: string,
-  visualPrompt: string
+  visualPrompt: string,
+  contentType: ContentType = 'story'
 ): Promise<string> => {
   await wait(60);
   const trimmedNarration = narration.replace(/\s+/g, ' ').trim().slice(0, 220);
   const trimmedVisual = extractMotionAnchor(visualPrompt, 420);
-  const direction = createCreativeDirection(`${trimmedNarration}:${trimmedVisual}`, 0);
-  return [
-    'Create a fresh motion treatment unless the user explicitly requested something similar.',
-    'Start from one precise scene beat instead of summarizing the whole sequence.',
-    `Motion style: ${direction.transitionBeat}`,
-    `Camera language: ${direction.cameraLanguage}`,
-    `Lighting continuity: ${direction.lightingDirection}.`,
-    'Keep the character identity and selected art style consistent, but avoid a copy-paste motion loop.',
-    trimmedNarration ? `Emotion cue: ${trimmedNarration}.` : '',
-    trimmedVisual ? `Scene anchor: ${trimmedVisual}.` : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
+  const direction = createCreativeDirection(`${trimmedNarration}:${trimmedVisual}`, 0, contentType);
+  return joinPromptBlocks([
+    buildMarkdownSection('Goal', [
+      'Create a production-ready motion treatment for one short-form video scene.',
+      'Start from one precise scene beat instead of summarizing the whole sequence.',
+    ]),
+    buildMarkdownSection('Concept Direction', buildConceptDirectionLines(contentType, 'motion')),
+    buildMarkdownSection('Motion Rules', [
+      'Prioritize visible action, body movement, reaction, and timing over text-bearing props or written details.',
+      `Motion style: ${direction.transitionBeat}`,
+      `Camera language: ${direction.cameraLanguage}`,
+      `Lighting continuity: ${direction.lightingDirection}.`,
+      'Keep the character identity and selected art style consistent, but avoid a copy-paste motion loop.',
+    ]),
+    buildMarkdownSection('Transition Rules', buildTransitionIntentLines(contentType, 'motion')),
+    buildMarkdownSection('Similarity Control', buildSimilarityControlLines()),
+    buildMarkdownSection('Scene Anchor', [
+      trimmedNarration ? `Emotion cue: ${trimmedNarration}.` : '',
+      trimmedVisual ? `Scene anchor: ${trimmedVisual}.` : '',
+    ], { bullet: false }),
+    buildMarkdownSection('Do Not', [
+      'Do not introduce readable text, subtitles, signage, labels, posters, UI, logo marks, or typography into the shot.',
+    ]),
+  ]);
 };

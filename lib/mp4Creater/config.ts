@@ -1,6 +1,6 @@
 /**
  * TubeGen AI 전역 설정 파일
- * 민감한 API 키는 여기 직접 넣지 않고 설정 화면에서 입력하도록 유지합니다.
+ * 민감한 API 키는 여기에 직접 넣지 않고 설정 화면에서 입력하도록 둡니다.
  */
 
 export const IMAGE_MODELS = [
@@ -10,7 +10,7 @@ export const IMAGE_MODELS = [
     provider: '샘플',
     tier: 'free',
     pricePerImage: 0,
-    description: 'API 키 없이도 흐름을 확인할 수 있는 샘플 이미지',
+    description: 'API 없이도 흐름과 결과 형태를 확인할 수 있는 샘플 이미지',
     speed: '즉시',
   },
   {
@@ -28,7 +28,7 @@ export const IMAGE_MODELS = [
     provider: 'Google AI Studio',
     tier: 'paid',
     pricePerImage: 0.039,
-    description: 'Nano Banana 2 계열, 범용 밸런스가 좋은 이미지 생성',
+    description: '범용 밸런스가 좋은 이미지 생성 모델',
     speed: '보통',
   },
   {
@@ -37,7 +37,7 @@ export const IMAGE_MODELS = [
     provider: 'Google AI Studio',
     tier: 'paid',
     pricePerImage: 0.06,
-    description: '정교한 지시와 고품질 자산 제작용 이미지 생성',
+    description: '정교한 지시와 고품질 묘사에 강한 이미지 생성 모델',
     speed: '보통',
   },
 ] as const;
@@ -61,11 +61,11 @@ export const VIDEO_MODEL_OPTIONS = [
 export const GEMINI_STYLE_CATEGORIES = [
   {
     id: 'main',
-    name: '기본 화풍',
+    name: '기본 스타일',
     styles: [
       {
         id: 'gemini-none',
-        name: '자동 추천 안 함',
+        name: '자동 추천 없음',
         prompt: '',
       },
     ],
@@ -106,12 +106,12 @@ export function formatKRW(usd: number): string {
 }
 
 export const ELEVENLABS_MODELS = [
-  { id: 'eleven_multilingual_v2', name: '다국어 v2', description: '다국어 29개, 안정적인 기본 모델', supportsTimestamp: true },
-  { id: 'eleven_v3', name: 'Eleven v3', description: '최신 모델, 70개 언어 지원, 표현력 강화', supportsTimestamp: true },
+  { id: 'eleven_multilingual_v2', name: '다국어 v2', description: '다국어 29개 언어를 지원하는 안정적인 기본 모델', supportsTimestamp: true },
+  { id: 'eleven_v3', name: 'Eleven v3', description: '최신 모델, 70개 언어 지원과 표현력 강화', supportsTimestamp: true },
   { id: 'eleven_turbo_v2_5', name: '터보 v2.5', description: '빠른 속도, 32개 언어 지원', supportsTimestamp: true },
   { id: 'eleven_flash_v2_5', name: '플래시 v2.5', description: '초고속 응답, 32개 언어 지원', supportsTimestamp: true },
   { id: 'eleven_turbo_v2', name: '터보 v2', description: '빠른 속도, 영어 최적화', supportsTimestamp: true },
-  { id: 'eleven_monolingual_v1', name: '영어 전용 v1', description: '영어 전용 레거시 모델', supportsTimestamp: false },
+  { id: 'eleven_monolingual_v1', name: '영어 전용 v1', description: '영어 전용 구형 모델', supportsTimestamp: false },
 ] as const;
 
 export type ElevenLabsModelId = typeof ELEVENLABS_MODELS[number]['id'];
@@ -126,6 +126,8 @@ export const CHATTERBOX_TTS_PRESET_OPTIONS = [
   { id: 'chatterbox-warm', name: 'Chatterbox 웜' },
 ] as const;
 
+export const CHATTERBOX_CUSTOM_VOICE_ID = 'chatterbox-custom-reference';
+
 export const NO_AI_SCRIPT_MODEL_ID = 'no-ai-model';
 
 export const TTS_NARRATOR_OPTIONS = [
@@ -135,18 +137,17 @@ export const TTS_NARRATOR_OPTIONS = [
 ] as const;
 
 export const BGM_MODEL_OPTIONS = [
-  { id: 'sample-ambient-v1', name: '샘플 앰비언트 v1' },
-  { id: 'sample-cinematic-v1', name: '샘플 시네마틱 v1' },
-  { id: 'sample-news-v1', name: '샘플 뉴스 v1' },
-  { id: 'elevenlabs-music-auto', name: 'ElevenLabs 음악 자동 선택' },
+  { id: 'sample-ambient-v1', name: '샘플 배경음 v1' },
+  { id: 'lyria-002', name: 'Google Lyria 2' },
+  { id: 'elevenlabs-music-auto', name: 'ElevenLabs 자동 배경음' },
 ] as const;
 
 export const ELEVENLABS_DEFAULT_VOICES = [
-  { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', gender: 'female' as const, accent: '미국식', description: '안정적인 기본 나레이션 보이스' },
+  { id: '21m00Tcm4TlvDq8ikWAM', name: 'Rachel', gender: 'female' as const, accent: '미국식', description: '안정적인 기본 내레이션 보이스' },
   { id: 'EXAVITQu4vr4xnSDxMaL', name: 'Bella', gender: 'female' as const, accent: '미국식', description: '부드럽고 친근한 대화형 보이스' },
   { id: 'XB0fDUnXU5powFXDhCwa', name: 'Charlotte', gender: 'female' as const, accent: '영국식', description: '차분하고 고급스러운 영국식 보이스' },
-  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', gender: 'male' as const, accent: '미국식', description: '뉴스와 설명형에 어울리는 보이스' },
-  { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', gender: 'male' as const, accent: '미국식', description: '젊고 역동적인 진행형 보이스' },
+  { id: 'pNInz6obpgDQGcFmaJgB', name: 'Adam', gender: 'male' as const, accent: '미국식', description: '뉴스형 설명에 어울리는 보이스' },
+  { id: 'TxGEqnHWrfWFTfGW9XjX', name: 'Josh', gender: 'male' as const, accent: '미국식', description: '밝고 역동적인 진행형 보이스' },
   { id: 'yoZ06aMxZJJ28mfd3POQ', name: 'Sam', gender: 'male' as const, accent: '미국식', description: '차분하고 신뢰감 있는 보이스' },
 ] as const;
 

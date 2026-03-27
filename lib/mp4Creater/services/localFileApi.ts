@@ -1,4 +1,4 @@
-import { CHATTERBOX_TTS_PRESET_OPTIONS, CONFIG, ELEVENLABS_MODELS, IMAGE_MODELS, QWEN_TTS_PRESET_OPTIONS, SCRIPT_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS } from '../config';
+import { CHATTERBOX_CUSTOM_VOICE_ID, CHATTERBOX_TTS_PRESET_OPTIONS, CONFIG, ELEVENLABS_MODELS, IMAGE_MODELS, QWEN_TTS_PRESET_OPTIONS, SCRIPT_MODEL_OPTIONS, VIDEO_MODEL_OPTIONS } from '../config';
 import {
   SavedProject,
   StudioState,
@@ -17,7 +17,10 @@ const IMAGE_MODEL_ID_SET = new Set(IMAGE_MODELS.map((item) => item.id));
 const VIDEO_MODEL_ID_SET = new Set(VIDEO_MODEL_OPTIONS.map((item) => item.id));
 const ELEVENLABS_MODEL_ID_SET = new Set(ELEVENLABS_MODELS.map((item) => item.id));
 const QWEN_TTS_PRESET_ID_SET = new Set(QWEN_TTS_PRESET_OPTIONS.map((item) => item.id));
-const CHATTERBOX_TTS_PRESET_ID_SET = new Set(CHATTERBOX_TTS_PRESET_OPTIONS.map((item) => item.id));
+const CHATTERBOX_TTS_PRESET_ID_SET = new Set([
+  ...CHATTERBOX_TTS_PRESET_OPTIONS.map((item) => item.id),
+  CHATTERBOX_CUSTOM_VOICE_ID,
+]);
 
 function normalizeAllowedValue(value: string | null | undefined, allowed: Set<string>, fallback: string) {
   const trimmed = `${value || ''}`.trim();
@@ -131,7 +134,7 @@ function createDefaultRegistry(): ProviderRegistryItem[] {
 }
 
 export const createDefaultStudioState = (): StudioState => ({
-  version: 7,
+  version: 8,
   storageDir: '',
   isStorageConfigured: false,
   configuredAt: Date.now(),
@@ -178,9 +181,28 @@ function sanitizeRoutingForAvailableProviders(state: StudioState): StudioState {
   routing.elevenLabsModelId = normalizeAllowedValue(routing.elevenLabsModelId || routing.audioModel, ELEVENLABS_MODEL_ID_SET, routing.audioModel);
   routing.qwenVoicePreset = normalizeAllowedValue(routing.qwenVoicePreset, QWEN_TTS_PRESET_ID_SET, 'qwen-default');
   routing.chatterboxVoicePreset = normalizeAllowedValue(routing.chatterboxVoicePreset, CHATTERBOX_TTS_PRESET_ID_SET, 'chatterbox-clear');
+  if (routing.ttsProvider === 'chatterbox') {
+    routing.ttsProvider = 'qwen3Tts';
+  }
+  if (routing.audioProvider === 'chatterbox') {
+    routing.audioProvider = 'qwen3Tts';
+  }
+  if (routing.chatterboxVoicePreset === CHATTERBOX_CUSTOM_VOICE_ID && !routing.voiceReferenceAudioData) {
+    routing.chatterboxVoicePreset = 'chatterbox-clear';
+  }
+  if (routing.ttsNarratorId === CHATTERBOX_CUSTOM_VOICE_ID && !routing.voiceReferenceAudioData) {
+    routing.ttsNarratorId = 'chatterbox-clear';
+  }
 
   if ((routing.backgroundMusicModel || '') === 'lyria-002' && hasGoogleStyleKey) {
     routing.backgroundMusicProvider = 'google';
+  }
+
+  if (routing.backgroundMusicModel === 'sample-cinematic-v1' || routing.backgroundMusicModel === 'sample-news-v1') {
+    routing.backgroundMusicModel = 'sample-ambient-v1';
+    if (routing.backgroundMusicProvider !== 'google') {
+      routing.backgroundMusicProvider = 'sample';
+    }
   }
 
   if (routing.imageModel === CONFIG.DEFAULT_IMAGE_MODEL) {
@@ -340,6 +362,7 @@ export function summarizeProjectForIndex(project: any): SavedProject {
     folderName: typeof project?.folderName === 'string' ? project.folderName : undefined,
     folderPath: typeof project?.folderPath === 'string' ? project.folderPath : undefined,
     lastSavedAt: typeof project?.lastSavedAt === 'number' ? project.lastSavedAt : Date.now(),
+    schemaVersion: typeof project?.schemaVersion === 'number' && project.schemaVersion > 0 ? project.schemaVersion : 2,
     settings: project?.settings || {
       imageModel: CONFIG.DEFAULT_IMAGE_MODEL,
       videoModel: CONFIG.DEFAULT_VIDEO_MODEL,
@@ -355,6 +378,9 @@ export function summarizeProjectForIndex(project: any): SavedProject {
       chatterboxVoicePreset: 'chatterbox-clear',
       elevenLabsVoiceId: null,
       heygenVoiceId: null,
+      voiceReferenceAudioData: null,
+      voiceReferenceMimeType: null,
+      voiceReferenceName: null,
       backgroundMusicProvider: 'sample',
       backgroundMusicModel: CONFIG.DEFAULT_BGM_MODEL,
       musicVideoProvider: 'sample',
@@ -594,9 +620,14 @@ function buildLeanStatePayload(partial: Partial<StudioState>, cachedState?: Stud
 export async function fetchStudioState(options?: { force?: boolean; storageDir?: string }): Promise<StudioState> {
   const cachedDir = options?.storageDir || getCachedStorageDir();
   const cachedState = getCachedStudioState();
+  const hasConfiguredExternalStorage = Boolean(cachedDir.trim() || cachedState?.isStorageConfigured);
 
   if (!options?.force && cachedState && (cachedState.storageDir || '') === cachedDir) {
     return cachedState;
+  }
+
+  if (!hasConfiguredExternalStorage) {
+    return cachedState || createDefaultStudioState();
   }
 
   try {
@@ -612,6 +643,10 @@ export async function fetchStudioState(options?: { force?: boolean; storageDir?:
 
 export async function fetchStudioProjects(options?: { storageDir?: string }): Promise<SavedProject[]> {
   const storageDir = options?.storageDir || getCachedStorageDir();
+  if (!storageDir.trim()) {
+    const cachedProjects = getCachedStudioState()?.projects;
+    return Array.isArray(cachedProjects) ? cachedProjects.map(summarizeProjectForIndex) : [];
+  }
   const query = new URLSearchParams();
   if (storageDir) query.set('storageDir', storageDir);
   query.set('includeProjects', '1');
@@ -621,6 +656,7 @@ export async function fetchStudioProjects(options?: { storageDir?: string }): Pr
 
 export async function fetchStudioProjectById(projectId: string, options?: { storageDir?: string }): Promise<SavedProject | null> {
   const storageDir = options?.storageDir || getCachedStorageDir();
+  if (!storageDir.trim()) return null;
   const query = new URLSearchParams();
   if (storageDir) query.set('storageDir', storageDir);
   query.set('projectId', projectId);
@@ -634,6 +670,7 @@ export async function fetchStudioProjectById(projectId: string, options?: { stor
 
 export async function saveStudioProject(project: SavedProject, options?: { storageDir?: string }): Promise<SavedProject> {
   const storageDir = options?.storageDir || getCachedStorageDir();
+  if (!storageDir.trim()) return normalizeProjectContentTypes(project);
   const response = await requestJson<{ project?: SavedProject }>('/api/local-storage/project', {
     method: 'POST',
     body: JSON.stringify({ storageDir, project: normalizeProjectContentTypes(project) }),
@@ -643,6 +680,7 @@ export async function saveStudioProject(project: SavedProject, options?: { stora
 
 export async function deleteStudioProjects(projectIds: string[], options?: { storageDir?: string }): Promise<void> {
   const storageDir = options?.storageDir || getCachedStorageDir();
+  if (!storageDir.trim()) return;
   await requestJson('/api/local-storage/project', {
     method: 'DELETE',
     body: JSON.stringify({ storageDir, projectIds }),
@@ -677,6 +715,11 @@ export async function saveStudioState(partial: Partial<StudioState>): Promise<St
       }) as StudioState;
 
   const normalizedOptimisticState = normalizeStudioStateContentTypes(buildOptimisticState());
+
+  if (!normalizedOptimisticState.isStorageConfigured || !normalizedOptimisticState.storageDir?.trim()) {
+    syncStudioStateToLocalCache(normalizedOptimisticState);
+    return normalizedOptimisticState;
+  }
 
   if (shouldBypassStudioStateSaveRequest()) {
     syncStudioStateToLocalCache(normalizedOptimisticState);

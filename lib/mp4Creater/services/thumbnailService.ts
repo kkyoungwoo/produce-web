@@ -1,5 +1,11 @@
 import { CharacterProfile, PromptedImageAsset, SavedProject, ScriptScene } from '../types';
 import { buildCreativeDirectionBlock, buildGenerationSignature } from '../config/creativeVariance';
+import {
+  buildConceptDirectionLines,
+  buildMarkdownSection,
+  buildSimilarityControlLines,
+  joinPromptBlocks,
+} from './promptMarkdown';
 
 export interface ThumbnailComposerOptions {
   titleText?: string;
@@ -12,26 +18,39 @@ export interface ThumbnailComposerOptions {
   similarPrompt?: string;
 }
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
+const SAMPLE_THUMBNAIL_BACKGROUNDS = [
+  '/mp4Creater/samples/styles/cold_rational_architecture.png',
+  '/mp4Creater/samples/styles/dawn_of_recovery.png',
+  '/mp4Creater/samples/styles/dynamic_road_sprint.png',
+  '/mp4Creater/samples/styles/ethereal_dreamscape_fog.png',
+  '/mp4Creater/samples/styles/minimal_purity_void.png',
+  '/mp4Creater/samples/styles/mysterious_night_cityscape.png',
+  '/mp4Creater/samples/styles/nostalgic_film_fragments.png',
+  '/mp4Creater/samples/styles/radiant_nature_bliss.png',
+  '/mp4Creater/samples/styles/soft_pastel_first_blush.png',
+  '/mp4Creater/samples/styles/still_moment_dust.png',
+  '/mp4Creater/samples/styles/unyielding_landscape_grit.png',
+  '/mp4Creater/samples/styles/vibrant_festival_lights.png',
+] as const;
 
-function encodeBase64(value: string) {
-  if (typeof window !== 'undefined') {
-    return btoa(unescape(encodeURIComponent(value)));
+function hashSeed(value: string) {
+  let hash = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0;
   }
-  return (globalThis as any).Buffer.from(value, 'utf-8').toString('base64');
+  return Math.abs(hash);
 }
 
-function resolveImageSrc(value?: string | null) {
-  if (!value) return '';
-  if (value.startsWith('data:') || value.startsWith('/') || value.startsWith('http')) return value;
-  return `data:image/png;base64,${value}`;
+function pickSampleThumbnailBackground(project: SavedProject, variantSeed: number, options: ThumbnailComposerOptions = {}) {
+  const seed = [
+    project.id || project.name || project.topic || 'thumbnail',
+    project.workflowDraft?.selectedStyleImageId || '',
+    options.customPrompt || '',
+    options.titleText || '',
+    options.similarPrompt || '',
+    String(variantSeed),
+  ].join('|');
+  return SAMPLE_THUMBNAIL_BACKGROUNDS[hashSeed(seed) % SAMPLE_THUMBNAIL_BACKGROUNDS.length];
 }
 
 function pickLeadCharacter(project: SavedProject, options?: ThumbnailComposerOptions): CharacterProfile | null {
@@ -75,14 +94,6 @@ export function buildThumbnailLabel(project: SavedProject, customPrompt?: string
   return fallback.length > 28 ? `${fallback.slice(0, 28)}…` : fallback;
 }
 
-function getCharacterSelectedImage(character?: CharacterProfile | null) {
-  if (!character) return '';
-  const selected = character.generatedImages?.find((item) => item.id === character.selectedImageId);
-  if (selected?.imageData) return selected.imageData;
-  if (character.imageData) return character.imageData;
-  return character.generatedImages?.find((item) => item.imageData)?.imageData || '';
-}
-
 function buildThumbnailStoryBeat(project: SavedProject) {
   const candidates = [
     ...(project.assets || []).map((item) => item.narration || ''),
@@ -110,7 +121,7 @@ export function buildThumbnailPrompt(project: SavedProject, variantSeed = 0, opt
   const leadPrompt = options.leadDirectionText?.trim() || lead?.prompt || lead?.description || '핵심 감정을 보여주는 주인공 상반신 클로즈업';
   const stylePrompt = style?.prompt || '깔끔하고 클릭을 부르는 유튜브 썸네일 아트 디렉션';
   const extraDirection = options.extraDirectionText?.trim();
-  const similarDirection = options.similarPrompt?.trim();
+  const similarDirection = options.similarPrompt?.trim() || '';
   const selectedTemplate = draft?.promptTemplates?.find((item) => item.id === draft?.selectedPromptTemplateId) || draft?.promptTemplates?.[0] || null;
   const selectionSummary = [
     `콘텐츠 타입 ${draft?.contentType || 'story'}`,
@@ -144,6 +155,50 @@ export function buildThumbnailPrompt(project: SavedProject, variantSeed = 0, opt
     mode: freshnessMode,
     contentType: draft?.contentType,
   });
+  return joinPromptBlocks([
+    buildMarkdownSection('Goal', [
+      'Create a Korean YouTube thumbnail art direction.',
+      `[GENERATION SIGNATURE] ${buildGenerationSignature('image', `${project.id || project.name || project.topic}:${variantSeed}`, variantSeed)}`,
+      'The thumbnail must read as the final representative cut that summarizes Step1 through Step6 in one glance.',
+    ]),
+    buildMarkdownSection('Concept Direction', [
+      ...buildConceptDirectionLines(draft?.contentType || 'story', 'thumbnail'),
+      'Keep the thumbnail in the same world, same emotional arc, and same character relationships as the main video.',
+    ]),
+    buildMarkdownSection('Similarity Control', [
+      ...buildSimilarityControlLines(),
+      similarDirection
+        ? 'The user asked for a similar thumbnail. Preserve the core character, composition family, color energy, and click hook while still creating a new adjacent variation.'
+        : 'Default to a fresh representative cut with a new hook, new placement emphasis, or new gaze guidance inside the same project continuity.',
+    ]),
+    buildMarkdownSection('Project Summary', [
+      `Project title: ${project.topic || project.name || 'Project'}.`,
+      `Step1 format: ${draft?.contentType || 'story'} / ${draft?.aspectRatio || '16:9'}.`,
+      `Step2 world: ${selectionSummary || 'Default story setup'}.`,
+      `Step3 core beat: ${storyBeat || subtitle}.`,
+      `Thumbnail main line: ${title}.`,
+      `Thumbnail support line: ${subtitle}.`,
+      `Lead character hint: ${leadPrompt}.`,
+      `Background / space hint: ${backgroundHint}.`,
+      `Mood: ${mood}.`,
+      `Step5 style hint: ${stylePrompt}.`,
+    ]),
+    sceneReferenceSummary ? buildMarkdownSection('Step6 Scene Reference', [sceneReferenceSummary], { bullet: false }) : '',
+    packSummary ? buildMarkdownSection('Workflow Prompt Pack', [packSummary], { bullet: false }) : '',
+    buildMarkdownSection('Extra Direction', [
+      customPrompt ? `User direction: ${customPrompt}. Blend it naturally into the default art direction.` : 'No extra user direction. Maximize quality from the workflow context alone.',
+      extraDirection ? `Additional staging: ${extraDirection}.` : '',
+      similarDirection ? `Near-match reference: ${(similarDirection || '').slice(0, 220)}.` : '',
+      creativeBlock,
+    ], { bullet: false }),
+    buildMarkdownSection('Do Not', [
+      'Do not make the thumbnail feel unrelated to the video world.',
+      'Do not let text placement and image storytelling fight each other.',
+      'No watermark, clutter, weak focal point, or low-contrast layout.',
+      'Use a 16:9 composition with strong readability and an immediate click-worthy focal hierarchy.',
+      `Thumbnail variant ${variantSeed + 1}.`,
+    ]),
+  ]);
 
   return [
     '한국어 유튜브 썸네일 생성용 아트 디렉션.',
@@ -175,76 +230,10 @@ export function buildThumbnailPrompt(project: SavedProject, variantSeed = 0, opt
 }
 
 export function createSampleThumbnail(project: SavedProject, variantSeed = 0, options: ThumbnailComposerOptions = {}): { dataUrl: string; title: string; prompt: string } {
-  const lead = pickLeadCharacter(project, options);
-  const style = pickSelectedStyle(project);
   const customPrompt = options.customPrompt?.trim();
   const title = buildThumbnailLabel(project, customPrompt || options.titleText);
-  const subtitle = buildSceneSnippet(project, options.subtitleText || customPrompt);
-  const backgroundHint = options.backgroundText?.trim() || project.workflowDraft?.selections?.setting || 'cinematic city background';
-  const leadDirection = options.leadDirectionText?.trim() || lead?.roleLabel || lead?.description || '클릭을 부르는 중심 인물';
-  const extraDirection = customPrompt || options.extraDirectionText?.trim() || '큰 타이포, 강한 대비, 깔끔한 시선 유도';
-  const styleName = style?.groupLabel || style?.label || '기본 화풍';
-  const leadImage = resolveImageSrc(getCharacterSelectedImage(lead));
-  const styleImage = resolveImageSrc(style?.imageData || '');
-  const safeTitle = escapeHtml(title);
-  const safeSubtitle = escapeHtml(subtitle);
-  const safeLead = escapeHtml(lead?.name || '주인공');
-  const safeLeadDirection = escapeHtml(leadDirection);
-  const safeStyle = escapeHtml(styleName);
-  const safeBackground = escapeHtml(backgroundHint);
-  const safeExtra = escapeHtml(extraDirection);
-  const safeLeadImage = escapeHtml(leadImage);
-  const safeStyleImage = escapeHtml(styleImage);
-  const svg = `
-  <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
-    <defs>
-      <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#0f172a"/>
-        <stop offset="50%" stop-color="#312e81"/>
-        <stop offset="100%" stop-color="#c026d3"/>
-      </linearGradient>
-      <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="#ffffff" stop-opacity="0.18"/>
-        <stop offset="100%" stop-color="#ffffff" stop-opacity="0.05"/>
-      </linearGradient>
-      <linearGradient id="shade" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#020617" stop-opacity="0.28"/>
-        <stop offset="100%" stop-color="#020617" stop-opacity="0.75"/>
-      </linearGradient>
-      <filter id="softGlow">
-        <feGaussianBlur stdDeviation="18" result="blur"/>
-        <feMerge>
-          <feMergeNode in="blur"/>
-          <feMergeNode in="SourceGraphic"/>
-        </feMerge>
-      </filter>
-    </defs>
-    <rect width="1280" height="720" fill="url(#bg)"/>
-    ${safeStyleImage ? `<image href="${safeStyleImage}" x="0" y="0" width="1280" height="720" preserveAspectRatio="xMidYMid slice" opacity="0.16"/>` : ''}
-    <rect width="1280" height="720" fill="url(#shade)"/>
-    <circle cx="1020" cy="128" r="132" fill="#f8fafc" fill-opacity="0.12" filter="url(#softGlow)"/>
-    <circle cx="210" cy="600" r="180" fill="#38bdf8" fill-opacity="0.15" filter="url(#softGlow)"/>
-    <rect x="46" y="42" width="1188" height="636" rx="34" fill="url(#glass)" stroke="#ffffff" stroke-opacity="0.18"/>
-    <rect x="76" y="74" width="420" height="572" rx="32" fill="#0f172a" fill-opacity="0.28" stroke="#ffffff" stroke-opacity="0.16"/>
-    ${safeLeadImage ? `<image href="${safeLeadImage}" x="94" y="92" width="384" height="536" preserveAspectRatio="xMidYMid slice" opacity="0.98"/>` : '<circle cx="286" cy="228" r="86" fill="#ffffff" fill-opacity="0.16"/><path d="M190 418c28-82 164-82 192 0" fill="none" stroke="#ffffff" stroke-opacity="0.9" stroke-width="22" stroke-linecap="round"/><path d="M286 314v186" stroke="#ffffff" stroke-opacity="0.9" stroke-width="22" stroke-linecap="round"/><path d="M198 402h176" stroke="#ffffff" stroke-opacity="0.9" stroke-width="22" stroke-linecap="round"/>'}
-    <rect x="540" y="92" width="644" height="78" rx="24" fill="#ffffff" fill-opacity="0.12"/>
-    <text x="576" y="142" fill="#f8fafc" font-size="28" font-family="Arial, sans-serif" font-weight="800">${safeLead} · ${safeStyle}</text>
-    <foreignObject x="540" y="204" width="620" height="214">
-      <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; font-size: 78px; line-height: 1.04; font-weight: 900; color: #ffffff; letter-spacing: -0.04em; word-break: keep-all; text-shadow: 0 10px 28px rgba(15,23,42,0.35);">${safeTitle}</div>
-    </foreignObject>
-    <foreignObject x="544" y="420" width="590" height="116">
-      <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; font-size: 28px; line-height: 1.42; color: #e2e8f0; word-break: keep-all;">${safeSubtitle}</div>
-    </foreignObject>
-    <rect x="540" y="566" width="292" height="56" rx="18" fill="#0f172a" fill-opacity="0.46" stroke="#ffffff" stroke-opacity="0.16"/>
-    <text x="570" y="602" fill="#f8fafc" font-size="24" font-family="Arial, sans-serif" font-weight="700">${safeBackground}</text>
-    <rect x="852" y="566" width="306" height="56" rx="18" fill="#ffffff" fill-opacity="0.12" stroke="#ffffff" stroke-opacity="0.16"/>
-    <text x="882" y="602" fill="#ffffff" font-size="24" font-family="Arial, sans-serif" font-weight="700">${safeLeadDirection}</text>
-    <foreignObject x="540" y="634" width="618" height="48">
-      <div xmlns="http://www.w3.org/1999/xhtml" style="font-family: Arial, sans-serif; font-size: 18px; line-height: 1.25; color: rgba(255,255,255,0.74);">${safeExtra} · variation ${variantSeed + 1}</div>
-    </foreignObject>
-  </svg>`;
   return {
-    dataUrl: `data:image/svg+xml;base64,${encodeBase64(svg)}`,
+    dataUrl: pickSampleThumbnailBackground(project, variantSeed, options),
     title,
     prompt: buildThumbnailPrompt(project, variantSeed, options),
   };

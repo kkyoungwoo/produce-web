@@ -38,6 +38,8 @@ export default function RouteStepView({ vm }: { vm: any }) {
     topicRecommendations,
     refreshTopicRecommendation,
     isGeneratingScript,
+    scriptGenerationProgressPercent,
+    scriptGenerationProgressMessage,
     sceneCount,
     storyScript,
     handleGenerateScriptClick,
@@ -115,10 +117,17 @@ export default function RouteStepView({ vm }: { vm: any }) {
     isLoadingVoiceCatalogs,
     projectVoiceProvider,
     projectVoiceSummary,
+    googleApiKey,
+    elevenLabsApiKey,
+    currentTtsModelId,
+    voiceReferenceAudioData,
+    voiceReferenceMimeType,
     voicePreviewCharacterId,
     voicePreviewMessage,
+    onOpenSettings,
     handleCharacterVoiceProviderChange,
     handleCharacterVoiceChoiceChange,
+    handleProjectTtsModelChange,
     handleCharacterVoiceDirectInputChange,
     handlePreviewCharacterVoice,
     getCharacterVoiceSummary,
@@ -235,6 +244,8 @@ export default function RouteStepView({ vm }: { vm: any }) {
           customScriptLanguage={customScriptLanguage}
           expectedDurationMinutes={customScriptDurationMinutes}
           isGeneratingScript={isGeneratingScript}
+          scriptGenerationProgressPercent={scriptGenerationProgressPercent}
+          scriptGenerationProgressMessage={scriptGenerationProgressMessage}
           sceneCount={sceneCount}
           storyScript={storyScript}
           customScriptReferenceText={customScriptReferenceText}
@@ -276,16 +287,23 @@ export default function RouteStepView({ vm }: { vm: any }) {
           isLoadingVoiceCatalogs={isLoadingVoiceCatalogs}
           projectVoiceProvider={projectVoiceProvider}
           projectVoiceSummary={projectVoiceSummary}
+          googleApiKey={googleApiKey}
+          elevenLabsApiKey={elevenLabsApiKey}
+          currentTtsModelId={currentTtsModelId}
+          voiceReferenceAudioData={voiceReferenceAudioData}
+          voiceReferenceMimeType={voiceReferenceMimeType}
           elevenLabsVoices={elevenLabsVoices}
           heygenVoices={heygenVoices}
           activeVoicePreviewCharacterId={voicePreviewCharacterId}
           voicePreviewMessage={voicePreviewMessage}
+          onOpenSettings={onOpenSettings}
           newCharacterName={newCharacterName}
           newCharacterPrompt={newCharacterPrompt}
           onCharacterToggle={(characterId) => toggleCharacterSelection(characterId)}
           onCharacterRemove={(characterId) => removeCharacter(characterId)}
           onCharacterVoiceProviderChange={handleCharacterVoiceProviderChange}
           onCharacterVoiceChoiceChange={handleCharacterVoiceChoiceChange}
+          onProjectTtsModelChange={handleProjectTtsModelChange}
           onCharacterVoiceDirectInputChange={handleCharacterVoiceDirectInputChange}
           onPreviewCharacterVoice={handlePreviewCharacterVoice}
           onNewCharacterNameChange={(value) => setNewCharacterName(value)}

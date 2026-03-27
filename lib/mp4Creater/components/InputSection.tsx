@@ -16,8 +16,9 @@ import {
   ReferenceLinkDraft,
   ScriptLanguageOption,
   ScriptSpeechStyle,
+  WorkflowRolePromptBundle,
 } from '../types';
-import { CHATTERBOX_TTS_PRESET_OPTIONS, CONFIG, IMAGE_MODELS, NO_AI_SCRIPT_MODEL_ID, QWEN_TTS_PRESET_OPTIONS, SCRIPT_MODEL_OPTIONS } from '../config';
+import { CHATTERBOX_CUSTOM_VOICE_ID, CHATTERBOX_TTS_PRESET_OPTIONS, CONFIG, IMAGE_MODELS, NO_AI_SCRIPT_MODEL_ID, QWEN_TTS_PRESET_OPTIONS, SCRIPT_MODEL_OPTIONS } from '../config';
 import { STEP3_PROMPT_EDITOR_GUIDE } from '../config/promptEditGuides';
 import { WORKFLOW_CHARACTER_STYLE_OPTIONS, getCharacterSamplePreset, getStyleSamplePreset } from '../samples/presetCatalog';
 import {
@@ -38,6 +39,7 @@ import {
   getSelectedWorkflowPromptTemplate,
   resolveWorkflowPromptTemplates,
 } from '../services/workflowPromptBuilder';
+import { buildWorkflowPromptStore, buildWorkflowStepContract } from '../services/workflowStepContractService';
 import {
   buildStyleRecommendations,
   buildImageAwareUploadPrompt,
@@ -202,6 +204,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [showPromptPack, setShowPromptPack] = useState(false);
   const [isExtracting, setIsExtracting] = useState(false);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+  const [scriptGenerationProgress, setScriptGenerationProgress] = useState<{ percent: number; message: string } | null>(null);
   const [notice, setNotice] = useState('');
   const [promptTemplates, setPromptTemplates] = useState<WorkflowPromptTemplate[]>(initialTemplates);
   const initialTemplateId = initial.selectedPromptTemplateId
@@ -513,7 +516,13 @@ const InputSection: React.FC<InputSectionProps> = ({
     () => (selectedStyleImageId ? styleImages.find((item) => item.id === selectedStyleImageId) || null : null),
     [styleImages, selectedStyleImageId]
   );
-  const projectVoiceProvider = (workflowDraft?.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
+  const projectVoiceProvider = (
+    workflowDraft?.ttsProvider === 'elevenLabs' || studioState?.routing?.ttsProvider === 'elevenLabs'
+      ? 'elevenLabs'
+      : workflowDraft?.ttsProvider === 'heygen' || studioState?.routing?.ttsProvider === 'heygen'
+        ? 'heygen'
+        : 'qwen3Tts'
+  ) as 'qwen3Tts' | 'elevenLabs' | 'heygen';
   const selectedProjectElevenVoice = useMemo(
     () => elevenLabsVoices.find((item) => item.voice_id === (workflowDraft?.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID)) || elevenLabsVoices[0] || null,
     [elevenLabsVoices, studioState?.routing?.elevenLabsVoiceId, workflowDraft?.elevenLabsVoiceId]
@@ -522,6 +531,22 @@ const InputSection: React.FC<InputSectionProps> = ({
     () => heygenVoices.find((item) => item.voice_id === (workflowDraft?.heygenVoiceId || studioState?.routing?.heygenVoiceId || '')) || heygenVoices[0] || null,
     [heygenVoices, studioState?.routing?.heygenVoiceId, workflowDraft?.heygenVoiceId]
   );
+  const projectVoiceReferenceName = workflowDraft?.voiceReferenceName || studioState?.routing?.voiceReferenceName || '내 목소리 샘플';
+  const hasProjectVoiceReference = Boolean(workflowDraft?.voiceReferenceAudioData || studioState?.routing?.voiceReferenceAudioData);
+  const resolveChatterboxVoiceMeta = (voiceId?: string | null) => {
+    const normalizedId = `${voiceId || ''}`.trim();
+    if (normalizedId === CHATTERBOX_CUSTOM_VOICE_ID && hasProjectVoiceReference) {
+      return {
+        id: CHATTERBOX_CUSTOM_VOICE_ID,
+        name: projectVoiceReferenceName,
+      };
+    }
+    const preset = CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === normalizedId) || CHATTERBOX_TTS_PRESET_OPTIONS[0];
+    return {
+      id: preset.id,
+      name: preset.name,
+    };
+  };
   const projectVoiceSummary = useMemo(() => {
     if (projectVoiceProvider === 'elevenLabs') {
       return `기본값 · ElevenLabs / ${selectedProjectElevenVoice?.name || '기본 보이스'}`;
@@ -529,11 +554,8 @@ const InputSection: React.FC<InputSectionProps> = ({
     if (projectVoiceProvider === 'heygen') {
       return `기본값 · HeyGen / ${selectedProjectHeyGenVoice?.name || '기본 보이스'}`;
     }
-    if (projectVoiceProvider === 'chatterbox') {
-      return `기본값 · Chatterbox / ${CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === (workflowDraft?.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear'))?.name || 'Chatterbox 클리어'}`;
-    }
     return `기본값 · qwen3-tts / ${QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default'))?.name || 'qwen3-tts 기본 보이스'}`;
-  }, [projectVoiceProvider, selectedProjectElevenVoice, selectedProjectHeyGenVoice, studioState?.routing?.chatterboxVoicePreset, studioState?.routing?.qwenVoicePreset, workflowDraft?.chatterboxVoicePreset, workflowDraft?.qwenVoicePreset]);
+  }, [projectVoiceProvider, selectedProjectElevenVoice, selectedProjectHeyGenVoice, studioState?.routing?.qwenVoicePreset, workflowDraft?.qwenVoicePreset]);
   const stopCharacterVoicePreview = () => {
     if (characterVoiceAudioRef.current) {
       characterVoiceAudioRef.current.pause();
@@ -547,16 +569,12 @@ const InputSection: React.FC<InputSectionProps> = ({
     setVoicePreviewCharacterId(null);
   };
   const resolveCharacterVoiceSelection = (character: CharacterProfile) => {
-    const provider = (character.voiceProvider || 'project-default') as 'project-default' | 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
+    const rawProvider = (character.voiceProvider || 'project-default') as 'project-default' | 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
+    const provider = rawProvider === 'chatterbox' ? 'qwen3Tts' : rawProvider;
     if (provider === 'qwen3Tts') {
       const qwenId = character.voiceId || character.voiceHint || workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default';
       const qwenVoice = QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === qwenId) || QWEN_TTS_PRESET_OPTIONS[0];
       return { provider, voiceId: qwenVoice.id, voiceName: qwenVoice.name, previewUrl: null as string | null, locale: 'ko-KR' };
-    }
-    if (provider === 'chatterbox') {
-      const chatterboxId = character.voiceId || character.voiceHint || workflowDraft?.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear';
-      const chatterboxVoice = CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === chatterboxId) || CHATTERBOX_TTS_PRESET_OPTIONS[0];
-      return { provider, voiceId: chatterboxVoice.id, voiceName: chatterboxVoice.name, previewUrl: null as string | null, locale: 'ko-KR' };
     }
     if (provider === 'elevenLabs') {
       const voiceId = character.voiceId || character.voiceHint || workflowDraft?.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID;
@@ -574,11 +592,6 @@ const InputSection: React.FC<InputSectionProps> = ({
     if (projectVoiceProvider === 'heygen') {
       return { provider, voiceId: selectedProjectHeyGenVoice?.voice_id || workflowDraft?.heygenVoiceId || studioState?.routing?.heygenVoiceId || null, voiceName: selectedProjectHeyGenVoice?.name || 'HeyGen 기본 보이스', previewUrl: selectedProjectHeyGenVoice?.preview_audio_url || selectedProjectHeyGenVoice?.preview_audio || null, locale: selectedProjectHeyGenVoice?.language || null };
     }
-    if (projectVoiceProvider === 'chatterbox') {
-      const chatterboxId = workflowDraft?.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear';
-      const chatterboxVoice = CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === chatterboxId) || CHATTERBOX_TTS_PRESET_OPTIONS[0];
-      return { provider, voiceId: chatterboxVoice.id, voiceName: chatterboxVoice.name, previewUrl: null as string | null, locale: 'ko-KR' };
-    }
     const qwenId = workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default';
     const qwenVoice = QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === qwenId) || QWEN_TTS_PRESET_OPTIONS[0];
     return { provider, voiceId: qwenVoice.id, voiceName: qwenVoice.name, previewUrl: null as string | null, locale: 'ko-KR' };
@@ -588,11 +601,11 @@ const InputSection: React.FC<InputSectionProps> = ({
     if (resolved.provider === 'project-default') return projectVoiceSummary;
     if (resolved.provider === 'elevenLabs') return `직접 지정 · ElevenLabs / ${resolved.voiceName}`;
     if (resolved.provider === 'heygen') return `직접 지정 · HeyGen / ${resolved.voiceName}`;
-    if (resolved.provider === 'chatterbox') return `직접 지정 · Chatterbox / ${resolved.voiceName}`;
     return `직접 지정 · qwen3-tts / ${resolved.voiceName}`;
   };
   const buildCharacterVoicePatch = (provider: 'project-default' | 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen', value?: string | null) => {
-    if (provider === 'project-default') {
+    const normalizedProvider = provider === 'chatterbox' ? 'qwen3Tts' : provider;
+    if (normalizedProvider === 'project-default') {
       return {
         voiceProvider: 'project-default' as const,
         voiceHint: undefined,
@@ -602,7 +615,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         voiceLocale: null,
       };
     }
-    if (provider === 'qwen3Tts') {
+    if (normalizedProvider === 'qwen3Tts') {
       const preset = QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === (value || 'qwen-default')) || QWEN_TTS_PRESET_OPTIONS[0];
       return {
         voiceProvider: 'qwen3Tts' as const,
@@ -613,18 +626,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         voiceLocale: 'ko-KR',
       };
     }
-    if (provider === 'chatterbox') {
-      const preset = CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === (value || 'chatterbox-clear')) || CHATTERBOX_TTS_PRESET_OPTIONS[0];
-      return {
-        voiceProvider: 'chatterbox' as const,
-        voiceHint: preset.id,
-        voiceId: preset.id,
-        voiceName: preset.name,
-        voicePreviewUrl: null,
-        voiceLocale: 'ko-KR',
-      };
-    }
-    if (provider === 'elevenLabs') {
+    if (normalizedProvider === 'elevenLabs') {
       const voice = elevenLabsVoices.find((item) => item.voice_id === value) || selectedProjectElevenVoice || elevenLabsVoices[0] || null;
       return {
         voiceProvider: 'elevenLabs' as const,
@@ -788,7 +790,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       if (!provider) return false;
       if (provider === 'project-default') return true;
       if (provider === 'qwen3Tts') return Boolean(character.voiceId || character.voiceHint || 'qwen-default');
-      if (provider === 'chatterbox') return Boolean(character.voiceId || character.voiceHint || studioState?.routing?.chatterboxVoicePreset || workflowDraft?.chatterboxVoicePreset || 'chatterbox-clear');
+      if (provider === 'chatterbox') return Boolean(character.voiceId || character.voiceHint || studioState?.routing?.qwenVoicePreset || workflowDraft?.qwenVoicePreset || 'qwen-default');
       if (provider === 'elevenLabs') {
         return Boolean(
           character.voiceId
@@ -905,54 +907,107 @@ const InputSection: React.FC<InputSectionProps> = ({
     .map((meta) => meta.id)
     .filter((stage) => stage <= activeStage && (!routeStep || stage === routeStep));
 
-  const buildDraftPayload = () => ({
-    contentType,
-    aspectRatio,
-    topic: effectiveTopic,
-    script: normalizedScript,
-    activeStage,
-    selections,
-    extractedCharacters,
-    styleImages,
-    characterImages: extractedCharacters.flatMap((item) => item.generatedImages || []),
-    selectedCharacterIds: effectiveSelectedCharacterIds,
-    hasSelectedContentType,
-    hasSelectedAspectRatio,
-    selectedCharacterStyleId: selectedCharacterStyle?.id || null,
-    selectedCharacterStyleLabel: selectedCharacterStyle?.label || '',
-    selectedCharacterStylePrompt: selectedCharacterStyle?.prompt || '',
-    selectedStyleImageId,
-    referenceImages: workflowDraft?.referenceImages || DEFAULT_REFERENCE_IMAGES,
-    promptPack,
-    promptTemplates: syncedPromptTemplates,
-    selectedPromptTemplateId,
-    ttsProvider: projectVoiceProvider,
-    elevenLabsVoiceId: workflowDraft?.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || selectedProjectElevenVoice?.voice_id || null,
-    elevenLabsModelId: workflowDraft?.elevenLabsModelId || studioState?.routing?.elevenLabsModelId || null,
-    heygenVoiceId: workflowDraft?.heygenVoiceId || studioState?.routing?.heygenVoiceId || selectedProjectHeyGenVoice?.voice_id || null,
-    qwenVoicePreset: workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default',
-    chatterboxVoicePreset: workflowDraft?.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear',
-    voiceReferenceAudioData: workflowDraft?.voiceReferenceAudioData || studioState?.routing?.voiceReferenceAudioData || null,
-    voiceReferenceMimeType: workflowDraft?.voiceReferenceMimeType || studioState?.routing?.voiceReferenceMimeType || null,
-    voiceReferenceName: workflowDraft?.voiceReferenceName || studioState?.routing?.voiceReferenceName || null,
-    qwenStylePreset: workflowDraft?.qwenStylePreset || studioState?.routing?.qwenStylePreset || 'balanced',
-    customScriptSettings: {
-      expectedDurationMinutes: customScriptDurationMinutes,
-      speechStyle: customScriptSpeechStyle,
-      language: customScriptLanguage,
-      referenceText: customScriptReferenceText,
-      referenceLinks,
-      scriptModel: selectedScriptGenerationModel,
-    },
-    constitutionAnalysis,
-    completedSteps: {
-      step1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
-      step2: Boolean(effectiveTopic.trim()),
-      step3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
-      step4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
-      step5: Boolean(selectedStyleImageId),
-    },
-  });
+  const buildDraftPayload = () => {
+    const baseDraft = {
+      ...workflowDraft,
+      contentType,
+      aspectRatio,
+      topic: effectiveTopic,
+      script: normalizedScript,
+      activeStage,
+      selections,
+      extractedCharacters,
+      styleImages,
+      characterImages: extractedCharacters.flatMap((item) => item.generatedImages || []),
+      selectedCharacterIds: effectiveSelectedCharacterIds,
+      hasSelectedContentType,
+      hasSelectedAspectRatio,
+      selectedCharacterStyleId: selectedCharacterStyle?.id || null,
+      selectedCharacterStyleLabel: selectedCharacterStyle?.label || '',
+      selectedCharacterStylePrompt: selectedCharacterStyle?.prompt || '',
+      selectedStyleImageId,
+      referenceImages: workflowDraft?.referenceImages || DEFAULT_REFERENCE_IMAGES,
+      promptPack,
+      promptTemplates: syncedPromptTemplates,
+      selectedPromptTemplateId,
+      ttsProvider: projectVoiceProvider,
+      elevenLabsVoiceId: workflowDraft?.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || selectedProjectElevenVoice?.voice_id || null,
+      elevenLabsModelId: workflowDraft?.elevenLabsModelId || studioState?.routing?.elevenLabsModelId || null,
+      heygenVoiceId: workflowDraft?.heygenVoiceId || studioState?.routing?.heygenVoiceId || selectedProjectHeyGenVoice?.voice_id || null,
+      qwenVoicePreset: workflowDraft?.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default',
+      chatterboxVoicePreset: workflowDraft?.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear',
+      voiceReferenceAudioData: workflowDraft?.voiceReferenceAudioData || studioState?.routing?.voiceReferenceAudioData || null,
+      voiceReferenceMimeType: workflowDraft?.voiceReferenceMimeType || studioState?.routing?.voiceReferenceMimeType || null,
+      voiceReferenceName: workflowDraft?.voiceReferenceName || studioState?.routing?.voiceReferenceName || null,
+      qwenStylePreset: workflowDraft?.qwenStylePreset || studioState?.routing?.qwenStylePreset || 'balanced',
+      customScriptSettings: {
+        expectedDurationMinutes: customScriptDurationMinutes,
+        speechStyle: customScriptSpeechStyle,
+        language: customScriptLanguage,
+        referenceText: customScriptReferenceText,
+        referenceLinks,
+        scriptModel: selectedScriptGenerationModel,
+      },
+      constitutionAnalysis,
+      completedSteps: {
+        step1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
+        step2: Boolean(effectiveTopic.trim()),
+        step3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
+        step4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
+        step5: Boolean(selectedStyleImageId),
+      },
+    } as WorkflowDraft;
+    const promptStore = buildWorkflowPromptStore({ draft: baseDraft });
+    return {
+      ...baseDraft,
+      promptStore,
+      stepContract: buildWorkflowStepContract({
+        draft: {
+          ...baseDraft,
+          promptStore,
+        },
+        generationMeta: workflowDraft?.scriptGenerationMeta || null,
+      }),
+    };
+  };
+
+  const compactPromptExecutionText = (value?: string | null, max = 420) => {
+    const normalized = `${value || ''}`.replace(/\s+/g, ' ').trim();
+    if (!normalized) return '';
+    if (normalized.length <= max) return normalized;
+    const sliced = normalized.slice(0, max).trim();
+    const punctuationIndex = Math.max(
+      sliced.lastIndexOf('.'),
+      sliced.lastIndexOf('!'),
+      sliced.lastIndexOf('?'),
+      sliced.lastIndexOf(','),
+      sliced.lastIndexOf(';'),
+    );
+    return `${(punctuationIndex > Math.floor(max * 0.55) ? sliced.slice(0, punctuationIndex + 1) : sliced).trim()}...`;
+  };
+
+  const buildRolePromptAddition = (label: string, bundle?: WorkflowRolePromptBundle | null, max = 420) => {
+    if (!bundle) return '';
+    const sectionSummary = bundle.sections
+      ? Object.values(bundle.sections).filter(Boolean).join(' ')
+      : '';
+    const content = compactPromptExecutionText(bundle.finalPrompt || sectionSummary || bundle.basePrompt, max);
+    return content ? `### ${label}\n- ${content}` : '';
+  };
+
+  const buildStep3PromptAdditions = (draftForExecution: WorkflowDraft) => {
+    const rolePrompts = draftForExecution.promptStore?.rolePrompts
+      || buildWorkflowPromptStore({ draft: draftForExecution }).rolePrompts
+      || null;
+
+    return [
+      buildRolePromptAddition('SCRIPT ROLE', rolePrompts?.script, 720),
+      buildRolePromptAddition('CHARACTER CONTINUITY', rolePrompts?.character, 380),
+      buildRolePromptAddition('STYLE CONTINUITY', rolePrompts?.style, 300),
+      buildRolePromptAddition('SCENE CONTINUITY', rolePrompts?.scene, 460),
+      buildRolePromptAddition('MOUTH SHAPE / DELIVERY', rolePrompts?.video, 300),
+    ].filter(Boolean);
+  };
 
   const buildNavigationDraftPayload = (
     completedStage: StepId,
@@ -993,6 +1048,13 @@ const InputSection: React.FC<InputSectionProps> = ({
   });
 
   const createGenerationNonce = () => `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const updateScriptGenerationProgress = (percent: number, message: string) => {
+    setScriptGenerationProgress({
+      percent: Math.max(0, Math.min(100, Math.round(percent))),
+      message,
+    });
+  };
+  const clearScriptGenerationProgress = () => setScriptGenerationProgress(null);
 
   const connectionSummary = {
     text: Boolean(studioState?.providers?.openRouterApiKey),
@@ -1799,18 +1861,22 @@ const InputSection: React.FC<InputSectionProps> = ({
     }
     focusPromptTemplate(targetTemplate.id);
     setIsGeneratingScript(true);
+    updateScriptGenerationProgress(6, 'Preparing the current draft for expansion.');
     try {
+      const executionDraft = buildDraftPayload();
       const result = await composeScriptDraft({
         contentType,
         topic: effectiveTopic,
         selections,
         template: targetTemplate,
         currentScript: normalizedScript,
+        promptAdditions: buildStep3PromptAdditions(executionDraft),
         model: selectedScriptGenerationModel,
         conversationMode: targetTemplate.mode === 'dialogue',
         generationIntent: 'expand',
         expandByChars: chars,
         generationNonce: createGenerationNonce(),
+        onProgress: ({ percent, message }) => updateScriptGenerationProgress(percent, message),
         customSettings: {
           expectedDurationMinutes: customScriptDurationMinutes,
           speechStyle: customScriptSpeechStyle,
@@ -1831,6 +1897,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       openStageWithIntent(3, false);
     } finally {
       setIsGeneratingScript(false);
+      clearScriptGenerationProgress();
     }
   };
 
@@ -1904,23 +1971,25 @@ const InputSection: React.FC<InputSectionProps> = ({
       referenceLinks,
       scriptModel: selectedScriptGenerationModel,
     };
+    const executionDraft = buildDraftPayload();
+    const promptAdditions = buildStep3PromptAdditions(executionDraft);
     const sampleDraft = buildSampleScriptDraft({
       contentType,
       topic: effectiveTopic,
       selections,
       template,
       currentScript: '',
+      promptAdditions,
       model: selectedScriptGenerationModel,
       conversationMode,
       generationNonce: createGenerationNonce(),
       customSettings: generationSettings,
     });
 
-    applyGeneratedStoryScript(sampleDraft);
-    setConstitutionAnalysis(null);
     openStageWithIntent(3, false);
 
     const applySampleFallback = async (message: string) => {
+      updateScriptGenerationProgress(100, 'Sample script is ready.');
       applyGeneratedStoryScript(sampleDraft);
       setConstitutionAnalysis(null);
       try {
@@ -1932,17 +2001,20 @@ const InputSection: React.FC<InputSectionProps> = ({
 
     if (!hasTextApiConnection) {
       setIsGeneratingScript(true);
+      updateScriptGenerationProgress(12, 'Preparing the sample script.');
       try {
         await applySampleFallback(isNoAiScriptMode
           ? 'AI 모델 없음이 선택되어 Step 3 샘플 대본을 바로 채웠습니다. 모델을 바꾸면 실제 AI 생성으로 전환됩니다.'
           : 'AI 연결이 없어 Step 3 샘플 대본을 바로 채웠습니다. 설정을 연결하면 같은 버튼에서 실제 AI 대본으로 바뀝니다.');
       } finally {
         setIsGeneratingScript(false);
+        clearScriptGenerationProgress();
       }
       return;
     }
 
     setIsGeneratingScript(true);
+    updateScriptGenerationProgress(8, 'Preparing the AI script request.');
     try {
       const result = await composeScriptDraft({
         contentType,
@@ -1950,9 +2022,11 @@ const InputSection: React.FC<InputSectionProps> = ({
         selections,
         template,
         currentScript: '',
+        promptAdditions,
         model: selectedScriptGenerationModel,
         conversationMode,
         generationNonce: createGenerationNonce(),
+        onProgress: ({ percent, message }) => updateScriptGenerationProgress(percent, message),
         customSettings: generationSettings,
       });
       const nextScript = (result.text || '').trim() ? result.text : sampleDraft;
@@ -1965,6 +2039,7 @@ const InputSection: React.FC<InputSectionProps> = ({
       await applySampleFallback('AI 연결 호출이 실패해도 Step 3 샘플 대본은 바로 나오도록 보정했습니다. 지금은 샘플 대본으로 채워졌습니다.');
     } finally {
       setIsGeneratingScript(false);
+      clearScriptGenerationProgress();
     }
   };
 
@@ -2588,6 +2663,14 @@ const InputSection: React.FC<InputSectionProps> = ({
     replaceExtractedCharacters(nextCharacters, { persistDraft: true });
   };
 
+  const handleProjectTtsModelChange = (modelId: string) => {
+    if (!onSaveWorkflowDraft) return;
+    void Promise.resolve(onSaveWorkflowDraft({
+      ttsProvider: 'elevenLabs',
+      elevenLabsModelId: modelId,
+    })).catch(() => undefined);
+  };
+
   const handleCharacterVoiceDirectInputChange = (characterId: string, provider: 'elevenLabs' | 'heygen', value: string) => {
     const directId = value.trim();
     const nextCharacters = extractedCharactersRef.current.map((item) => {
@@ -2640,7 +2723,7 @@ const InputSection: React.FC<InputSectionProps> = ({
 
     try {
       const previewUrl = resolved.previewUrl || character.voicePreviewUrl || null;
-      if (effectiveProvider !== 'qwen3Tts' && effectiveProvider !== 'chatterbox' && previewUrl) {
+      if (effectiveProvider !== 'qwen3Tts' && previewUrl) {
         const audio = new Audio(previewUrl);
         characterVoiceAudioRef.current = audio;
         audio.onended = () => {
@@ -2656,7 +2739,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         return;
       }
 
-      if (effectiveProvider === 'qwen3Tts' || effectiveProvider === 'chatterbox') {
+      if (effectiveProvider === 'qwen3Tts') {
         setVoicePreviewMessage(`${character.name} · ${resolved.voiceName} 실제 무료 TTS 미리 듣기를 준비 중입니다.`);
       }
 
@@ -2684,6 +2767,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         text: `${character.name}입니다. 지금 선택한 목소리를 확인합니다.`,
         mode: 'voice-preview',
         apiKey: providerApiKey,
+        googleApiKey: studioState?.providers?.openRouterApiKey || undefined,
         voiceId: resolved.voiceId || undefined,
         modelId: studioState?.routing?.elevenLabsModelId || studioState?.routing?.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
         qwenPreset: resolved.voiceId || studioState?.routing?.qwenVoicePreset || 'qwen-default',
@@ -3074,6 +3158,8 @@ const InputSection: React.FC<InputSectionProps> = ({
     promptDetailTemplate,
     promptPack,
     onOpenSettings,
+    scriptGenerationProgressPercent: scriptGenerationProgress?.percent ?? null,
+    scriptGenerationProgressMessage: scriptGenerationProgress?.message || '',
     studioState,
     imageModelReady,
     openStageWithIntent,
@@ -3118,10 +3204,16 @@ const InputSection: React.FC<InputSectionProps> = ({
     isLoadingVoiceCatalogs,
     projectVoiceProvider,
     projectVoiceSummary,
+    googleApiKey: studioState?.providers?.openRouterApiKey || '',
+    elevenLabsApiKey: studioState?.providers?.elevenLabsApiKey || '',
+    currentTtsModelId: workflowDraft?.elevenLabsModelId || studioState?.routing?.elevenLabsModelId || studioState?.routing?.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+    voiceReferenceAudioData: workflowDraft?.voiceReferenceAudioData || studioState?.routing?.voiceReferenceAudioData || null,
+    voiceReferenceMimeType: workflowDraft?.voiceReferenceMimeType || studioState?.routing?.voiceReferenceMimeType || null,
     voicePreviewCharacterId,
     voicePreviewMessage,
     handleCharacterVoiceProviderChange,
     handleCharacterVoiceChoiceChange,
+    handleProjectTtsModelChange,
     handleCharacterVoiceDirectInputChange,
     handlePreviewCharacterVoice,
     getCharacterVoiceSummary,

@@ -1,5 +1,31 @@
 # STEP6
 
+## Tab AI Generation
+- The `대사 / 이미지 / 영상` editor row owns a right-aligned `AI 생성` button.
+- It rewrites only the currently selected text field.
+- It never auto-runs image generation, video generation, or audio generation.
+- Prompt-template path: `lib/mp4Creater/services/sceneEditorPromptService.ts`
+- UI button and duplicate-click lock path: `lib/mp4Creater/components/ResultTable.tsx`
+- Queue execution and model routing path: `lib/mp4Creater/pages/SceneStudioPage.tsx`
+- Continuity rules:
+- current scene + previous scene + next scene
+- compact `workflowDraft.promptStore.rolePrompts`
+- selected character/style continuity
+- fresh variation on every click
+- Image/video tab AI generation must keep the shot action-led and must avoid readable background text, signage, labels, posters, UI, or decorative typography.
+
+## Shared Audio Picker Guard
+- Step6 scene audio quick selection must use the shared metadata from `lib/mp4Creater/services/aiOptionCatalog.ts`.
+- The scene-level image / video / audio gear buttons should open `lib/mp4Creater/components/AiOptionPickerModal.tsx` instead of relying on plain dropdown UX.
+- Step6 audio quick selection is a routing shortcut, so the detailed default TTS voice still comes from `lib/mp4Creater/components/SettingsDrawer.tsx`.
+- If Step6 audio picker copy changes, keep its cost / quality / provider labels aligned with Settings and Step3.
+- Step6 audio / TTS picker should stage the change first and apply it only after the shared confirm button is pressed.
+- Preview playback in Step6 audio cards should come from the shared picker metadata when a clip is available.
+- Step6 audio picker action labels should stay Korean for selection / confirmation guidance.
+- Step6 audio / TTS picker should receive the same ElevenLabs voice catalog and current voice reference data as Settings so the user can finish voice selection inside the project without losing consistency.
+- Step6 image / video model pickers should also wait for the shared confirm button before saving and closing.
+- Sample-mode Step6 images should reuse random files from `public/mp4Creater/samples/styles/*` instead of placeholder-only visuals.
+
 목표: 각 문단이 개별 컷이면서도 이전/다음 씬과 연결되는 자연스러운 영상 흐름을 유지합니다.
 
 ## 먼저 읽을 파일
@@ -12,6 +38,8 @@
 - 이미지 프롬프트는 항상 새 컷을 우선하되, 현재 프로젝트 캐릭터/화풍/문단 흐름을 유지합니다.
 - 영상 프롬프트는 현재 이미지가 첫 프레임이 되도록 맞추고, 이전/다음 씬을 참고해 자연스럽게 연결합니다.
 - 대본 발화 구간은 입모양 싱크를 우선합니다.
+- Step6 씬별 이미지/영상 prompt는 `workflowDraft.promptStore.rolePrompts`를 우선 받아 현재 프로젝트 전체 맥락을 compact하게 이어받아야 합니다.
+- Step6 씬 이미지와 영상은 텍스트 읽기보다 행동과 감정 변화가 먼저 보이게 만들고, 간판/포스터/UI/라벨/로고는 만들지 않거나 읽히지 않게 처리해야 합니다.
 - 문단 설정 내부 `해당 내용 적용` 버튼은 현재 문단 편집값으로 이미지와 영상을 다시 생성하는 버튼입니다.
 - Thumbnail Studio는 현재 씬 결과를 참조해 새 생성과 유사 재생성을 분리합니다.
 - Step6 저장본은 `rolePrompts` 기준으로 대본 / 캐릭터 / 스타일 / 장면 / 영상 / 배경음 / 썸네일 프롬프트를 각각 분리해 남겨야 합니다.
@@ -41,6 +69,7 @@
 ## Step6 Key Files To Preserve
 - Route handoff: `lib/mp4Creater/App.tsx`
 - Main Step6 logic: `lib/mp4Creater/pages/SceneStudioPage.tsx`
+- Scene prompt continuity assembly: `lib/mp4Creater/services/sceneAssemblyService.ts`
 - Step6 result rendering UI: `lib/mp4Creater/components/ResultTable.tsx`
 - Snapshot storage: `lib/mp4Creater/services/sceneStudioSnapshotCache.ts`
 - Navigation cache: `lib/mp4Creater/services/projectNavigationCache.ts`
@@ -53,6 +82,7 @@
 - If the user already has a rendered Step6 preview MP4, final download should reuse that exact preview MP4 instead of creating a different render.
 - `scripts/ensure-ffmpeg-binary.mjs` must copy the installed `ffmpeg-static` binary into `ffmpeg/bin` during `postinstall`, and `app/api/mp4Creater/render/route.ts` must prefer that path before falling back to system ffmpeg lookup.
 - `next.config.ts` must include `outputFileTracingIncludes['/api/mp4Creater/render'] = ['./ffmpeg/bin/**/*', './node_modules/ffmpeg-static/**/*']` so Vercel keeps the bundled ffmpeg binary with the route.
+- The legacy browser merged-render path in `SceneStudioPage.tsx` must stay removed; Step6 preview and final download share the ffmpeg render path only.
 - If a scene has `selectedVisualType === 'video'` and `videoData`, final export must use that scene video instead of collapsing back to a still image.
 - If a scene has no real image/video result yet, preview/export must fall back to a black frame only; do not inject random sample style backgrounds.
 - Once Step6 preview render succeeds, reopen must keep showing that last rendered preview until the user clicks render again; edit invalidation can change the message, but must not clear the stored preview video itself.
@@ -60,6 +90,7 @@
 - The Step6 preview modal must not expose DaVinci auto-import or DaVinci package ZIP actions anymore.
 - Step6 autosave must keep the local browser cache small enough to avoid `QuotaExceededError`; inline preview binaries, background audio blobs, and data-URL thumbnails must be stripped from lightweight cache writes.
 - Step6 preview/export should only burn in actual Step6 media state: scene image/video, scene audio, and selected background music. Narration text should not be auto-converted into subtitles.
+- Sample background music should reuse `public/mp4Creater/samples/audio/loop_main.wav` and loop against the target render duration.
 - Result preview is the canonical current render product for Step6.
 - The preview player and final MP4 download must stay visually identical.
 - If a preview MP4 already exists, final download should reuse that same preview MP4 payload first.
@@ -87,3 +118,17 @@
 - 결과보기 웹 플레이어와 다운로드 파일은 같은 최신 렌더 결과를 기준으로 갱신해야 합니다. 새 다운로드 렌더가 끝나면 결과보기 플레이어도 같은 렌더 결과로 즉시 교체합니다.
 - 렌더 길이는 개별 씬의 계산된 재생 시간을 모두 더한 총 길이를 기준으로 맞춰야 합니다. 특정 씬에 미디어가 없다고 해서 타임라인에서 빠지면 안 됩니다.
 - 이 규칙들은 Step6 렌더 관련 AI 수정 이후에도 유지되어야 하며, 렌더 경로를 바꿀 때는 이 섹션도 함께 갱신합니다.
+
+## 2026-03 Live And Sample Media Baseline
+- Step6 background-music creation and Settings background-music preview must both call lib/mp4Creater/services/musicService.ts:createBackgroundMusicTrack(...).
+- Google background-music models use the live Google path only when a Google AI Studio key is available.
+- If no live key is available, or the live request fails, background music must fall back to the sample loop without blocking Step6.
+- Sample background-music source: public/mp4Creater/samples/audio/loop_main.wav
+- Sample image fallback source: public/mp4Creater/samples/styles/*
+- The ffmpeg render route must understand public asset paths as well as data URLs so sample-mode export matches preview-mode behavior.
+- This sample/live baseline is the foundation for future prompt additions and future model additions. New models should plug into the same Step6 execution path instead of creating a separate render branch.
+- Step6 scene TTS should prefer the live Google TTS path for free providers when a Google AI Studio key is connected, because that is the stable spoken-output path.
+- Even on the live Google path, the saved free provider/preset must still control the mapped voice choice so `qwen-default / qwen-soft` do not collapse into one identical narrator.
+- Google live TTS scene audio arrives as `audio/L16;codec=pcm;rate=24000`, so Step6 runtime must wrap that PCM payload using the official `s16le` interpretation. Swapping the byte order turns speech into metallic/effect-like noise.
+- Single-scene `오디오 생성` should keep the same soft-timeout behavior as batch generation so TTS failures do not leave the scene card stuck in loading.
+- Step6 should not surface unstable custom/free local TTS routes in the active audio picker; only free paths that produce real spoken output in actual generation should remain visible.

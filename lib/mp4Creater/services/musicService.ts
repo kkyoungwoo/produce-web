@@ -1,4 +1,10 @@
+import { resolveGoogleAiStudioApiKey } from './googleAiStudioService';
 import { BackgroundMusicPromptSections, BackgroundMusicTrack, WorkflowDraft } from '../types';
+import { buildConceptDirectionLines, buildMarkdownSection, joinPromptBlocks } from './promptMarkdown';
+
+const SAMPLE_BACKGROUND_LOOP_AUDIO = '/mp4Creater/samples/audio/loop_main.wav';
+const GOOGLE_LYRIA_CLIP_MODEL = 'lyria-3-clip-preview';
+const GOOGLE_LYRIA_PRO_MODEL = 'lyria-3-pro-preview';
 
 function getSafeSelections(draft?: WorkflowDraft | null) {
   const raw = draft?.selections;
@@ -120,6 +126,101 @@ function buildMusicVideoReference(draft: WorkflowDraft) {
   return `뮤직비디오 콘셉트이며 step3에서 작성한 가사를 그대로 lyric reference로 사용합니다. 현재 가사/대본 흐름은 "${excerpt}"이며, step6 배경음악은 이 가사의 훅, 리듬, 보컬 호흡을 우선 반영해야 합니다.`;
 }
 
+export function isGoogleBackgroundMusicModel(modelId?: string | null) {
+  const normalized = `${modelId || ''}`.trim();
+  return normalized === 'lyria-002' || normalized === GOOGLE_LYRIA_CLIP_MODEL || normalized === GOOGLE_LYRIA_PRO_MODEL;
+}
+
+function normalizeGoogleBackgroundMusicModel(modelId?: string | null) {
+  const normalized = `${modelId || ''}`.trim();
+  if (normalized === GOOGLE_LYRIA_PRO_MODEL) return GOOGLE_LYRIA_PRO_MODEL;
+  if (normalized === GOOGLE_LYRIA_CLIP_MODEL || normalized === 'lyria-002') return GOOGLE_LYRIA_CLIP_MODEL;
+  return GOOGLE_LYRIA_CLIP_MODEL;
+}
+
+function extractInlineAudioPart(json: any) {
+  const candidates = Array.isArray(json?.candidates) ? json.candidates : [];
+  for (const candidate of candidates) {
+    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
+    for (const part of parts) {
+      const data = part?.inlineData?.data || part?.inline_data?.data;
+      const mimeType = part?.inlineData?.mimeType || part?.inline_data?.mime_type;
+      if (typeof data === 'string' && data.trim()) {
+        return {
+          data: data.trim(),
+          mimeType: typeof mimeType === 'string' && mimeType.trim() ? mimeType.trim() : 'audio/mpeg',
+        };
+      }
+    }
+  }
+  return null;
+}
+
+async function generateGoogleBackgroundMusicTrack(options: {
+  draft: WorkflowDraft;
+  modelId?: string;
+  mode?: 'preview' | 'final';
+  promptSections?: Partial<BackgroundMusicPromptSections> | null;
+  durationSeconds?: number | null;
+  title?: string;
+  parentTrackId?: string | null;
+  prompt?: string;
+  googleApiKey?: string | null;
+}): Promise<BackgroundMusicTrack | null> {
+  const apiKey = resolveGoogleAiStudioApiKey(options.googleApiKey);
+  if (!apiKey) return null;
+
+  const requestedDuration = sanitizeBackgroundMusicDuration(options.durationSeconds || options.draft.backgroundMusicScene?.durationSeconds || 20);
+  const modelId = normalizeGoogleBackgroundMusicModel(options.modelId);
+  const promptSections = buildBackgroundMusicPromptSections(options.draft, options.promptSections || options.draft.backgroundMusicScene?.promptSections || null);
+  const prompt = options.prompt?.trim() || combineBackgroundMusicPromptSections(promptSections, requestedDuration);
+  const stylePreset = inferStylePreset(modelId, options.draft.contentType);
+
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': apiKey,
+    },
+    body: JSON.stringify({
+      contents: [{
+        role: 'user',
+        parts: [{ text: prompt }],
+      }],
+      generationConfig: {
+        responseModalities: ['AUDIO', 'TEXT'],
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`google-bgm-request-failed:${response.status}`);
+  }
+
+  const json = await response.json();
+  const inlineAudio = extractInlineAudioPart(json);
+  if (!inlineAudio?.data) {
+    throw new Error('google-bgm-no-audio');
+  }
+
+  return {
+    id: `bgm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    title: options.title?.trim() || `${options.draft.topic || '프로젝트'} 배경음 ${requestedDuration}초`,
+    prompt,
+    audioData: `data:${inlineAudio.mimeType};base64,${inlineAudio.data}`,
+    duration: requestedDuration,
+    requestedDuration,
+    volume: 0.28,
+    sourceMode: 'ai',
+    provider: 'google',
+    mode: options.mode || 'preview',
+    stylePreset,
+    promptSections,
+    parentTrackId: options.parentTrackId || null,
+    createdAt: Date.now(),
+  };
+}
+
 function buildSceneFlowReference(draft: WorkflowDraft) {
   const finalScript = (draft.promptStore?.finalPrompts?.finalScript || draft.script || '').trim().replace(/\s+/g, ' ');
   const sceneCount = Number((draft.stepContract?.step6?.summaryData as any)?.sceneCount || 0);
@@ -173,15 +274,18 @@ export function buildBackgroundMusicPromptSections(
 
 export function combineBackgroundMusicPromptSections(sections: BackgroundMusicPromptSections, durationSeconds?: number | null) {
   const safeDuration = sanitizeBackgroundMusicDuration(durationSeconds, 20);
-  return [
-    '섹션 구성:',
-    `1. 정체성: ${sections.identity}`,
-    `2. 분위기: ${sections.mood}`,
-    `3. 악기 구성: ${sections.instruments}`,
-    `4. 퍼포먼스: ${sections.performance}`,
-    `5. 프로덕션: ${sections.production}`,
-    `길이: ${safeDuration}초`,
-  ].join('\n');
+  const contentType = /music video|보컬|후렴|chorus|hook/i.test(`${sections.identity} ${sections.mood}`) ? 'music_video' : 'story';
+  return joinPromptBlocks([
+    buildMarkdownSection('Goal', [
+      `Create background music for ${safeDuration} seconds.`,
+      ...buildConceptDirectionLines(contentType, 'music'),
+    ]),
+    buildMarkdownSection('Identity', [sections.identity], { bullet: false }),
+    buildMarkdownSection('Mood', [sections.mood], { bullet: false }),
+    buildMarkdownSection('Instruments', [sections.instruments], { bullet: false }),
+    buildMarkdownSection('Performance', [sections.performance], { bullet: false }),
+    buildMarkdownSection('Production', [sections.production], { bullet: false }),
+  ]);
 }
 
 export function buildBackgroundMusicPrompt(
@@ -224,14 +328,13 @@ export function createSampleBackgroundTrack(
   const renderDuration = Math.min(requestedDuration, 60);
   const prompt = options?.prompt?.trim() || combineBackgroundMusicPromptSections(promptSections, requestedDuration);
   const stylePreset = inferStylePreset(modelId, draft.contentType);
-  const selections = getSafeSelections(draft);
   const provider = options?.provider === 'google' ? 'google' : 'sample';
   return {
     id: `bgm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     title: options?.title?.trim() || `${draft.topic || '프로젝트'} 배경음 ${requestedDuration}초`,
     prompt,
-    audioData: createAmbientTrack(`${draft.topic}-${selections.mood}-${prompt}-${(draft.script || '').slice(0, 120)}-${requestedDuration}`, renderDuration, stylePreset),
-    duration: renderDuration,
+    audioData: SAMPLE_BACKGROUND_LOOP_AUDIO || createAmbientTrack(`${draft.topic}-${prompt}-${requestedDuration}`, renderDuration, stylePreset),
+    duration: requestedDuration,
     requestedDuration,
     volume: 0.28,
     sourceMode: 'sample',
@@ -253,13 +356,26 @@ export async function createBackgroundMusicTrack(options: {
   durationSeconds?: number | null;
   title?: string;
   parentTrackId?: string | null;
+  prompt?: string;
+  googleApiKey?: string | null;
 }): Promise<BackgroundMusicTrack> {
+  const wantsGoogle = options.provider === 'google' || isGoogleBackgroundMusicModel(options.modelId);
+  if (wantsGoogle) {
+    try {
+      const generated = await generateGoogleBackgroundMusicTrack(options);
+      if (generated) return generated;
+    } catch (error) {
+      console.warn('[musicService] google background music failed, falling back to sample loop', error);
+    }
+  }
+
   return createSampleBackgroundTrack(options.draft, options.modelId || 'sample-ambient-v1', options.mode || 'preview', {
-    provider: options.provider || 'sample',
+    provider: wantsGoogle ? 'google' : (options.provider || 'sample'),
     promptSections: options.promptSections,
     durationSeconds: options.durationSeconds,
     title: options.title,
     parentTrackId: options.parentTrackId,
+    prompt: options.prompt,
   });
 }
 

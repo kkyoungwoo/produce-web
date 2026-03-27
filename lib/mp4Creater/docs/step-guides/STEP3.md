@@ -1,5 +1,22 @@
 # STEP3
 
+## Script Generation Progress Guard
+- Keep the Step3 textarea locked while AI generation is running.
+- Do not write partial segmented output into the textarea; only commit the final merged script after generation finishes.
+- `lib/mp4Creater/components/InputSection.tsx` starts and clears the progress state.
+- `lib/mp4Creater/services/scriptComposerService.ts` reports long-script progress during initial draft, segmented continuation, and final merge.
+- `lib/mp4Creater/components/inputSection/steps/Step3Panel.tsx` shows the progress card and keeps Save / Revert disabled during generation.
+
+## Shared Voice / Model Picker Rules
+- Step3 script model selection must use the shared option catalog from `lib/mp4Creater/services/aiOptionCatalog.ts`.
+- Step3 cast voice selection must open `lib/mp4Creater/components/AiOptionPickerModal.tsx` instead of relying on a plain dropdown as the main UX.
+- Step3 project default TTS summary must stay aligned with `lib/mp4Creater/components/SettingsDrawer.tsx`.
+- If you change cost / quality / badge copy for Step3 voice or model cards, update `aiOptionCatalog.ts` first.
+- Step3 cast voice selection should not auto-apply on first card click; keep the shared confirm button flow so the user can compare before saving the choice.
+- Step3 cast voice selection should use the same `provider -> model -> voice` modal flow as Settings, and the current project voice sample/reference should be passed into the shared TTS modal when available.
+- Voice preview in the Step3 picker should use the shared option metadata when a preview clip exists.
+- Step3 voice picker labels should stay Korean for actions and guidance text, even when the voice/model name itself is English.
+
 목표: Step2에서 선택한 콘텐츠 주제와 톤을 유지한 채, 바로 읽거나 부를 수 있는 최종 대본만 생성되게 유지합니다.
 
 ## 먼저 읽을 파일

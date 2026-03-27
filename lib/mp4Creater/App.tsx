@@ -292,7 +292,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   const pendingProjectSaveReasonRef = useRef<'input' | 'action' | null>(null);
   const pendingProjectSaveTokenRef = useRef(0);
 
-  const storageReady = Boolean(studioState?.isStorageConfigured && studioState?.storageDir?.trim());
+  const externalStorageReady = Boolean(studioState?.isStorageConfigured && studioState?.storageDir?.trim());
+  const projectPersistenceReady = typeof window === 'undefined' ? true : typeof window.indexedDB !== 'undefined';
   const requestedProjectId = searchParams?.get('projectId') || '';
   const galleryLiveApiCostTotal = useMemo(
     () => savedProjects.reduce((sum, project) => sum + (typeof project?.cost?.total === 'number' ? project.cost.total : 0), 0),
@@ -727,8 +728,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         if (cachedProjects.length) {
           applyProjectListSnapshot(cachedProjects);
         }
-        const shouldShowWizardFromCache = !cachedState.isStorageConfigured || !cachedState.storageDir?.trim();
-        setShowStartupWizard(shouldShowWizardFromCache);
+        setShowStartupWizard(false);
       }
 
       if (hasBootstrappedSession && bootstrapCachedState) {
@@ -748,13 +748,12 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
           if (Array.isArray(state.projects) && state.projects.length) {
             applyProjectListSnapshot(state.projects);
           }
-          const shouldShowWizard = !state.isStorageConfigured || !state.storageDir?.trim();
-          setShowStartupWizard(shouldShowWizard);
+          setShowStartupWizard(false);
         } catch {
           const fallback = await ensureRuntimeStorageReady(createDefaultStudioState());
           if (cancelled) return;
           setStudioState(fallback);
-          setShowStartupWizard(!fallback.isStorageConfigured || !fallback.storageDir?.trim());
+          setShowStartupWizard(false);
         }
 
         await migrateFromLocalStorage();
@@ -789,7 +788,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   useEffect(() => {
     if (!currentProjectId) return;
     if (!generatedData.length) return;
-    if (!storageReady) return;
+    if (!projectPersistenceReady) return;
     if (!pendingProjectSaveReasonRef.current) return;
     if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
 
@@ -811,7 +810,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     return () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current);
     };
-  }, [currentProjectId, generatedData, backgroundMusicTracks, previewMix, savedProjects, storageReady]);
+  }, [currentProjectId, generatedData, backgroundMusicTracks, previewMix, savedProjects, projectPersistenceReady]);
 
   const handleDeleteProjects = async (ids: string[]) => {
     const uniqueIds = Array.from(new Set((ids || []).filter(Boolean)));
@@ -1007,7 +1006,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       updatedAt: Date.now(),
     });
     setStudioState(nextState);
-    setShowStartupWizard(!nextState.isStorageConfigured || !nextState.storageDir?.trim());
+    setShowStartupWizard(false);
 
     if (currentProjectId && partial.routing) {
       const currentProject = await updateProject(currentProjectId, {
@@ -1106,7 +1105,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     }, 180);
 
     const targetProjectId = currentProjectId || requestedProjectId;
-    if (targetProjectId && storageReady) {
+    if (targetProjectId && projectPersistenceReady) {
       if (projectDraftSyncTimerRef.current) window.clearTimeout(projectDraftSyncTimerRef.current);
       projectDraftSyncTimerRef.current = window.setTimeout(() => {
         void updateProject(targetProjectId, {
@@ -1118,8 +1117,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
   };
 
   const handleOpenSceneStudio = useCallback(async (draftPatch: Partial<WorkflowDraft>) => {
-    const currentState = await ensureRuntimeStorageReady(studioStateRef.current || createDefaultStudioState());
-    if (!currentState.isStorageConfigured || !currentState.storageDir?.trim()) {
+    const currentState = studioStateRef.current || createDefaultStudioState();
+    if (false) {
       promptStorageSelection('JSON 저장 위치가 정해져야 프로젝트와 씬 데이터를 빠르게 저장할 수 있습니다. 먼저 저장 위치를 선택해 주세요.');
       return;
     }
@@ -1316,7 +1315,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
       {viewMode === 'main' && (
         <main className="py-8">
-          {!storageReady && !shouldAutoConfigureLocalStorage(studioState) && (
+          {false && !externalStorageReady && !shouldAutoConfigureLocalStorage(studioState) && (
             <div className="mx-auto mb-6 max-w-6xl px-4">
               <div className="mp4-glass-panel rounded-[24px] border border-amber-200 bg-amber-50 px-5 py-4 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1373,7 +1372,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
                 }
               }
               const targetProjectId = currentProjectId || requestedProjectId;
-              if (targetProjectId && storageReady && currentDraft) {
+      if (targetProjectId && projectPersistenceReady && currentDraft) {
                 const persistedProject = await updateProject(targetProjectId, {
                   workflowDraft: currentDraft,
                   topic: currentDraft.topic || currentTopic || '새 프로젝트',

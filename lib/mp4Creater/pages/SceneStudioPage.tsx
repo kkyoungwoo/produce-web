@@ -23,24 +23,26 @@ import {
   WorkflowDraft,
   getContentTypeLabel,
 } from '../types';
-import { DEFAULT_STORAGE_DIR, createDefaultStudioState, fetchStudioState, saveStudioState, getCachedStudioState } from '../services/localFileApi';
+import { createDefaultStudioState, fetchStudioState, saveStudioState, getCachedStudioState } from '../services/localFileApi';
 import { createSelectedWorkflowDraftForTransport, ensureWorkflowDraft } from '../services/workflowDraftService';
-import { buildBackgroundMusicPrompt, buildBackgroundMusicPromptSections, combineBackgroundMusicPromptSections, getDefaultPreviewMix, createSampleBackgroundTrack, sanitizeBackgroundMusicDuration } from '../services/musicService';
+import { buildBackgroundMusicPrompt, buildBackgroundMusicPromptSections, combineBackgroundMusicPromptSections, getDefaultPreviewMix, createBackgroundMusicTrack, sanitizeBackgroundMusicDuration } from '../services/musicService';
 import { buildProjectSettingsSnapshot } from '../services/projectSettingsSnapshot';
 import { generateImage, getSelectedImageModel, isSampleImageModel } from '../services/imageService';
 import { buildThumbnailScene, createSampleThumbnail } from '../services/thumbnailService';
 import { isFfmpegUnavailableError, renderVideoWithFfmpeg } from '../services/serverRenderService';
 import { generateTtsAudio } from '../services/ttsService';
 import { generateMotionPrompt, generateScript } from '../services/geminiService';
-import { generateVideo, generateVideoStaticFallback } from '../services/videoService';
 import { generateVideoFromImage, getFalApiKey } from '../services/falService';
+import { fetchElevenLabsVoices, type ElevenLabsVoice } from '../services/elevenLabsService';
 import { getProjectById, getSavedProjects, updateProject, upsertWorkflowProject } from '../services/projectService';
 import { buildDefaultSubtitlePreset, buildScenePlanItems, buildScriptParagraphPlans, buildTtsFileItems, inferGenerationMode, inferSceneSourceType, resolveAssetPlaybackDuration, sumSceneDuration, sumTtsDuration } from '../services/projectEnhancementService';
-import { CHATTERBOX_TTS_PRESET_OPTIONS, CONFIG, ELEVENLABS_MODELS, IMAGE_MODELS, PRICING, QWEN_TTS_PRESET_OPTIONS, VIDEO_MODEL_OPTIONS } from '../config';
+import { CONFIG, ELEVENLABS_DEFAULT_VOICES, ELEVENLABS_MODELS, IMAGE_MODELS, PRICING, QWEN_TTS_PRESET_OPTIONS, VIDEO_MODEL_OPTIONS } from '../config';
 import { clearProjectNavigationProject, readProjectNavigationProject, rememberProjectNavigationProject } from '../services/projectNavigationCache';
+import { buildMarkdownSection, buildTransitionIntentLines, joinPromptBlocks } from '../services/promptMarkdown';
 import { estimateClipDuration, splitStoryIntoParagraphScenes } from '../utils/storyHelpers';
 import {
   applySelectionPromptsToScenes as applyDraftSelectionPromptsToScenes,
+  buildSelectedPromptContextFromDraft,
   createAdditionalSceneAssetFromDraft,
   createInitialSceneAssetsFromDraft,
   createLightweightSceneAssetsFromDraft,
@@ -52,11 +54,23 @@ import { buildWorkflowPromptStore, buildWorkflowStepContract } from '../services
 import SceneStudioResultPanel from '../components/scene-studio/SceneStudioResultPanel';
 import { buildSceneStudioSnapshotPayload, mergeSceneStudioSnapshotIntoProject, readSceneStudioSnapshot, writeSceneStudioSnapshot, type SceneStudioSnapshotPayload } from '../services/sceneStudioSnapshotCache';
 import { hasDetailedSceneStudioProject } from './sceneStudio/helpers';
+import { getImageModelPickerOptions, getSceneAudioPickerOptions, getVideoModelPickerOptions } from '../services/aiOptionCatalog';
+import { generateSceneEditorContent, type SceneEditorPromptMode } from '../services/sceneEditorPromptService';
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const DEFAULT_SCENE_DURATION = 1;
 const MAX_SCENE_DURATION = 6;
 const MAX_GENERATION_QUEUE = 4;
 const clampSceneDuration = (value?: number | null) => Math.min(MAX_SCENE_DURATION, Math.max(0, Number((value || 0).toFixed(1))));
+const DEFAULT_SCENE_ELEVEN_VOICES: ElevenLabsVoice[] = ELEVENLABS_DEFAULT_VOICES.map((voice) => ({
+  voice_id: voice.id,
+  name: voice.name,
+  category: 'default',
+  labels: {
+    accent: voice.accent,
+    gender: voice.gender,
+    description: voice.description,
+  },
+}));
 
 function hasDetailedSceneStudioWorkflowDraft(draft?: WorkflowDraft | null) {
   if (!draft) return false;
@@ -406,8 +420,8 @@ function createBootstrapStudioState(projectId: string): StudioState {
       workflowDraft: cachedDraft,
       projects: cachedProject ? [cachedProject, ...((cachedState?.projects || []).filter((item) => item.id !== cachedProject.id))] : (cachedState?.projects || []),
       lastContentType: cachedDraft.contentType || cachedState?.lastContentType || 'story',
-      storageDir: cachedState?.storageDir || DEFAULT_STORAGE_DIR,
-      isStorageConfigured: Boolean((cachedState?.storageDir || DEFAULT_STORAGE_DIR).trim()),
+      storageDir: cachedState?.storageDir || '',
+      isStorageConfigured: Boolean(cachedState?.isStorageConfigured && cachedState?.storageDir?.trim()),
       updatedAt: Date.now(),
     };
   }
@@ -456,6 +470,7 @@ const SceneStudioPage: React.FC = () => {
   const [queuedGenerationCount, setQueuedGenerationCount] = useState(0);
   const [projectLookupTick, setProjectLookupTick] = useState(0);
   const [isProjectHydrating, setIsProjectHydrating] = useState(Boolean(requestedProjectId));
+  const [sceneElevenLabsVoices, setSceneElevenLabsVoices] = useState<ElevenLabsVoice[]>(DEFAULT_SCENE_ELEVEN_VOICES);
   const assetsRef = useRef<GeneratedAsset[]>([]);
   const studioStateRef = useRef<StudioState | null>(null);
   const isAbortedRef = useRef(false);
@@ -508,8 +523,8 @@ const SceneStudioPage: React.FC = () => {
           workflowDraft: cachedProject.workflowDraft,
           projects: cachedProject ? [cachedProject, ...(((state || prev || createDefaultStudioState()).projects || []).filter((item) => item.id !== cachedProject.id))] : ((state || prev || createDefaultStudioState()).projects || []),
           lastContentType: cachedProject.workflowDraft?.contentType || (state || prev || createDefaultStudioState()).lastContentType || 'story',
-          storageDir: (state || prev || createDefaultStudioState()).storageDir || DEFAULT_STORAGE_DIR,
-          isStorageConfigured: Boolean(((state || prev || createDefaultStudioState()).storageDir || DEFAULT_STORAGE_DIR).trim()),
+          storageDir: (state || prev || createDefaultStudioState()).storageDir || '',
+          isStorageConfigured: Boolean((state || prev || createDefaultStudioState()).isStorageConfigured && (state || prev || createDefaultStudioState()).storageDir?.trim()),
           updatedAt: Date.now(),
         }));
         setBackgroundMusicTracks(cachedProject.backgroundMusicTracks || []);
@@ -566,11 +581,24 @@ const SceneStudioPage: React.FC = () => {
     [backgroundMusicTracks, backgroundTrackBaseTitle],
   );
   const buildSceneMotionPrompt = useCallback(async (asset: GeneratedAsset) => {
-    const basePrompt = (asset.videoPrompt || '').trim() || await generateMotionPrompt(asset.narration, asset.imagePrompt || asset.visualPrompt);
+    const promptContext = buildSelectedPromptContextFromDraft(draft);
+    const basePrompt = (asset.videoPrompt || '').trim() || await generateMotionPrompt(
+      asset.narration,
+      asset.imagePrompt || asset.visualPrompt,
+      draft.contentType,
+    );
     const lipSyncDirection = buildLipSyncDirection(draft.contentType, asset.narration || '');
     const dialogueStartGuide = buildDialogueStartMotionGuide(asset.narration || '');
-    return [basePrompt, lipSyncDirection, dialogueStartGuide].filter(Boolean).join(' ');
-  }, [draft.contentType]);
+    const noTextGuide = 'Keep the frame action-led. Avoid readable text in signs, posters, screens, labels, captions, storefronts, or background typography.';
+    return joinPromptBlocks([
+      buildMarkdownSection('Motion Goal', [basePrompt], { bullet: false }),
+      promptContext.storyPrompt ? buildMarkdownSection('Script Role', [promptContext.storyPrompt], { bullet: false }) : '',
+      promptContext.actionPrompt ? buildMarkdownSection('Motion Role', [promptContext.actionPrompt], { bullet: false }) : '',
+      buildMarkdownSection('Lip Sync Rules', [lipSyncDirection, dialogueStartGuide]),
+      buildMarkdownSection('Transition Rules', buildTransitionIntentLines(draft.contentType, 'motion')),
+      buildMarkdownSection('Do Not', [noTextGuide]),
+    ]);
+  }, [draft]);
   const summaryCharacterIds = useMemo(() => (
     draft.selectedCharacterIds.length ? draft.selectedCharacterIds : draft.extractedCharacters.map((item) => item.id)
   ), [draft.extractedCharacters, draft.selectedCharacterIds]);
@@ -965,7 +993,7 @@ const SceneStudioPage: React.FC = () => {
   }, []);
 
   const resolveSceneTtsOptions = useCallback((): {
-    provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
+    provider: 'qwen3Tts' | 'elevenLabs';
     apiKey: string;
     voiceId: string | null;
     modelId: string;
@@ -974,43 +1002,30 @@ const SceneStudioPage: React.FC = () => {
     voiceReferenceAudioData: string | null;
     voiceReferenceMimeType: string | null;
   } => {
-    const preferredProvider = (draft.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
+    const preferredProvider = (draft.ttsProvider || studioState?.routing?.ttsProvider || 'qwen3Tts') as 'qwen3Tts' | 'elevenLabs' | 'heygen' | 'chatterbox';
     const elevenApiKey = studioState?.providers?.elevenLabsApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.ELEVENLABS_API_KEY) || '';
-    const heygenApiKey = studioState?.providers?.heygenApiKey || localStorage.getItem(CONFIG.STORAGE_KEYS.HEYGEN_API_KEY) || '';
 
-    const provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen' = preferredProvider === 'chatterbox'
-      ? 'chatterbox'
-      : preferredProvider === 'heygen'
-      ? (heygenApiKey ? 'heygen' : elevenApiKey ? 'elevenLabs' : 'qwen3Tts')
-      : preferredProvider === 'elevenLabs'
-        ? (elevenApiKey ? 'elevenLabs' : heygenApiKey ? 'heygen' : 'qwen3Tts')
+    const provider: 'qwen3Tts' | 'elevenLabs' = preferredProvider === 'elevenLabs'
+        ? (elevenApiKey ? 'elevenLabs' : 'qwen3Tts')
         : 'qwen3Tts';
 
     const apiKey = provider === 'elevenLabs'
       ? elevenApiKey
-      : provider === 'heygen'
-        ? heygenApiKey
-        : '';
+      : '';
 
     return {
       provider,
       apiKey,
       voiceId: provider === 'elevenLabs'
         ? (draft.elevenLabsVoiceId || studioState?.routing?.elevenLabsVoiceId || CONFIG.DEFAULT_VOICE_ID)
-        : provider === 'chatterbox'
-          ? (draft.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear')
-        : provider === 'heygen'
-          ? (draft.heygenVoiceId || studioState?.routing?.heygenVoiceId || null)
-          : (draft.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default'),
-      modelId: draft.elevenLabsModelId || studioState?.routing?.elevenLabsModelId || studioState?.routing?.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
-      qwenPreset: provider === 'chatterbox'
-        ? (draft.chatterboxVoicePreset || studioState?.routing?.chatterboxVoicePreset || 'chatterbox-clear')
         : (draft.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default'),
+      modelId: draft.elevenLabsModelId || studioState?.routing?.elevenLabsModelId || studioState?.routing?.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+      qwenPreset: draft.qwenVoicePreset || studioState?.routing?.qwenVoicePreset || 'qwen-default',
       locale: ((draft.customScriptSettings?.language || 'ko').trim().toLowerCase() === 'mute' ? 'ko' : (draft.customScriptSettings?.language || 'ko')),
-      voiceReferenceAudioData: draft.voiceReferenceAudioData || studioState?.routing?.voiceReferenceAudioData || null,
-      voiceReferenceMimeType: draft.voiceReferenceMimeType || studioState?.routing?.voiceReferenceMimeType || null,
+      voiceReferenceAudioData: null,
+      voiceReferenceMimeType: null,
     };
-  }, [draft.chatterboxVoicePreset, draft.customScriptSettings?.language, draft.elevenLabsModelId, draft.elevenLabsVoiceId, draft.heygenVoiceId, draft.qwenVoicePreset, draft.ttsProvider, draft.voiceReferenceAudioData, draft.voiceReferenceMimeType, studioState?.providers?.elevenLabsApiKey, studioState?.providers?.heygenApiKey, studioState?.routing?.audioModel, studioState?.routing?.chatterboxVoicePreset, studioState?.routing?.elevenLabsModelId, studioState?.routing?.elevenLabsVoiceId, studioState?.routing?.heygenVoiceId, studioState?.routing?.qwenVoicePreset, studioState?.routing?.ttsProvider, studioState?.routing?.voiceReferenceAudioData, studioState?.routing?.voiceReferenceMimeType]);
+  }, [draft.customScriptSettings?.language, draft.elevenLabsModelId, draft.elevenLabsVoiceId, draft.qwenVoicePreset, draft.ttsProvider, studioState?.providers?.elevenLabsApiKey, studioState?.routing?.audioModel, studioState?.routing?.elevenLabsModelId, studioState?.routing?.elevenLabsVoiceId, studioState?.routing?.qwenVoicePreset, studioState?.routing?.ttsProvider]);
 
   const generateSceneAudioAsset = useCallback(async (text: string) => {
     const tts = resolveSceneTtsOptions();
@@ -1018,6 +1033,7 @@ const SceneStudioPage: React.FC = () => {
       provider: tts.provider,
       text,
       apiKey: tts.apiKey || undefined,
+      googleApiKey: studioState?.providers?.openRouterApiKey || undefined,
       voiceId: tts.voiceId || undefined,
       modelId: tts.modelId || undefined,
       qwenPreset: tts.qwenPreset || undefined,
@@ -1026,6 +1042,27 @@ const SceneStudioPage: React.FC = () => {
       voiceReferenceMimeType: tts.voiceReferenceMimeType || undefined,
     });
   }, [resolveSceneTtsOptions]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const voices = await fetchElevenLabsVoices(studioState?.providers?.elevenLabsApiKey || undefined);
+        if (!cancelled && voices.length) {
+          setSceneElevenLabsVoices(voices);
+        }
+      } catch {
+        if (!cancelled) {
+          setSceneElevenLabsVoices(DEFAULT_SCENE_ELEVEN_VOICES);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [studioState?.providers?.elevenLabsApiKey]);
 
   useEffect(() => {
     if (resolvedProjectId && projectHydrationPendingRef.current) return;
@@ -1111,17 +1148,8 @@ const SceneStudioPage: React.FC = () => {
     });
     setStudioState(nextState);
 
-    if (currentProjectId && partial.routing) {
-      await updateProject(currentProjectId, {
-        settings: buildProjectSettingsSnapshot({
-          routing: nextState.routing,
-          workflowDraft: nextState.workflowDraft,
-        }),
-      });
-    }
-
     return nextState;
-  }, [currentProjectId, studioState]);
+  }, [studioState]);
 
   const updateQuickRouting = useCallback(async (routingPatch: Partial<StudioState['routing']>, draftPatch?: Partial<WorkflowDraft>) => {
     const baseState = studioStateRef.current || studioState || createDefaultStudioState();
@@ -1160,22 +1188,10 @@ const SceneStudioPage: React.FC = () => {
     const tts = resolveSceneTtsOptions();
     if (tts.provider === 'elevenLabs') {
       const model = ELEVENLABS_MODELS.find((item) => item.id === tts.modelId) || ELEVENLABS_MODELS[0];
+      const voice = ELEVENLABS_DEFAULT_VOICES.find((item) => item.id === tts.voiceId);
       return {
         currentId: `elevenLabs:${model?.id || CONFIG.DEFAULT_ELEVENLABS_MODEL}`,
-        currentLabel: `ElevenLabs · ${model?.name || tts.modelId}`,
-      };
-    }
-    if (tts.provider === 'chatterbox') {
-      const preset = CHATTERBOX_TTS_PRESET_OPTIONS.find((item) => item.id === tts.qwenPreset) || CHATTERBOX_TTS_PRESET_OPTIONS[0];
-      return {
-        currentId: `chatterbox:${preset?.id || 'chatterbox-clear'}`,
-        currentLabel: `Chatterbox 고품질 · ${preset?.name || tts.qwenPreset}`,
-      };
-    }
-    if (tts.provider === 'heygen') {
-      return {
-        currentId: `heygen:${tts.voiceId || 'default'}`,
-        currentLabel: 'HeyGen · 기본 보이스',
+        currentLabel: `ElevenLabs · ${model?.name || tts.modelId} · ${voice?.name || tts.voiceId || '기본 보이스'}`,
       };
     }
     const preset = QWEN_TTS_PRESET_OPTIONS.find((item) => item.id === tts.qwenPreset) || QWEN_TTS_PRESET_OPTIONS[0];
@@ -1183,14 +1199,25 @@ const SceneStudioPage: React.FC = () => {
       currentId: `qwen3Tts:${preset?.id || 'qwen-default'}`,
       currentLabel: `qwen3-tts 경량 · ${preset?.name || tts.qwenPreset}`,
     };
-  }, [resolveSceneTtsOptions]);
+  }, [draft.voiceReferenceAudioData, draft.voiceReferenceName, resolveSceneTtsOptions, studioState?.routing?.voiceReferenceAudioData, studioState?.routing?.voiceReferenceName]);
 
   const quickAudioModelOptions = useMemo(() => ([
     ...QWEN_TTS_PRESET_OPTIONS.map((item) => ({ id: `qwen3Tts:${item.id}`, label: item.name, helper: '경량 무료 TTS · 빠른 로드' })),
-    ...CHATTERBOX_TTS_PRESET_OPTIONS.map((item) => ({ id: `chatterbox:${item.id}`, label: item.name, helper: '고품질 무료 TTS · 음성 샘플 반영' })),
     ...ELEVENLABS_MODELS.slice(0, 4).map((item) => ({ id: `elevenLabs:${item.id}`, label: `ElevenLabs ${item.name}`, helper: item.description })),
-    { id: 'heygen:default', label: 'HeyGen 기본 보이스', helper: 'HeyGen TTS 사용' },
   ]), []);
+
+  const quickImageModelCardOptions = useMemo(() => getImageModelPickerOptions().map((item) => ({
+    ...item,
+    label: item.title,
+  })), []);
+  const quickVideoModelCardOptions = useMemo(() => getVideoModelPickerOptions().map((item) => ({
+    ...item,
+    label: item.title,
+  })), []);
+  const quickAudioModelCardOptions = useMemo(() => getSceneAudioPickerOptions().filter((item) => !item.id.startsWith('heygen:')).map((item) => ({
+    ...item,
+    label: item.title,
+  })), []);
 
   const handleQuickImageModelSelect = useCallback((modelId: string) => {
     void updateQuickRouting({
@@ -1206,51 +1233,71 @@ const SceneStudioPage: React.FC = () => {
     });
   }, [updateQuickRouting]);
 
-  const handleQuickAudioModelSelect = useCallback((value: string) => {
-    const [provider, rawId] = value.split(':');
-    if (provider === 'elevenLabs') {
+  const applyQuickAudioSelection = useCallback((selection: {
+    provider: 'qwen3Tts' | 'elevenLabs';
+    modelId?: string | null;
+    voiceId?: string | null;
+  }) => {
+    if (selection.provider === 'elevenLabs') {
       void updateQuickRouting({
         ttsProvider: 'elevenLabs',
         audioProvider: 'elevenLabs',
-        audioModel: rawId || CONFIG.DEFAULT_ELEVENLABS_MODEL,
-        elevenLabsModelId: rawId || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+        audioModel: selection.modelId || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+        elevenLabsModelId: selection.modelId || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+        elevenLabsVoiceId: selection.voiceId || CONFIG.DEFAULT_VOICE_ID,
       }, {
         ttsProvider: 'elevenLabs',
-        elevenLabsModelId: rawId || CONFIG.DEFAULT_ELEVENLABS_MODEL,
-      });
-      return;
-    }
-    if (provider === 'chatterbox') {
-      void updateQuickRouting({
-        ttsProvider: 'chatterbox',
-        audioProvider: 'chatterbox',
-        chatterboxVoicePreset: rawId || 'chatterbox-clear',
-      }, {
-        ttsProvider: 'chatterbox',
-        chatterboxVoicePreset: rawId || 'chatterbox-clear',
-      });
-      return;
-    }
-    if (provider === 'heygen') {
-      void updateQuickRouting({
-        ttsProvider: 'heygen',
-        audioProvider: 'heygen',
-        heygenVoiceId: rawId || 'default',
-      }, {
-        ttsProvider: 'heygen',
-        heygenVoiceId: rawId || 'default',
+        elevenLabsModelId: selection.modelId || CONFIG.DEFAULT_ELEVENLABS_MODEL,
+        elevenLabsVoiceId: selection.voiceId || CONFIG.DEFAULT_VOICE_ID,
       });
       return;
     }
     void updateQuickRouting({
       ttsProvider: 'qwen3Tts',
       audioProvider: 'qwen3Tts',
-      qwenVoicePreset: rawId || 'qwen-default',
+      qwenVoicePreset: selection.voiceId || 'qwen-default',
     }, {
       ttsProvider: 'qwen3Tts',
-      qwenVoicePreset: rawId || 'qwen-default',
+      qwenVoicePreset: selection.voiceId || 'qwen-default',
     });
   }, [updateQuickRouting]);
+
+  const handleQuickAudioModelSelect = useCallback((value: string) => {
+    const [provider, rawId] = value.split(':');
+    applyQuickAudioSelection({
+      provider: (provider || 'qwen3Tts') as 'qwen3Tts' | 'elevenLabs',
+      modelId: provider === 'elevenLabs' ? (rawId || CONFIG.DEFAULT_ELEVENLABS_MODEL) : null,
+      voiceId: provider === 'elevenLabs' ? CONFIG.DEFAULT_VOICE_ID : (rawId || 'qwen-default'),
+    });
+  }, [applyQuickAudioSelection]);
+
+  const resolveSceneEditorModel = useCallback((mode: SceneEditorPromptMode) => {
+    if (mode === 'narration') {
+      return draft.customScriptSettings?.scriptModel
+        || studioState?.routing?.scriptModel
+        || studioState?.routing?.textModel
+        || CONFIG.DEFAULT_SCRIPT_MODEL;
+    }
+    if (mode === 'image') {
+      return studioState?.routing?.imagePromptModel
+        || studioState?.routing?.sceneModel
+        || draft.customScriptSettings?.scriptModel
+        || studioState?.routing?.scriptModel
+        || CONFIG.DEFAULT_SCRIPT_MODEL;
+    }
+    return studioState?.routing?.motionPromptModel
+      || studioState?.routing?.sceneModel
+      || draft.customScriptSettings?.scriptModel
+      || studioState?.routing?.scriptModel
+      || CONFIG.DEFAULT_SCRIPT_MODEL;
+  }, [
+    draft.customScriptSettings?.scriptModel,
+    studioState?.routing?.imagePromptModel,
+    studioState?.routing?.motionPromptModel,
+    studioState?.routing?.sceneModel,
+    studioState?.routing?.scriptModel,
+    studioState?.routing?.textModel,
+  ]);
 
   const buildProjectEnhancementPatch = useCallback((assets: GeneratedAsset[], overrides?: Partial<SavedProject>) => {
     const subtitlePreset = overrides?.subtitlePreset || buildDefaultSubtitlePreset();
@@ -1661,7 +1708,7 @@ const SceneStudioPage: React.FC = () => {
             visualPrompt: asset.imagePrompt || asset.visualPrompt || '',
             imagePrompt: asset.imagePrompt || asset.visualPrompt || '',
             videoPrompt: asset.videoPrompt || '',
-            targetDuration: clampSceneDuration(asset.targetDuration || estimateClipDuration(asset.narration || '장면')), 
+            targetDuration: clampSceneDuration(asset.targetDuration || estimateClipDuration(asset.narration || '장면')),
             aspectRatio: asset.aspectRatio || draft.aspectRatio || '16:9',
           })),
           draft,
@@ -1756,31 +1803,31 @@ const SceneStudioPage: React.FC = () => {
     setProgressMessage('현재 프로젝트 흐름을 바탕으로 배경음 느낌 문장을 자동으로 채웠습니다. 필요하면 바로 수정해서 다시 생성하면 됩니다.');
   }, [backgroundMusicSceneConfig.promptSections, draft, updateBackgroundMusicScene]);
 
-  const createAnotherBackgroundTrack = useCallback(() => {
+  const createAnotherBackgroundTrack = useCallback(async () => {
     const nextDuration = resolveCurrentVideoDurationSeconds(draft, assetsRef.current);
-    const nextTrack = createSampleBackgroundTrack(
+    setProgressMessage('배경음 트랙을 생성하고 있습니다.');
+    const nextTrack = await createBackgroundMusicTrack({
       draft,
-      backgroundMusicSceneConfig.modelId,
-      'preview',
-      {
-        prompt: backgroundMusicSceneConfig.prompt,
-        title: resolveNextBackgroundTrackTitle(backgroundMusicTracks),
-        provider: backgroundMusicSceneConfig.provider,
-        promptSections: backgroundMusicSceneConfig.promptSections,
-        durationSeconds: nextDuration,
-      },
-    );
+      modelId: backgroundMusicSceneConfig.modelId,
+      mode: 'preview',
+      prompt: backgroundMusicSceneConfig.prompt,
+      title: resolveNextBackgroundTrackTitle(backgroundMusicTracks),
+      provider: backgroundMusicSceneConfig.provider,
+      promptSections: backgroundMusicSceneConfig.promptSections,
+      durationSeconds: nextDuration,
+      googleApiKey: studioState?.providers?.openRouterApiKey || '',
+    });
     const nextTracks = [...backgroundMusicTracks, nextTrack];
     setBackgroundMusicTracks(nextTracks);
     setActiveBackgroundTrackId(nextTrack.id);
     updateBackgroundMusicScene({ enabled: true, selectedTrackId: nextTrack.id, durationSeconds: nextDuration });
     persistBackgroundMusicSnapshot(nextTracks, nextTrack.id, { enabled: true, selectedTrackId: nextTrack.id, durationSeconds: nextDuration });
     setProgressMessage(
-      backgroundMusicSceneConfig.provider === 'google'
-        ? `Google Lyria 연동용 배경음 설정을 보존했고, 현재는 영상 총 길이 ${nextDuration}초 기준 샘플 음원으로 새 트랙을 생성했습니다.`
-        : `새 배경음을 영상 총 길이 ${nextDuration}초 기준으로 생성했습니다. 생성 이력은 고정 폭 카드 안에서 가로로 쌓이며, 방금 생성한 트랙으로 자동 포커스됩니다.`,
+      nextTrack.sourceMode === 'ai'
+        ? `AI 배경음으로 약 ${nextDuration}초 길이의 트랙을 만들었습니다.`
+        : `샘플 배경음으로 약 ${nextDuration}초 길이의 트랙을 만들었습니다.`,
     );
-  }, [backgroundMusicSceneConfig, backgroundMusicTracks, draft, persistBackgroundMusicSnapshot, resolveNextBackgroundTrackTitle, updateBackgroundMusicScene]);
+  }, [backgroundMusicSceneConfig, backgroundMusicTracks, draft, persistBackgroundMusicSnapshot, resolveNextBackgroundTrackTitle, studioState?.providers?.openRouterApiKey, updateBackgroundMusicScene]);
 
   const handleDeleteBackgroundTrack = useCallback((trackId: string) => {
     const nextTracks = backgroundMusicTracks.filter((track) => track.id !== trackId);
@@ -1793,30 +1840,34 @@ const SceneStudioPage: React.FC = () => {
     setProgressMessage('배경음 이력에서 선택한 트랙을 삭제했습니다. 남은 트랙은 프로젝트 저장 시 함께 유지됩니다.');
   }, [activeBackgroundTrackId, backgroundMusicTracks, persistBackgroundMusicSnapshot, updateBackgroundMusicScene]);
 
-  const handleExtendBackgroundTrack = useCallback((trackId: string) => {
+  const handleExtendBackgroundTrack = useCallback(async (trackId: string) => {
     const sourceTrack = backgroundMusicTracks.find((track) => track.id === trackId);
     if (!sourceTrack) return;
     const nextDuration = resolveCurrentVideoDurationSeconds(draft, assetsRef.current);
-    const nextTrack = createSampleBackgroundTrack(
+    setProgressMessage('선택한 배경음과 이어지는 새 트랙을 생성하고 있습니다.');
+    const nextTrack = await createBackgroundMusicTrack({
       draft,
-      backgroundMusicSceneConfig.modelId,
-      'preview',
-      {
-        prompt: sourceTrack.prompt || backgroundMusicSceneConfig.prompt,
-        title: resolveNextBackgroundTrackTitle(backgroundMusicTracks),
-        provider: backgroundMusicSceneConfig.provider,
-        promptSections: sourceTrack.promptSections || backgroundMusicSceneConfig.promptSections,
-        durationSeconds: nextDuration,
-        parentTrackId: sourceTrack.id,
-      },
-    );
+      modelId: backgroundMusicSceneConfig.modelId,
+      mode: 'preview',
+      prompt: sourceTrack.prompt || backgroundMusicSceneConfig.prompt,
+      title: resolveNextBackgroundTrackTitle(backgroundMusicTracks),
+      provider: backgroundMusicSceneConfig.provider,
+      promptSections: sourceTrack.promptSections || backgroundMusicSceneConfig.promptSections,
+      durationSeconds: nextDuration,
+      parentTrackId: sourceTrack.id,
+      googleApiKey: studioState?.providers?.openRouterApiKey || '',
+    });
     const nextTracks = [...backgroundMusicTracks, nextTrack];
     setBackgroundMusicTracks(nextTracks);
     setActiveBackgroundTrackId(nextTrack.id);
     updateBackgroundMusicScene({ enabled: true, selectedTrackId: nextTrack.id, durationSeconds: nextDuration });
     persistBackgroundMusicSnapshot(nextTracks, nextTrack.id, { enabled: true, selectedTrackId: nextTrack.id, durationSeconds: nextDuration });
-    setProgressMessage(`선택한 배경음을 영상 총 길이 ${nextDuration}초 기준으로 타이밍 조절 버전으로 추가했습니다. 원본은 그대로 남아 언제든 다시 선택할 수 있습니다.`);
-  }, [backgroundMusicSceneConfig, backgroundMusicTracks, draft, persistBackgroundMusicSnapshot, resolveNextBackgroundTrackTitle, updateBackgroundMusicScene]);
+    setProgressMessage(
+      nextTrack.sourceMode === 'ai'
+        ? `기존 흐름을 이어서 AI 배경음 ${nextDuration}초 버전을 만들었습니다.`
+        : `기존 흐름을 이어서 샘플 배경음 ${nextDuration}초 버전을 만들었습니다.`,
+    );
+  }, [backgroundMusicSceneConfig, backgroundMusicTracks, draft, persistBackgroundMusicSnapshot, resolveNextBackgroundTrackTitle, studioState?.providers?.openRouterApiKey, updateBackgroundMusicScene]);
 
   const persistWorkflowStep4 = async (step4Completed: boolean) => {
     if (!studioState) return;
@@ -2046,7 +2097,7 @@ const SceneStudioPage: React.FC = () => {
       initialAssets.forEach((_, index) => setSceneProgress(index, 8, '생성 대기 중'));
 
       const initialTtsOptions = generateAudio ? resolveSceneTtsOptions() : null;
-      const isTtsAvailable = Boolean(initialTtsOptions && (initialTtsOptions.provider === 'qwen3Tts' || initialTtsOptions.provider === 'chatterbox' || initialTtsOptions.apiKey));
+      const isTtsAvailable = Boolean(initialTtsOptions && (initialTtsOptions.provider === 'qwen3Tts' || initialTtsOptions.apiKey));
 
       for (let i = 0; i < initialAssets.length; i++) {
         const currentAspectRatio = assetsRef.current[i].aspectRatio || draft.aspectRatio || '16:9';
@@ -2097,7 +2148,7 @@ const SceneStudioPage: React.FC = () => {
         setSceneProgress(i, isTtsAvailable ? 72 : 100, isTtsAvailable ? '오디오 대기 중' : '이미지 준비 완료');
 
         const sceneTts = resolveSceneTtsOptions();
-        if (generateAudio && (sceneTts.provider === 'qwen3Tts' || sceneTts.provider === 'chatterbox' || sceneTts.apiKey)) {
+        if (generateAudio && (sceneTts.provider === 'qwen3Tts' || sceneTts.apiKey)) {
           setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 오디오와 자막을 준비하는 중...`);
           try {
             const audio = await withSoftTimeout(
@@ -2124,12 +2175,18 @@ const SceneStudioPage: React.FC = () => {
         await wait(120);
       }
 
-      const nextTracks = backgroundMusicTracks.length ? backgroundMusicTracks : [createSampleBackgroundTrack(draft, backgroundMusicSceneConfig.modelId, 'preview', {
-        promptSections: backgroundMusicSceneConfig.promptSections,
-        durationSeconds: resolveCurrentVideoDurationSeconds(draft, assetsRef.current),
-        provider: backgroundMusicSceneConfig.provider,
-        title: resolveNextBackgroundTrackTitle(backgroundMusicTracks),
-      })];
+      const nextTracks = backgroundMusicTracks.length
+        ? backgroundMusicTracks
+        : [await createBackgroundMusicTrack({
+            draft,
+            modelId: backgroundMusicSceneConfig.modelId,
+            mode: 'preview',
+            promptSections: backgroundMusicSceneConfig.promptSections,
+            durationSeconds: resolveCurrentVideoDurationSeconds(draft, assetsRef.current),
+            provider: backgroundMusicSceneConfig.provider,
+            title: resolveNextBackgroundTrackTitle(backgroundMusicTracks),
+            googleApiKey: studioState?.providers?.openRouterApiKey || '',
+          })];
       const selectedTrack = nextTracks.find((track) => track.id === (activeBackgroundTrackId || backgroundMusicSceneConfig.selectedTrackId)) || nextTracks[0];
       setBackgroundMusicTracks(nextTracks);
       setActiveBackgroundTrackId(selectedTrack?.id || null);
@@ -2272,334 +2329,6 @@ const SceneStudioPage: React.FC = () => {
     writeSceneStudioLocalSnapshot(resolvedProjectId, { workflowDraft: nextDraft });
     void persistSceneStudioSnapshot(resolvedProjectId, { workflowDraft: nextDraft });
   }, [buildSceneStudioWorkflowDraft, draft, persistSceneStudioSnapshot, resolvedProjectId, studioState, writeSceneStudioLocalSnapshot]);
-
-  const renderMergedVideo = useCallback(async (options: {
-    enableSubtitles: boolean;
-    qualityMode: 'preview' | 'final';
-    downloadFile?: boolean;
-    customTitle?: string;
-  }) => {
-    const { enableSubtitles, qualityMode, downloadFile = false, customTitle } = options;
-    if (isVideoGenerating) return null;
-
-    const renderableAssets = [...assetsRef.current];
-    const existingPreviewUrl = finalVideoUrl;
-    const existingPreviewStatus = previewVideoStatus;
-    const existingPreviewMessage = previewVideoMessage;
-    const sceneVideoCount = renderableAssets.filter((asset) => Boolean(asset.videoData)).length;
-    const hasSceneOutputs = renderableAssets.some((asset) => Boolean(asset.imageData || asset.videoData || asset.audioData));
-    const hasBackgroundOutputs = effectiveBackgroundTracks.some((track) => Boolean(track?.audioData));
-    const shouldStartWithStaticFallback = !hasSceneOutputs && !hasBackgroundOutputs;
-    const subtitlePreset = currentProjectSummary?.subtitlePreset || buildDefaultSubtitlePreset();
-
-    if (!renderableAssets.length) {
-      const message = '합칠 씬이 아직 없어 결과 미리보기를 만들 수 없습니다.';
-      setProgressMessage(message);
-      setPreviewVideoStatus('error');
-      setPreviewVideoMessage(message);
-      return null;
-    }
-
-    if (enableSubtitles && assetsRef.current.some((asset) => !asset.subtitleData && !asset.audioData)) {
-      const message = '자막 포함 출력은 오디오와 자막 데이터가 준비된 뒤에 진행할 수 있습니다.';
-      setPreviewVideoStatus('error');
-      setPreviewVideoMessage(message);
-      openApiModal({
-        title: '자막 출력에는 오디오 생성 연결이 필요합니다',
-        description: '현재 씬 중 일부는 자막용 오디오 데이터가 없어 자막이 비어 있을 수 있습니다. ElevenLabs 키를 연결하면 이 자리에서 다시 생성할 수 있습니다.',
-        focusField: 'elevenLabs',
-      });
-      return null;
-    }
-
-    const progressHandler = (message: string) => {
-      setProgressMessage(`[Render] ${message}`);
-      const percentMatch = message.match(/(\d+)%/);
-      if (percentMatch) {
-        setTaskProgressPercent(Math.max(8, Math.min(100, Number(percentMatch[1]))));
-        return;
-      }
-      if (message.includes('(1/3)')) setTaskProgressPercent(18);
-      else if (message.includes('(2/3)')) setTaskProgressPercent(52);
-      else if (message.includes('렌더링 완료')) setTaskProgressPercent(96);
-    };
-
-    const renderTitle = (fallbackLabel?: string) => (
-      customTitle
-      || (downloadFile
-        ? `${draft.topic || '프로젝트'} 최종 출력 (${enableSubtitles ? '자막 포함' : '자막 없음'})${fallbackLabel ? ` · ${fallbackLabel}` : ''}`
-        : `${draft.topic || '프로젝트'} 합본 미리보기${fallbackLabel ? ` · ${fallbackLabel}` : ''}`)
-    );
-
-    try {
-      setIsVideoGenerating(true);
-      if (!downloadFile) {
-        setIsPreparingPreviewVideo(true);
-      }
-      if (downloadFile) {
-        setTaskProgressPercent(12);
-        setProgressMessage('ffmpeg로 완성형 MP4를 정리하는 중입니다.');
-        const finalResult = await renderVideoWithFfmpeg({
-          assets: assetsRef.current,
-          backgroundTracks: effectiveBackgroundTracks,
-          previewMix,
-          aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
-          qualityMode,
-          enableSubtitles,
-          subtitlePreset,
-          title: renderTitle(),
-        });
-        setTaskProgressPercent(92);
-        triggerBlobDownload(finalResult.videoBlob, `mp4Creater_${enableSubtitles ? 'sub' : 'nosub'}_${Date.now()}.mp4`);
-        setProgressMessage('완성형 MP4 저장이 완료되었습니다.');
-        setTaskProgressPercent(100);
-
-        if (resolvedProjectId) {
-          await persistSceneStudioSnapshot(resolvedProjectId, {
-            ...buildProjectEnhancementPatch(assetsRef.current, {
-              encodingMode: 'ffmpeg',
-            }),
-          });
-        }
-
-        return {
-          videoBlob: finalResult.videoBlob,
-          recordedSubtitles: [],
-        };
-      }
-
-      setTaskProgressPercent(8);
-      setPreviewVideoStatus('loading');
-
-      const primaryMessage = shouldStartWithStaticFallback
-        ? '이미지, 영상, 오디오가 없어도 각 씬 길이만큼 검정 화면으로 합본 영상을 만드는 중입니다.'
-        : sceneVideoCount > 0
-          ? `준비된 씬 영상 ${sceneVideoCount}개와 이미지를 함께 합쳐 합본 영상을 만드는 중입니다.`
-          : 'AI 씬 영상이 없어도 현재 씬 이미지와 오디오를 기준으로 합본 영상을 만드는 중입니다.';
-      setPreviewVideoMessage(primaryMessage);
-      setProgressMessage(primaryMessage);
-
-      let result = null;
-      let usedFallback = shouldStartWithStaticFallback;
-      let usedSceneVideos = sceneVideoCount > 0 && !shouldStartWithStaticFallback;
-      let usedSafeFallback = shouldStartWithStaticFallback;
-
-      try {
-        if (shouldStartWithStaticFallback) {
-          result = await generateVideoStaticFallback(
-            assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
-            progressHandler,
-            isAbortedRef,
-            {
-              enableSubtitles,
-              qualityMode,
-              backgroundTracks: effectiveBackgroundTracks,
-              previewMix,
-              aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
-            }
-          );
-        } else {
-          result = await generateVideo(
-            assetsRef.current,
-            progressHandler,
-            isAbortedRef,
-            {
-              enableSubtitles,
-              qualityMode,
-              backgroundTracks: effectiveBackgroundTracks,
-              previewMix,
-              aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
-              useSceneVideos: usedSceneVideos,
-            }
-          );
-        }
-      } catch (primaryError) {
-        console.error('[SceneStudioPage] primary merged render failed', primaryError);
-        usedFallback = true;
-        usedSceneVideos = false;
-        setTaskProgressPercent(22);
-        const fallbackMessage = '합치는 중 문제가 있어 안전 모드로 다시 시도합니다. 씬 영상 없이 이미지 기반으로 합칩니다.';
-        setPreviewVideoStatus('loading');
-        setPreviewVideoMessage(fallbackMessage);
-        setProgressMessage(fallbackMessage);
-
-        try {
-          result = await generateVideo(
-            assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
-            progressHandler,
-            isAbortedRef,
-            {
-              enableSubtitles,
-              qualityMode: 'preview',
-              backgroundTracks: effectiveBackgroundTracks,
-              previewMix,
-              aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
-              useSceneVideos: false,
-            }
-          );
-        } catch (secondaryError) {
-          console.error('[SceneStudioPage] browser merged render failed, switching to static fallback', secondaryError);
-          usedSafeFallback = true;
-          setTaskProgressPercent(35);
-          const safeFallbackMessage = '브라우저 합치기 중 문제가 있어 ZIP 방식과 같은 정적 합본 렌더로 다시 만듭니다.';
-          setPreviewVideoStatus('loading');
-          setPreviewVideoMessage(safeFallbackMessage);
-          setProgressMessage(safeFallbackMessage);
-
-          result = await generateVideoStaticFallback(
-            assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
-            progressHandler,
-            isAbortedRef,
-            {
-              enableSubtitles,
-              qualityMode,
-              backgroundTracks: effectiveBackgroundTracks,
-              previewMix,
-              aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
-            }
-          );
-        }
-      }
-
-      if (!result) {
-        const message = '합본 영상 결과를 아직 받지 못했습니다. 잠시 후 다시 시도해 주세요.';
-        setPreviewVideoStatus('error');
-        setPreviewVideoMessage(message);
-        setProgressMessage(message);
-        return null;
-      }
-
-      let finalResult = result;
-
-      const expectedDuration = Number(renderableAssets.reduce((sum, asset) => sum + resolveScenePlaybackDuration(asset), 0).toFixed(2));
-      const measuredDuration = await measureRenderedVideoDuration(finalResult.videoBlob);
-
-      if (!usedSafeFallback && (!measuredDuration || measuredDuration < 0.2)) {
-        usedSafeFallback = true;
-        usedFallback = true;
-        usedSceneVideos = false;
-        setTaskProgressPercent(42);
-        const invalidDurationMessage = '렌더 결과 길이를 확인하지 못해 정적 합본 렌더로 한 번 더 맞춥니다.';
-        setPreviewVideoStatus('loading');
-        setPreviewVideoMessage(invalidDurationMessage);
-        setProgressMessage(invalidDurationMessage);
-
-        const safeFallbackResult = await generateVideoStaticFallback(
-          assetsRef.current.map((asset) => ({ ...asset, videoData: null })),
-          progressHandler,
-          isAbortedRef,
-          {
-            enableSubtitles,
-            qualityMode,
-            backgroundTracks: effectiveBackgroundTracks,
-            previewMix,
-            aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
-          }
-        );
-        if (!safeFallbackResult) return null;
-        finalResult = safeFallbackResult;
-      }
-
-      const safeMeasuredDuration = await measureRenderedVideoDuration(finalResult.videoBlob);
-      const normalizedExpectedDuration = safeMeasuredDuration && safeMeasuredDuration > 0.1
-        ? safeMeasuredDuration
-        : expectedDuration;
-
-      const suffix = enableSubtitles ? 'sub' : 'nosub';
-      const previewUrl = URL.createObjectURL(finalResult.videoBlob);
-      setFinalVideoUrl((previous) => {
-        revokePreviewVideoUrl(previous);
-        return previewUrl;
-      });
-      const nextFinalVideoTitle = renderTitle(usedFallback ? '안전 모드' : undefined);
-      setFinalVideoTitle(nextFinalVideoTitle);
-      setFinalVideoDuration(normalizedExpectedDuration > 0 ? normalizedExpectedDuration : null);
-
-      if (downloadFile) {
-        const outputExtension = finalResult.videoBlob.type.includes('webm') ? 'webm' : 'mp4';
-        triggerBlobDownload(finalResult.videoBlob, `mp4Creater_${suffix}_${Date.now()}.${outputExtension}`);
-      }
-
-      const successMessage = usedSafeFallback
-        ? '정적 합본 렌더로 전체 씬을 다시 묶어 결과 영상을 준비했습니다.'
-        : usedFallback
-          ? '안전 모드로 합본 영상을 만들었습니다. 브라우저 합치기 문제가 있어 이미지 기반으로 다시 합쳤습니다.'
-          : usedSceneVideos
-            ? `씬 영상 ${sceneVideoCount}개를 반영한 합본 영상이 준비되었습니다.`
-            : 'AI 씬 영상 없이도 이미지 기반 합본 영상이 준비되었습니다.';
-
-      const durationMessage = normalizedExpectedDuration > 0
-        ? ` 총 길이 ${normalizedExpectedDuration.toFixed(1)}초 기준으로 맞췄습니다.`
-        : '';
-
-      const nextPreviewStatus = usedFallback || usedSafeFallback || !usedSceneVideos ? 'fallback' : 'ready';
-      setPreviewVideoStatus(nextPreviewStatus);
-      setPreviewVideoMessage(`${successMessage}${durationMessage}`);
-      setProgressMessage(downloadFile ? '합본 영상 저장이 완료되었습니다.' : '합본 영상 미리보기가 준비되었습니다.');
-      setTaskProgressPercent(100);
-
-      if (resolvedProjectId) {
-        const renderNonce = previewRenderNonceRef.current;
-        finalPreviewPersistedRef.current = true;
-        try {
-          const previewVideoData = await blobToDataUrl(finalResult.videoBlob);
-          if (renderNonce === previewRenderNonceRef.current) {
-            await persistSceneStudioSnapshot(resolvedProjectId, {
-              ...buildProjectEnhancementPatch(assetsRef.current, {
-                encodingMode: 'browser',
-              }),
-              sceneStudioPreviewVideo: {
-                id: `scene_preview_${Date.now()}`,
-                title: nextFinalVideoTitle,
-                prompt: successMessage,
-                videoData: previewVideoData,
-                provider: 'sample',
-                mode: 'preview',
-                sourceMode: usedSceneVideos && !usedFallback && !usedSafeFallback ? 'ai' : 'sample',
-                createdAt: Date.now(),
-                duration: normalizedExpectedDuration,
-              },
-              sceneStudioPreviewStatus: nextPreviewStatus,
-              sceneStudioPreviewMessage: `${successMessage}${durationMessage}`,
-            });
-          }
-        } catch (persistError) {
-          finalPreviewPersistedRef.current = false;
-          console.error('[SceneStudioPage] preview persist failed', persistError);
-        }
-      }
-
-      return finalResult;
-    } catch (error) {
-      console.error('[SceneStudioPage] merged render failed', error);
-      const failureMessage = '브라우저에서 합본 영상을 만드는 중 문제가 발생했습니다. 다시 시도하거나 씬 수를 줄여 확인해 주세요.';
-      const resolvedFailureMessage = downloadFile
-        ? (isFfmpegUnavailableError(error)
-          ? '완성형 MP4 출력에 필요한 ffmpeg를 찾지 못했습니다. ffmpeg 설치 또는 FFMPEG_PATH 설정이 필요합니다.'
-          : error instanceof Error && error.message
-            ? error.message
-            : '완성형 MP4 출력 중 문제가 발생했습니다. 잠시 후 다시 시도해 주세요.')
-        : failureMessage;
-      if (downloadFile) {
-        setProgressMessage(resolvedFailureMessage);
-        setPreviewVideoMessage(resolvedFailureMessage);
-      } else if (existingPreviewUrl && (existingPreviewStatus === 'ready' || existingPreviewStatus === 'fallback')) {
-        setPreviewVideoStatus(existingPreviewStatus);
-        setPreviewVideoMessage(existingPreviewMessage);
-        setProgressMessage(resolvedFailureMessage);
-      } else {
-        setPreviewVideoStatus('error');
-        setPreviewVideoMessage(resolvedFailureMessage);
-        setProgressMessage(resolvedFailureMessage);
-        setFinalVideoDuration(null);
-      }
-      return null;
-    } finally {
-      setIsVideoGenerating(false);
-      if (!downloadFile) setIsPreparingPreviewVideo(false);
-      window.setTimeout(() => setTaskProgressPercent(null), 1200);
-    }
-  }, [buildProjectEnhancementPatch, currentProjectSummary?.subtitlePreset, draft.aspectRatio, draft.topic, effectiveBackgroundTracks, finalVideoUrl, isVideoGenerating, openApiModal, persistSceneStudioSnapshot, previewMix, previewVideoMessage, previewVideoStatus, resolvedProjectId]);
 
   const renderSceneStudioVideoWithFfmpeg = useCallback(async (options: {
     enableSubtitles: boolean;
@@ -2839,7 +2568,11 @@ const SceneStudioPage: React.FC = () => {
         setTaskProgressPercent(12);
         setSceneProgress(index, 24, '오디오 다시 생성');
         try {
-          const audio = await generateSceneAudioAsset(assetsRef.current[index].narration);
+          const audio = await withSoftTimeout(
+            generateSceneAudioAsset(assetsRef.current[index].narration),
+            15000,
+            { audioData: null, subtitleData: null, estimatedDuration: null, sourceMode: 'sample' as const },
+          );
           if (audio.audioData) {
             updateAssetAt(index, {
               audioData: audio.audioData,
@@ -3081,6 +2814,46 @@ const SceneStudioPage: React.FC = () => {
     updateAssetAt(index, { videoPrompt: prompt });
     syncSceneStudioWorkingCopy();
   };
+
+  const handleGenerateSceneEditorContent = useCallback(async (index: number, mode: SceneEditorPromptMode) => {
+    const currentAsset = assetsRef.current[index];
+    if (!currentAsset) return;
+
+    const modeLabel = mode === 'narration' ? '대사' : mode === 'image' ? '이미지 프롬프트' : '영상 프롬프트';
+    const sceneLabel = `씬 ${currentAsset.sceneNumber} ${modeLabel}`;
+
+    try {
+      await enqueueGenerationTask(sceneLabel, async () => {
+        const queuedAsset = assetsRef.current[index];
+        if (!queuedAsset) return;
+        setTaskProgressPercent(18);
+        setProgressMessage(`${sceneLabel}를 현재 흐름 기준으로 새로 생성하는 중...`);
+        const result = await generateSceneEditorContent({
+          mode,
+          draft,
+          asset: queuedAsset,
+          previousAsset: assetsRef.current[index - 1] || null,
+          nextAsset: assetsRef.current[index + 1] || null,
+          model: resolveSceneEditorModel(mode),
+        });
+        setTaskProgressPercent(82);
+
+        if (mode === 'narration') {
+          handleNarrationChange(index, result.text);
+        } else if (mode === 'image') {
+          handleImagePromptChange(index, result.text);
+        } else {
+          handleVideoPromptChange(index, result.text);
+        }
+
+        setTaskProgressPercent(100);
+        setProgressMessage(`${sceneLabel}를 ${result.source === 'ai' ? 'AI' : '샘플 규칙'} 기준으로 새 안으로 갱신했습니다. 같은 버튼을 다시 누르면 이어지는 다른 변주를 계속 만들 수 있습니다.`);
+      });
+    } catch {}
+    finally {
+      window.setTimeout(() => setTaskProgressPercent(null), 700);
+    }
+  }, [draft, enqueueGenerationTask, handleImagePromptChange, handleNarrationChange, handleVideoPromptChange, resolveSceneEditorModel]);
 
   const handleSelectedVisualTypeChange = (index: number, mode: 'image' | 'video') => {
     const asset = assetsRef.current[index];
@@ -3491,6 +3264,7 @@ const SceneStudioPage: React.FC = () => {
           onNarrationChange={handleNarrationChange}
           onImagePromptChange={handleImagePromptChange}
           onVideoPromptChange={handleVideoPromptChange}
+          onGenerateEditorContent={handleGenerateSceneEditorContent}
           onSelectedVisualTypeChange={handleSelectedVisualTypeChange}
           onDurationChange={handleDurationChange}
           onAddParagraphScene={handleAddParagraphScene}
@@ -3540,20 +3314,35 @@ const SceneStudioPage: React.FC = () => {
           imageModelSelector={{
             currentId: selectedImageModelId,
             currentLabel: selectedImageModelLabel,
-            options: quickImageModelOptions,
+            options: quickImageModelCardOptions,
             onSelect: handleQuickImageModelSelect,
           }}
           videoModelSelector={{
             currentId: selectedVideoModel,
             currentLabel: selectedVideoModelLabel,
-            options: quickVideoModelOptions,
+            options: quickVideoModelCardOptions,
             onSelect: handleQuickVideoModelSelect,
           }}
           audioModelSelector={{
             currentId: selectedAudioModelMeta.currentId,
             currentLabel: selectedAudioModelMeta.currentLabel,
-            options: quickAudioModelOptions,
+            options: quickAudioModelCardOptions,
             onSelect: handleQuickAudioModelSelect,
+          }}
+          audioTtsSelectionFlow={{
+            currentProvider: resolveSceneTtsOptions().provider,
+            currentModelId: resolveSceneTtsOptions().modelId,
+            currentVoiceId: resolveSceneTtsOptions().voiceId,
+            googleApiKey: studioState?.providers?.openRouterApiKey || null,
+            elevenLabsApiKey: studioState?.providers?.elevenLabsApiKey || null,
+            hasElevenLabsApiKey: Boolean(studioState?.providers?.elevenLabsApiKey),
+            elevenLabsVoices: sceneElevenLabsVoices,
+            voiceReferenceAudioData: resolveSceneTtsOptions().voiceReferenceAudioData,
+            voiceReferenceMimeType: resolveSceneTtsOptions().voiceReferenceMimeType,
+            voiceReferenceName: draft.voiceReferenceName || studioState?.routing?.voiceReferenceName || null,
+            onApply: (selection) => {
+              applyQuickAudioSelection(selection);
+            },
           }}
           onFooterBack={handleGoBackToWorkflow}
           footerBackLabel="이전으로"

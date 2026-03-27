@@ -7,13 +7,23 @@ import {
   ScriptLanguageOption,
   WorkflowPromptTemplateEngine,
 } from '../../../types';
-import { CHATTERBOX_TTS_PRESET_OPTIONS, NO_AI_SCRIPT_MODEL_ID } from '../../../config';
+import { CONFIG, NO_AI_SCRIPT_MODEL_ID } from '../../../config';
+import AiOptionPickerModal from '../../AiOptionPickerModal';
+import TtsSelectionModal from '../../TtsSelectionModal';
+import {
+  AiPickerOption,
+  getElevenLabsVoicePickerOptions,
+  getQwenVoicePickerOptions,
+  getScriptModelPickerOptions,
+} from '../../../services/aiOptionCatalog';
 
 interface Step3PanelProps {
   contentType: ContentType;
   customScriptLanguage: ScriptLanguageOption;
   expectedDurationMinutes: number;
   isGeneratingScript: boolean;
+  scriptGenerationProgressPercent?: number | null;
+  scriptGenerationProgressMessage?: string;
   sceneCount: number;
   storyScript: string;
   customScriptReferenceText: string;
@@ -33,6 +43,11 @@ interface Step3PanelProps {
   isLoadingVoiceCatalogs: boolean;
   projectVoiceProvider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' | 'heygen';
   projectVoiceSummary: string;
+  googleApiKey?: string;
+  elevenLabsApiKey?: string;
+  currentTtsModelId?: string | null;
+  voiceReferenceAudioData?: string | null;
+  voiceReferenceMimeType?: string | null;
   elevenLabsVoices: Array<{
     voice_id: string;
     name: string;
@@ -49,6 +64,7 @@ interface Step3PanelProps {
   }>;
   activeVoicePreviewCharacterId: string | null;
   voicePreviewMessage: string;
+  onOpenSettings?: () => void;
   newCharacterName: string;
   newCharacterPrompt: string;
   onGenerateScript: () => void;
@@ -67,13 +83,14 @@ interface Step3PanelProps {
   onCharacterRemove: (characterId: string) => void;
   onCharacterVoiceProviderChange: (
     characterId: string,
-    provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs'
+    provider: 'qwen3Tts' | 'elevenLabs'
   ) => void;
   onCharacterVoiceChoiceChange: (
     characterId: string,
-    provider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs',
+    provider: 'qwen3Tts' | 'elevenLabs',
     value: string
   ) => void;
+  onProjectTtsModelChange?: (modelId: string) => void;
   onCharacterVoiceDirectInputChange: (
     characterId: string,
     provider: 'elevenLabs',
@@ -96,8 +113,6 @@ const QWEN_VOICE_OPTIONS = [
   { id: 'qwen-default', name: 'qwen3-tts 기본 보이스' },
   { id: 'qwen-soft', name: 'qwen3-tts 부드러운 보이스' },
 ];
-
-const CHATTERBOX_VOICE_OPTIONS = CHATTERBOX_TTS_PRESET_OPTIONS;
 
 const SCRIPT_CHARACTER_RANGE_BY_TYPE: Record<ContentType, { min: number; max: number }> = {
   music_video: { min: 130, max: 250 },
@@ -424,6 +439,8 @@ export default function Step3Panel({
   customScriptLanguage,
   expectedDurationMinutes,
   isGeneratingScript,
+  scriptGenerationProgressPercent,
+  scriptGenerationProgressMessage,
   sceneCount,
   storyScript,
   selectedScriptModel,
@@ -431,9 +448,16 @@ export default function Step3Panel({
   extractedCharacters: extractedCharactersProp,
   selectedCharacterIds: selectedCharacterIdsProp,
   isHydratingCharacters,
+  googleApiKey,
+  elevenLabsApiKey,
+  currentTtsModelId,
+  voiceReferenceAudioData,
+  voiceReferenceMimeType,
   elevenLabsVoices: elevenLabsVoicesProp,
   activeVoicePreviewCharacterId,
   voicePreviewMessage,
+  projectVoiceSummary,
+  onOpenSettings,
   onGenerateScript,
   onViewPrompt,
   onStoryScriptChange,
@@ -443,12 +467,28 @@ export default function Step3Panel({
   onCharacterRemove,
   onCharacterVoiceProviderChange,
   onCharacterVoiceChoiceChange,
+  onProjectTtsModelChange,
   onCharacterVoiceDirectInputChange,
   onPreviewCharacterVoice,
   onCreateCharacterFromForm,
+  getCharacterVoiceSummary,
   castSelectionHighlightTick = 0,
 }: Step3PanelProps) {
-  const scriptModelOptions = Array.isArray(scriptModelOptionsProp) ? scriptModelOptionsProp : [];
+  const scriptModelPickerOptions = useMemo<AiPickerOption[]>(() => {
+    const catalogOptions = getScriptModelPickerOptions(true);
+    if (catalogOptions.length) return catalogOptions;
+    return (Array.isArray(scriptModelOptionsProp) ? scriptModelOptionsProp : []).map((item) => ({
+      id: item.id,
+      title: item.name,
+      provider: item.id === NO_AI_SCRIPT_MODEL_ID ? 'Built-in' : 'AI model',
+      description: 'Script model option',
+      badge: item.id === NO_AI_SCRIPT_MODEL_ID ? 'Sample' : 'AI',
+      priceLabel: item.id === NO_AI_SCRIPT_MODEL_ID ? 'Free' : 'API',
+      qualityLabel: 'Balanced',
+      group: item.id === NO_AI_SCRIPT_MODEL_ID ? 'sample' as const : 'free' as const,
+      tier: item.id === NO_AI_SCRIPT_MODEL_ID ? 'sample' as const : 'free' as const,
+    }));
+  }, [scriptModelOptionsProp]);
   const extractedCharacters = Array.isArray(extractedCharactersProp) ? extractedCharactersProp : [];
   const selectedCharacterIds = Array.isArray(selectedCharacterIdsProp) ? selectedCharacterIdsProp : [];
   const elevenLabsVoices = Array.isArray(elevenLabsVoicesProp) ? elevenLabsVoicesProp : [];
@@ -460,6 +500,11 @@ export default function Step3Panel({
   const [showInlineAddCharacterCard, setShowInlineAddCharacterCard] = useState(false);
   const [savedScriptSnapshot, setSavedScriptSnapshot] = useState(storyScript || '');
   const [railFocusIndex, setRailFocusIndex] = useState<number | null>(null);
+  const [modelPickerOpen, setModelPickerOpen] = useState(false);
+  const [voicePickerTarget, setVoicePickerTarget] = useState<{
+    characterId: string;
+    provider: 'qwen3Tts' | 'elevenLabs';
+  } | null>(null);
 
   const prevCharacterCountRef = useRef(extractedCharacters.length);
   const castSectionRef = useRef<HTMLElement | null>(null);
@@ -492,6 +537,26 @@ export default function Step3Panel({
     () => (storyScript || '') !== (savedScriptSnapshot || ''),
     [storyScript, savedScriptSnapshot]
   );
+  const currentScriptModelSummary = useMemo(
+    () => scriptModelPickerOptions.find((item) => item.id === selectedScriptModel) || scriptModelPickerOptions[0] || null,
+    [scriptModelPickerOptions, selectedScriptModel]
+  );
+  const voicePickerOptions = useMemo<AiPickerOption[]>(() => {
+    if (!voicePickerTarget) return [];
+    if (voicePickerTarget.provider === 'elevenLabs') {
+      return getElevenLabsVoicePickerOptions(elevenLabsVoices);
+    }
+    return getQwenVoicePickerOptions();
+  }, [elevenLabsVoices, voicePickerTarget]);
+  const voicePickerCurrentId = useMemo(() => {
+    if (!voicePickerTarget) return '';
+    const targetCharacter = extractedCharacters.find((item) => item.id === voicePickerTarget.characterId);
+    const currentVoiceId = targetCharacter?.voiceId || targetCharacter?.voiceHint || '';
+    if (voicePickerTarget.provider === 'elevenLabs') {
+      return currentVoiceId || elevenLabsVoices[0]?.voice_id || '';
+    }
+    return currentVoiceId || 'qwen-default';
+  }, [elevenLabsVoices, extractedCharacters, voicePickerTarget]);
 
 
   const needsCastSelectionGuidance = useMemo(() => {
@@ -507,21 +572,15 @@ export default function Step3Panel({
 
     return selectedCharacters.some((character) => {
       const rawVoiceProvider = character.voiceProvider;
-      const voiceProvider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' =
-        rawVoiceProvider === 'elevenLabs' ||
-        rawVoiceProvider === 'chatterbox' ||
-        rawVoiceProvider === 'qwen3Tts'
-          ? rawVoiceProvider
+      const voiceProvider: 'qwen3Tts' | 'elevenLabs' =
+        rawVoiceProvider === 'elevenLabs'
+          ? 'elevenLabs'
           : 'qwen3Tts';
 
       const currentVoiceId = character.voiceId || character.voiceHint || '';
 
       if (voiceProvider === 'qwen3Tts') {
         return !(currentVoiceId || 'qwen-default');
-      }
-
-      if (voiceProvider === 'chatterbox') {
-        return !(currentVoiceId || CHATTERBOX_VOICE_OPTIONS[0]?.id);
       }
 
       return !(currentVoiceId || elevenLabsVoices[0]?.voice_id);
@@ -707,20 +766,35 @@ export default function Step3Panel({
   return (
     <div className="space-y-6">
       <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-4">
-          <div className="whitespace-nowrap text-[20px] font-black uppercase text-violet-900">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <div className="whitespace-nowrap text-[20px] font-black uppercase text-violet-900">
             AI 설정
           </div>
 
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
+              Pick the script model here, keep the default project TTS easy to see, and only write the final script into the editor after generation is fully done.
+            </p>
+          </div>
+
           <div className="flex flex-row flex-nowrap items-center gap-3 overflow-x-auto">
+            <button
+              type="button"
+              onClick={() => setModelPickerOpen(true)}
+              className="min-w-[240px] shrink-0 rounded-[24px] border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
+            >
+              <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Script model</div>
+              <div className="mt-1 text-sm font-black text-slate-900">{currentScriptModelSummary?.title || selectedScriptModel}</div>
+              <div className="mt-1 text-xs text-slate-500">{currentScriptModelSummary?.priceLabel || 'AI'} · {currentScriptModelSummary?.qualityLabel || 'Balanced'}</div>
+            </button>
             <select
               value={selectedScriptModel}
               onChange={(e) => onScriptModelChange(e.target.value)}
-              className="shrink-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400"
+              className="hidden shrink-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none focus:border-violet-400"
             >
-              {scriptModelOptions.map((item) => (
+              {scriptModelPickerOptions.map((item) => (
                 <option key={item.id} value={item.id}>
-                  {item.name}
+                  {item.title}
                   {item.id === NO_AI_SCRIPT_MODEL_ID ? ' · 무료 샘플' : ' · AI'}
                 </option>
               ))}
@@ -744,6 +818,39 @@ export default function Step3Panel({
             </button>
           </div>
         </div>
+
+        <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Current script model</div>
+          <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-black">
+            <span className="rounded-full bg-white px-3 py-1 text-slate-700">{currentScriptModelSummary?.provider || 'AI model'}</span>
+            <span className="rounded-full bg-white px-3 py-1 text-slate-700">{currentScriptModelSummary?.priceLabel || 'AI'}</span>
+            <span className="rounded-full bg-white px-3 py-1 text-slate-700">{currentScriptModelSummary?.qualityLabel || 'Balanced'}</span>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-600">{currentScriptModelSummary?.description || 'Select a script model for Step3 generation.'}</p>
+        </div>
+
+        {isGeneratingScript ? (
+          <div className="mt-4 rounded-[24px] border border-violet-200 bg-violet-50 px-4 py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.16em] text-violet-700">Script generation progress</div>
+                <div className="mt-1 text-sm font-black text-slate-900">{scriptGenerationProgressMessage || 'Preparing the final script output.'}</div>
+              </div>
+              <div className="rounded-full bg-white px-3 py-1 text-[11px] font-black text-violet-700">
+                {typeof scriptGenerationProgressPercent === 'number' ? `${Math.round(scriptGenerationProgressPercent)}%` : 'Running'}
+              </div>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/90">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-violet-600 via-fuchsia-500 to-blue-500 transition-all duration-300"
+                style={{ width: `${Math.max(8, Math.min(100, scriptGenerationProgressPercent || 0))}%` }}
+              />
+            </div>
+            <div className="mt-2 text-xs leading-5 text-violet-700">
+              The editor stays locked until the final script is fully prepared.
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -765,7 +872,7 @@ export default function Step3Panel({
                     onSaveStoryScript();
                     setSavedScriptSnapshot(storyScript || '');
                   }}
-                  disabled={isHydratingCharacters}
+                  disabled={isHydratingCharacters || isGeneratingScript}
                   className="rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
                   {isHydratingCharacters ? '출연자 업데이트 중...' : '수정하기'}
@@ -774,7 +881,7 @@ export default function Step3Panel({
                 <button
                   type="button"
                   onClick={() => onStoryScriptChange(savedScriptSnapshot)}
-                  disabled={isHydratingCharacters}
+                  disabled={isHydratingCharacters || isGeneratingScript}
                   className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   수정취소
@@ -822,6 +929,7 @@ export default function Step3Panel({
             <textarea
               value={storyScript}
               onChange={(e) => onStoryScriptChange(e.target.value)}
+              readOnly={isGeneratingScript}
               className={`min-h-[420px] w-full rounded-3xl border px-5 py-5 text-sm leading-7 text-slate-900 outline-none transition ${
                 isScriptModified
                   ? 'border-blue-300 bg-white focus:border-blue-400'
@@ -857,11 +965,23 @@ export default function Step3Panel({
               Step4로 넘길 출연자를 고르고, 각 카드에서 TTS까지 바로 정해 주세요
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              카드 상단 정보 영역은 선택, 아래 설정 배경은 드래그 또는 마우스 휠로 좌우 이동할 수 있습니다.
+              헤더 설정에서 고른 기본 TTS는 새 프로젝트 기본값으로만 쓰이고, 여기서는 캐릭터마다 다른 목소리를 바로 고를 수 있습니다.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center justify-end gap-2 text-[11px] font-black">
+            <span className="rounded-full bg-blue-50 px-3 py-1 text-blue-700">
+              기본 TTS {projectVoiceSummary || '무료 기본 목소리'}
+            </span>
+            {onOpenSettings ? (
+              <button
+                type="button"
+                onClick={onOpenSettings}
+                className="rounded-2xl border border-blue-200 bg-white px-4 py-2.5 text-sm font-black text-blue-700 transition hover:bg-blue-50"
+              >
+                기본값 보기
+              </button>
+            ) : null}
             <button
               type="button"
               onClick={() => setShowInlineAddCharacterCard(true)}
@@ -934,11 +1054,9 @@ export default function Step3Panel({
             >
               {extractedCharacters.map((character, index) => {
                 const rawVoiceProvider = character.voiceProvider;
-                const voiceProvider: 'qwen3Tts' | 'chatterbox' | 'elevenLabs' =
-                  rawVoiceProvider === 'elevenLabs' ||
-                  rawVoiceProvider === 'chatterbox' ||
-                  rawVoiceProvider === 'qwen3Tts'
-                    ? rawVoiceProvider
+                const voiceProvider: 'qwen3Tts' | 'elevenLabs' =
+                  rawVoiceProvider === 'elevenLabs'
+                    ? 'elevenLabs'
                     : 'qwen3Tts';
 
                 const currentVoiceId = character.voiceId || character.voiceHint || '';
@@ -952,10 +1070,6 @@ export default function Step3Panel({
                     ? currentVoiceId || elevenLabsVoices[0]?.voice_id || ''
                     : elevenLabsVoices[0]?.voice_id || '';
 
-                const chatterboxVoiceId =
-                  voiceProvider === 'chatterbox'
-                    ? currentVoiceId || CHATTERBOX_VOICE_OPTIONS[0]?.id || 'chatterbox-clear'
-                    : CHATTERBOX_VOICE_OPTIONS[0]?.id || 'chatterbox-clear';
                 const selected = selectedCharacterIds.includes(character.id);
                 const positionText =
                   character.roleLabel ||
@@ -1050,6 +1164,7 @@ export default function Step3Panel({
                                 event.preventDefault();
                                 event.stopPropagation();
                                 onCharacterVoiceProviderChange(character.id, 'qwen3Tts');
+                                setVoicePickerTarget({ characterId: character.id, provider: 'qwen3Tts' });
                               }}
                             />
                             <SelectablePill
@@ -1059,24 +1174,30 @@ export default function Step3Panel({
                                 event.preventDefault();
                                 event.stopPropagation();
                                 onCharacterVoiceProviderChange(character.id, 'elevenLabs');
-                              }}
-                            />
-                            <SelectablePill
-                              active={voiceProvider === 'chatterbox'}
-                              label="Chatterbox"
-                              onClick={(event) => {
-                                event.preventDefault();
-                                event.stopPropagation();
-                                onCharacterVoiceProviderChange(character.id, 'chatterbox');
+                                setVoicePickerTarget({ characterId: character.id, provider: 'elevenLabs' });
                               }}
                             />
                           </div>
                         </div>
 
                         <div>
-                          <div className="mb-1.5 text-[11px] font-black text-slate-700">보이스 선택</div>
+                          <div className="mb-1.5 text-[11px] font-black text-slate-700">TTS 선택</div>
                           <div className="flex items-end gap-2">
                             <div className="min-w-0 flex-1">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  stopCardToggle(event);
+                                  setVoicePickerTarget({ characterId: character.id, provider: voiceProvider });
+                                }}
+                                className="mb-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-left hover:bg-slate-50"
+                              >
+                                <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">TTS 모델 / 목소리</div>
+                                <div className="mt-1 text-sm font-black text-slate-900">{getCharacterVoiceSummary(character)}</div>
+                                <div className="mt-1 text-xs leading-5 text-slate-500">
+                                  {voiceProvider === 'elevenLabs' ? '이 버튼을 누르면 모델을 고르고, 이어서 그 모델의 실제 목소리를 들어보며 선택합니다.' : '이 버튼을 누르면 무료 모델 안에서 실제 목소리를 들어보고 선택합니다.'}
+                                </div>
+                              </button>
                               {voiceProvider === 'qwen3Tts' ? (
                                 <select
                                   value={qwenVoiceId}
@@ -1090,7 +1211,7 @@ export default function Step3Panel({
                                       e.target.value
                                     )
                                   }
-                                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
+                                  className="hidden w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
                                 >
                                   {QWEN_VOICE_OPTIONS.map((item) => (
                                     <option key={item.id} value={item.id}>
@@ -1111,7 +1232,7 @@ export default function Step3Panel({
                                       e.target.value
                                     )
                                   }
-                                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
+                                  className="hidden w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
                                 >
                                   {elevenLabsVoices.length ? (
                                     elevenLabsVoices.map((item) => (
@@ -1123,28 +1244,7 @@ export default function Step3Panel({
                                     <option value="">연결된 보이스 없음</option>
                                   )}
                                 </select>
-                              ) : (
-                                <select
-                                  value={chatterboxVoiceId}
-                                  onClick={stopCardToggle}
-                                  onKeyDown={stopCardToggle}
-                                  onPointerDown={stopCardToggle}
-                                  onChange={(e) =>
-                                    onCharacterVoiceChoiceChange(
-                                      character.id,
-                                      'chatterbox',
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-violet-400"
-                                >
-                                  {CHATTERBOX_VOICE_OPTIONS.map((item) => (
-                                    <option key={item.id} value={item.id}>
-                                      {item.name}
-                                    </option>
-                                  ))}
-                                </select>
-                              )}
+                              ) : null}
                             </div>
 
                             <button
@@ -1258,6 +1358,46 @@ export default function Step3Panel({
           </p>
         ) : null}
       </section>
+
+      <AiOptionPickerModal
+        open={modelPickerOpen}
+        title="Step3 대본 모델"
+        description="대본 생성에 쓸 모델을 비교한 뒤 선택하면 저장됩니다."
+        currentId={selectedScriptModel}
+        options={scriptModelPickerOptions}
+        onClose={() => setModelPickerOpen(false)}
+        onSelect={onScriptModelChange}
+        requireConfirm
+        confirmLabel="이 모델 선택하기"
+      />
+
+      <TtsSelectionModal
+        open={Boolean(voicePickerTarget)}
+        title={voicePickerTarget ? `${extractedCharacters.find((item) => item.id === voicePickerTarget.characterId)?.name || '캐릭터'} TTS 모델 / 목소리 선택` : '음성 선택'}
+        currentProvider={voicePickerTarget?.provider || 'qwen3Tts'}
+        currentModelId={currentTtsModelId || CONFIG.DEFAULT_ELEVENLABS_MODEL}
+        currentVoiceId={voicePickerCurrentId}
+        googleApiKey={googleApiKey}
+        elevenLabsApiKey={elevenLabsApiKey}
+        hasElevenLabsApiKey={Boolean(elevenLabsApiKey?.trim())}
+        allowPaid={Boolean(elevenLabsApiKey?.trim())}
+        elevenLabsVoices={elevenLabsVoices}
+        voiceReferenceAudioData={voiceReferenceAudioData}
+        voiceReferenceMimeType={voiceReferenceMimeType}
+        onClose={() => setVoicePickerTarget(null)}
+        onApply={(selection) => {
+          if (!voicePickerTarget) return;
+          onCharacterVoiceProviderChange(voicePickerTarget.characterId, selection.provider as 'qwen3Tts' | 'elevenLabs');
+          if (selection.provider === 'elevenLabs' && selection.modelId && onProjectTtsModelChange) {
+            onProjectTtsModelChange(selection.modelId);
+          }
+          onCharacterVoiceChoiceChange(
+            voicePickerTarget.characterId,
+            selection.provider as 'qwen3Tts' | 'elevenLabs',
+            selection.voiceId || ''
+          );
+        }}
+      />
     </div>
   );
 }
