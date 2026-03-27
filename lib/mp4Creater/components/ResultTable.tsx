@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AssetHistoryItem, BackgroundMusicSceneConfig, BackgroundMusicTrack, CostBreakdown, GeneratedAsset, PreviewMixSettings } from '../types';
 import { getAspectRatioClass } from '../utils/aspectRatio';
 import { getAspectRatioPreviewClass } from '../config/workflowUi';
-import { BGM_MODEL_OPTIONS } from '../config';
+import { PRICING } from '../config';
 import { handleHorizontalWheel, scrollContainerBy, scrollElementIntoView } from '../utils/horizontalScroll';
 import { exportAssetsToZip } from '../services/exportService';
 import { downloadProjectZip } from '../utils/csvHelper';
@@ -91,6 +91,7 @@ interface ResultTableProps {
   onBackgroundMusicSceneChange?: (patch: Partial<BackgroundMusicSceneConfig>) => void;
   onAutoFillBackgroundMusicMood?: () => void;
   isMuteMode?: boolean;
+  isNarrationAudioEnabled?: boolean;
   currentTopic?: string;
   totalCost?: CostBreakdown;
   isGenerating?: boolean;
@@ -121,10 +122,25 @@ interface ResultTableProps {
   imageModelSelector?: QuickModelSelector;
   videoModelSelector?: QuickModelSelector;
   audioModelSelector?: QuickModelSelector;
+  backgroundMusicModelSelector?: QuickModelSelector;
   audioTtsSelectionFlow?: AudioTtsSelectionFlow;
 }
 
 const formatSeconds = (value?: number | null) => (typeof value === 'number' ? `${value.toFixed(1)}초` : '-');
+const formatUsdAmount = (value?: number | null) => {
+  const safeValue = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  const digits = safeValue > 0 && safeValue < 1 ? 3 : 2;
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits,
+  }).format(safeValue);
+};
+const formatKrwEstimate = (value?: number | null) => {
+  const safeValue = typeof value === 'number' && Number.isFinite(value) ? value : 0;
+  return `${Math.round(safeValue * PRICING.USD_TO_KRW).toLocaleString('ko-KR')}원`;
+};
 const MAX_SCENE_DURATION = 6;
 const MIN_SCENE_DURATION = 1;
 const DEFAULT_SCENE_NARRATION_VOLUME = 0.5;
@@ -338,6 +354,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   onBackgroundMusicSceneChange,
   onAutoFillBackgroundMusicMood,
   isMuteMode = false,
+  isNarrationAudioEnabled = true,
   currentTopic,
   totalCost,
   isGenerating,
@@ -368,8 +385,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
   imageModelSelector,
   videoModelSelector,
   audioModelSelector,
+  backgroundMusicModelSelector,
   audioTtsSelectionFlow,
 }) => {
+  const narrationAudioEnabled = !isMuteMode && isNarrationAudioEnabled;
   const [previewOpen, setPreviewOpen] = useState(false);
   const downloadQuality: 'preview' | 'final' = 'final';
   const [sequenceSceneIndex, setSequenceSceneIndex] = useState(0);
@@ -398,6 +417,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [sceneMediaShift, setSceneMediaShift] = useState<Record<string, number>>({});
   const [sceneActionLocks, setSceneActionLocks] = useState<Record<string, boolean>>({});
   const [activeModelPicker, setActiveModelPicker] = useState<{ index: number; kind: ModelPickerKind } | null>(null);
+  const [backgroundMusicPickerOpen, setBackgroundMusicPickerOpen] = useState(false);
   const [sceneInlineSettingsOpen, setSceneInlineSettingsOpen] = useState<Record<number, boolean>>({});
   const sceneActionLocksRef = useRef<Record<string, boolean>>({});
   const previewQueueRef = useRef<Set<string>>(new Set());
@@ -411,10 +431,10 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
   const summary = useMemo(() => {
     const imageCount = data.filter((item) => item.imageData).length;
-    const audioCount = data.filter((item) => item.audioData).length;
+    const audioCount = narrationAudioEnabled ? data.filter((item) => item.audioData).length : 0;
     const videoCount = data.filter((item) => item.videoData).length;
     return { imageCount, audioCount, videoCount };
-  }, [data]);
+  }, [data, narrationAudioEnabled]);
 
   const totalDuration = useMemo(() => Number(data.reduce((sum, item) => sum + resolveAssetPlaybackDuration(item, { minimum: MIN_SCENE_DURATION, fallbackNarrationEstimate: true, preferTargetDuration: true }), 0).toFixed(2)), [data]);
 
@@ -422,7 +442,43 @@ const ResultTable: React.FC<ResultTableProps> = ({
     if (!backgroundMusicTracks.length) return null;
     return backgroundMusicTracks.find((item) => item.id === activeBackgroundTrackId) || backgroundMusicTracks[0];
   }, [backgroundMusicTracks, activeBackgroundTrackId]);
-  const backgroundMusicModelOptions = BGM_MODEL_OPTIONS.map((item) => ({ value: item.id, label: item.name }));
+  const selectedBackgroundMusicOption = useMemo(
+    () => backgroundMusicModelSelector?.options.find((item) => item.id === (backgroundMusicSceneConfig?.modelId || backgroundMusicModelSelector.currentId || '')) || null,
+    [backgroundMusicModelSelector, backgroundMusicSceneConfig?.modelId],
+  );
+  const backgroundMusicModelLabel = selectedBackgroundMusicOption?.title
+    || backgroundMusicModelSelector?.currentLabel
+    || backgroundMusicSceneConfig?.modelId
+    || '-';
+  const backgroundMusicTargetDuration = Math.max(10, Math.round(totalDuration || backgroundMusicSceneConfig?.durationSeconds || 20));
+  const previewMixSnapshot = previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 };
+  const canRequestPreviewRerender = Boolean(onPreparePreviewVideo && !isPreparingPreviewVideo);
+  const estimatedCostCards = totalCost ? [
+    {
+      id: 'image',
+      label: '이미지',
+      countLabel: `${totalCost.imageCount}장`,
+      amount: totalCost.images,
+      tone: 'text-emerald-600',
+      bgTone: 'bg-emerald-50',
+    },
+    {
+      id: 'tts',
+      label: 'TTS',
+      countLabel: `${totalCost.ttsCharacters.toLocaleString('ko-KR')}자`,
+      amount: totalCost.tts,
+      tone: 'text-blue-600',
+      bgTone: 'bg-blue-50',
+    },
+    {
+      id: 'video',
+      label: '영상',
+      countLabel: `${totalCost.videoCount}개`,
+      amount: totalCost.videos,
+      tone: 'text-violet-600',
+      bgTone: 'bg-violet-50',
+    },
+  ] : [];
 
   const sequenceScene = data[sequenceSceneIndex] || null;
   const sequenceSceneAudioRate = sceneAudioRates[sequenceSceneIndex] || 1;
@@ -765,12 +821,12 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
   const getScenePreviewMode = (row: GeneratedAsset, index: number): ScenePreviewMode => {
     const savedMode = scenePreviewModes[index];
-    if (!isMuteMode && savedMode === 'audio' && row.audioData) return 'audio';
+    if (narrationAudioEnabled && savedMode === 'audio' && row.audioData) return 'audio';
     if (savedMode === 'video' && hasRenderableVideo(row)) return 'video';
     if (savedMode === 'image' && hasRenderableImage(row)) return 'image';
     if (hasRenderableImage(row)) return 'image';
     if (hasRenderableVideo(row)) return 'video';
-    if (!isMuteMode && row.audioData) return 'audio';
+    if (narrationAudioEnabled && row.audioData) return 'audio';
     return 'image';
   };
 
@@ -999,7 +1055,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
       void sceneVideo.play().catch(() => {});
     }
 
-    if (narrationAudio) {
+    if (narrationAudioEnabled && narrationAudio) {
       narrationAudio.currentTime = 0;
       narrationAudio.volume = clampMediaVolume(previewMix?.narrationVolume || 1);
       void narrationAudio.play().catch(() => {});
@@ -1025,7 +1081,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
       narrationAudio?.pause();
       sceneVideo?.pause();
     };
-  }, [mainBgm?.audioData, mainBgm?.volume, previewMix, previewOpen, sequencePlaying, sequenceRunId, sequenceScene, sequenceSceneDuration]);
+  }, [mainBgm?.audioData, mainBgm?.volume, narrationAudioEnabled, previewMix, previewOpen, sequencePlaying, sequenceRunId, sequenceScene, sequenceSceneDuration]);
 
   const resolvedSceneData = useMemo(() => {
     return data.map((row, index) => {
@@ -1039,7 +1095,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
       const selectedImageData = imageEntries[selectedImageIndex]?.data || row.imageData || null;
       const selectedVideoData = videoEntries[selectedVideoIndex]?.data || row.videoData || null;
-      const selectedAudioData = audioEntries[selectedAudioIndex]?.data || row.audioData || null;
+      const selectedAudioData = narrationAudioEnabled
+        ? (audioEntries[selectedAudioIndex]?.data || row.audioData || null)
+        : null;
       const selectedPreviewMode = scenePreviewModes[index] || null;
 
       const selectedVisualType = selectedPreviewMode === 'video' && selectedVideoData
@@ -1060,7 +1118,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
         selectedVisualType,
       };
     });
-  }, [data, sceneAudioHistory, sceneAudioIndices, sceneMediaIndices, scenePreviewModes]);
+  }, [data, narrationAudioEnabled, sceneAudioHistory, sceneAudioIndices, sceneMediaIndices, scenePreviewModes]);
 
   const shouldShowFooter = !previewOpen;
 
@@ -1108,7 +1166,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <span className="rounded-full bg-slate-100 px-3 py-2">총 {formatSeconds(totalDuration)}</span>
               </div>
             </div>
-            {onDeleteAllAudio ? (
+            {narrationAudioEnabled && onDeleteAllAudio ? (
               <button
                 type="button"
                 onClick={onDeleteAllAudio}
@@ -1139,8 +1197,29 @@ const ResultTable: React.FC<ResultTableProps> = ({
         )}
 
         {totalCost && (
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-600">
-            이미지 {totalCost.imageCount}장 · TTS {totalCost.ttsCharacters}자 · 영상 {totalCost.videoCount}개
+          <div className="mt-4 rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">예상 API 비용</div>
+                <div className="mt-1 text-sm font-bold text-slate-700">현재 선택된 모델 기준으로 Step6 예상 금액을 바로 확인할 수 있습니다.</div>
+              </div>
+              <div className="text-right">
+                <div className="text-lg font-black text-slate-900">{formatUsdAmount(totalCost.total)}</div>
+                <div className="mt-1 text-xs text-slate-500">약 {formatKrwEstimate(totalCost.total)}</div>
+              </div>
+            </div>
+            <div className="mt-3 grid gap-2.5 sm:grid-cols-3">
+              {estimatedCostCards.map((item) => (
+                <div key={item.id} className={`rounded-2xl border border-slate-200 ${item.bgTone} px-4 py-3`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-xs font-black text-slate-500">{item.label}</span>
+                    <span className={`text-xs font-black ${item.tone}`}>{item.countLabel}</span>
+                  </div>
+                  <div className="mt-2 text-sm font-black text-slate-900">{formatUsdAmount(item.amount)}</div>
+                  <div className="mt-1 text-[11px] text-slate-500">{formatKrwEstimate(item.amount)}</div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -1169,16 +1248,40 @@ const ResultTable: React.FC<ResultTableProps> = ({
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3 text-sm font-black text-slate-900">
                 <span>나레이션 볼륨</span>
-                <span>{Math.round((previewMix?.narrationVolume || 1) * 100)}%</span>
+                <div className="flex items-center gap-2">
+                  <span>{Math.round((previewMixSnapshot.narrationVolume || 1) * 100)}%</span>
+                  {onPreparePreviewVideo ? (
+                    <button
+                      type="button"
+                      onClick={() => void onPreparePreviewVideo?.()}
+                      disabled={!canRequestPreviewRerender}
+                      className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      {isPreparingPreviewVideo ? '다시 렌더링 중...' : '다시 렌더링'}
+                    </button>
+                  ) : null}
+                </div>
               </div>
-              <input type="range" min="0" max="1.6" step="0.05" value={previewMix?.narrationVolume || 1} onChange={(e) => onPreviewMixChange?.({ ...(previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 }), narrationVolume: Number(e.target.value) })} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
+              <input type="range" min="0" max="1.6" step="0.05" value={previewMixSnapshot.narrationVolume || 1} onChange={(e) => onPreviewMixChange?.({ ...previewMixSnapshot, narrationVolume: Number(e.target.value) })} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex items-center justify-between gap-3 text-sm font-black text-slate-900">
                 <span>배경음 볼륨</span>
-                <span>{Math.round((previewMix?.backgroundMusicVolume || mainBgm?.volume || 0.28) * 100)}%</span>
+                <div className="flex items-center gap-2">
+                  <span>{Math.round((previewMixSnapshot.backgroundMusicVolume || mainBgm?.volume || 0.28) * 100)}%</span>
+                  {onPreparePreviewVideo ? (
+                    <button
+                      type="button"
+                      onClick={() => void onPreparePreviewVideo?.()}
+                      disabled={!canRequestPreviewRerender}
+                      className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      {isPreparingPreviewVideo ? '다시 렌더링 중...' : '다시 렌더링'}
+                    </button>
+                  ) : null}
+                </div>
               </div>
-              <input type="range" min="0" max="1" step="0.02" value={previewMix?.backgroundMusicVolume || mainBgm?.volume || 0.28} onChange={(e) => onPreviewMixChange?.({ ...(previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 }), backgroundMusicVolume: Number(e.target.value) })} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-violet-600" />
+              <input type="range" min="0" max="1" step="0.02" value={previewMixSnapshot.backgroundMusicVolume || mainBgm?.volume || 0.28} onChange={(e) => onPreviewMixChange?.({ ...previewMixSnapshot, backgroundMusicVolume: Number(e.target.value) })} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-violet-600" />
             </div>
           </div>
 
@@ -1262,39 +1365,51 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     <div className="mt-2 text-sm font-bold text-slate-700">트랙 제목은 프로젝트 이름 기준으로 자동 번호가 붙고, 길이는 현재 영상 총 길이에 맞춰 자동 조절됩니다.</div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black text-slate-600">영상 길이 {Math.max(10, Math.round(totalDuration || backgroundMusicSceneConfig.durationSeconds || 20))}초 자동 맞춤</span>
-                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black text-slate-600">모델 {backgroundMusicSceneConfig.modelId || backgroundMusicModelOptions[0]?.value || '-'}</span>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black text-slate-600">영상 길이 {backgroundMusicTargetDuration}초 자동 맞춤</span>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black text-slate-600">모델 {backgroundMusicModelLabel}</span>
                   </div>
                 </div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                  <label className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left">
-                    <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">생성 방식</div>
-                    <select
-                      value={backgroundMusicSceneConfig.provider || 'sample'}
-                      onChange={(event) => {
-                        const nextProvider: BackgroundMusicSceneConfig['provider'] = event.target.value === 'google' ? 'google' : 'sample';
-                        const currentModelId = backgroundMusicSceneConfig.modelId || '';
-                        const nextModelId = currentModelId === 'lyria-002' ? 'sample-ambient-v1' : currentModelId;
-                        onBackgroundMusicSceneChange?.({ provider: nextProvider, modelId: nextModelId });
-                      }}
-                      className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 outline-none focus:border-violet-400"
-                    >
-                      <option value="sample">무료 샘플</option>
-                      <option value="google">Google 연동용 설정 보존 (현재 샘플 생성)</option>
-                    </select>
-                  </label>
-                  <label className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-left">
-                    <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">모델</div>
-                    <select
-                      value={backgroundMusicSceneConfig.modelId || backgroundMusicModelOptions[0]?.value || ''}
-                      onChange={(event) => onBackgroundMusicSceneChange?.({ modelId: event.target.value })}
-                      className="mt-2 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800 outline-none focus:border-violet-400"
-                    >
-                      {backgroundMusicModelOptions.map((option) => (
-                        <option key={option.value} value={option.value}>{option.label}</option>
-                      ))}
-                    </select>
-                  </label>
+                <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(240px,0.8fr)]">
+                  <button
+                    type="button"
+                    onClick={() => setBackgroundMusicPickerOpen(true)}
+                    disabled={!backgroundMusicModelSelector}
+                    className="rounded-[22px] border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-violet-200 hover:bg-violet-50/60 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Model picker</div>
+                    <div className="mt-2 text-base font-black text-slate-900">{backgroundMusicModelLabel}</div>
+                    <div className="mt-2 text-xs leading-5 text-slate-500">설정의 프로젝트 기본값과 별개로, 여기서 바꾸는 배경음 모델은 현재 Step6 배경음 카드에만 적용됩니다.</div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-black">
+                      <span className="rounded-full bg-white px-3 py-1 text-slate-700">{selectedBackgroundMusicOption?.priceLabel || '무료'}</span>
+                      <span className="rounded-full bg-white px-3 py-1 text-slate-700">{selectedBackgroundMusicOption?.qualityLabel || '샘플'}</span>
+                      {selectedBackgroundMusicOption?.speedLabel ? <span className="rounded-full bg-white px-3 py-1 text-slate-700">{selectedBackgroundMusicOption.speedLabel}</span> : null}
+                    </div>
+                    {selectedBackgroundMusicOption?.costHint ? (
+                      <div className="mt-3 text-[11px] leading-5 text-slate-500">{selectedBackgroundMusicOption.costHint}</div>
+                    ) : null}
+                    {selectedBackgroundMusicOption?.helper ? (
+                      <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
+                        {selectedBackgroundMusicOption.helper}
+                      </div>
+                    ) : null}
+                    {selectedBackgroundMusicOption?.disabledReason ? (
+                      <div className="mt-3 rounded-2xl border border-slate-300 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
+                        {selectedBackgroundMusicOption.disabledReason}
+                      </div>
+                    ) : null}
+                  </button>
+                  <div className="rounded-[22px] border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">적용 범위</div>
+                    <div className="mt-2 text-sm font-black text-slate-900">Step6 전용 배경음 모델</div>
+                    <div className="mt-2 text-xs leading-5 text-slate-500">이 팝업은 현재 Step6 배경음 생성에만 적용되고, Settings에 저장된 프로젝트 기본값은 그대로 유지됩니다.</div>
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-black text-slate-600">
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1">{backgroundMusicSceneConfig.provider === 'google' ? 'Google Lyria 3' : '샘플 배경음'}</span>
+                      <span className="rounded-full border border-slate-200 bg-white px-3 py-1">현재 목표 길이 {backgroundMusicTargetDuration}초</span>
+                    </div>
+                    <div className="mt-3 rounded-2xl border border-dashed border-violet-200 bg-white px-3 py-3 text-[11px] leading-5 text-slate-500">
+                      Google API가 연결되어 있으면 Lyria 3로 바로 생성하고, 연결이 없거나 실행이 실패하면 샘플 배경음으로만 안전하게 대체합니다.
+                    </div>
+                  </div>
                 </div>
                 <div className="mt-4 rounded-[22px] border border-violet-100 bg-violet-50/70 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1347,7 +1462,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <div className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">생성 이력</div>
-                    <div className="mt-2 text-sm font-bold text-slate-700">배경음 생성과 타이밍 조절은 모두 이력으로만 쌓이고, 새 음악은 오른쪽 끝에 추가됩니다.</div>
+                    <div className="mt-2 text-sm font-bold text-slate-700">배경음 생성과 연장본은 모두 이력으로만 쌓이고, 새 음악은 오른쪽 끝에 추가됩니다.</div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[11px] font-black text-slate-600">총 {backgroundMusicTracks.length}개 트랙</span>
@@ -1396,7 +1511,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                             <div className="mt-3 line-clamp-4 text-xs leading-5 text-slate-500">{track.prompt}</div>
                             <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-black text-slate-600">
                               <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">{track.requestedDuration || track.duration || 20}초</span>
-                              {track.parentTrackId ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">타이밍 조절본</span> : null}
+                              {track.parentTrackId ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">연장본</span> : null}
                             </div>
                             {resolveBackgroundAudioSrc(track.audioData) ? (
                               <audio controls className="mt-3 w-full">
@@ -1405,7 +1520,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                             ) : null}
                             <div className="mt-4 flex flex-wrap gap-2">
                               <button type="button" onClick={() => onSelectBackgroundTrack?.(track.id)} className={`rounded-xl px-3 py-2 text-xs font-black ${active ? 'bg-violet-600 text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>{active ? '선택됨' : '선택'}</button>
-                              {onExtendBackgroundTrack ? <button type="button" onClick={() => onExtendBackgroundTrack(track.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">음악 타이밍 조절</button> : null}
+                              {onExtendBackgroundTrack ? <button type="button" onClick={() => onExtendBackgroundTrack(track.id)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 hover:bg-slate-50">음악 연장</button> : null}
                               {onDeleteBackgroundTrack ? <button type="button" onClick={() => onDeleteBackgroundTrack(track.id)} className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-black text-rose-600 hover:bg-rose-50">삭제</button> : null}
                             </div>
                           </div>
@@ -1504,8 +1619,8 @@ const ResultTable: React.FC<ResultTableProps> = ({
           const videoAudioVolume = getSceneVideoAudioVolume(index);
           const silenceTrim = getSceneSilenceTrim(index);
           const hasNarrationControl = Boolean(audioEntry?.data || row.audioData);
-          const canAdjustSilenceTrim = !isMuteMode && hasNarrationControl;
-          const canAdjustNarrationVolume = !isMuteMode && hasNarrationControl;
+          const canAdjustSilenceTrim = narrationAudioEnabled && hasNarrationControl;
+          const canAdjustNarrationVolume = narrationAudioEnabled && hasNarrationControl;
           const canAdjustVideoAudio = Boolean(videoEntry?.data || row.videoData);
           const canGenerateVideo = Boolean(imageEntry?.data || row.imageData || imageEntries.length);
 
@@ -1655,7 +1770,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     <div className="mt-2 space-y-2">
                       <div className="inline-flex w-full rounded-2xl border border-slate-200 bg-white p-1">
 
-                        {!isMuteMode ? (
+                        {narrationAudioEnabled ? (
                           <button
                             type="button"
                             disabled={!audioSrc}
@@ -1700,7 +1815,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-500">
                       <span className="rounded-full bg-slate-100 px-3 py-1">컷 {formatSeconds(getSceneCutDuration(row, silenceTrim))}</span>
                       <span className="rounded-full bg-slate-100 px-3 py-1">비율 {row.aspectRatio || '16:9'}</span>
-                      {!isMuteMode ? <span className="rounded-full bg-slate-100 px-3 py-1">오디오 {formatSeconds(getAdjustedAudioDuration(row.audioDuration, silenceTrim) || row.audioDuration)}</span> : null}
+                      {narrationAudioEnabled ? <span className="rounded-full bg-slate-100 px-3 py-1">오디오 {formatSeconds(getAdjustedAudioDuration(row.audioDuration, silenceTrim) || row.audioDuration)}</span> : null}
                     </div>
                   </div>
 
@@ -1762,7 +1877,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                           <input type="range" min={MIN_SCENE_DURATION} max={MAX_SCENE_DURATION} step="0.5" value={Math.min(MAX_SCENE_DURATION, Math.max(MIN_SCENE_DURATION, row.targetDuration || 0))} onChange={(e) => onDurationChange?.(index, Number(e.target.value))} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
                           <div className="mt-auto pt-2 text-[11px] leading-5 text-slate-500">Step1 비율은 유지하고 컷 길이만 조절합니다.</div>
                         </div>
-                        {!isMuteMode ? (
+                        {narrationAudioEnabled ? (
                           <>
                             <div className={`flex min-h-[112px] flex-col rounded-[22px] border px-3 py-3 ${canAdjustSilenceTrim ? 'border-slate-200 bg-slate-50' : 'border-slate-200 bg-slate-100/90'}`}>
                               <div className="flex items-center justify-between gap-3 text-[11px] font-black text-slate-600"><span>공백 제거</span><span>{silenceTrim}%</span></div>
@@ -1822,7 +1937,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
                     ) : null}
                   </div>
                   <div className="mt-2 space-y-2.5">
-                                        {!isMuteMode && onRegenerateAudio && (
+                                        {narrationAudioEnabled && onRegenerateAudio && (
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <button
@@ -1956,7 +2071,23 @@ const ResultTable: React.FC<ResultTableProps> = ({
       )}
     </div>
 
-      {activeModelPicker?.kind === 'audio' && audioTtsSelectionFlow ? (
+      {backgroundMusicPickerOpen && backgroundMusicModelSelector ? (
+        <AiOptionPickerModal
+          open={backgroundMusicPickerOpen}
+          title="Step6 배경음 모델"
+          description="Settings의 프로젝트 기본 배경음과 별개로, 여기서 선택한 모델은 현재 Step6 배경음 카드에만 적용됩니다."
+          currentId={backgroundMusicModelSelector.currentId || backgroundMusicSceneConfig?.modelId || ''}
+          options={(backgroundMusicModelSelector.options || []).map((option) => ({
+            ...option,
+            title: option.title || option.label || option.id,
+          }))}
+          onClose={() => setBackgroundMusicPickerOpen(false)}
+          onSelect={(id) => backgroundMusicModelSelector.onSelect?.(id)}
+          requireConfirm
+          confirmLabel="이 Step 배경음 모델 적용하기"
+          emptyMessage="사용 가능한 배경음 모델이 없습니다."
+        />
+      ) : activeModelPicker?.kind === 'audio' && audioTtsSelectionFlow ? (
         <TtsSelectionModal
           open={Boolean(activeModelPicker)}
           title={`씬 ${data[activeModelPicker.index]?.sceneNumber} 오디오 / TTS 선택`}

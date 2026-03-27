@@ -13,9 +13,11 @@
 - Step3 project default TTS summary must stay aligned with `lib/mp4Creater/components/SettingsDrawer.tsx`.
 - If you change cost / quality / badge copy for Step3 voice or model cards, update `aiOptionCatalog.ts` first.
 - Step3 cast voice selection should not auto-apply on first card click; keep the shared confirm button flow so the user can compare before saving the choice.
-- Step3 cast voice selection should use the same `provider -> model -> voice` modal flow as Settings, and the current project voice sample/reference should be passed into the shared TTS modal when available.
+- Step3 cast voice selection should use the same grouped `무료 / 유료 / 프리미엄` model-card step and follow-up voice step as Settings, and the current project voice sample/reference should be passed into the shared TTS modal when available.
 - Voice preview in the Step3 picker should use the shared option metadata when a preview clip exists.
 - Step3 voice picker labels should stay Korean for actions and guidance text, even when the voice/model name itself is English.
+- Step3 script-model cards must keep API-missing entries disabled/gray, with sample/no-AI remaining selectable just like the other shared picker flows.
+- For `music_video`, Step3 writes lyrics only. Those lyrics must later feed Step6 background-music prompting and performer lip-sync timing instead of becoming scene narration audio.
 
 목표: Step2에서 선택한 콘텐츠 주제와 톤을 유지한 채, 바로 읽거나 부를 수 있는 최종 대본만 생성되게 유지합니다.
 

@@ -1,4 +1,5 @@
 import {
+  BGM_MODEL_OPTIONS,
   CHATTERBOX_CUSTOM_VOICE_ID,
   CHATTERBOX_TTS_PRESET_OPTIONS,
   ELEVENLABS_DEFAULT_VOICES,
@@ -63,6 +64,10 @@ type HeygenVoiceItem = {
   gender?: string;
   preview_audio_url?: string;
   preview_audio?: string;
+};
+
+type BackgroundMusicPickerOptionsParams = {
+  hasGoogleApiKey?: boolean;
 };
 
 const scriptModelMeta: Record<string, Omit<AiPickerOption, 'id' | 'title' | 'provider' | 'tier'>> = {
@@ -212,6 +217,45 @@ const videoModelMeta: Record<string, Omit<AiPickerOption, 'id' | 'title' | 'prov
     speedLabel: '보통',
     helper: '비용보다 결과 품질이 더 중요할 때 선택하면 됩니다.',
     avatarLabel: 'VP',
+    tone: 'violet',
+    group: 'premium',
+  },
+};
+
+const backgroundMusicModelMeta: Record<string, Omit<AiPickerOption, 'id' | 'title' | 'provider' | 'tier'>> = {
+  'sample-ambient-v1': {
+    description: 'API 없이도 바로 미리듣기와 저장 테스트를 할 수 있는 기본 배경음 샘플입니다.',
+    badge: '샘플',
+    priceLabel: '무료',
+    costHint: '예상 비용: 무료',
+    qualityLabel: '샘플',
+    speedLabel: '즉시',
+    helper: '실시간 생성 없이 전체 흐름과 렌더링을 먼저 확인할 때 좋습니다.',
+    avatarLabel: 'BG',
+    tone: 'slate',
+    group: 'sample',
+  },
+  'lyria-3-clip-preview': {
+    description: 'Google Lyria 3 Clip 실생성 경로입니다. 가장 가볍게 Lyria3 배경음을 비교할 때 적합합니다.',
+    badge: '유료',
+    priceLabel: '보통',
+    costHint: '예상 비용: Google AI Studio 사용량 기준',
+    qualityLabel: 'AI 생성',
+    speedLabel: '보통',
+    helper: 'Google AI Studio API가 연결되어 있으면 Step6와 Settings에서 같은 모델로 바로 생성합니다.',
+    avatarLabel: 'L3',
+    tone: 'blue',
+    group: 'budget',
+  },
+  'lyria-3-pro-preview': {
+    description: 'Lyria 3 상위 모델로 더 풍부한 질감과 완성도를 노릴 때 선택하는 배경음 경로입니다.',
+    badge: '프리미엄',
+    priceLabel: '높음',
+    costHint: '예상 비용: Google AI Studio 사용량 기준',
+    qualityLabel: '프리미엄',
+    speedLabel: '보통',
+    helper: '배경음 정체성과 완성도를 더 강하게 유지하고 싶을 때 적합합니다.',
+    avatarLabel: 'LP',
     tone: 'violet',
     group: 'premium',
   },
@@ -469,6 +513,34 @@ export function getVideoModelPickerOptions(): AiPickerOption[] {
   return VIDEO_MODEL_OPTIONS.map((item) => buildOptionFromModel(item, videoModelMeta, item.provider || 'Google AI Studio'));
 }
 
+export function getBackgroundMusicPickerOptions(
+  options: BackgroundMusicPickerOptionsParams = {},
+): AiPickerOption[] {
+  const hasGoogleApiKey = Boolean(options.hasGoogleApiKey);
+  return BGM_MODEL_OPTIONS.map((item) => {
+    const meta = backgroundMusicModelMeta[item.id];
+    const isSample = item.id === 'sample-ambient-v1';
+    return {
+      id: item.id,
+      title: item.name,
+      provider: isSample ? 'Sample' : 'Google AI Studio',
+      description: meta?.description || '배경음 모델 옵션입니다.',
+      badge: meta?.badge || (isSample ? '샘플' : '유료'),
+      priceLabel: meta?.priceLabel || (isSample ? '무료' : '보통'),
+      costHint: meta?.costHint,
+      qualityLabel: meta?.qualityLabel || (isSample ? '샘플' : 'AI 생성'),
+      speedLabel: meta?.speedLabel,
+      helper: meta?.helper,
+      avatarLabel: meta?.avatarLabel || initials(item.name),
+      tone: meta?.tone || (isSample ? 'slate' : 'blue'),
+      group: meta?.group || (isSample ? 'sample' : 'budget'),
+      tier: isSample ? 'sample' as const : 'paid' as const,
+      disabled: isSample ? false : !hasGoogleApiKey,
+      disabledReason: isSample || hasGoogleApiKey ? undefined : 'Google AI Studio API 키를 연결하면 선택할 수 있습니다.',
+    };
+  });
+}
+
 export function getQwenVoicePickerOptions(): AiPickerOption[] {
   return QWEN_TTS_PRESET_OPTIONS.map((item) => ({
     id: item.id,
@@ -594,7 +666,7 @@ export function getTtsProviderPickerOptions(): AiPickerOption[] {
       helper: '무료 음성 생성이 필요할 때 가장 먼저 선택하면 됩니다.',
       avatarLabel: 'Q',
       tone: 'emerald' as const,
-      group: 'provider' as const,
+      group: 'free' as const,
       tier: 'free' as const,
     },
     {
@@ -610,7 +682,7 @@ export function getTtsProviderPickerOptions(): AiPickerOption[] {
       helper: '연결된 API 기준으로 실제 사용할 수 있는 목소리 목록을 불러옵니다.',
       avatarLabel: '11',
       tone: 'amber' as const,
-      group: 'provider' as const,
+      group: 'budget' as const,
       tier: 'paid' as const,
     },
     {
@@ -626,7 +698,7 @@ export function getTtsProviderPickerOptions(): AiPickerOption[] {
       helper: '현재 프로젝트에서 HeyGen을 연결한 경우에만 선택하면 됩니다.',
       avatarLabel: 'HG',
       tone: 'blue' as const,
-      group: 'provider' as const,
+      group: 'premium' as const,
       tier: 'paid' as const,
     },
   ];
@@ -663,7 +735,7 @@ export function getTtsModelPickerOptions(options?: {
       avatarLabel: 'Q',
       tone: 'emerald',
       cardVariant: 'tts-model',
-      group: 'provider',
+      group: 'free',
       tier: 'free',
       disabled: !hasGoogleApiKey,
       disabledReason: !hasGoogleApiKey
@@ -698,7 +770,7 @@ export function getTtsModelPickerOptions(options?: {
     avatarLabel: 'HG',
     tone: 'blue',
     cardVariant: 'tts-model',
-    group: 'provider',
+    group: 'premium',
     tier: 'paid',
     disabled: !allowPaid || !allowHeygen,
     disabledReason: !allowHeygen

@@ -1,3 +1,2 @@
-[00:00:01.530] Server  LOG     ✓ Ready in 1299ms
-[00:00:04.926] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:00:32.014] Server  WARN    [render-route] merged video had no narration audio stream, falling back to bgm-only mix
+[00:00:01.387] Server  LOG     ✓ Ready in 1182ms
+[00:00:04.206] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold

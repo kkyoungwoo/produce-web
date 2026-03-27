@@ -107,6 +107,7 @@
 - Shared picker catalog path: `lib/mp4Creater/services/aiOptionCatalog.ts`
 - Shared picker modal path: `lib/mp4Creater/components/AiOptionPickerModal.tsx`
 - Shared TTS multi-step picker path: `lib/mp4Creater/components/TtsSelectionModal.tsx`
+- The TTS model step should visually match the shared AI picker with grouped `무료 / 유료 / 프리미엄` model sections, while keeping voice selection as the second step in the same popup.
 - Settings default model / TTS picker path: `lib/mp4Creater/components/SettingsDrawer.tsx`
 - Step3 script model / cast voice picker path: `lib/mp4Creater/components/inputSection/steps/Step3Panel.tsx`
 - Step6 image / video / audio picker path: `lib/mp4Creater/components/ResultTable.tsx`
@@ -117,7 +118,7 @@
 - TTS pickers must not auto-close on first click. The user should choose a card, optionally preview it, then confirm with the modal action button.
 - The visible `선택하기` action inside each 16:9 picker card must be a real clickable button, not just decorative text.
 - TTS cards should expose estimated cost in dollars and preview playback when a clip or preview render path is available.
-- Settings TTS flow should move in the order `provider -> model -> voice`, especially for ElevenLabs.
+- Settings TTS flow should move in the order `grouped model sections -> model -> voice`, especially for ElevenLabs.
 - Picking a TTS model alone must not finalize the narrator. The final TTS voice is fixed only after the voice picker confirm step.
 - Paid TTS model cards should stay visible for comparison, but remain disabled with a Korean reason message when the required API key or paid mode is not ready.
 - Free TTS preview should prefer the Google AI Studio speech path when a key exists, so the user hears a real voice sample instead of a fallback tone.
@@ -141,7 +142,11 @@
 - Sample thumbnail candidates should reuse the real style background images under `public/mp4Creater/samples/styles` so fallback previews still match the product mood.
 - Sample Step6 scene images should reuse the same `public/mp4Creater/samples/styles/*` pool whenever the image route is in sample mode.
 - Sample background music should reuse `public/mp4Creater/samples/audio/loop_main.wav` and loop to the requested duration in Settings preview and Step6 export.
-- Header Settings background-music picker should expose `Google Lyria 2 (lyria-002)` in the same shared card flow and keep it disabled until the Google AI Studio key is connected.
+- Header Settings background-music picker should expose the active Lyria 3 runtime choices in the same shared card flow, and legacy `lyria-002` ids should normalize into the Lyria 3 clip path instead of staying visible.
+- In `music_video` projects, Step3 text is lyric source material for Step6 scene timing and background-music prompting; do not treat that Step3 text as narration TTS in Step6 render/export.
+- Step6 music-video renders must ignore scene narration audio even if an older project payload still contains stale TTS assets.
+- Step6 background-music history must support an explicit `extend current song` action that creates a longer continuation-oriented version while keeping the previous track in history.
+- Step6 preview-mix controls must stay visible after a render succeeds, and both narration-volume and background-music-volume cards must expose a direct rerender action beside the slider state.
 
 ## Step6 Tab AI Generation
 - Step6 `대사 / 이미지 / 영상` editor tabs must keep the `AI 생성` button on the same row, aligned to the right edge of the tab group.

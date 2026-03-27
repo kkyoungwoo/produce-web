@@ -18,13 +18,19 @@ import AiOptionPickerModal from './AiOptionPickerModal';
 import TtsSelectionModal from './TtsSelectionModal';
 import { validateProviderConnection } from '../services/providerValidationService';
 import { createTtsPreview } from '../services/ttsService';
-import { createBackgroundMusicTrack, isGoogleBackgroundMusicModel } from '../services/musicService';
+import {
+  createBackgroundMusicTrack,
+  isGoogleBackgroundMusicModel,
+  normalizeBackgroundMusicModelId,
+  resolveBackgroundMusicProvider,
+} from '../services/musicService';
 import { fetchElevenLabsVoices } from '../services/elevenLabsService';
 import { resolveGoogleAiStudioApiKey } from '../services/googleAiStudioService';
 import {
   AiPickerOption,
   getElevenLabsModelPickerOptions,
   getElevenLabsVoicePickerOptions,
+  getBackgroundMusicPickerOptions,
   getImageModelPickerOptions,
   getQwenVoicePickerOptions,
   getScriptModelPickerOptions,
@@ -344,7 +350,11 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       videoModel: studioState.routing?.videoModel || CONFIG.DEFAULT_VIDEO_MODEL,
       ttsProvider: studioState.routing?.ttsProvider === 'elevenLabs' ? 'elevenLabs' : 'qwen3Tts',
       audioProvider: studioState.routing?.audioProvider === 'elevenLabs' ? 'elevenLabs' : 'qwen3Tts',
-      backgroundMusicProvider: studioState.routing?.backgroundMusicProvider === 'google' || studioState.routing?.backgroundMusicModel === 'lyria-002' ? 'google' : 'sample',
+      backgroundMusicModel: normalizeBackgroundMusicModelId(studioState.routing?.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL),
+      backgroundMusicProvider: resolveBackgroundMusicProvider(
+        studioState.routing?.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL,
+        studioState.routing?.backgroundMusicProvider || 'sample',
+      ),
       musicVideoProvider: studioState.routing?.musicVideoProvider === 'elevenLabs' ? 'elevenLabs' : 'sample',
       musicVideoMode: studioState.routing?.musicVideoMode || 'sample',
       chatterboxVoicePreset: studioState.routing?.chatterboxVoicePreset || 'chatterbox-clear',
@@ -560,37 +570,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     })
   ), [backgroundMusicModelOptions, hasElevenLabsApiKey, hasGoogleApiKey]);
   */
-  const backgroundMusicPickerOptions = useMemo<AiPickerOption[]>(() => (
-    backgroundMusicModelOptions.map((item) => {
-      const isElevenLabsMusic = item.id === 'elevenlabs-music-auto';
-      const isGoogleMusic = isGoogleBgmModel(item.id);
-      return {
-        id: item.id,
-        title: item.name,
-        provider: isGoogleMusic ? 'Google AI Studio' : isElevenLabsMusic ? 'ElevenLabs' : 'Sample',
-        description: isGoogleMusic
-          ? 'Google AI Studio가 연결되어 있으면 프로젝트 기본 배경음 모델로 선택할 수 있습니다.'
-          : isElevenLabsMusic
-            ? 'ElevenLabs API가 연결되어 있으면 배경음 모델로 선택할 수 있습니다.'
-            : 'API 없이 바로 확인할 수 있는 샘플 배경음입니다.',
-        badge: isGoogleMusic ? 'Google AI' : isElevenLabsMusic ? '유료' : '무료',
-        priceLabel: isGoogleMusic || isElevenLabsMusic ? '보통' : '무료',
-        qualityLabel: isGoogleMusic || isElevenLabsMusic ? 'AI 생성' : '샘플',
-        speedLabel: isGoogleMusic || isElevenLabsMusic ? '보통' : '즉시',
-        helper: isGoogleMusic ? 'Google API required' : isElevenLabsMusic ? 'ElevenLabs API required' : 'Instant preview',
-        avatarLabel: isGoogleMusic ? 'G' : isElevenLabsMusic ? '11' : 'BG',
-        tone: isGoogleMusic ? 'blue' : isElevenLabsMusic ? 'amber' : 'slate',
-        group: isGoogleMusic || isElevenLabsMusic ? 'premium' : 'sample',
-        tier: isGoogleMusic || isElevenLabsMusic ? 'paid' : 'free',
-        disabled: isGoogleMusic ? !hasGoogleApiKey : isElevenLabsMusic ? !hasElevenLabsApiKey : false,
-        disabledReason: isGoogleMusic
-          ? (!hasGoogleApiKey ? 'Google AI Studio API를 연결하면 선택할 수 있습니다.' : undefined)
-          : isElevenLabsMusic
-            ? (!hasElevenLabsApiKey ? 'ElevenLabs API를 연결하면 선택할 수 있습니다.' : undefined)
-            : undefined,
-      } satisfies AiPickerOption;
-    })
-  ), [backgroundMusicModelOptions, hasElevenLabsApiKey, hasGoogleApiKey]);
+  const backgroundMusicPickerOptions = useMemo<AiPickerOption[]>(
+    () => getBackgroundMusicPickerOptions({ hasGoogleApiKey }),
+    [hasGoogleApiKey],
+  );
   const ttsProviderPickerOptions = useMemo(
     () => getTtsProviderPickerOptions().filter((item) => {
       if (item.id === 'heygen') return false;
@@ -827,13 +810,13 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     if (settingsPicker.kind === 'bgm-model') {
       return {
         title: '배경 음악 모델',
-        description: '프로젝트 기본 배경음 생성에 사용할 모델을 고르세요. 연결된 API가 없으면 샘플 배경음만 선택할 수 있습니다.',
+        description: '프로젝트 기본 배경음 생성에 사용할 모델을 고르세요. Lyria 3는 Google AI Studio가 연결되어 있으면 바로 실생성에 쓰고, 실패 시에는 샘플 배경음으로만 안전하게 대체합니다.',
         currentId: routing.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL,
         options: backgroundMusicPickerOptions,
         onSelect: (id: string) => setRouting((prev) => ({
           ...prev,
-          backgroundMusicModel: id,
-          backgroundMusicProvider: isGoogleBgmModel(id) ? 'google' : 'sample',
+          backgroundMusicModel: normalizeBackgroundMusicModelId(id),
+          backgroundMusicProvider: resolveBackgroundMusicProvider(id, prev.backgroundMusicProvider || 'sample'),
         })),
         requireConfirm: true,
         confirmLabel: '이 배경음 모델 선택하기',
@@ -1194,9 +1177,12 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     }
   }, [closeVoiceSampleModal]);
   const playBgmPreview = useCallback(async () => {
+    const normalizedBackgroundMusicModel = normalizeBackgroundMusicModelId(
+      routing.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL,
+    );
     const bgmPreviewKey = [
-      routing.backgroundMusicProvider || 'sample',
-      routing.backgroundMusicModel || 'sample-ambient-v1',
+      resolveBackgroundMusicProvider(normalizedBackgroundMusicModel, routing.backgroundMusicProvider || 'sample'),
+      normalizedBackgroundMusicModel,
     ].join('|');
 
     if (isBgmPreviewing && bgmPreviewKeyRef.current === bgmPreviewKey) {
@@ -1236,9 +1222,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
           styleImages: [],
           updatedAt: Date.now(),
         } as any,
-        modelId: routing.backgroundMusicModel || 'sample-ambient-v1',
+        modelId: normalizedBackgroundMusicModel,
         mode: 'preview',
-        provider: isGoogleBgmModel(routing.backgroundMusicModel) ? 'google' : 'sample',
+        provider: resolveBackgroundMusicProvider(normalizedBackgroundMusicModel, routing.backgroundMusicProvider || 'sample'),
         googleApiKey: providerValues.openRouterApiKey.trim(),
         durationSeconds: 20,
         title: 'Settings background music preview',
@@ -1255,14 +1241,14 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       bgmAudioRef.current = audio;
       audio.onended = () => {
         setIsBgmPreviewing(false);
-        setBgmPreviewMessage(`배경 음악 (${routing.backgroundMusicModel || 'sample-ambient-v1'}) 미리 듣기가 끝났습니다.`);
+        setBgmPreviewMessage(`배경 음악 (${normalizedBackgroundMusicModel}) 미리 듣기가 끝났습니다.`);
       };
       audio.onerror = () => {
         setIsBgmPreviewing(false);
         setBgmPreviewMessage('배경 음악 미리 듣기에 실패했습니다.');
       };
       await audio.play();
-      setBgmPreviewMessage(`배경 음악 (${routing.backgroundMusicModel || 'sample-ambient-v1'}) 미리 듣기 중입니다.`);
+      setBgmPreviewMessage(`배경 음악 (${normalizedBackgroundMusicModel}) 미리 듣기 중입니다.`);
     } catch {
       setIsBgmPreviewing(false);
       setBgmPreviewMessage('배경 음악 미리 듣기에 실패했습니다.');
@@ -1640,8 +1626,12 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     const nextPromptModel = routing.sceneModel || nextScriptModel;
     const nextImageModel = routing.imageModel || freeImageModel;
     const nextVideoModel = routing.videoModel || freeVideoModel;
+    const nextBackgroundMusicModel = normalizeBackgroundMusicModelId(routing.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL);
+    const nextBackgroundMusicProvider = resolveBackgroundMusicProvider(
+      nextBackgroundMusicModel,
+      routing.backgroundMusicProvider || 'sample',
+    );
     const wantsElevenTts = routing.ttsProvider === 'elevenLabs' && Boolean(elevenLabsApiKey);
-    const wantsGoogleBgm = false;
     const wantsPaidImage = nextImageModel !== freeImageModel && Boolean(googleApiKey);
     const wantsPaidVideo = nextVideoModel !== freeVideoModel && Boolean(googleApiKey);
     const paidModeEnabled =
@@ -1662,12 +1652,12 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       imageProvider: wantsPaidImage ? 'openrouter' : 'sample',
       ttsProvider: wantsElevenTts ? 'elevenLabs' : 'qwen3Tts',
       audioProvider: wantsElevenTts ? 'elevenLabs' : 'qwen3Tts',
-      backgroundMusicProvider: wantsGoogleBgm ? 'google' : 'sample',
+      backgroundMusicProvider: nextBackgroundMusicProvider,
       videoProvider: wantsPaidVideo ? 'elevenLabs' : 'sample',
       videoModel: nextVideoModel,
       musicVideoProvider: wantsPaidVideo ? 'elevenLabs' : 'sample',
       musicVideoMode: wantsPaidVideo ? 'auto' : 'sample',
-      backgroundMusicModel: wantsGoogleBgm ? routing.backgroundMusicModel : (isGoogleBgmModel(routing.backgroundMusicModel) ? 'sample-ambient-v1' : routing.backgroundMusicModel),
+      backgroundMusicModel: nextBackgroundMusicModel,
       paidModeEnabled,
     } as StudioState['routing'];
 
@@ -1971,7 +1961,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                         ? `${selectedElevenModel?.title || 'ElevenLabs'} · ${selectedElevenVoice?.name || '기본 목소리'}`
                           : `Qwen3-TTS · ${selectedQwenVoice?.name || 'qwen3-tts 기본 보이스'}`}
                     </div>
-                    <div className="mt-1 text-xs text-slate-500">기본은 무료 모델입니다. 같은 팝업 안에서 모델을 고르고, 그 모델의 실제 목소리를 들어본 뒤 확인합니다.</div>
+                    <div className="mt-1 text-xs text-slate-500">같은 팝업 안에서 무료 / 유료 / 프리미엄 TTS 모델을 고르고, 이어서 그 모델의 실제 목소리를 들어본 뒤 저장합니다.</div>
                   </button>
                   <select value={ttsProviderPickerCurrentId} onChange={(e) => setRouting((prev) => ({ ...prev, ttsProvider: e.target.value as 'qwen3Tts' | 'elevenLabs', audioProvider: e.target.value as 'qwen3Tts' | 'elevenLabs' }))} className={`${inputClass} hidden`}>
                     {ttsProviderPickerOptions.map((item) => (
@@ -1984,10 +1974,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
                   {visibleTtsProvider === 'elevenLabs'
                     ? `현재 기본 TTS: ${selectedElevenModel?.title || 'ElevenLabs 모델'} · ${selectedElevenVoice?.name || 'ElevenLabs 기본 목소리'}${selectedElevenVoice?.labels?.gender ? ` · ${selectedElevenVoice.labels.gender}` : ''}`
-                      : `현재 기본 TTS: ${selectedQwenVoice?.name || 'qwen3-tts 기본 보이스'} · 경량 무료 모델`}
+                      : `현재 기본 TTS: ${selectedQwenVoice?.name || 'qwen3-tts 기본 보이스'} · 무료 모델`}
                 </div>
                 <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
-                  Qwen, ElevenLabs 목소리는 모두 위의 `모델 / 목소리 변경` 팝업 안에서 선택합니다.
+                  Qwen, ElevenLabs 목소리는 모두 위의 `모델 / 목소리 변경` 팝업 안에서 같은 카드 디자인으로 선택합니다.
                   헤더 설정은 새 프로젝트 기본값만 바꾸고, 프로젝트 안에서는 Step3/Step6에서 다시 덮어쓸 수 있습니다.
                 </div>
                 <button type="button" onClick={() => void playVoicePreview()} className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
@@ -2018,11 +2008,11 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                   <select
                     value={routing.backgroundMusicModel || 'sample-ambient-v1'}
                     onChange={(e) => {
-                      const nextModel = e.target.value;
+                      const nextModel = normalizeBackgroundMusicModelId(e.target.value);
                       setRouting((prev) => ({
                         ...prev,
                         backgroundMusicModel: nextModel,
-                        backgroundMusicProvider: isGoogleBgmModel(nextModel) ? 'google' : 'sample',
+                        backgroundMusicProvider: resolveBackgroundMusicProvider(nextModel, prev.backgroundMusicProvider || 'sample'),
                       }));
                     }}
                     className={`${inputClass} hidden`}
@@ -2039,7 +2029,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 </button>
                 {bgmPreviewMessage ? <p className="mt-2 text-xs text-slate-500">{bgmPreviewMessage}</p> : null}
                 {isGoogleBgmModel(routing.backgroundMusicModel) ? (
-                  <p className="mt-2 text-xs text-amber-600">이전 Google Lyria 설정은 현재 샘플 배경음으로 미리 듣기/저장됩니다.</p>
+                  <p className="mt-2 text-xs text-blue-600">Google Lyria 3 모델은 현재 선택 상태 그대로 저장되고, API가 없거나 실패하면 실행 시 샘플 배경음으로만 안전하게 대체됩니다.</p>
                 ) : null}
               </div>
             </div>
@@ -2049,7 +2039,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">텍스트 · 이미지 · 영상 모델</h3>
-                <p className="mt-1 text-xs text-slate-600">Google AI Studio 모델은 무료/유료를 구분해 드롭다운으로 제공합니다. 무료 API가 없는 항목은 샘플 모델로 최종 출력까지 테스트할 수 있습니다.</p>
+                <p className="mt-1 text-xs text-slate-600">공통 카드 팝업에서 무료, 유료, 프리미엄 단계를 나눠 비교하고 선택할 수 있습니다. API가 없는 항목은 회색으로 잠겨 보여 줍니다.</p>
               </div>
               <span className={`rounded-full px-3 py-1 text-[11px] font-black ${hasGoogleApiKey ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
                 {hasGoogleApiKey ? 'Google API 연결됨' : '샘플 모델 기본 세팅'}

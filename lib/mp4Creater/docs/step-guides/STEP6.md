@@ -23,8 +23,11 @@
 - Preview playback in Step6 audio cards should come from the shared picker metadata when a clip is available.
 - Step6 audio picker action labels should stay Korean for selection / confirmation guidance.
 - Step6 audio / TTS picker should receive the same ElevenLabs voice catalog and current voice reference data as Settings so the user can finish voice selection inside the project without losing consistency.
+- Step6 TTS popup should reuse the same grouped model-card design as Settings and Step3, but apply the result only to the current step/scene scope instead of mutating header defaults.
 - Step6 image / video model pickers should also wait for the shared confirm button before saving and closing.
 - Sample-mode Step6 images should reuse random files from `public/mp4Creater/samples/styles/*` instead of placeholder-only visuals.
+- In `music_video`, keep the scene text for lyric timing and visual generation, but do not generate or render scene narration TTS from that text.
+- In `music_video`, Step3 lyrics must be the primary source for Step6 background-music prompt direction.
 
 목표: 각 문단이 개별 컷이면서도 이전/다음 씬과 연결되는 자연스러운 영상 흐름을 유지합니다.
 
@@ -90,6 +93,8 @@
 - The Step6 preview modal must not expose DaVinci auto-import or DaVinci package ZIP actions anymore.
 - Step6 autosave must keep the local browser cache small enough to avoid `QuotaExceededError`; inline preview binaries, background audio blobs, and data-URL thumbnails must be stripped from lightweight cache writes.
 - Step6 preview/export should only burn in actual Step6 media state: scene image/video, scene audio, and selected background music. Narration text should not be auto-converted into subtitles.
+- Step6 preview-mix sliders must remain visible even after a preview MP4 already exists so the user can tweak mix values and rerender from the same modal.
+- The narration-volume card and background-music-volume card must each expose a direct rerender action beside the slider.
 - Sample background music should reuse `public/mp4Creater/samples/audio/loop_main.wav` and loop against the target render duration.
 - Result preview is the canonical current render product for Step6.
 - The preview player and final MP4 download must stay visually identical.
@@ -124,6 +129,8 @@
 - Google background-music models use the live Google path only when a Google AI Studio key is available.
 - If no live key is available, or the live request fails, background music must fall back to the sample loop without blocking Step6.
 - Sample background-music source: public/mp4Creater/samples/audio/loop_main.wav
+- Step6 background-music history must support extending the currently selected song into a longer version while keeping the earlier version in history.
+- The current extend flow is prompt-based continuation, not waveform stitching; keep that behavior explicit in future edits unless a true continuation API is added.
 - Sample image fallback source: public/mp4Creater/samples/styles/*
 - The ffmpeg render route must understand public asset paths as well as data URLs so sample-mode export matches preview-mode behavior.
 - This sample/live baseline is the foundation for future prompt additions and future model additions. New models should plug into the same Step6 execution path instead of creating a separate render branch.

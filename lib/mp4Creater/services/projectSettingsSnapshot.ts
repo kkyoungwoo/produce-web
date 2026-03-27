@@ -1,12 +1,9 @@
 import { CONFIG } from '../config';
 import { AiRoutingSettings, SavedProject, WorkflowDraft } from '../types';
+import { normalizeBackgroundMusicModelId, resolveBackgroundMusicProvider } from './musicService';
 
 function normalizeBackgroundMusicModel(modelId?: string | null) {
-  const normalized = `${modelId || ''}`.trim();
-  if (normalized === 'sample-cinematic-v1' || normalized === 'sample-news-v1') {
-    return 'sample-ambient-v1';
-  }
-  return normalized || CONFIG.DEFAULT_BGM_MODEL;
+  return normalizeBackgroundMusicModelId(modelId || CONFIG.DEFAULT_BGM_MODEL);
 }
 
 /**
@@ -28,9 +25,10 @@ export function buildProjectSettingsSnapshot(options: {
   const imageModel = routing.imageModel || fallback.imageModel || CONFIG.DEFAULT_IMAGE_MODEL;
   const videoModel = routing.videoModel || fallback.videoModel || CONFIG.DEFAULT_VIDEO_MODEL;
   const backgroundMusicModel = normalizeBackgroundMusicModel(routing.backgroundMusicModel || fallback.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL);
-  const backgroundMusicProvider = backgroundMusicModel === 'lyria-002'
-    ? 'google'
-    : (routing.backgroundMusicProvider || fallback.backgroundMusicProvider || 'sample');
+  const backgroundMusicProvider = resolveBackgroundMusicProvider(
+    backgroundMusicModel,
+    routing.backgroundMusicProvider || fallback.backgroundMusicProvider || 'sample',
+  );
 
   return {
     imageModel,
@@ -69,9 +67,10 @@ export function applyProjectSettingsToRouting(baseRouting: AiRoutingSettings, se
   const sceneModel = settings.sceneModel || baseRouting.sceneModel || baseRouting.imagePromptModel || scriptModel;
   const elevenLabsModel = settings.elevenLabsModel || baseRouting.elevenLabsModelId || baseRouting.audioModel || CONFIG.DEFAULT_ELEVENLABS_MODEL;
   const backgroundMusicModel = normalizeBackgroundMusicModel(settings.backgroundMusicModel || baseRouting.backgroundMusicModel);
-  const backgroundMusicProvider = backgroundMusicModel === 'lyria-002'
-    ? 'google'
-    : (settings.backgroundMusicProvider || baseRouting.backgroundMusicProvider);
+  const backgroundMusicProvider = resolveBackgroundMusicProvider(
+    backgroundMusicModel,
+    settings.backgroundMusicProvider || baseRouting.backgroundMusicProvider,
+  );
 
   return {
     ...baseRouting,

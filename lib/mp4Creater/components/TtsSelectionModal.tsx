@@ -73,6 +73,33 @@ const clampStyle: React.CSSProperties = {
   overflow: 'hidden',
 };
 
+const modelGroupOrder: Array<NonNullable<AiPickerOption['group']>> = [
+  'sample',
+  'free',
+  'budget',
+  'premium',
+  'provider',
+  'voice',
+];
+
+const modelGroupLabels: Record<NonNullable<AiPickerOption['group']>, string> = {
+  sample: '샘플',
+  free: '무료',
+  budget: '유료',
+  premium: '프리미엄',
+  provider: '모델 계열',
+  voice: '목소리',
+};
+
+const modelGroupDescriptions: Record<NonNullable<AiPickerOption['group']>, string> = {
+  sample: '실행 전 흐름 확인용 카드입니다.',
+  free: '비용 부담을 줄이면서 바로 시작하기 좋은 모델입니다.',
+  budget: '유료 기준에서 균형형으로 쓰기 좋은 모델입니다.',
+  premium: '표현력과 완성도를 우선할 때 보는 상위 모델입니다.',
+  provider: '연동 계열 설명용 카드입니다.',
+  voice: '목소리 전용 카드입니다.',
+};
+
 function buildModelOptionId(provider: TtsSelectionProvider, modelId?: string | null) {
   if (provider === 'elevenLabs') return `elevenLabs:${modelId || CONFIG.DEFAULT_ELEVENLABS_MODEL}`;
   return 'qwen3Tts:qwen3-free';
@@ -233,6 +260,17 @@ export default function TtsSelectionModal({
   );
   const selectedVoiceOption = voiceOptions.find((item) => item.id === voiceId) || voiceOptions[0] || null;
   const canSaveVoice = Boolean(selectedVoiceOption?.id);
+  const groupedModelOptions = useMemo(
+    () => modelGroupOrder
+      .map((group) => ({
+        group,
+        label: modelGroupLabels[group],
+        description: modelGroupDescriptions[group],
+        items: modelOptions.filter((item) => (item.group || 'sample') === group),
+      }))
+      .filter((section) => section.items.length > 0),
+    [modelOptions],
+  );
 
   useEffect(() => {
     if (!open || !voiceOptions.length) return;
@@ -397,6 +435,98 @@ export default function TtsSelectionModal({
     onClose();
   }, [modelId, onApply, onClose, provider, selectedVoiceOption]);
 
+  const renderModelCard = useCallback((option: AiPickerOption) => {
+    const selected = option.id === currentModelOptionId;
+    const disabled = Boolean(option.disabled);
+    const tone = option.tone || 'slate';
+    const cardClassName = `flex h-full min-h-[280px] flex-col rounded-[28px] border p-5 text-left transition-all ${
+      disabled
+        ? 'border-slate-200 bg-slate-100/90 opacity-70'
+        : selected
+          ? 'border-blue-400 bg-blue-50 shadow-lg shadow-blue-100'
+          : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/80'
+    }`;
+    const cardContent = (
+      <>
+        <div className="flex items-start justify-between gap-3">
+          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-sm font-black text-white ${avatarToneClassMap[tone]}`}>
+            {option.avatarLabel || 'AI'}
+          </div>
+          <div className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${toneClassMap[tone]}`}>
+            {option.badge}
+          </div>
+        </div>
+
+        <div className="mt-4 flex flex-1 flex-col gap-3">
+          <div>
+            <div className="text-lg font-black text-slate-900">{option.title}</div>
+            <div className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{option.provider}</div>
+          </div>
+
+          <p className="text-sm leading-6 text-slate-600" style={clampStyle}>{option.description}</p>
+
+          <div className="grid grid-cols-2 gap-2 text-[11px] leading-5 text-slate-600">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="font-bold text-slate-500">비용 단계</div>
+              <div className="mt-1 font-black text-slate-900">{option.priceLabel}</div>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="font-bold text-slate-500">품질 톤</div>
+              <div className="mt-1 font-black text-slate-900">{option.qualityLabel}</div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-[11px] font-black text-slate-700">
+            {option.speedLabel ? <span className="rounded-full bg-slate-100 px-3 py-1">{option.speedLabel}</span> : null}
+            {option.costHint ? <span className="rounded-full bg-slate-100 px-3 py-1">{option.costHint}</span> : null}
+          </div>
+
+          {option.helper ? (
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+              {option.helper}
+            </div>
+          ) : null}
+
+          {disabled && option.disabledReason ? (
+            <div className="rounded-2xl border border-slate-300 bg-white/80 px-3 py-2 text-xs leading-5 text-slate-500">
+              {option.disabledReason}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
+          <span className="text-xs font-bold text-slate-400">
+            {disabled ? '지금은 선택할 수 없음' : selected ? '현재 적용된 모델' : '이 모델의 목소리 보기'}
+          </span>
+          <span className={`rounded-full px-3 py-2 text-[11px] font-black ${
+            disabled
+              ? 'bg-slate-300 text-slate-500'
+              : selected
+                ? 'bg-blue-600 text-white'
+                : 'bg-slate-900 text-white'
+          }`}>
+            {disabled ? '선택 불가' : selected ? '선택됨' : '목소리 보기'}
+          </span>
+        </div>
+      </>
+    );
+
+    return disabled ? (
+      <div key={option.id} className={cardClassName}>
+        {cardContent}
+      </div>
+    ) : (
+      <button
+        key={option.id}
+        type="button"
+        onClick={() => handleModelSelect(option.id)}
+        className={cardClassName}
+      >
+        {cardContent}
+      </button>
+    );
+  }, [currentModelOptionId, handleModelSelect]);
+
   const extraPanel = null;
 
   if (!open || !mounted) return null;
@@ -404,7 +534,7 @@ export default function TtsSelectionModal({
   const modal = (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-4" onClick={onClose}>
       <div
-        className="flex max-h-[92vh] w-full max-w-7xl flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl"
+        className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl"
         onClick={(event) => event.stopPropagation()}
       >
         <div className="border-b border-slate-200 px-5 py-4 sm:px-6">
@@ -416,7 +546,7 @@ export default function TtsSelectionModal({
               <h3 className="mt-2 text-2xl font-black text-slate-900">{title}</h3>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
                 {step === 'model'
-                  ? '먼저 사용할 TTS 모델을 고르세요. 무료 모델은 바로 사용할 수 있고, API가 연결된 유료 모델은 클릭 후 해당 모델의 목소리 목록으로 들어갑니다.'
+                  ? '다른 API 선택 모달과 같은 카드 규칙으로 무료 / 유료 / 프리미엄 TTS 모델을 먼저 고르고, 이어서 해당 모델의 실제 목소리를 확인합니다. 저장 가능한 샘플 TTS는 없고, 무료 미리듣기 fallback만 브라우저 음성으로 동작합니다.'
                   : '선택한 모델 안에서 실제로 사용할 목소리를 고르세요. 미리듣기 후 저장하면 현재 설정에 바로 반영됩니다.'}
               </p>
               {previewMessage ? <p className="mt-3 text-xs font-bold text-slate-500">{previewMessage}</p> : null}
@@ -433,7 +563,37 @@ export default function TtsSelectionModal({
 
         <div className="flex-1 overflow-y-auto px-5 py-5 sm:px-6">
           {step === 'model' ? (
-            <div className="grid auto-rows-fr gap-4 lg:grid-cols-2 xl:grid-cols-3">
+            <>
+              <div className="space-y-5">
+                <div className="rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-4">
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">모델 선택 규칙</div>
+                  <div className="mt-2 text-sm leading-6 text-slate-500">
+                    무료 / 유료 / 프리미엄 구간으로 나눠서 보여주며, API가 연결되지 않은 모델은 회색으로 잠겨 있습니다.
+                    저장 가능한 샘플 TTS 런타임은 없고, 무료 미리듣기 실패 시에만 브라우저 음성으로 fallback 합니다.
+                  </div>
+                </div>
+
+                {groupedModelOptions.map((section) => (
+                  <section key={section.group} className="space-y-3">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                      <div>
+                        <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">{section.label}</div>
+                        <div className="mt-1 text-sm text-slate-500">{section.description}</div>
+                      </div>
+                      <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600">
+                        {section.items.length}개 모델
+                      </div>
+                    </div>
+
+                    <div className="grid auto-rows-fr gap-4 lg:grid-cols-2 xl:grid-cols-3">
+                      {section.items.map((option) => renderModelCard(option))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+
+              {false && (
+                <div className="grid auto-rows-fr gap-4 lg:grid-cols-2 xl:grid-cols-3">
               {modelOptions.map((option) => {
                 const selected = option.id === currentModelOptionId;
                 const disabled = Boolean(option.disabled);
@@ -515,7 +675,9 @@ export default function TtsSelectionModal({
                   )
                 );
               })}
-            </div>
+                </div>
+              )}
+            </>
           ) : (
             <div className="space-y-4">
               <div className="rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-4">
@@ -547,6 +709,16 @@ export default function TtsSelectionModal({
                 </div>
               ) : (
                 <div className="space-y-3">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">목소리 목록</div>
+                      <div className="mt-1 text-sm text-slate-500">선택한 모델 안에서 실제 저장할 목소리를 미리듣기 후 고르세요.</div>
+                    </div>
+                    <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-black text-slate-600">
+                      {voiceOptions.length}개 목소리
+                    </div>
+                  </div>
+
                   {voiceOptions.map((option) => {
                     const selected = option.id === selectedVoiceOption?.id;
                     const tone = option.tone || 'slate';
@@ -659,7 +831,7 @@ export default function TtsSelectionModal({
               </div>
               <div className="mt-1 text-sm font-black text-slate-900">
                 {step === 'model'
-                  ? '원하는 TTS 모델을 고르면 바로 목소리 목록으로 이동합니다.'
+                  ? '무료 / 유료 / 프리미엄 모델 중 하나를 고르면 바로 해당 목소리 목록으로 이동합니다.'
                   : `${selectedModelOption?.title || 'TTS 모델'} · ${selectedVoiceOption?.title || '목소리를 선택해 주세요'}`}
               </div>
               {step === 'voice' ? (

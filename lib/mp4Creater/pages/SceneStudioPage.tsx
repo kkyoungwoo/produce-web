@@ -25,7 +25,17 @@ import {
 } from '../types';
 import { createDefaultStudioState, fetchStudioState, saveStudioState, getCachedStudioState } from '../services/localFileApi';
 import { createSelectedWorkflowDraftForTransport, ensureWorkflowDraft } from '../services/workflowDraftService';
-import { buildBackgroundMusicPrompt, buildBackgroundMusicPromptSections, combineBackgroundMusicPromptSections, getDefaultPreviewMix, createBackgroundMusicTrack, sanitizeBackgroundMusicDuration } from '../services/musicService';
+import {
+  buildBackgroundMusicPrompt,
+  buildBackgroundMusicPromptSections,
+  buildExtendedBackgroundMusicPrompt,
+  combineBackgroundMusicPromptSections,
+  getDefaultPreviewMix,
+  createBackgroundMusicTrack,
+  normalizeBackgroundMusicModelId,
+  resolveBackgroundMusicProvider,
+  sanitizeBackgroundMusicDuration,
+} from '../services/musicService';
 import { buildProjectSettingsSnapshot } from '../services/projectSettingsSnapshot';
 import { generateImage, getSelectedImageModel, isSampleImageModel } from '../services/imageService';
 import { buildThumbnailScene, createSampleThumbnail } from '../services/thumbnailService';
@@ -54,13 +64,27 @@ import { buildWorkflowPromptStore, buildWorkflowStepContract } from '../services
 import SceneStudioResultPanel from '../components/scene-studio/SceneStudioResultPanel';
 import { buildSceneStudioSnapshotPayload, mergeSceneStudioSnapshotIntoProject, readSceneStudioSnapshot, writeSceneStudioSnapshot, type SceneStudioSnapshotPayload } from '../services/sceneStudioSnapshotCache';
 import { hasDetailedSceneStudioProject } from './sceneStudio/helpers';
-import { getImageModelPickerOptions, getSceneAudioPickerOptions, getVideoModelPickerOptions } from '../services/aiOptionCatalog';
+import {
+  getBackgroundMusicPickerOptions,
+  getImageModelPickerOptions,
+  getSceneAudioPickerOptions,
+  getVideoModelPickerOptions,
+} from '../services/aiOptionCatalog';
 import { generateSceneEditorContent, type SceneEditorPromptMode } from '../services/sceneEditorPromptService';
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const DEFAULT_SCENE_DURATION = 1;
 const MAX_SCENE_DURATION = 6;
 const MAX_GENERATION_QUEUE = 4;
 const clampSceneDuration = (value?: number | null) => Math.min(MAX_SCENE_DURATION, Math.max(0, Number((value || 0).toFixed(1))));
+const stripNarrationAudioFromAsset = (asset: GeneratedAsset): GeneratedAsset => ({
+  ...asset,
+  audioData: null,
+  audioDuration: null,
+  subtitleData: null,
+  targetDuration: typeof asset.videoDuration === 'number'
+    ? clampSceneDuration(asset.videoDuration)
+    : clampSceneDuration(asset.targetDuration || DEFAULT_SCENE_DURATION),
+});
 const DEFAULT_SCENE_ELEVEN_VOICES: ElevenLabsVoice[] = ELEVENLABS_DEFAULT_VOICES.map((voice) => ({
   voice_id: voice.id,
   name: voice.name,
@@ -314,11 +338,12 @@ function buildLipSyncDirection(contentType: WorkflowDraft['contentType'], narrat
 function buildDefaultBackgroundMusicSceneConfig(draft: WorkflowDraft): BackgroundMusicSceneConfig {
   const defaultDurationSeconds = resolveStep2VideoDurationSeconds(draft);
   const promptSections = buildBackgroundMusicPromptSections(draft);
+  const modelId = normalizeBackgroundMusicModelId(CONFIG.DEFAULT_BGM_MODEL);
   return {
     enabled: false,
     prompt: combineBackgroundMusicPromptSections(promptSections, defaultDurationSeconds),
-    provider: 'sample',
-    modelId: CONFIG.DEFAULT_BGM_MODEL,
+    provider: resolveBackgroundMusicProvider(modelId, 'sample'),
+    modelId,
     title: draft.topic?.trim() ? `${draft.topic.trim()} 배경음` : '프로젝트 배경음',
     durationSeconds: defaultDurationSeconds,
     promptSections,
@@ -330,11 +355,12 @@ function resolveBackgroundMusicSceneConfig(draft: WorkflowDraft): BackgroundMusi
   const base = buildDefaultBackgroundMusicSceneConfig(draft);
   const promptSections = buildBackgroundMusicPromptSections(draft, draft.backgroundMusicScene?.promptSections || base.promptSections);
   const durationSeconds = sanitizeBackgroundMusicDuration(draft.backgroundMusicScene?.durationSeconds, base.durationSeconds || 20);
+  const modelId = normalizeBackgroundMusicModelId(draft.backgroundMusicScene?.modelId || base.modelId);
   return {
     enabled: Boolean(draft.backgroundMusicScene?.enabled),
     prompt: draft.backgroundMusicScene?.prompt?.trim() || combineBackgroundMusicPromptSections(promptSections, durationSeconds),
-    provider: draft.backgroundMusicScene?.provider === 'google' ? 'google' : base.provider,
-    modelId: draft.backgroundMusicScene?.modelId || base.modelId,
+    provider: resolveBackgroundMusicProvider(modelId, draft.backgroundMusicScene?.provider || base.provider),
+    modelId,
     title: draft.backgroundMusicScene?.title?.trim() || base.title,
     durationSeconds,
     promptSections,
@@ -560,6 +586,8 @@ const SceneStudioPage: React.FC = () => {
 
   const draft = useMemo(() => ensureWorkflowDraft(studioState), [studioState]);
   const isMuteProject = draft.customScriptSettings?.language === 'mute';
+  const isMusicVideoProject = draft.contentType === 'music_video';
+  const isNarrationAudioEnabled = !isMuteProject && !isMusicVideoProject;
   const backgroundMusicSceneConfig = useMemo(() => resolveBackgroundMusicSceneConfig(draft), [draft]);
   const workflowProgress = useMemo(() => {
     const completed = draft?.completedSteps || { step1: false, step2: false, step3: false, step4: false };
@@ -1112,9 +1140,12 @@ const SceneStudioPage: React.FC = () => {
         ...(patch.promptSections || {}),
       } as Partial<BackgroundMusicPromptSections>);
       const nextDuration = sanitizeBackgroundMusicDuration(patch.durationSeconds ?? currentConfig.durationSeconds, currentConfig.durationSeconds || 20);
+      const nextModelId = normalizeBackgroundMusicModelId(patch.modelId || currentConfig.modelId);
       const nextConfig = {
         ...currentConfig,
         ...patch,
+        modelId: nextModelId,
+        provider: resolveBackgroundMusicProvider(nextModelId, patch.provider || currentConfig.provider),
         durationSeconds: nextDuration,
         promptSections: nextSections,
         prompt: combineBackgroundMusicPromptSections(nextSections, nextDuration),
@@ -1218,6 +1249,21 @@ const SceneStudioPage: React.FC = () => {
     ...item,
     label: item.title,
   })), []);
+  const backgroundMusicModelCardOptions = useMemo(
+    () => getBackgroundMusicPickerOptions({
+      hasGoogleApiKey: Boolean(studioState?.providers?.openRouterApiKey?.trim()),
+    }).map((item) => ({
+      ...item,
+      label: item.title,
+    })),
+    [studioState?.providers?.openRouterApiKey],
+  );
+  const selectedBackgroundMusicModelLabel = useMemo(
+    () => backgroundMusicModelCardOptions.find((item) => item.id === backgroundMusicSceneConfig.modelId)?.title
+      || backgroundMusicSceneConfig.modelId
+      || CONFIG.DEFAULT_BGM_MODEL,
+    [backgroundMusicModelCardOptions, backgroundMusicSceneConfig.modelId],
+  );
 
   const handleQuickImageModelSelect = useCallback((modelId: string) => {
     void updateQuickRouting({
@@ -1626,7 +1672,12 @@ const SceneStudioPage: React.FC = () => {
   const applyProjectToScreen = useCallback((project: SavedProject, options?: { message?: string; suppressStatusMessage?: boolean }) => {
     const hydratedProject = mergeSceneStudioSnapshotIntoProject(project, readSceneStudioSnapshot(project.id));
     const safeAssets = Array.isArray(hydratedProject.assets) && hydratedProject.assets.length
-      ? hydratedProject.assets.map((asset) => ({ ...asset, aspectRatio: asset?.aspectRatio || hydratedProject.workflowDraft?.aspectRatio || '16:9' }))
+      ? hydratedProject.assets.map((asset) => {
+          const normalizedAsset = { ...asset, aspectRatio: asset?.aspectRatio || hydratedProject.workflowDraft?.aspectRatio || '16:9' };
+          return hydratedProject.workflowDraft?.contentType === 'music_video'
+            ? stripNarrationAudioFromAsset(normalizedAsset)
+            : normalizedAsset;
+        })
       : (hydratedProject.workflowDraft ? createInitialSceneAssetsFromDraft(hydratedProject.workflowDraft) : []);
 
     assetsRef.current = safeAssets;
@@ -1843,16 +1894,25 @@ const SceneStudioPage: React.FC = () => {
   const handleExtendBackgroundTrack = useCallback(async (trackId: string) => {
     const sourceTrack = backgroundMusicTracks.find((track) => track.id === trackId);
     if (!sourceTrack) return;
-    const nextDuration = resolveCurrentVideoDurationSeconds(draft, assetsRef.current);
+    const extensionRequest = buildExtendedBackgroundMusicPrompt({
+      draft,
+      sourceTrack,
+      durationSeconds: Math.max(
+        resolveCurrentVideoDurationSeconds(draft, assetsRef.current),
+        sourceTrack.requestedDuration || sourceTrack.duration || 20,
+      ),
+      promptSections: backgroundMusicSceneConfig.promptSections,
+    });
+    const nextDuration = extensionRequest.durationSeconds;
     setProgressMessage('선택한 배경음과 이어지는 새 트랙을 생성하고 있습니다.');
     const nextTrack = await createBackgroundMusicTrack({
       draft,
       modelId: backgroundMusicSceneConfig.modelId,
       mode: 'preview',
-      prompt: sourceTrack.prompt || backgroundMusicSceneConfig.prompt,
+      prompt: extensionRequest.prompt,
       title: resolveNextBackgroundTrackTitle(backgroundMusicTracks),
       provider: backgroundMusicSceneConfig.provider,
-      promptSections: sourceTrack.promptSections || backgroundMusicSceneConfig.promptSections,
+      promptSections: extensionRequest.promptSections,
       durationSeconds: nextDuration,
       parentTrackId: sourceTrack.id,
       googleApiKey: studioState?.providers?.openRouterApiKey || '',
@@ -2054,6 +2114,7 @@ const SceneStudioPage: React.FC = () => {
 
     const preserveExistingCards = Boolean(options?.preserveExistingCards && assetsRef.current.length);
     const generateAudio = Boolean(options?.generateAudio);
+    const shouldGenerateSceneAudio = generateAudio && isNarrationAudioEnabled;
 
     isProcessingRef.current = true;
     setIsGeneratingScenes(true);
@@ -2065,7 +2126,7 @@ const SceneStudioPage: React.FC = () => {
     clearSceneProgress();
     setProgressMessage(
       preserveExistingCards
-        ? (generateAudio ? '기존 씬 카드 기준으로 이미지와 오디오를 다시 준비하는 중...' : '기존 씬 카드 기준으로 이미지를 다시 준비하는 중...')
+        ? (shouldGenerateSceneAudio ? '기존 씬 카드 기준으로 이미지와 오디오를 다시 준비하는 중...' : '기존 씬 카드 기준으로 이미지를 다시 준비하는 중...')
         : '스토리를 문단별 씬으로 정리하는 중...'
     );
 
@@ -2079,7 +2140,7 @@ const SceneStudioPage: React.FC = () => {
       const initialAssets: GeneratedAsset[] = scenes.map((scene, index) => {
         const existing = baseAssets[index];
         const fallbackPreview = sampleAssets[index];
-        return {
+        const baseAsset: GeneratedAsset = {
           ...fallbackPreview,
           ...existing,
           ...scene,
@@ -2089,6 +2150,7 @@ const SceneStudioPage: React.FC = () => {
           videoHistory: existing?.videoHistory || [],
           status: existing?.imageData ? 'completed' : 'pending',
         };
+        return shouldGenerateSceneAudio ? baseAsset : stripNarrationAudioFromAsset(baseAsset);
       });
 
       assetsRef.current = initialAssets;
@@ -2096,7 +2158,7 @@ const SceneStudioPage: React.FC = () => {
       setStep(GenerationStep.ASSETS);
       initialAssets.forEach((_, index) => setSceneProgress(index, 8, '생성 대기 중'));
 
-      const initialTtsOptions = generateAudio ? resolveSceneTtsOptions() : null;
+      const initialTtsOptions = shouldGenerateSceneAudio ? resolveSceneTtsOptions() : null;
       const isTtsAvailable = Boolean(initialTtsOptions && (initialTtsOptions.provider === 'qwen3Tts' || initialTtsOptions.apiKey));
 
       for (let i = 0; i < initialAssets.length; i++) {
@@ -2147,8 +2209,8 @@ const SceneStudioPage: React.FC = () => {
         syncSceneStudioWorkingCopy();
         setSceneProgress(i, isTtsAvailable ? 72 : 100, isTtsAvailable ? '오디오 대기 중' : '이미지 준비 완료');
 
-        const sceneTts = resolveSceneTtsOptions();
-        if (generateAudio && (sceneTts.provider === 'qwen3Tts' || sceneTts.apiKey)) {
+        const sceneTts = shouldGenerateSceneAudio ? resolveSceneTtsOptions() : null;
+        if (shouldGenerateSceneAudio && sceneTts && (sceneTts.provider === 'qwen3Tts' || sceneTts.apiKey)) {
           setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 오디오와 자막을 준비하는 중...`);
           try {
             const audio = await withSoftTimeout(
@@ -2194,7 +2256,7 @@ const SceneStudioPage: React.FC = () => {
 
       setStep(GenerationStep.COMPLETED);
       setTaskProgressPercent(96);
-      setProgressMessage(generateAudio
+      setProgressMessage(shouldGenerateSceneAudio
         ? '씬 카드(이미지/오디오) 생성이 끝났습니다. 현재는 저부하 샘플 이미지 중심으로 준비했고, 필요하면 씬별 영상화 또는 최종 출력으로 넘어가 주세요.'
         : '씬 이미지 생성이 끝났습니다. 현재는 저부하 샘플 이미지 중심으로 준비했고, 필요하면 씬별 또는 전체 영상 생성을 진행해 주세요.');
 
@@ -2236,7 +2298,7 @@ const SceneStudioPage: React.FC = () => {
       setIsGeneratingScenes(false);
       window.setTimeout(() => setTaskProgressPercent(null), 900);
     }
-  }, [appendImageHistory, backgroundMusicTracks, backgroundMusicSceneConfig, buildProjectEnhancementPatch, buildReferenceImages, buildSceneStudioWorkflowDraft, createScenePlan, draft, persistWorkflowStep4, previewMix, resolveNextBackgroundTrackTitle, resolvedProjectId, studioState, updateAssetAt, writeSceneStudioLocalSnapshot]);
+  }, [appendImageHistory, backgroundMusicTracks, backgroundMusicSceneConfig, buildProjectEnhancementPatch, buildReferenceImages, buildSceneStudioWorkflowDraft, createScenePlan, draft, isNarrationAudioEnabled, persistWorkflowStep4, previewMix, resolveNextBackgroundTrackTitle, resolvedProjectId, studioState, updateAssetAt, writeSceneStudioLocalSnapshot]);
 
   useEffect(() => {
     return () => {
@@ -2339,7 +2401,9 @@ const SceneStudioPage: React.FC = () => {
     const { enableSubtitles, qualityMode, downloadFile = false, customTitle } = options;
     if (isVideoGenerating) return null;
 
-    const renderableAssets = [...assetsRef.current];
+    const renderableAssets = isNarrationAudioEnabled
+      ? [...assetsRef.current]
+      : assetsRef.current.map((asset) => stripNarrationAudioFromAsset(asset));
     const hasVisualOutputs = renderableAssets.some((asset) => Boolean(asset.imageData || asset.videoData));
     const hasNarrationOutputs = renderableAssets.some((asset) => Boolean(asset.audioData));
     const hasBackgroundOutputs = effectiveBackgroundTracks.some((track) => Boolean(track?.audioData));
@@ -2392,7 +2456,7 @@ const SceneStudioPage: React.FC = () => {
       }
 
       const finalResult = await renderVideoWithFfmpeg({
-        assets: assetsRef.current,
+        assets: renderableAssets,
         backgroundTracks: effectiveBackgroundTracks,
         previewMix,
         aspectRatio: draft.aspectRatio || assetsRef.current[0]?.aspectRatio || '16:9',
@@ -2501,7 +2565,7 @@ const SceneStudioPage: React.FC = () => {
       if (!downloadFile) setIsPreparingPreviewVideo(false);
       window.setTimeout(() => setTaskProgressPercent(null), 1200);
     }
-  }, [buildProjectEnhancementPatch, currentProjectSummary?.subtitlePreset, draft.aspectRatio, draft.topic, effectiveBackgroundTracks, finalVideoTitle, finalVideoUrl, isVideoGenerating, persistSceneStudioSnapshot, previewMix, previewVideoStatus, resolvedProjectId]);
+  }, [buildProjectEnhancementPatch, currentProjectSummary?.subtitlePreset, draft.aspectRatio, draft.topic, effectiveBackgroundTracks, finalVideoTitle, finalVideoUrl, isNarrationAudioEnabled, isVideoGenerating, persistSceneStudioSnapshot, previewMix, previewVideoStatus, resolvedProjectId]);
 
   const handleRegenerateImage = async (index: number) => {
     if (!acquireSceneActionLock(index, 'image')) return;
@@ -2559,7 +2623,7 @@ const SceneStudioPage: React.FC = () => {
   };
 
   const handleRegenerateAudio = async (index: number) => {
-    if (isMuteProject) return;
+    if (!isNarrationAudioEnabled) return;
     if (!acquireSceneActionLock(index, 'audio')) return;
     try {
       await enqueueGenerationTask(`씬 ${index + 1} 오디오 생성`, async () => {
@@ -3257,8 +3321,8 @@ const SceneStudioPage: React.FC = () => {
         <SceneStudioResultPanel
           data={generatedData}
           onRegenerateImage={handleRegenerateImage}
-          onRegenerateAudio={handleRegenerateAudio}
-          onDeleteAllAudio={() => void handleDeleteAllGeneratedAudio()}
+          onRegenerateAudio={isNarrationAudioEnabled ? handleRegenerateAudio : undefined}
+          onDeleteAllAudio={isNarrationAudioEnabled ? (() => void handleDeleteAllGeneratedAudio()) : undefined}
           onExportVideo={triggerVideoExport}
           onGenerateAnimation={handleGenerateAnimation}
           onNarrationChange={handleNarrationChange}
@@ -3290,6 +3354,7 @@ const SceneStudioPage: React.FC = () => {
           onBackgroundMusicSceneChange={updateBackgroundMusicScene}
           onAutoFillBackgroundMusicMood={handleAutoFillBackgroundMusicMood}
           isMuteMode={isMuteProject}
+          isNarrationAudioEnabled={isNarrationAudioEnabled}
           previewMix={previewMix}
           onPreviewMixChange={handlePreviewMixChange}
           currentTopic={draft.topic}
@@ -3323,13 +3388,21 @@ const SceneStudioPage: React.FC = () => {
             options: quickVideoModelCardOptions,
             onSelect: handleQuickVideoModelSelect,
           }}
-          audioModelSelector={{
+          audioModelSelector={isNarrationAudioEnabled ? {
             currentId: selectedAudioModelMeta.currentId,
             currentLabel: selectedAudioModelMeta.currentLabel,
             options: quickAudioModelCardOptions,
             onSelect: handleQuickAudioModelSelect,
+          } : undefined}
+          backgroundMusicModelSelector={{
+            currentId: backgroundMusicSceneConfig.modelId,
+            currentLabel: selectedBackgroundMusicModelLabel,
+            options: backgroundMusicModelCardOptions,
+            onSelect: (modelId) => {
+              updateBackgroundMusicScene({ enabled: true, modelId });
+            },
           }}
-          audioTtsSelectionFlow={{
+          audioTtsSelectionFlow={isNarrationAudioEnabled ? {
             currentProvider: resolveSceneTtsOptions().provider,
             currentModelId: resolveSceneTtsOptions().modelId,
             currentVoiceId: resolveSceneTtsOptions().voiceId,
@@ -3343,7 +3416,7 @@ const SceneStudioPage: React.FC = () => {
             onApply: (selection) => {
               applyQuickAudioSelection(selection);
             },
-          }}
+          } : undefined}
           onFooterBack={handleGoBackToWorkflow}
           footerBackLabel="이전으로"
           thumbnailToolbarRef={thumbnailToolbarRef}

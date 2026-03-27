@@ -3,8 +3,9 @@ import { BackgroundMusicPromptSections, BackgroundMusicTrack, WorkflowDraft } fr
 import { buildConceptDirectionLines, buildMarkdownSection, joinPromptBlocks } from './promptMarkdown';
 
 const SAMPLE_BACKGROUND_LOOP_AUDIO = '/mp4Creater/samples/audio/loop_main.wav';
-const GOOGLE_LYRIA_CLIP_MODEL = 'lyria-3-clip-preview';
-const GOOGLE_LYRIA_PRO_MODEL = 'lyria-3-pro-preview';
+export const GOOGLE_LYRIA_CLIP_MODEL = 'lyria-3-clip-preview';
+export const GOOGLE_LYRIA_PRO_MODEL = 'lyria-3-pro-preview';
+const LEGACY_GOOGLE_LYRIA_MODEL = 'lyria-002';
 
 function getSafeSelections(draft?: WorkflowDraft | null) {
   const raw = draft?.selections;
@@ -126,15 +127,36 @@ function buildMusicVideoReference(draft: WorkflowDraft) {
   return `뮤직비디오 콘셉트이며 step3에서 작성한 가사를 그대로 lyric reference로 사용합니다. 현재 가사/대본 흐름은 "${excerpt}"이며, step6 배경음악은 이 가사의 훅, 리듬, 보컬 호흡을 우선 반영해야 합니다.`;
 }
 
-export function isGoogleBackgroundMusicModel(modelId?: string | null) {
+export function normalizeBackgroundMusicModelId(modelId?: string | null) {
   const normalized = `${modelId || ''}`.trim();
-  return normalized === 'lyria-002' || normalized === GOOGLE_LYRIA_CLIP_MODEL || normalized === GOOGLE_LYRIA_PRO_MODEL;
+  if (normalized === 'sample-cinematic-v1' || normalized === 'sample-news-v1' || normalized === 'elevenlabs-music-auto') {
+    return 'sample-ambient-v1';
+  }
+  if (normalized === LEGACY_GOOGLE_LYRIA_MODEL) return GOOGLE_LYRIA_CLIP_MODEL;
+  if (normalized === GOOGLE_LYRIA_CLIP_MODEL || normalized === GOOGLE_LYRIA_PRO_MODEL || normalized === 'sample-ambient-v1') {
+    return normalized;
+  }
+  return normalized || 'sample-ambient-v1';
+}
+
+export function isGoogleBackgroundMusicModel(modelId?: string | null) {
+  const normalized = normalizeBackgroundMusicModelId(modelId);
+  return normalized === GOOGLE_LYRIA_CLIP_MODEL || normalized === GOOGLE_LYRIA_PRO_MODEL;
+}
+
+export function resolveBackgroundMusicProvider(
+  modelId?: string | null,
+  provider?: 'google' | 'sample' | null,
+): 'google' | 'sample' {
+  const normalizedModelId = normalizeBackgroundMusicModelId(modelId);
+  if (isGoogleBackgroundMusicModel(normalizedModelId)) return 'google';
+  return provider === 'google' ? 'sample' : 'sample';
 }
 
 function normalizeGoogleBackgroundMusicModel(modelId?: string | null) {
-  const normalized = `${modelId || ''}`.trim();
+  const normalized = normalizeBackgroundMusicModelId(modelId);
   if (normalized === GOOGLE_LYRIA_PRO_MODEL) return GOOGLE_LYRIA_PRO_MODEL;
-  if (normalized === GOOGLE_LYRIA_CLIP_MODEL || normalized === 'lyria-002') return GOOGLE_LYRIA_CLIP_MODEL;
+  if (normalized === GOOGLE_LYRIA_CLIP_MODEL) return GOOGLE_LYRIA_CLIP_MODEL;
   return GOOGLE_LYRIA_CLIP_MODEL;
 }
 
@@ -288,6 +310,49 @@ export function combineBackgroundMusicPromptSections(sections: BackgroundMusicPr
   ]);
 }
 
+export function buildExtendedBackgroundMusicPrompt(options: {
+  draft: WorkflowDraft;
+  sourceTrack: Pick<BackgroundMusicTrack, 'duration' | 'requestedDuration' | 'prompt' | 'promptSections'>;
+  durationSeconds?: number | null;
+  promptSections?: Partial<BackgroundMusicPromptSections> | null;
+}) {
+  const currentDuration = sanitizeBackgroundMusicDuration(
+    options.sourceTrack.requestedDuration || options.sourceTrack.duration || 20,
+    20,
+  );
+  const requestedDuration = sanitizeBackgroundMusicDuration(
+    Math.max(options.durationSeconds || currentDuration, currentDuration + 10),
+    currentDuration + 10,
+  );
+  const baseSections = buildBackgroundMusicPromptSections(
+    options.draft,
+    options.sourceTrack.promptSections || options.promptSections || null,
+  );
+  const continuationInstruction = options.draft.contentType === 'music_video'
+    ? `Continue the same song from the current ending instead of restarting. Keep the same hook, topline contour, vocal phrasing, groove, key center, and emotional rise so the extended section feels like one longer performance from ${currentDuration} to ${requestedDuration} seconds.`
+    : `Extend the current background cue from its existing ending instead of resetting. Keep the same motif, tempo, harmonic center, transition energy, and emotional flow so the soundtrack naturally grows from ${currentDuration} to ${requestedDuration} seconds total.`;
+  const nextSections: BackgroundMusicPromptSections = {
+    ...baseSections,
+    performance: `${baseSections.performance} ${continuationInstruction}`.trim(),
+    production: `${baseSections.production} Preserve the same sonic identity and make the transition into the longer arrangement feel seamless.`.trim(),
+  };
+  const previousPromptReference = options.sourceTrack.prompt?.trim()
+    ? `Previous approved direction: ${options.sourceTrack.prompt.trim().slice(0, 320)}`
+    : '';
+
+  return {
+    durationSeconds: requestedDuration,
+    promptSections: nextSections,
+    prompt: joinPromptBlocks([
+      combineBackgroundMusicPromptSections(nextSections, requestedDuration),
+      buildMarkdownSection('Continuation', [
+        continuationInstruction,
+        previousPromptReference,
+      ].filter(Boolean), { bullet: false }),
+    ]),
+  };
+}
+
 export function buildBackgroundMusicPrompt(
   draft: WorkflowDraft,
   modelId = 'sample-ambient-v1',
@@ -323,12 +388,13 @@ export function createSampleBackgroundTrack(
     parentTrackId?: string | null;
   },
 ): BackgroundMusicTrack {
+  const normalizedModelId = normalizeBackgroundMusicModelId(modelId);
   const promptSections = buildBackgroundMusicPromptSections(draft, options?.promptSections || draft.backgroundMusicScene?.promptSections || null);
   const requestedDuration = sanitizeBackgroundMusicDuration(options?.durationSeconds || draft.backgroundMusicScene?.durationSeconds || 20);
   const renderDuration = Math.min(requestedDuration, 60);
   const prompt = options?.prompt?.trim() || combineBackgroundMusicPromptSections(promptSections, requestedDuration);
-  const stylePreset = inferStylePreset(modelId, draft.contentType);
-  const provider = options?.provider === 'google' ? 'google' : 'sample';
+  const stylePreset = inferStylePreset(normalizedModelId, draft.contentType);
+  const provider = resolveBackgroundMusicProvider(normalizedModelId, options?.provider);
   return {
     id: `bgm_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     title: options?.title?.trim() || `${draft.topic || '프로젝트'} 배경음 ${requestedDuration}초`,
@@ -359,18 +425,23 @@ export async function createBackgroundMusicTrack(options: {
   prompt?: string;
   googleApiKey?: string | null;
 }): Promise<BackgroundMusicTrack> {
-  const wantsGoogle = options.provider === 'google' || isGoogleBackgroundMusicModel(options.modelId);
+  const normalizedModelId = normalizeBackgroundMusicModelId(options.modelId);
+  const resolvedProvider = resolveBackgroundMusicProvider(normalizedModelId, options.provider);
+  const wantsGoogle = resolvedProvider === 'google';
   if (wantsGoogle) {
     try {
-      const generated = await generateGoogleBackgroundMusicTrack(options);
+      const generated = await generateGoogleBackgroundMusicTrack({
+        ...options,
+        modelId: normalizedModelId,
+      });
       if (generated) return generated;
     } catch (error) {
       console.warn('[musicService] google background music failed, falling back to sample loop', error);
     }
   }
 
-  return createSampleBackgroundTrack(options.draft, options.modelId || 'sample-ambient-v1', options.mode || 'preview', {
-    provider: wantsGoogle ? 'google' : (options.provider || 'sample'),
+  return createSampleBackgroundTrack(options.draft, normalizedModelId || 'sample-ambient-v1', options.mode || 'preview', {
+    provider: resolvedProvider,
     promptSections: options.promptSections,
     durationSeconds: options.durationSeconds,
     title: options.title,

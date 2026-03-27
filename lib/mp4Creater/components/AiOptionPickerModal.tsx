@@ -48,6 +48,24 @@ const clampStyle: React.CSSProperties = {
   overflow: 'hidden',
 };
 
+const optionGroupOrder: Array<NonNullable<AiPickerOption['group']>> = [
+  'sample',
+  'free',
+  'budget',
+  'premium',
+  'provider',
+  'voice',
+];
+
+const optionGroupLabels: Record<NonNullable<AiPickerOption['group']>, string> = {
+  sample: '샘플',
+  free: '무료',
+  budget: '유료',
+  premium: '프리미엄',
+  provider: '모델 계열',
+  voice: '목소리',
+};
+
 export default function AiOptionPickerModal({
   open,
   title,
@@ -190,6 +208,189 @@ export default function AiOptionPickerModal({
     }
   };
 
+  const groupedOptions = optionGroupOrder
+    .map((group) => ({
+      group,
+      label: optionGroupLabels[group],
+      items: options.filter((option) => (option.group || 'sample') === group),
+    }))
+    .filter((section) => section.items.length > 0);
+
+  const renderOptionCard = (option: AiPickerOption) => {
+    const selected = option.id === activeId;
+    const isCurrent = option.id === currentId;
+    const canPreview = Boolean(option.previewUrl || onPreviewOption);
+    const tone = option.tone || 'slate';
+    const disabled = Boolean(option.disabled);
+    const resolvedCardVariant = option.cardVariant || cardVariant;
+    const isTtsModelCard = resolvedCardVariant === 'tts-model';
+    const isTtsVoiceCard = resolvedCardVariant === 'tts-voice';
+
+    return (
+      <div
+        key={option.id}
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        onClick={() => handleOptionClick(option.id)}
+        onKeyDown={(event) => {
+          if (disabled) return;
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            handleOptionClick(option.id);
+          }
+        }}
+        className={`group flex h-full min-h-[280px] flex-col overflow-hidden rounded-[24px] border p-4 text-left transition-all ${
+          disabled
+            ? 'border-slate-200 bg-slate-100/90 opacity-70'
+            : selected
+              ? 'border-blue-400 bg-blue-50 shadow-lg shadow-blue-100'
+              : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/80'
+        } ${disabled ? '' : 'cursor-pointer'}`}
+      >
+        <div className="flex min-h-0 flex-1 flex-col text-left">
+          <div className="flex items-start justify-between gap-3">
+            <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-sm font-black text-white ${avatarToneClassMap[tone]}`}>
+              {option.avatarLabel || 'AI'}
+            </div>
+            <div className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${toneClassMap[tone]}`}>
+              {option.badge}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-1 flex-col gap-2.5">
+            <div>
+              <div className="text-[15px] font-black leading-5 text-slate-900">{option.title}</div>
+              <div className="mt-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{option.provider}</div>
+            </div>
+
+            <p className="text-xs leading-5 text-slate-600" style={clampStyle}>{option.description}</p>
+
+            {isTtsModelCard ? (
+              <>
+                <div className="grid grid-cols-2 gap-2 text-[11px] leading-5 text-slate-600">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div className="font-bold text-slate-500">비용 수준</div>
+                    <div className="mt-1 font-black text-slate-900">{option.priceLabel}</div>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
+                    <div className="font-bold text-slate-500">목소리 수</div>
+                    <div className="mt-1 font-black text-slate-900">{option.helper?.replace('선택 가능한 목소리 ', '') || '-'}</div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {option.genderLabel || option.voiceToneLabel ? (
+                  isTtsVoiceCard ? (
+                    <div className="flex flex-wrap gap-2 text-[11px] font-black text-slate-700">
+                      {option.genderLabel ? <span className="rounded-full bg-slate-100 px-3 py-1">{option.genderLabel}</span> : null}
+                      {option.voiceToneLabel ? <span className="rounded-full bg-slate-100 px-3 py-1">{option.voiceToneLabel}</span> : null}
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                      {option.genderLabel ? (
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-bold text-slate-500">성별</span>
+                          <span className="font-black text-slate-800">{option.genderLabel}</span>
+                        </div>
+                      ) : null}
+                      {option.voiceToneLabel ? (
+                        <div className={`flex items-center justify-between gap-3 ${option.genderLabel ? 'mt-1.5' : ''}`}>
+                          <span className="font-bold text-slate-500">톤</span>
+                          <span className="font-black text-slate-800">{option.voiceToneLabel}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  )
+                ) : null}
+
+                <div className="flex flex-wrap gap-2 text-[11px] font-black">
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{option.priceLabel}</span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{option.qualityLabel}</span>
+                  {option.speedLabel ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{option.speedLabel}</span> : null}
+                </div>
+
+                {option.costHint && !isTtsVoiceCard && !isTtsModelCard ? (
+                  <div className="text-[11px] leading-5 text-slate-500">
+                    {option.costHint}
+                  </div>
+                ) : null}
+
+                {!isTtsVoiceCard && option.helper ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
+                    {option.helper}
+                  </div>
+                ) : null}
+              </>
+            )}
+
+            {disabled && option.disabledReason ? (
+              <div className="rounded-2xl border border-slate-300 bg-white/80 px-3 py-2 text-[11px] leading-5 text-slate-500">
+                {option.disabledReason}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-xs font-bold text-slate-400">
+            {disabled
+              ? '현재 선택할 수 없음'
+              : selected
+                ? (requireConfirm && !isCurrent ? '적용 대기 중' : '현재 선택')
+                : isCurrent && requireConfirm
+                  ? '현재 저장된 선택'
+                  : '이 옵션 선택하기'}
+          </span>
+          <div className="flex items-center gap-2">
+            {canPreview ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handlePreview(option);
+                }}
+                disabled={disabled}
+                className={`rounded-full px-3 py-1 text-[11px] font-black ${
+                  previewingId === option.id
+                    ? 'bg-slate-900 text-white'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                } disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400`}
+              >
+                {previewingId === option.id ? '듣는 중' : '미리듣기'}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                handleOptionClick(option.id);
+              }}
+              disabled={disabled}
+              className={`rounded-full px-3 py-1 text-[11px] font-black ${
+                disabled
+                  ? 'bg-slate-300 text-slate-500'
+                  : selected
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-slate-900 text-white group-hover:bg-slate-700'
+              } disabled:cursor-not-allowed`}
+            >
+              {disabled
+                ? '선택 불가'
+                : selected
+                  ? (requireConfirm && !isCurrent ? '대기 중' : '선택됨')
+                  : isTtsVoiceCard
+                    ? '이 목소리 고르기'
+                    : isTtsModelCard
+                      ? '이 모델 고르기'
+                      : '선택하기'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const modal = (
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/55 p-4" onClick={onClose}>
       <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl" onClick={(event) => event.stopPropagation()}>
@@ -213,180 +414,23 @@ export default function AiOptionPickerModal({
               {emptyMessage}
             </div>
           ) : (
-            <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {options.map((option) => {
-                const selected = option.id === activeId;
-                const isCurrent = option.id === currentId;
-                const canPreview = Boolean(option.previewUrl || onPreviewOption);
-                const tone = option.tone || 'slate';
-                const disabled = Boolean(option.disabled);
-                const resolvedCardVariant = option.cardVariant || cardVariant;
-                const isTtsModelCard = resolvedCardVariant === 'tts-model';
-                const isTtsVoiceCard = resolvedCardVariant === 'tts-voice';
-                return (
-                  <div
-                    key={option.id}
-                    role="button"
-                    tabIndex={disabled ? -1 : 0}
-                    onClick={() => handleOptionClick(option.id)}
-                    onKeyDown={(event) => {
-                      if (disabled) return;
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        handleOptionClick(option.id);
-                      }
-                    }}
-                    className={`group flex h-full min-h-[280px] flex-col overflow-hidden rounded-[24px] border p-4 text-left transition-all ${
-                      disabled
-                        ? 'border-slate-200 bg-slate-100/90 opacity-70'
-                        : selected
-                          ? 'border-blue-400 bg-blue-50 shadow-lg shadow-blue-100'
-                          : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg hover:shadow-slate-200/80'
-                    } ${disabled ? '' : 'cursor-pointer'}`}
-                  >
-                    <div className="flex min-h-0 flex-1 flex-col text-left">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br text-sm font-black text-white ${avatarToneClassMap[tone]}`}>
-                          {option.avatarLabel || 'AI'}
-                        </div>
-                        <div className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${toneClassMap[tone]}`}>
-                          {option.badge}
-                        </div>
-                      </div>
-
-                      <div className="mt-3 flex flex-1 flex-col gap-2.5">
-                        <div>
-                          <div className="text-[15px] font-black leading-5 text-slate-900">{option.title}</div>
-                          <div className="mt-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500">{option.provider}</div>
-                        </div>
-
-                        <p className="text-xs leading-5 text-slate-600" style={clampStyle}>{option.description}</p>
-
-                        {isTtsModelCard ? (
-                          <>
-                            <div className="grid grid-cols-2 gap-2 text-[11px] leading-5 text-slate-600">
-                              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                                <div className="font-bold text-slate-500">비용 수준</div>
-                                <div className="mt-1 font-black text-slate-900">{option.priceLabel}</div>
-                              </div>
-                              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
-                                <div className="font-bold text-slate-500">목소리 수</div>
-                                <div className="mt-1 font-black text-slate-900">{option.helper?.replace('선택 가능한 목소리 ', '') || '-'}</div>
-                              </div>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            {option.genderLabel || option.voiceToneLabel ? (
-                              isTtsVoiceCard ? (
-                                <div className="flex flex-wrap gap-2 text-[11px] font-black text-slate-700">
-                                  {option.genderLabel ? <span className="rounded-full bg-slate-100 px-3 py-1">{option.genderLabel}</span> : null}
-                                  {option.voiceToneLabel ? <span className="rounded-full bg-slate-100 px-3 py-1">{option.voiceToneLabel}</span> : null}
-                                </div>
-                              ) : (
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
-                                  {option.genderLabel ? (
-                                    <div className="flex items-center justify-between gap-3">
-                                      <span className="font-bold text-slate-500">성별</span>
-                                      <span className="font-black text-slate-800">{option.genderLabel}</span>
-                                    </div>
-                                  ) : null}
-                                  {option.voiceToneLabel ? (
-                                    <div className={`flex items-center justify-between gap-3 ${option.genderLabel ? 'mt-1.5' : ''}`}>
-                                      <span className="font-bold text-slate-500">특징</span>
-                                      <span className="font-black text-slate-800">{option.voiceToneLabel}</span>
-                                    </div>
-                                  ) : null}
-                                </div>
-                              )
-                            ) : null}
-
-                            <div className="flex flex-wrap gap-2 text-[11px] font-black">
-                              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{option.priceLabel}</span>
-                              <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{option.qualityLabel}</span>
-                              {option.speedLabel ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{option.speedLabel}</span> : null}
-                            </div>
-
-                            {option.costHint && !isTtsVoiceCard && !isTtsModelCard ? (
-                              <div className="text-[11px] leading-5 text-slate-500">
-                                {option.costHint}
-                              </div>
-                            ) : null}
-
-                            {!isTtsVoiceCard && option.helper ? (
-                              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] leading-5 text-slate-500">
-                                {option.helper}
-                              </div>
-                            ) : null}
-                          </>
-                        )}
-
-                        {disabled && option.disabledReason ? (
-                          <div className="rounded-2xl border border-slate-300 bg-white/80 px-3 py-2 text-[11px] leading-5 text-slate-500">
-                            {option.disabledReason}
-                          </div>
-                        ) : null}
-                      </div>
+            <div className="space-y-6">
+              {groupedOptions.map((section) => (
+                <section key={section.group}>
+                  <div className="mb-3 flex items-center gap-3">
+                    <div className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+                      {section.label}
                     </div>
-
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                      <span className="text-xs font-bold text-slate-400">
-                        {disabled
-                          ? '현재 선택할 수 없음'
-                          : selected
-                            ? (requireConfirm && !isCurrent ? '적용 대기 중' : '현재 선택됨')
-                            : isCurrent && requireConfirm
-                              ? '현재 저장된 선택'
-                              : '이 옵션 선택하기'}
-                      </span>
-                      <div className="flex items-center gap-2">
-                        {canPreview ? (
-                          <button
-                            type="button"
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              void handlePreview(option);
-                            }}
-                            disabled={disabled}
-                            className={`rounded-full px-3 py-1 text-[11px] font-black ${
-                              previewingId === option.id
-                                ? 'bg-slate-900 text-white'
-                                : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
-                            } disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400`}
-                          >
-                            {previewingId === option.id ? '듣기 중지' : '음성 듣기'}
-                          </button>
-                        ) : null}
-                        <button
-                          type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleOptionClick(option.id);
-                          }}
-                          disabled={disabled}
-                          className={`rounded-full px-3 py-1 text-[11px] font-black ${
-                            disabled
-                              ? 'bg-slate-300 text-slate-500'
-                              : selected
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-slate-900 text-white group-hover:bg-slate-700'
-                          } disabled:cursor-not-allowed`}
-                        >
-                          {disabled
-                            ? '선택 불가'
-                            : selected
-                              ? (requireConfirm && !isCurrent ? '대기 중' : '선택됨')
-                              : isTtsVoiceCard
-                                ? '이 목소리 고르기'
-                                : isTtsModelCard
-                                  ? '이 모델 고르기'
-                              : '선택하기'}
-                        </button>
-                      </div>
+                    <div className="h-px flex-1 bg-slate-200" />
+                    <div className="text-[11px] font-bold text-slate-400">
+                      {section.items.length}개
                     </div>
                   </div>
-                );
-              })}
+                  <div className="grid auto-rows-fr gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                    {section.items.map((option) => renderOptionCard(option))}
+                  </div>
+                </section>
+              ))}
             </div>
           )}
 

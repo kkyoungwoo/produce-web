@@ -110,7 +110,8 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
   const canShowRenderedPreview = Boolean(finalVideoUrl);
   const showFinalRenderButton = Boolean(onPreparePreviewVideo && !isPreparingPreviewVideo);
   const showFinalOutputButton = Boolean(canShowRenderedPreview && onExportVideo);
-  const showPreviewMixControls = Boolean(!finalVideoUrl && previewVideoStatus !== 'loading' && !isPreparingPreviewVideo && onPreviewMixChange);
+  const showPreviewMixControls = Boolean(onPreviewMixChange);
+  const canRequestPreviewRerender = Boolean(onPreparePreviewVideo && !isPreparingPreviewVideo);
   const showRenderProgressCard = Boolean(
     (previewVideoStatus === 'loading' || isPreparingPreviewVideo || isExporting)
     && (progressMessage || activeOverallProgress !== null),
@@ -188,14 +189,38 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
                     <div className="flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">
                       <span>나레이션 볼륨</span>
-                      <span>{Math.round(narrationVolume * 100)}%</span>
+                      <div className="flex items-center gap-2">
+                        <span>{Math.round(narrationVolume * 100)}%</span>
+                        {onPreparePreviewVideo ? (
+                          <button
+                            type="button"
+                            onClick={() => void onPreparePreviewVideo?.()}
+                            disabled={!canRequestPreviewRerender}
+                            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black normal-case tracking-normal text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                          >
+                            {isPreparingPreviewVideo ? '다시 렌더링 중...' : '다시 렌더링'}
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                     <input type="range" min="0" max="1.6" step="0.05" value={narrationVolume} onChange={(event) => onPreviewMixChange?.({ ...safePreviewMix, narrationVolume: Number(event.target.value) })} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-blue-600" />
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
                     <div className="flex items-center justify-between gap-3 text-xs font-black uppercase tracking-[0.16em] text-slate-500">
                       <span>배경음 볼륨</span>
-                      <span>{Math.round(backgroundMusicVolume * 100)}%</span>
+                      <div className="flex items-center gap-2">
+                        <span>{Math.round(backgroundMusicVolume * 100)}%</span>
+                        {onPreparePreviewVideo ? (
+                          <button
+                            type="button"
+                            onClick={() => void onPreparePreviewVideo?.()}
+                            disabled={!canRequestPreviewRerender}
+                            className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-black normal-case tracking-normal text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                          >
+                            {isPreparingPreviewVideo ? '다시 렌더링 중...' : '다시 렌더링'}
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
                     <input type="range" min="0" max="1" step="0.02" value={backgroundMusicVolume} onChange={(event) => onPreviewMixChange?.({ ...safePreviewMix, backgroundMusicVolume: Number(event.target.value) })} className="mt-3 h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-violet-600" />
                   </div>

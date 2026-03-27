@@ -138,8 +138,8 @@ export const TTS_NARRATOR_OPTIONS = [
 
 export const BGM_MODEL_OPTIONS = [
   { id: 'sample-ambient-v1', name: '샘플 배경음 v1' },
-  { id: 'lyria-002', name: 'Google Lyria 2' },
-  { id: 'elevenlabs-music-auto', name: 'ElevenLabs 자동 배경음' },
+  { id: 'lyria-3-clip-preview', name: 'Google Lyria 3 Clip' },
+  { id: 'lyria-3-pro-preview', name: 'Google Lyria 3 Pro' },
 ] as const;
 
 export const ELEVENLABS_DEFAULT_VOICES = [

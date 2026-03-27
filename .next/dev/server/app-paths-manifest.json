@@ -1,7 +1,9 @@
 {
   "/api/local-storage/state/route": "app/api/local-storage/state/route.js",
   "/api/local-storage/project/route": "app/api/local-storage/project/route.js",
+  "/api/mp4Creater/render/route": "app/api/mp4Creater/render/route.js",
   "/api/mp4Creater/youtube/config/route": "app/api/mp4Creater/youtube/config/route.js",
-  "/mp4Creater/step-4/page": "app/mp4Creater/step-4/page.js",
+  "/page": "app/page.js",
+  "/mp4Creater/page": "app/mp4Creater/page.js",
   "/mp4Creater/step-6/page": "app/mp4Creater/step-6/page.js"
 }

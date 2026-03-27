@@ -474,21 +474,31 @@ export default function Step3Panel({
   getCharacterVoiceSummary,
   castSelectionHighlightTick = 0,
 }: Step3PanelProps) {
+  const hasGoogleApiKey = Boolean(googleApiKey?.trim());
   const scriptModelPickerOptions = useMemo<AiPickerOption[]>(() => {
     const catalogOptions = getScriptModelPickerOptions(true);
-    if (catalogOptions.length) return catalogOptions;
-    return (Array.isArray(scriptModelOptionsProp) ? scriptModelOptionsProp : []).map((item) => ({
-      id: item.id,
-      title: item.name,
-      provider: item.id === NO_AI_SCRIPT_MODEL_ID ? 'Built-in' : 'AI model',
-      description: 'Script model option',
-      badge: item.id === NO_AI_SCRIPT_MODEL_ID ? 'Sample' : 'AI',
-      priceLabel: item.id === NO_AI_SCRIPT_MODEL_ID ? 'Free' : 'API',
-      qualityLabel: 'Balanced',
-      group: item.id === NO_AI_SCRIPT_MODEL_ID ? 'sample' as const : 'free' as const,
-      tier: item.id === NO_AI_SCRIPT_MODEL_ID ? 'sample' as const : 'free' as const,
+    const baseOptions = catalogOptions.length
+      ? catalogOptions
+      : (Array.isArray(scriptModelOptionsProp) ? scriptModelOptionsProp : []).map((item) => ({
+        id: item.id,
+        title: item.name,
+        provider: item.id === NO_AI_SCRIPT_MODEL_ID ? 'Built-in' : 'AI model',
+        description: 'Script model option',
+        badge: item.id === NO_AI_SCRIPT_MODEL_ID ? 'Sample' : 'AI',
+        priceLabel: item.id === NO_AI_SCRIPT_MODEL_ID ? 'Free' : 'API',
+        qualityLabel: 'Balanced',
+        group: item.id === NO_AI_SCRIPT_MODEL_ID ? 'sample' as const : 'free' as const,
+        tier: item.id === NO_AI_SCRIPT_MODEL_ID ? 'sample' as const : 'free' as const,
+      }));
+
+    return baseOptions.map((item) => ({
+      ...item,
+      disabled: item.id === NO_AI_SCRIPT_MODEL_ID ? false : !hasGoogleApiKey,
+      disabledReason: item.id === NO_AI_SCRIPT_MODEL_ID || hasGoogleApiKey
+        ? undefined
+        : 'Google AI Studio API 키를 연결하면 선택할 수 있습니다.',
     }));
-  }, [scriptModelOptionsProp]);
+  }, [hasGoogleApiKey, scriptModelOptionsProp]);
   const extractedCharacters = Array.isArray(extractedCharactersProp) ? extractedCharactersProp : [];
   const selectedCharacterIds = Array.isArray(selectedCharacterIdsProp) ? selectedCharacterIdsProp : [];
   const elevenLabsVoices = Array.isArray(elevenLabsVoicesProp) ? elevenLabsVoicesProp : [];
@@ -1195,7 +1205,9 @@ export default function Step3Panel({
                                 <div className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">TTS 모델 / 목소리</div>
                                 <div className="mt-1 text-sm font-black text-slate-900">{getCharacterVoiceSummary(character)}</div>
                                 <div className="mt-1 text-xs leading-5 text-slate-500">
-                                  {voiceProvider === 'elevenLabs' ? '이 버튼을 누르면 모델을 고르고, 이어서 그 모델의 실제 목소리를 들어보며 선택합니다.' : '이 버튼을 누르면 무료 모델 안에서 실제 목소리를 들어보고 선택합니다.'}
+                                  {voiceProvider === 'elevenLabs'
+                                    ? '이 버튼을 누르면 무료 / 유료 / 프리미엄 TTS 모델 카드를 보고, 이어서 그 모델의 실제 목소리를 들어보며 선택합니다.'
+                                    : '이 버튼을 누르면 같은 카드형 팝업에서 무료 TTS 모델과 실제 목소리를 이어서 선택합니다.'}
                                 </div>
                               </button>
                               {voiceProvider === 'qwen3Tts' ? (

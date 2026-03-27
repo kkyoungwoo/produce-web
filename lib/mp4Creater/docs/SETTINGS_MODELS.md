@@ -4,6 +4,7 @@
 - Settings must be the source of truth for project-default text, image, video, and TTS routing.
 - Model / TTS cards must use `lib/mp4Creater/services/aiOptionCatalog.ts`.
 - The card modal UI must use `lib/mp4Creater/components/AiOptionPickerModal.tsx`.
+- `lib/mp4Creater/components/TtsSelectionModal.tsx` model step must mirror the same grouped card language as the shared AI picker so TTS also reads as `무료 / 유료 / 프리미엄` sections.
 - Step3 and Step6 should read the same option metadata instead of hardcoding separate cost / quality labels.
 
 ## TTS Consistency Guard
@@ -13,13 +14,14 @@
 - Step6 audio quick selection should reuse the same option catalog so quality / cost labels stay aligned with Settings.
 - If voice badges, descriptions, or quality tiers change, update `aiOptionCatalog.ts` first.
 - TTS provider / voice / model pickers should stage the choice first and only apply it after the modal confirm button is pressed.
-- Settings, Step3, and Step6 should all use `lib/mp4Creater/components/TtsSelectionModal.tsx` for the final `provider -> model -> voice` flow instead of maintaining separate voice pickers.
+- Settings, Step3, and Step6 should all use `lib/mp4Creater/components/TtsSelectionModal.tsx` for the final `tiered model cards -> voice list -> save` flow instead of maintaining separate voice pickers.
 - HeyGen is no longer part of the active TTS picker flow. The supported TTS choices are `Qwen3-TTS` and `ElevenLabs`.
 - The shared picker should show estimated dollar cost from `aiOptionCatalog.ts` and allow preview playback when the option has a preview clip or the Settings preview callback can generate one.
-- TTS Settings flow should guide the user in this order: provider -> model -> voice. When ElevenLabs is chosen, the model picker should reopen into the voice picker after confirm.
+- TTS Settings flow should guide the user in this order: grouped model section -> model card -> voice. When ElevenLabs is chosen, selecting the model card should move inside the same popup to that model's voice list.
 - Choosing a TTS model does not finalize the narrator. The final TTS voice is only fixed after the voice picker confirm step.
 - For TTS specifically, clicking a model card should move the same modal directly into that model's voice list. The save/confirm button is only required on the final voice step.
 - TTS model cards should keep paid providers visible for comparison, but disable them with a Korean reason message when API keys or paid mode are not ready.
+- TTS does not currently have a real persisted sample runtime model. Sample behavior is preview fallback only, so the grouped model view may start at `무료 / 유료 / 프리미엄` while still using sample/browser fallback for free preview failures.
 - TTS card descriptions, helper copy, and action labels should be written in Korean for the user-facing UI. English model names may stay as-is.
 - TTS price labels should use the user-friendly tiers `무료 / 보통 / 높음`, while `costHint` can still show the approximate dollar estimate.
 - Voice cards should expose the essentials needed for the final choice: `이름 / 설명 / 특징 / 가격 수준 / 미리듣기`.
@@ -40,13 +42,13 @@
 - TTS voice cards should stay in a one-row list layout instead of the generic multi-column AI model grid.
 - Header Settings background music selection should reuse the shared AI picker card flow so users compare BGM model options with the same interaction pattern as text/image/video model selection.
 - Sample background-music preview should reuse `public/mp4Creater/samples/audio/loop_main.wav`.
-- `Google Lyria 2 (lyria-002)` should be visible in the background-music picker and become selectable only when the Google AI Studio key is connected.
+- Active background-music picker choices should now be `sample-ambient-v1`, `lyria-3-clip-preview`, and `lyria-3-pro-preview`; legacy `lyria-002` ids must normalize into the Lyria 3 clip path instead of staying visible in UI.
 
 ## 2026-03 Runtime Notes
 - `lib/mp4Creater/services/googleAiStudioService.ts` is the shared Google key resolver used by script, image, video, and Google background-music flows.
 - Background-music model routing is execution-based, not UI-only:
 - sample background-music models => `createSampleBackgroundTrack(...)`
-- `lyria-002` / `lyria-3-clip-preview` / `lyria-3-pro-preview` => `createBackgroundMusicTrack(...)` live Google music path
+- legacy `lyria-002` plus `lyria-3-clip-preview` / `lyria-3-pro-preview` => `createBackgroundMusicTrack(...)` live Google music path after normalization
 - If Google background-music generation fails or no Google key exists, the runtime must fall back to the sample loop track without breaking Settings preview or Step6 export.
 - Sample background-music defaults are now intentionally reduced to one baseline sample model. Older removed sample ids should normalize back to `sample-ambient-v1`.
 - Free TTS providers should prefer the live Google TTS route when the Google AI Studio key is connected, because that is the stable real-speech path for current runtime.

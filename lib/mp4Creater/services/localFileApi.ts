@@ -9,6 +9,7 @@ import {
   normalizeContentType,
 } from '../types';
 import { compactWorkflowDraftForStorage, createDefaultWorkflowDraft } from './workflowDraftService';
+import { normalizeBackgroundMusicModelId, resolveBackgroundMusicProvider } from './musicService';
 
 export const DEFAULT_STORAGE_DIR = './local-data/tubegen-studio';
 
@@ -181,6 +182,11 @@ function sanitizeRoutingForAvailableProviders(state: StudioState): StudioState {
   routing.elevenLabsModelId = normalizeAllowedValue(routing.elevenLabsModelId || routing.audioModel, ELEVENLABS_MODEL_ID_SET, routing.audioModel);
   routing.qwenVoicePreset = normalizeAllowedValue(routing.qwenVoicePreset, QWEN_TTS_PRESET_ID_SET, 'qwen-default');
   routing.chatterboxVoicePreset = normalizeAllowedValue(routing.chatterboxVoicePreset, CHATTERBOX_TTS_PRESET_ID_SET, 'chatterbox-clear');
+  routing.backgroundMusicModel = normalizeBackgroundMusicModelId(routing.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL);
+  routing.backgroundMusicProvider = resolveBackgroundMusicProvider(
+    routing.backgroundMusicModel,
+    routing.backgroundMusicProvider || 'sample',
+  );
   if (routing.ttsProvider === 'chatterbox') {
     routing.ttsProvider = 'qwen3Tts';
   }
@@ -192,17 +198,6 @@ function sanitizeRoutingForAvailableProviders(state: StudioState): StudioState {
   }
   if (routing.ttsNarratorId === CHATTERBOX_CUSTOM_VOICE_ID && !routing.voiceReferenceAudioData) {
     routing.ttsNarratorId = 'chatterbox-clear';
-  }
-
-  if ((routing.backgroundMusicModel || '') === 'lyria-002' && hasGoogleStyleKey) {
-    routing.backgroundMusicProvider = 'google';
-  }
-
-  if (routing.backgroundMusicModel === 'sample-cinematic-v1' || routing.backgroundMusicModel === 'sample-news-v1') {
-    routing.backgroundMusicModel = 'sample-ambient-v1';
-    if (routing.backgroundMusicProvider !== 'google') {
-      routing.backgroundMusicProvider = 'sample';
-    }
   }
 
   if (routing.imageModel === CONFIG.DEFAULT_IMAGE_MODEL) {
@@ -227,11 +222,6 @@ function sanitizeRoutingForAvailableProviders(state: StudioState): StudioState {
     if (routing.ttsProvider === 'elevenLabs') routing.ttsProvider = 'qwen3Tts';
     routing.elevenLabsModelId = CONFIG.DEFAULT_ELEVENLABS_MODEL;
     routing.audioModel = CONFIG.DEFAULT_ELEVENLABS_MODEL;
-  }
-
-  if (!hasGoogleStyleKey) {
-    if (routing.backgroundMusicProvider === 'google') routing.backgroundMusicProvider = 'sample';
-    if ((routing.backgroundMusicModel || '') === 'lyria-002') routing.backgroundMusicModel = 'sample-ambient-v1';
   }
 
   if (!hasHeygenKey) {
