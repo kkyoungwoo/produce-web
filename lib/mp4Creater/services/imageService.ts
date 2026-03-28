@@ -179,14 +179,26 @@ function extractInlineImage(json: any): string | null {
 export async function generateImage(
   scene: ScriptScene,
   referenceImages: ReferenceImages,
-  options?: { qualityMode?: 'draft' | 'final' }
+  options?: { qualityMode?: 'draft' | 'final'; modelId?: string | null }
 ): Promise<string | null> {
-  const modelId = getSelectedImageModel();
+  const result = await generateImageWithMeta(scene, referenceImages, options);
+  return result.imageData;
+}
+
+export async function generateImageWithMeta(
+  scene: ScriptScene,
+  referenceImages: ReferenceImages,
+  options?: { qualityMode?: 'draft' | 'final'; modelId?: string | null }
+): Promise<{ imageData: string | null; source: 'ai' | 'sample' | 'fallback' }> {
+  const modelId = normalizeImageModel(options?.modelId || getSelectedImageModel());
   const fallback = makeScenePlaceholderImage(scene.sceneNumber, scene.imagePrompt || scene.visualPrompt || scene.narration || 'scene', scene.aspectRatio || '16:9');
   const apiKey = getGoogleAiStudioApiKey();
 
   if (isSampleImageModel(modelId) || !apiKey) {
-    return pickSampleStyleImage(scene) || fallback;
+    return {
+      imageData: pickSampleStyleImage(scene) || fallback,
+      source: 'sample',
+    };
   }
 
   try {
@@ -217,12 +229,30 @@ export async function generateImage(
 
     if (!response.ok) {
       const freeImage = await getPrimaryFreeImageForScene(scene).catch(() => null);
-      return freeImage || fallback;
+      return {
+        imageData: freeImage || fallback,
+        source: 'fallback',
+      };
     }
 
     const json = await response.json();
-    return extractInlineImage(json) || (await getPrimaryFreeImageForScene(scene).catch(() => null)) || fallback;
+    const inlineImage = extractInlineImage(json);
+    if (inlineImage) {
+      return {
+        imageData: inlineImage,
+        source: 'ai',
+      };
+    }
+
+    const freeImage = await getPrimaryFreeImageForScene(scene).catch(() => null);
+    return {
+      imageData: freeImage || fallback,
+      source: 'fallback',
+    };
   } catch {
-    return (await getPrimaryFreeImageForScene(scene).catch(() => null)) || fallback;
+    return {
+      imageData: (await getPrimaryFreeImageForScene(scene).catch(() => null)) || fallback,
+      source: 'fallback',
+    };
   }
 }

@@ -6,6 +6,8 @@
 - The card modal UI must use `lib/mp4Creater/components/AiOptionPickerModal.tsx`.
 - `lib/mp4Creater/components/TtsSelectionModal.tsx` model step must mirror the same grouped card language as the shared AI picker so TTS also reads as `무료 / 유료 / 프리미엄` sections.
 - Step3 and Step6 should read the same option metadata instead of hardcoding separate cost / quality labels.
+- Thumbnail Studio image-model selection must also come from the same shared option catalog / modal flow.
+- Thumbnail Studio image-model changes are project-scoped overrides. They should save into the current project settings snapshot and must not overwrite the global header defaults for unrelated projects.
 
 ## TTS Consistency Guard
 - `lib/mp4Creater/components/SettingsDrawer.tsx` sets the project default TTS provider, default voice, and default premium TTS model.
@@ -36,6 +38,7 @@
 - Step3 cast voice changes and Step6 scene audio changes must reuse the same `TtsSelectionModal.tsx` flow while staying scoped to the current project / cast / scene override.
 - Step3 should keep character-level `TTS 선택` buttons on each cast card as the primary entry point. Do not move detailed voice selection back to a top-of-page shared card.
 - Image / video model pickers should also wait for the modal confirm button before saving and closing.
+- Thumbnail Studio image-model picker should also wait for the same confirm interaction before saving the current project override.
 - Settings cards that only open modals should use plain block containers instead of nested `<label>` wrappers when click conflicts appear.
 
 ## Recent UI Notes
@@ -48,6 +51,7 @@
 
 ## 2026-03 Runtime Notes
 - `lib/mp4Creater/services/googleAiStudioService.ts` is the shared Google key resolver used by script, image, video, and Google background-music flows.
+- Thumbnail Studio live image readiness should use the same shared Google key resolver instead of a separate ad-hoc key check.
 - Background-music model routing is execution-based, not UI-only:
 - sample background-music models => `createSampleBackgroundTrack(...)`
 - legacy `lyria-002` plus `lyria-3-clip-preview` / `lyria-3-pro-preview` => `createBackgroundMusicTrack(...)` live Google music path after normalization
@@ -60,6 +64,8 @@
 - If no Google key is available, free preview should prefer browser speech preview rather than exposing a tone-like fallback.
 - Hidden local/custom free TTS experiments must not reappear in the active picker until they produce the same spoken output quality as live generation.
 - Hosted/server Header Settings saves must stay browser-first. Failure to persist the optional YouTube OAuth file must not block normal AI settings save or close behavior.
+- Thumbnail generation should pass the selected thumbnail image model id into `imageService.ts`, and the runtime should record `ai / sample / fallback` source accurately so project cost and gallery cost summary do not drift.
+- Thumbnail image cost must be added only when the live route returns an actual AI image. Sample model and fallback recovery outputs should not increase `project.cost.total`.
 - Adding a new model requires three aligned updates:
 - user-facing option metadata: `lib/mp4Creater/services/aiOptionCatalog.ts`
 - persisted default id / constants: `lib/mp4Creater/config.ts`

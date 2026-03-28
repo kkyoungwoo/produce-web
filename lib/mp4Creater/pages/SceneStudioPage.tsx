@@ -37,7 +37,7 @@ import {
   sanitizeBackgroundMusicDuration,
 } from '../services/musicService';
 import { buildProjectSettingsSnapshot } from '../services/projectSettingsSnapshot';
-import { generateImage, getSelectedImageModel, isSampleImageModel } from '../services/imageService';
+import { generateImageWithMeta, getSelectedImageModel, isSampleImageModel } from '../services/imageService';
 import { buildThumbnailScene, createSampleThumbnail } from '../services/thumbnailService';
 import { isFfmpegUnavailableError, renderVideoWithFfmpeg } from '../services/serverRenderService';
 import { generateTtsAudio } from '../services/ttsService';
@@ -1186,18 +1186,35 @@ const SceneStudioPage: React.FC = () => {
     const baseState = studioStateRef.current || studioState || createDefaultStudioState();
     const defaultRouting = createDefaultStudioState().routing;
     const nextWorkflowDraft = { ...ensureWorkflowDraft(baseState), ...(draftPatch || {}) };
-    const nextState = await saveStudioState({
+    const nextRouting = {
+      ...defaultRouting,
+      ...(baseState.routing || {}),
+      ...routingPatch,
+    };
+    const nextState = {
       ...baseState,
       workflowDraft: nextWorkflowDraft,
-      routing: {
-        ...defaultRouting,
-        ...(baseState.routing || {}),
-        ...routingPatch,
-      },
+      routing: nextRouting,
       updatedAt: Date.now(),
-    });
+    };
+
+    studioStateRef.current = nextState;
     setStudioState(nextState);
-  }, [studioState]);
+
+    if (resolvedProjectId) {
+      const savedProject = await updateProject(resolvedProjectId, {
+        workflowDraft: nextWorkflowDraft,
+        settings: buildProjectSettingsSnapshot({
+          routing: nextRouting,
+          workflowDraft: nextWorkflowDraft,
+          fallback: readProjectNavigationProject(resolvedProjectId)?.settings || null,
+        }),
+      });
+      if (savedProject) {
+        rememberProjectNavigationProject(savedProject);
+      }
+    }
+  }, [resolvedProjectId, studioState]);
 
   const selectedImageModelId = useMemo(() => studioState?.routing?.imageModel || getSelectedImageModel(), [studioState?.routing?.imageModel]);
   const selectedImageModelLabel = useMemo(() => IMAGE_MODELS.find((item) => item.id === selectedImageModelId)?.name || selectedImageModelId || CONFIG.DEFAULT_IMAGE_MODEL, [selectedImageModelId]);
@@ -2170,23 +2187,41 @@ const SceneStudioPage: React.FC = () => {
         setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 이미지를 준비하는 중...`);
 
         let imageData: string | null = null;
-        const imageModel = getSelectedImageModel();
+        const imageModel = selectedImageModelId || getSelectedImageModel();
         const usesSampleImageFlow = isSampleImageModel(imageModel);
-        let sourceMode: 'ai' | 'sample' = usesSampleImageFlow ? 'sample' : 'ai';
+        let sourceMode: 'ai' | 'sample' = 'sample';
 
         try {
-          imageData = await withSoftTimeout(
-            generateImage({ ...assetsRef.current[i], aspectRatio: currentAspectRatio }, referenceImages, { qualityMode: 'final' }),
+          const imageResult = await withSoftTimeout(
+            generateImageWithMeta(
+              { ...assetsRef.current[i], aspectRatio: currentAspectRatio },
+              referenceImages,
+              { qualityMode: 'final', modelId: imageModel },
+            ),
             12000,
-            null
+            { imageData: null, source: 'fallback' as const }
           );
-          if (imageData && !usesSampleImageFlow) {
+          imageData = imageResult.imageData;
+          const generatedByAi = imageResult.source === 'ai';
+          sourceMode = generatedByAi ? 'ai' : 'sample';
+          if (generatedByAi) {
             const price = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
             addCost('image', price, 1);
           }
-          setSceneProgress(i, 58, imageData ? (usesSampleImageFlow ? '샘플 초안 이미지 완성' : 'AI 이미지 완성') : '샘플 이미지 준비');
+          setSceneProgress(
+            i,
+            58,
+            imageData
+              ? (generatedByAi
+                ? 'AI 이미지 완성'
+                : usesSampleImageFlow
+                  ? '샘플 초안 이미지 완성'
+                  : '샘플 / 대체 이미지 준비')
+              : '샘플 이미지 준비',
+          );
         } catch {
           imageData = null;
+          sourceMode = 'sample';
         }
 
         if (!imageData) {
@@ -2194,7 +2229,12 @@ const SceneStudioPage: React.FC = () => {
         }
 
         const nextImageHistory = imageData
-          ? appendImageHistory(assetsRef.current[i], imageData, sourceMode, sourceMode === 'ai' ? 'AI 생성 이미지' : '샘플 / 저부하 초안 이미지')
+          ? appendImageHistory(
+              assetsRef.current[i],
+              imageData,
+              sourceMode,
+              sourceMode === 'ai' ? 'AI 생성 이미지' : '샘플 / 대체 초안 이미지',
+            )
           : assetsRef.current[i].imageHistory || [];
 
         updateAssetAt(i, {
@@ -2298,7 +2338,7 @@ const SceneStudioPage: React.FC = () => {
       setIsGeneratingScenes(false);
       window.setTimeout(() => setTaskProgressPercent(null), 900);
     }
-  }, [appendImageHistory, backgroundMusicTracks, backgroundMusicSceneConfig, buildProjectEnhancementPatch, buildReferenceImages, buildSceneStudioWorkflowDraft, createScenePlan, draft, isNarrationAudioEnabled, persistWorkflowStep4, previewMix, resolveNextBackgroundTrackTitle, resolvedProjectId, studioState, updateAssetAt, writeSceneStudioLocalSnapshot]);
+  }, [appendImageHistory, backgroundMusicTracks, backgroundMusicSceneConfig, buildProjectEnhancementPatch, buildReferenceImages, buildSceneStudioWorkflowDraft, createScenePlan, draft, isNarrationAudioEnabled, persistWorkflowStep4, previewMix, resolveNextBackgroundTrackTitle, resolvedProjectId, selectedImageModelId, studioState, updateAssetAt, writeSceneStudioLocalSnapshot]);
 
   useEffect(() => {
     return () => {
@@ -2577,23 +2617,42 @@ const SceneStudioPage: React.FC = () => {
         setSceneProgress(index, 18, '이미지 다시 준비');
         setProgressMessage(`씬 ${index + 1} 이미지를 다시 만드는 중...`);
         try {
-          const imageModel = getSelectedImageModel();
+          const imageModel = selectedImageModelId || getSelectedImageModel();
           const usesSampleImageFlow = isSampleImageModel(imageModel);
-          const imageData = await generateImage(assetsRef.current[index], buildReferenceImages(), { qualityMode: 'final' });
+          const imageResult = await generateImageWithMeta(
+            assetsRef.current[index],
+            buildReferenceImages(),
+            { qualityMode: 'final', modelId: imageModel },
+          );
+          const imageData = imageResult.imageData;
+          const generatedByAi = imageResult.source === 'ai';
           if (imageData) {
             updateAssetAt(index, {
               imageData,
-              imageHistory: appendImageHistory(assetsRef.current[index], imageData, usesSampleImageFlow ? 'sample' : 'ai', usesSampleImageFlow ? '샘플 / 저부하 초안 이미지' : 'AI 재생성 이미지'),
-              sourceMode: usesSampleImageFlow ? 'sample' : 'ai',
+              imageHistory: appendImageHistory(
+                assetsRef.current[index],
+                imageData,
+                generatedByAi ? 'ai' : 'sample',
+                generatedByAi ? 'AI 재생성 이미지' : '샘플 / 대체 이미지',
+              ),
+              sourceMode: generatedByAi ? 'ai' : 'sample',
               status: 'completed',
               selectedVisualType: 'image',
             });
             syncSceneStudioWorkingCopy();
-            if (!usesSampleImageFlow) {
+            if (generatedByAi) {
               const price = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
               addCost('image', price, 1);
             }
-            setSceneProgress(index, 100, usesSampleImageFlow ? '샘플 이미지 다시 준비 완료' : '이미지 다시 생성 완료');
+            setSceneProgress(
+              index,
+              100,
+              generatedByAi
+                ? '이미지 다시 생성 완료'
+                : usesSampleImageFlow
+                  ? '샘플 이미지 다시 준비 완료'
+                  : '대체 이미지 준비 완료',
+            );
             setTaskProgressPercent(100);
             window.setTimeout(() => setTaskProgressPercent(null), 700);
             return;
@@ -3041,14 +3100,23 @@ const SceneStudioPage: React.FC = () => {
       let nextThumbnail = sampleThumbnail.dataUrl;
       let sourceMode: PromptedImageAsset['sourceMode'] = 'sample';
       let sourceLabel = '샘플 썸네일';
+      const imageModel = studioState?.routing?.imageModel || getSelectedImageModel();
       try {
-        const imageModel = studioState?.routing?.imageModel || getSelectedImageModel();
-        const usesSampleImageFlow = isSampleImageModel(imageModel);
-        const generated = await generateImage(buildThumbnailScene(workingProject, thumbnailVariantSeed), buildReferenceImages(), { qualityMode: 'draft' });
+        const generatedResult = await generateImageWithMeta(
+          buildThumbnailScene(workingProject, thumbnailVariantSeed),
+          buildReferenceImages(),
+          { qualityMode: 'draft', modelId: imageModel },
+        );
+        const generated = generatedResult.imageData;
+        const generatedByAi = generatedResult.source === 'ai';
         if (generated) {
           nextThumbnail = generated;
-          sourceMode = usesSampleImageFlow ? 'sample' : 'ai';
-          sourceLabel = usesSampleImageFlow ? '샘플 썸네일' : 'AI 썸네일';
+          sourceMode = generatedByAi ? 'ai' : 'sample';
+          sourceLabel = generatedByAi
+            ? 'AI 썸네일'
+            : generatedResult.source === 'sample'
+              ? '샘플 썸네일'
+              : '샘플 / 대체 썸네일';
         }
       } catch {}
 
@@ -3074,6 +3142,16 @@ const SceneStudioPage: React.FC = () => {
       const projectEnhancementPatch = buildProjectEnhancementPatch(generatedData, {
         thumbnailPrompt: sampleThumbnail.prompt,
       });
+      const nextCost = sourceMode === 'ai'
+        ? {
+            ...currentCostRef.current,
+            images: currentCostRef.current.images + (PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01),
+            total: currentCostRef.current.total + (PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01),
+            imageCount: currentCostRef.current.imageCount + 1,
+          }
+        : currentCostRef.current;
+      currentCostRef.current = nextCost;
+      setCurrentCost(nextCost);
 
       await updateProject(currentProjectId, {
         ...projectEnhancementPatch,
@@ -3086,7 +3164,7 @@ const SceneStudioPage: React.FC = () => {
         thumbnailPrompt: sampleThumbnail.prompt,
         thumbnailHistory: nextThumbnailHistory,
         selectedThumbnailId: historyEntry.id,
-        cost: currentCostRef.current,
+        cost: nextCost,
       });
       setProgressMessage(`${sourceLabel}을 프로젝트 대표 이미지로 저장했습니다. 버튼을 다시 누르면 지금 완성된 씬 기준으로 새 후보를 계속 생성할 수 있습니다.`);
     } finally {

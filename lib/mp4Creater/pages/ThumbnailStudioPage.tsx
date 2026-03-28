@@ -3,13 +3,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Header from '../components/Header';
+import AiOptionPickerModal from '../components/AiOptionPickerModal';
 import SettingsDrawer from '../components/SettingsDrawer';
 import { LoadingOverlay, StudioPageSkeleton } from '../components/LoadingOverlay';
 import { OverlayModal } from '../components/inputSection/ui';
+import { CONFIG, PRICING } from '../config';
 import { getProjectById, updateProject } from '../services/projectService';
 import { createDefaultStudioState, fetchStudioState, saveStudioState } from '../services/localFileApi';
-import { generateImage, getSelectedImageModel, isSampleImageModel } from '../services/imageService';
+import { hasGoogleAiStudioApiKey } from '../services/googleAiStudioService';
+import { generateImageWithMeta, getSelectedImageModel, isSampleImageModel } from '../services/imageService';
+import { getImageModelPickerOptions, getImageModelSummary } from '../services/aiOptionCatalog';
 import { buildYoutubeMeta } from '../services/projectEnhancementService';
+import { buildProjectSettingsSnapshot } from '../services/projectSettingsSnapshot';
 import { runTextAi } from '../services/textAiService';
 import { renderVideoWithFfmpeg } from '../services/serverRenderService';
 import { fetchYoutubeConnectionStatus, type YoutubeConnectionStatus, uploadVideoToYoutube } from '../services/youtubeService';
@@ -315,6 +320,8 @@ export default function ThumbnailStudioPage() {
   const [selectedThumbnailId, setSelectedThumbnailId] = useState<string | null>(null);
   const [activeThumbnailId, setActiveThumbnailId] = useState<string | null>(null);
   const [copyFeedbackMessage, setCopyFeedbackMessage] = useState<string | null>(null);
+  const [thumbnailImageModelId, setThumbnailImageModelId] = useState<string>(CONFIG.DEFAULT_IMAGE_MODEL);
+  const [thumbnailImagePickerOpen, setThumbnailImagePickerOpen] = useState(false);
   const [studioState, setStudioState] = useState<StudioState>(() => createDefaultStudioState());
   const [showSettings, setShowSettings] = useState(false);
   const [isYoutubeModalOpen, setIsYoutubeModalOpen] = useState(false);
@@ -397,6 +404,11 @@ export default function ThumbnailStudioPage() {
     }
   }, []);
 
+  useEffect(() => {
+    const nextModelId = project?.settings?.imageModel || studioState?.routing?.imageModel || getSelectedImageModel() || CONFIG.DEFAULT_IMAGE_MODEL;
+    setThumbnailImageModelId(nextModelId);
+  }, [project?.settings?.imageModel, studioState?.routing?.imageModel]);
+
   const activeThumbnail = useMemo(
     () => history.find((item) => item.id === activeThumbnailId) || null,
     [activeThumbnailId, history]
@@ -410,7 +422,25 @@ export default function ThumbnailStudioPage() {
     [activeThumbnail, history, selectedThumbnailId]
   );
 
-  const textAiConnected = Boolean(studioState?.providers?.openRouterApiKey?.trim());
+  const googleAiReady = hasGoogleAiStudioApiKey(studioState?.providers?.openRouterApiKey || undefined);
+  const textAiConnected = googleAiReady;
+  const imageGenerationReady = googleAiReady;
+  const selectedThumbnailImageModel = useMemo(
+    () => getImageModelSummary(thumbnailImageModelId) || getImageModelSummary(CONFIG.DEFAULT_IMAGE_MODEL),
+    [thumbnailImageModelId],
+  );
+  const thumbnailUsesSampleFlow = !imageGenerationReady || isSampleImageModel(thumbnailImageModelId);
+  const thumbnailImagePickerOptions = useMemo(
+    () => getImageModelPickerOptions().map((option) => ({
+      ...option,
+      helper: option.id === 'sample-scene-image'
+        ? option.helper
+        : imageGenerationReady
+          ? option.helper
+          : `${option.helper ? `${option.helper} ` : ''}Google AI Studio 연결 전까지는 샘플 썸네일로 대체됩니다.`,
+    })),
+    [imageGenerationReady],
+  );
   const isRecommending = recommendLoadingTarget !== null;
 
   const sampleHeroThumbnail = useMemo(() => {
@@ -549,13 +579,15 @@ export default function ThumbnailStudioPage() {
       const variantSeed = history.length;
       const prompt = buildThumbnailPrompt(project, variantSeed, options);
       const sample = createSampleThumbnail(project, variantSeed, options);
-      const imageModel = getSelectedImageModel();
-      const usesSampleImageFlow = isSampleImageModel(imageModel);
-      const generated = await generateImage(
+      const imageModel = thumbnailImageModelId || getSelectedImageModel();
+      const usesSampleImageFlow = !imageGenerationReady || isSampleImageModel(imageModel);
+      const generatedResult = await generateImageWithMeta(
         buildThumbnailScene(project, variantSeed, options),
         buildReferenceImages(project, buildDefaultLeadCharacterId(project)),
-        { qualityMode: 'draft' },
-      ).catch(() => null);
+        { qualityMode: 'draft', modelId: imageModel },
+      ).catch(() => ({ imageData: null, source: 'fallback' as const }));
+      const generated = generatedResult.imageData;
+      const generatedByAi = generatedResult.source === 'ai';
 
       const entry: PromptedImageAsset = {
         id: `thumbnail_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -564,7 +596,7 @@ export default function ThumbnailStudioPage() {
         imageData: generated || sample.dataUrl,
         createdAt: Date.now(),
         kind: 'thumbnail',
-        sourceMode: generated ? (usesSampleImageFlow ? 'sample' : 'ai') : 'sample',
+        sourceMode: generatedByAi ? 'ai' : 'sample',
         note: [
           trimmedPrompt ? `추가 요청: ${trimmedPrompt}` : '프로젝트 대본과 선택값 기준으로 생성',
           similarTarget ? '기존 썸네일과 비슷한 느낌으로 재생성' : '새 썸네일 후보',
@@ -574,22 +606,39 @@ export default function ThumbnailStudioPage() {
       };
 
       const nextHistory = [...history, entry];
+      const imagePrice = PRICING.IMAGE[imageModel as keyof typeof PRICING.IMAGE] || 0.01;
+      const nextCost = generatedByAi
+        ? {
+            images: (project.cost?.images || 0) + imagePrice,
+            tts: project.cost?.tts || 0,
+            videos: project.cost?.videos || 0,
+            total: (project.cost?.total || 0) + imagePrice,
+            imageCount: (project.cost?.imageCount || 0) + 1,
+            ttsCharacters: project.cost?.ttsCharacters || 0,
+            videoCount: project.cost?.videoCount || 0,
+          }
+        : project.cost;
       const recommendedMeta = await recommendThumbnailMeta({ project, item: entry, studioState });
       setHistory(nextHistory);
       setActiveThumbnailId(entry.id);
       const updated = await persistDraftHistory(nextHistory, {
         youtubeTitle: recommendedMeta.title,
         youtubeDescription: recommendedMeta.description,
+        cost: nextCost,
       });
       if (updated) {
         setProject(updated);
       }
       scrollToCard(entry.id);
-      setStatusMessage(
-        recommendedMeta.source === 'ai'
-          ? (similarTarget ? '비슷한 결의 새 썸네일 후보와 추천 제목·내용을 자동 갱신했습니다.' : '새 썸네일 후보와 추천 제목·내용을 자동 갱신했습니다.')
-          : (similarTarget ? 'AI 연결이 없어 배경 이미지 기반 샘플 썸네일과 샘플 추천 제목·내용을 함께 채웠습니다.' : 'AI 연결이 없어 배경 이미지 기반 샘플 썸네일과 샘플 추천 제목·내용을 함께 채웠습니다.')
-      );
+      const imageStatusMessage = generatedByAi
+        ? (similarTarget ? '비슷한 결의 새 AI 썸네일 후보를 만들었습니다.' : '새 AI 썸네일 후보를 만들었습니다.')
+        : usesSampleImageFlow
+          ? 'AI 세팅이 없어 샘플 썸네일로 채웠습니다.'
+          : 'AI 응답이 불안정해 이번에는 샘플/대체 썸네일로 저장했습니다.';
+      const metaStatusMessage = recommendedMeta.source === 'ai'
+        ? '추천 제목·설명도 함께 갱신했습니다.'
+        : '추천 제목·설명은 샘플 기준으로 함께 채웠습니다.';
+      setStatusMessage(`${imageStatusMessage} ${metaStatusMessage}`);
     } catch (error) {
       console.error('[ThumbnailStudio] generate failed', error);
       setStatusMessage('썸네일 생성 중 오류가 발생했습니다. 입력값은 유지되었으니 다시 시도해 주세요.');
@@ -597,7 +646,7 @@ export default function ThumbnailStudioPage() {
       setIsGenerating(false);
       setGenerationTargetId(null);
     }
-  }, [history, isGenerating, isRecommending, persistDraftHistory, project, promptText, scrollToCard, studioState, thumbnailHeadline]);
+  }, [history, imageGenerationReady, isGenerating, isRecommending, persistDraftHistory, project, promptText, scrollToCard, studioState, thumbnailHeadline, thumbnailImageModelId]);
 
   const handleSelectFinalThumbnail = useCallback(async (targetThumbnail?: PromptedImageAsset | null) => {
     const resolvedThumbnail = targetThumbnail || activeThumbnail;
@@ -662,6 +711,47 @@ export default function ThumbnailStudioPage() {
     setStudioState(updated);
     return updated;
   }, []);
+
+  const handleSelectThumbnailImageModel = useCallback(async (modelId: string) => {
+    const previousModelId = thumbnailImageModelId;
+    const imageProvider = isSampleImageModel(modelId) ? 'sample' : 'openrouter';
+    const selectedModelTitle = getImageModelSummary(modelId)?.title || modelId;
+
+    setThumbnailImageModelId(modelId);
+
+    try {
+      if (project?.id) {
+        const updated = await updateProject(project.id, {
+          settings: buildProjectSettingsSnapshot({
+            routing: {
+              imageModel: modelId,
+              imageProvider,
+            },
+            workflowDraft: {
+              outputMode: project.settings?.outputMode || project.workflowDraft?.outputMode || 'video',
+            },
+            fallback: project.settings,
+          }),
+        });
+        if (updated) {
+          setProject(updated);
+          rememberProjectNavigationProject(updated);
+        }
+      }
+
+      setStatusMessage(
+        isSampleImageModel(modelId)
+          ? '썸네일 이미지 모델을 샘플로 바꿨습니다. 다음 생성은 샘플 썸네일로 진행됩니다.'
+          : imageGenerationReady
+            ? `${selectedModelTitle} 모델을 썸네일 생성에 적용했습니다. 다음 생성부터 실제 AI로 진행됩니다.`
+            : `${selectedModelTitle} 모델을 썸네일 생성 후보로 저장했습니다. 지금은 AI 세팅이 없어 샘플로 생성되고, 연결되면 이 모델로 실제 생성됩니다.`,
+      );
+    } catch (error) {
+      console.error('[ThumbnailStudio] image model save failed', error);
+      setThumbnailImageModelId(previousModelId);
+      setStatusMessage('썸네일 이미지 모델 저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.');
+    }
+  }, [imageGenerationReady, project, thumbnailImageModelId]);
 
   const handleAutoFillYoutubeMeta = useCallback(() => {
     if (!project) return;
@@ -791,7 +881,7 @@ export default function ThumbnailStudioPage() {
         currentSection="scene"
         selectedCharacterName={undefined}
         onOpenSettings={() => setShowSettings(true)}
-        liveApiCostTotal={project?.cost?.total ?? null}
+        liveApiCostTotal={project?.cost?.total ?? 0}
       />
 
       <main className="mx-auto max-w-[1680px] px-4 py-4 sm:px-6 lg:px-8">
@@ -834,6 +924,37 @@ export default function ThumbnailStudioPage() {
                     {isGenerating && generationTargetId === 'new' ? '썸네일 생성 중...' : '썸네일 생성'}
                   </button>
                 </div>
+                <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
+                  <div className="mb-2 flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-sm font-black text-slate-800">썸네일 이미지 모델</div>
+                      <div className="mt-1 text-[11px] leading-5 text-slate-500">Step처럼 썸네일 화면에서도 현재 프로젝트에 쓸 이미지 모델을 바로 고를 수 있습니다.</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setThumbnailImagePickerOpen(true)}
+                      className="rounded-xl border border-fuchsia-200 bg-white px-3 py-2 text-xs font-black text-fuchsia-700 hover:bg-fuchsia-50"
+                    >
+                      모델 선택
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-black text-slate-700">
+                      {selectedThumbnailImageModel?.title || thumbnailImageModelId}
+                    </span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-black ${thumbnailUsesSampleFlow ? 'border border-slate-200 bg-slate-100 text-slate-700' : 'border border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                      {thumbnailUsesSampleFlow ? '샘플 생성' : 'AI 생성'}
+                    </span>
+                  </div>
+                  <div className={`mt-3 rounded-2xl border px-3 py-3 text-xs leading-5 ${thumbnailUsesSampleFlow ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
+                    {isSampleImageModel(thumbnailImageModelId)
+                      ? '지금은 샘플 이미지 모델이 선택되어 있어 썸네일이 샘플 경로로 생성됩니다. 실제 AI 생성으로 바꾸려면 다른 이미지 모델을 선택해 주세요.'
+                      : thumbnailUsesSampleFlow
+                        ? 'AI 세팅이 아직 없어 지금은 샘플 썸네일로 생성됩니다. Google AI Studio를 연결하면 방금 고른 모델로 실제 생성됩니다.'
+                        : `${selectedThumbnailImageModel?.title || thumbnailImageModelId} 모델로 실제 AI 썸네일을 생성합니다.`}
+                  </div>
+                </div>
+
                 <div className="rounded-[24px] border border-slate-200 bg-slate-50 p-4">
                   <div className="mb-2 flex items-center justify-between gap-3">
                     <div>
@@ -1050,6 +1171,18 @@ export default function ThumbnailStudioPage() {
           </div>
         )}
       </main>
+
+      <AiOptionPickerModal
+        open={thumbnailImagePickerOpen}
+        title="썸네일 이미지 모델"
+        description="현재 프로젝트의 썸네일 생성에 바로 쓸 이미지 모델을 고릅니다. AI 세팅이 없으면 샘플로 생성되고, 연결되어 있으면 선택한 모델로 실제 생성됩니다."
+        currentId={thumbnailImageModelId}
+        options={thumbnailImagePickerOptions}
+        onClose={() => setThumbnailImagePickerOpen(false)}
+        onSelect={(id) => void handleSelectThumbnailImageModel(id)}
+        requireConfirm
+        confirmLabel="이 썸네일 이미지 모델 선택하기"
+      />
 
 
       <OverlayModal

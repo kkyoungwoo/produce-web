@@ -86,6 +86,7 @@ const Header: React.FC<HeaderProps> = ({
     : currentSection
       ? currentSection === 'gallery'
       : viewMode === 'gallery';
+  const apiCostLabel = isGalleryActive ? '전체 API 생성비용' : 'API 생성비용';
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/40 bg-white/45 backdrop-blur-xl">
@@ -111,7 +112,7 @@ const Header: React.FC<HeaderProps> = ({
           <div className="flex flex-wrap items-center gap-2">
             {formattedLiveApiCost ? (
               <div className="mp4-glass-pill inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black text-emerald-700">
-                <span>실시간 API 예상요금</span>
+                <span>{apiCostLabel}</span>
                 <span className="text-sm text-emerald-900">{formattedLiveApiCost}</span>
               </div>
             ) : null}

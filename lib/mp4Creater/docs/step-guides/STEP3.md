@@ -9,7 +9,7 @@
 
 ## Shared Voice / Model Picker Rules
 - Step3 script model selection must use the shared option catalog from `lib/mp4Creater/services/aiOptionCatalog.ts`.
-- Step3 cast voice selection must open `lib/mp4Creater/components/AiOptionPickerModal.tsx` instead of relying on a plain dropdown as the main UX.
+- Step3 cast voice selection must open `lib/mp4Creater/components/TtsSelectionModal.tsx`, while script model selection continues to use `lib/mp4Creater/components/AiOptionPickerModal.tsx`.
 - Step3 project default TTS summary must stay aligned with `lib/mp4Creater/components/SettingsDrawer.tsx`.
 - If you change cost / quality / badge copy for Step3 voice or model cards, update `aiOptionCatalog.ts` first.
 - Step3 cast voice selection should not auto-apply on first card click; keep the shared confirm button flow so the user can compare before saving the choice.

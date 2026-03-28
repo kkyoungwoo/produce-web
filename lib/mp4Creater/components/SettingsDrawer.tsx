@@ -62,6 +62,26 @@ type SettingsPickerConfig = {
 
 const cardClass = 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm';
 const inputClass = 'w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 outline-none focus:border-blue-400';
+const SETTINGS_INPUT_PLACEHOLDERS = {
+  storageDir: './local-data/tubegen-studio',
+  googleAiStudioApiKey: 'AIza...',
+  elevenLabsApiKey: 'sk_... or xi-...',
+  youtubeClientId: '1234567890-xxxxxxxxxxxxxxxx.apps.googleusercontent.com',
+  youtubeClientSecret: 'GOCSPX-...',
+  youtubeStoredSecretFallback: 'Stored Secret',
+} as const;
+const SETTINGS_DEFAULT_VALUES = {
+  storageDir: '',
+  loadedYoutubeClientId: '',
+  providerValues: {
+    openRouterApiKey: '',
+    elevenLabsApiKey: '',
+  },
+  youtubeOAuthValues: {
+    googleClientId: '',
+    googleClientSecret: '',
+  },
+} as const;
 const isGoogleBgmModel = (modelId?: string | null) => isGoogleBackgroundMusicModel(modelId);
 const isPaidScriptModel = (modelId?: string | null) => SCRIPT_MODEL_OPTIONS.find((item) => item.id === modelId)?.tier === 'paid';
 const isPaidImageModel = (modelId?: string | null) => IMAGE_MODELS.find((item) => item.id === modelId)?.tier === 'paid';
@@ -72,6 +92,19 @@ const freeVideoModel = VIDEO_MODEL_OPTIONS.find((item) => item.tier !== 'paid')?
 const VOICE_SAMPLE_MAX_SECONDS = 15;
 const LOCAL_RUNTIME_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
 const GOOGLE_MODEL_DISABLED_REASON = 'Google AI Studio API 키를 연결하면 선택할 수 있습니다.';
+
+function createDefaultProviderValues(): { openRouterApiKey: string; elevenLabsApiKey: string } {
+  return { ...SETTINGS_DEFAULT_VALUES.providerValues };
+}
+
+function createDefaultYoutubeOAuthValues(): { googleClientId: string; googleClientSecret: string } {
+  return { ...SETTINGS_DEFAULT_VALUES.youtubeOAuthValues };
+}
+
+function resolveYoutubeClientSecretPlaceholder(hasStoredSecret: boolean, secretMask?: string | null) {
+  if (!hasStoredSecret) return SETTINGS_INPUT_PLACEHOLDERS.youtubeClientSecret;
+  return `${secretMask || SETTINGS_INPUT_PLACEHOLDERS.youtubeStoredSecretFallback} (new value replaces current one)`;
+}
 
 function markApiLockedOptions(options: AiPickerOption[], enabled: boolean, disabledReason: string) {
   return options.map((option) => (
@@ -219,22 +252,16 @@ async function normalizeVoiceReferenceBlob(blob: Blob, fileName?: string | null)
 }
 
 const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onClose, onSave, youtubeSectionVariant = 'default' }) => {
-  const [storageDir, setStorageDir] = useState('');
+  const [storageDir, setStorageDir] = useState<string>(SETTINGS_DEFAULT_VALUES.storageDir);
   const [pickedFolderLabel, setPickedFolderLabel] = useState('');
-  const [providerValues, setProviderValues] = useState({
-    openRouterApiKey: '',
-    elevenLabsApiKey: '',
-  });
+  const [providerValues, setProviderValues] = useState(createDefaultProviderValues);
   const [showSecrets, setShowSecrets] = useState({
     openRouterApiKey: false,
     elevenLabsApiKey: false,
     googleClientId: false,
     googleClientSecret: false,
   });
-  const [youtubeOAuthValues, setYoutubeOAuthValues] = useState({
-    googleClientId: '',
-    googleClientSecret: '',
-  });
+  const [youtubeOAuthValues, setYoutubeOAuthValues] = useState(createDefaultYoutubeOAuthValues);
   const [youtubeConfigState, setYoutubeConfigState] = useState({
     isLoading: false,
     hasStoredSecret: false,
@@ -242,7 +269,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     redirectUri: '',
     source: 'missing' as 'env' | 'saved' | 'missing',
   });
-  const [loadedYoutubeClientId, setLoadedYoutubeClientId] = useState('');
+  const [loadedYoutubeClientId, setLoadedYoutubeClientId] = useState<string>(SETTINGS_DEFAULT_VALUES.loadedYoutubeClientId);
   const [youtubeConnectionState, setYoutubeConnectionState] = useState<{
     isChecking: boolean;
     tone: 'success' | 'error' | 'info';
@@ -335,10 +362,11 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
 
   useEffect(() => {
     if (!open || !studioState) return;
-    setStorageDir(studioState.storageDir || '');
+    setStorageDir(studioState.storageDir || SETTINGS_DEFAULT_VALUES.storageDir);
     setProviderValues({
-      openRouterApiKey: studioState.providers.openRouterApiKey || '',
-      elevenLabsApiKey: studioState.providers.elevenLabsApiKey || '',
+      ...createDefaultProviderValues(),
+      openRouterApiKey: studioState.providers.openRouterApiKey || SETTINGS_DEFAULT_VALUES.providerValues.openRouterApiKey,
+      elevenLabsApiKey: studioState.providers.elevenLabsApiKey || SETTINGS_DEFAULT_VALUES.providerValues.elevenLabsApiKey,
     });
     setRouting((prev) => ({
       ...prev,
@@ -385,11 +413,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       googleClientId: false,
       googleClientSecret: false,
     });
-    setYoutubeOAuthValues({
-      googleClientId: '',
-      googleClientSecret: '',
-    });
-    setLoadedYoutubeClientId('');
+    setYoutubeOAuthValues(createDefaultYoutubeOAuthValues());
+    setLoadedYoutubeClientId(SETTINGS_DEFAULT_VALUES.loadedYoutubeClientId);
     setYoutubeConfigState({
       isLoading: true,
       hasStoredSecret: false,
@@ -416,9 +441,9 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
         if (response.ok) {
           setYoutubeOAuthValues((prev) => ({
             ...prev,
-            googleClientId: typeof json?.clientId === 'string' ? json.clientId : '',
+            googleClientId: typeof json?.clientId === 'string' ? json.clientId : SETTINGS_DEFAULT_VALUES.youtubeOAuthValues.googleClientId,
           }));
-          setLoadedYoutubeClientId(typeof json?.clientId === 'string' ? json.clientId : '');
+          setLoadedYoutubeClientId(typeof json?.clientId === 'string' ? json.clientId : SETTINGS_DEFAULT_VALUES.loadedYoutubeClientId);
           setYoutubeConfigState({
             isLoading: false,
             hasStoredSecret: Boolean(json?.clientSecretConfigured),
@@ -431,7 +456,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       } catch {}
 
       if (!cancelled) {
-        setLoadedYoutubeClientId('');
+        setLoadedYoutubeClientId(SETTINGS_DEFAULT_VALUES.loadedYoutubeClientId);
         setYoutubeConfigState({
           isLoading: false,
           hasStoredSecret: false,
@@ -1278,10 +1303,10 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
 
     setYoutubeOAuthValues((prev) => ({
       ...prev,
-      googleClientId: typeof json?.clientId === 'string' ? json.clientId : '',
-      googleClientSecret: '',
+      googleClientId: typeof json?.clientId === 'string' ? json.clientId : SETTINGS_DEFAULT_VALUES.youtubeOAuthValues.googleClientId,
+      googleClientSecret: SETTINGS_DEFAULT_VALUES.youtubeOAuthValues.googleClientSecret,
     }));
-    setLoadedYoutubeClientId(typeof json?.clientId === 'string' ? json.clientId : '');
+    setLoadedYoutubeClientId(typeof json?.clientId === 'string' ? json.clientId : SETTINGS_DEFAULT_VALUES.loadedYoutubeClientId);
     setYoutubeConfigState({
       isLoading: false,
       hasStoredSecret: Boolean(json?.clientSecretConfigured),
@@ -1748,7 +1773,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                   value={youtubeOAuthValues.googleClientId}
                   onChange={(e) => setYoutubeOAuthValues((prev) => ({ ...prev, googleClientId: e.target.value }))}
                   className={inputClass}
-                  placeholder="1234567890-xxxxxxxxxxxxxxxx.apps.googleusercontent.com"
+                  placeholder={SETTINGS_INPUT_PLACEHOLDERS.youtubeClientId}
                 />
                 <button
                   type="button"
@@ -1788,7 +1813,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                   value={youtubeOAuthValues.googleClientSecret}
                   onChange={(e) => setYoutubeOAuthValues((prev) => ({ ...prev, googleClientSecret: e.target.value }))}
                   className={inputClass}
-                  placeholder={youtubeConfigState.hasStoredSecret ? `${youtubeConfigState.secretMask || '저장된 Secret 유지 중'} (새 값 입력 시 교체)` : 'GOCSPX-...'}
+                  placeholder={resolveYoutubeClientSecretPlaceholder(youtubeConfigState.hasStoredSecret, youtubeConfigState.secretMask)}
                 />
                 <button
                   type="button"
@@ -1884,7 +1909,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 </div>
                 <button type="button" onClick={handleFolderPick} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-500">폴더 선택</button>
               </div>
-              <input value={storageDir} onChange={(e) => setStorageDir(e.target.value)} className={`${inputClass} mt-3`} placeholder="./local-data/tubegen-studio" />
+              <input value={storageDir} onChange={(e) => setStorageDir(e.target.value)} className={`${inputClass} mt-3`} placeholder={SETTINGS_INPUT_PLACEHOLDERS.storageDir} />
               {pickedFolderLabel ? <p className="mt-2 text-xs text-slate-500">선택한 위치: {pickedFolderLabel}</p> : null}
             </section>
           ) : null}
@@ -1906,7 +1931,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                     value={providerValues.openRouterApiKey}
                     onChange={(e) => setProviderValues((prev) => ({ ...prev, openRouterApiKey: e.target.value }))}
                     className={inputClass}
-                    placeholder="AIza..."
+                    placeholder={SETTINGS_INPUT_PLACEHOLDERS.googleAiStudioApiKey}
                   />
                   <button
                     type="button"
@@ -1935,7 +1960,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                     value={providerValues.elevenLabsApiKey}
                     onChange={(e) => setProviderValues((prev) => ({ ...prev, elevenLabsApiKey: e.target.value }))}
                     className={inputClass}
-                    placeholder="sk_... 또는 xi-..."
+                    placeholder={SETTINGS_INPUT_PLACEHOLDERS.elevenLabsApiKey}
                   />
                   <button
                     type="button"

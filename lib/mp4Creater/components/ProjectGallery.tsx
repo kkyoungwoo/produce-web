@@ -174,7 +174,6 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
     () => sortedProjects.filter((project) => selectedProjectIds.includes(project.id)),
     [sortedProjects, selectedProjectIds]
   );
-
   const isAllSelected = sortedProjects.length > 0 && selectedProjectIds.length === sortedProjects.length;
   const hasSelection = selectedProjectIds.length > 0;
   const isInteractionLocked =
@@ -390,8 +389,8 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
 
   const renderProjectCard = (project: SavedProject) => {
     const thumbSrc = resolveImageSrc(resolveProjectCardThumbnail(project));
-    const totalCost = project.cost?.total;
-    const formattedTotalCost = formatUsdCost(totalCost);
+    const totalCost = project.cost?.total ?? 0;
+    const formattedTotalCost = formatUsdCost(totalCost) || '$0.00';
     const cardBackground = resolveThumbnailBackground(project);
     const completedMinutes = getCompletedMinutesLabel(project);
     const isChecked = selectedProjectIds.includes(project.id);
@@ -507,11 +506,9 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                 </span>
               ) : null}
 
-              {formattedTotalCost ? (
-                <span className="rounded-full border border-blue-100 bg-white px-2.5 py-1 font-bold text-blue-700">
-                  {`Est. ${formattedTotalCost}`}
-                </span>
-              ) : null}
+              <span className="rounded-full border border-blue-100 bg-white px-2.5 py-1 font-bold text-blue-700">
+                {`API 생성비용 ${formattedTotalCost}`}
+              </span>
             </div>
           </div>
 
@@ -605,6 +602,11 @@ const ProjectGallery: React.FC<ProjectGalleryProps> = ({
                 <p className="mt-2 text-sm text-slate-500">
                   제작하기 버튼을 눌러 프로젝트를 시작해보세요!
                 </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <span className="rounded-full border border-sky-100 bg-white/90 px-3 py-1.5 text-xs font-black text-sky-700">
+                    저장된 프로젝트 {sortedProjects.length}개
+                  </span>
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">

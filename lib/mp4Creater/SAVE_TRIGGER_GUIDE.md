@@ -66,6 +66,15 @@
 - Keep Step6 save triggers aligned with import/export/reopen so the same latest working copy is used everywhere.
 - When changing Step6 AI prompt or media logic, update `docs/README.md`, `docs/PROMPT_MANAGEMENT.md`, and `docs/step-guides/STEP6.md` together.
 
+## Thumbnail Studio specific
+- `lib/mp4Creater/pages/ThumbnailStudioPage.tsx`
+  - 썸네일 메인 문구 / 추가 요청 저장은 현재 프로젝트 draft에 바로 반영되어야 한다.
+  - 썸네일 전용 이미지 모델 선택은 현재 프로젝트 settings snapshot에 즉시 반영되어야 하며, 전역 Header 기본 설정을 덮어쓰면 안 된다.
+  - 썸네일 생성 후에는 `thumbnailHistory`, 추천 YouTube 제목/설명, 현재 대표 prompt, 그리고 최신 비용 상태를 같은 저장 패치로 함께 갱신해야 한다.
+  - 실제 AI 이미지 응답이 성공한 경우에만 `project.cost.images`, `project.cost.total`, `project.cost.imageCount`를 올린다.
+  - 샘플 모델, Google 키 없음, 라이브 실패 후 fallback 이미지 경로는 `sample`로 저장하고 비용을 올리지 않는다.
+  - 헤더 / 갤러리 / 프로젝트 카드 비용 표시는 모두 `project.cost.total` 합계에 의존하므로, 썸네일 비용 누락이나 중복 누적이 생기지 않게 저장 패치를 맞춰야 한다.
+
 ## Result Preview Save Rules
 - Treat the current Step6 preview video as the canonical render output for the current working state.
 - When preview render succeeds, persist that preview video, preview status, preview message, title, and duration together.

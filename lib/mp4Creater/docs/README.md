@@ -27,6 +27,9 @@
 - Step6은 각 문단이 개별 컷이지만 이전/다음 씬과 연결되는 하나의 영상 흐름처럼 유지해야 합니다.
 - 문단 설정 내부의 `해당 내용 적용` 버튼은 현재 문단 편집값으로 이미지와 영상을 다시 반영하는入口입니다.
 - 썸네일은 실제 씬/캐릭터/화풍/대본을 기반으로 만들고, 새 생성과 유사 재생성을 분리해서 다룹니다.
+- 썸네일 페이지는 메인 문구 위에서 현재 프로젝트 전용 이미지 모델을 고를 수 있고, 이 값은 프로젝트 settings snapshot에 저장되어 썸네일 생성 시 우선 적용됩니다.
+- 썸네일은 샘플 모델이 선택되었거나 Google AI Studio 키가 없으면 샘플 경로로 생성하고, 실제 AI 응답이 성공했을 때만 `sourceMode: ai` 와 비용을 누적합니다.
+- 헤더는 작업 화면에서는 현재 프로젝트의 `API 생성비용`, 갤러리 화면에서는 저장된 프로젝트 전체 합계 `API 생성비용`을 보여주고, 갤러리 요약 박스는 저장된 프로젝트 개수만 노출합니다. 각 프로젝트 카드는 프로젝트별 `API 생성비용`을 유지합니다.
 - `workflowDraft.promptStore.rolePrompts`와 `project.prompts.rolePrompts`에 대본/캐릭터/스타일/장면/영상/배경음/썸네일 프롬프트를 역할별로 분리 저장합니다.
 - `rolePrompts`는 저장용 요약이 아니라 Step3 실제 대본 생성과 Step6 씬 이미지/영상 prompt 실행의 공통 기준으로 재사용해야 합니다.
 - `project.prompts`는 기존 `scriptPrompt/scenePrompt/imagePrompt/videoPrompt/motionPrompt/thumbnailPrompt`를 유지하면서 `characterPrompt/stylePrompt/backgroundMusicPrompt/backgroundMusicPromptSections/rolePrompts`를 추가로 보존합니다.
@@ -107,11 +110,13 @@
 - Shared picker catalog path: `lib/mp4Creater/services/aiOptionCatalog.ts`
 - Shared picker modal path: `lib/mp4Creater/components/AiOptionPickerModal.tsx`
 - Shared TTS multi-step picker path: `lib/mp4Creater/components/TtsSelectionModal.tsx`
+- Thumbnail Studio image model picker must also use the same shared catalog/modal flow and save only to the current project scope.
 - The TTS model step should visually match the shared AI picker with grouped `무료 / 유료 / 프리미엄` model sections, while keeping voice selection as the second step in the same popup.
 - Settings default model / TTS picker path: `lib/mp4Creater/components/SettingsDrawer.tsx`
 - Step3 script model / cast voice picker path: `lib/mp4Creater/components/inputSection/steps/Step3Panel.tsx`
 - Step6 image / video / audio picker path: `lib/mp4Creater/components/ResultTable.tsx`
 - Step6 quick selector wiring path: `lib/mp4Creater/pages/SceneStudioPage.tsx`
+- Thumbnail Studio picker wiring path: `lib/mp4Creater/pages/ThumbnailStudioPage.tsx`
 - Active TTS picker choices are `Qwen3-TTS` and `ElevenLabs`; HeyGen and unstable custom/free local paths should stay out of the shared picker flow.
 - Header Settings background music selection should use the same card picker pattern as the other AI model settings.
 - If cost / quality / provider labels change, update them in `aiOptionCatalog.ts` first rather than hardcoding different descriptions in each screen.
@@ -136,7 +141,12 @@
 ## Thumbnail Studio Guard
 - `lib/mp4Creater/pages/ThumbnailStudioPage.tsx` must stay scroll-safe on shorter desktop heights and smaller widths; thumbnail input and history panels should not hide content behind fixed-height clipping.
 - Thumbnail Studio should pass the live project API cost into `lib/mp4Creater/components/Header.tsx` so the header dollar badge matches the rest of the editor flow.
-- `lib/mp4Creater/components/ProjectGallery.tsx` should show the project estimated cost in dollars for quick comparison before entering the project.
+- `lib/mp4Creater/components/ProjectGallery.tsx` should show the project `API 생성비용` in dollars for quick comparison before entering the project.
+- Gallery summary should show saved project count only, while the gallery header cost badge shows `전체 API 생성비용`.
+- Thumbnail Studio should expose a dedicated image-model picker above the main headline area, using the shared AI picker modal instead of a one-off dropdown.
+- Thumbnail image-model changes must stay project-scoped. They should update the current project settings snapshot without overwriting Header default settings for other projects.
+- Thumbnail generation must pass the selected thumbnail image model into the live image service, instead of silently falling back to only the global default image model.
+- Thumbnail generation cost should increase only when the live image route actually returns an AI image. Sample model, missing-key sample flow, and fallback image recovery must not be counted as paid AI generation.
 - Thumbnail candidate history should use a normal responsive grid, not a horizontal scroll strip with custom arrow controls.
 - The main `썸네일 생성` action belongs in the left `thumbnail inputs` header area, while the YouTube upload card stays in the right generation area.
 - Sample thumbnail candidates should reuse the real style background images under `public/mp4Creater/samples/styles` so fallback previews still match the product mood.
