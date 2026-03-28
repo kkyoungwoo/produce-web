@@ -23,7 +23,7 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
   open,
   studioState,
   title = 'API 빠른 연결',
-  description = 'Google AI Studio와 ElevenLabs 키만 입력하면 현재 화면에서 바로 실제 생성 흐름을 이어갈 수 있습니다.',
+  description = 'Google AI Studio와 ElevenLabs 키만 입력하면 현재 화면에서 바로 텍스트, 이미지, 영상, TTS 생성 흐름을 이어갈 수 있습니다.',
   focusField = null,
   onClose,
   onSave,
@@ -127,7 +127,7 @@ const ProviderQuickModal: React.FC<ProviderQuickModalProps> = ({
         <div className="grid gap-4 p-6 md:grid-cols-2">
           <label className={`rounded-2xl border p-4 ${focusField === 'openRouter' || focusField === 'fal' ? 'border-blue-300 bg-blue-50/70' : 'border-slate-200 bg-slate-50'}`}>
             <div className="text-sm font-black text-slate-900">Google AI Studio</div>
-            <div className="mt-1 text-xs leading-5 text-slate-500">대본 생성, 추천 문장, 이미지 생성, 영상 생성에 공통으로 사용합니다.</div>
+            <div className="mt-1 text-xs leading-5 text-slate-500">대본 생성, 추천 문장, 이미지 생성, Veo 영상 생성, 기본 TTS에 공통으로 사용합니다.</div>
             <input
               ref={openRouterInputRef}
               type="password"

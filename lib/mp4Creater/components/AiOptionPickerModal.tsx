@@ -59,12 +59,19 @@ const optionGroupOrder: Array<NonNullable<AiPickerOption['group']>> = [
 
 const optionGroupLabels: Record<NonNullable<AiPickerOption['group']>, string> = {
   sample: '샘플',
-  free: '무료',
-  budget: '유료',
-  premium: '프리미엄',
+  free: '최소 비용',
+  budget: '중간 비용',
+  premium: '고비용',
   provider: '모델 계열',
   voice: '목소리',
 };
+
+function formatStageLabel(value?: string | null) {
+  if (value === '무료') return '최소 비용';
+  if (value === '유료' || value === '보통') return '중간 비용';
+  if (value === '프리미엄') return '고비용';
+  return value || '';
+}
 
 export default function AiOptionPickerModal({
   open,
@@ -253,7 +260,7 @@ export default function AiOptionPickerModal({
               {option.avatarLabel || 'AI'}
             </div>
             <div className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${toneClassMap[tone]}`}>
-              {option.badge}
+              {formatStageLabel(option.badge)}
             </div>
           </div>
 
@@ -270,7 +277,7 @@ export default function AiOptionPickerModal({
                 <div className="grid grid-cols-2 gap-2 text-[11px] leading-5 text-slate-600">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
                     <div className="font-bold text-slate-500">비용 수준</div>
-                    <div className="mt-1 font-black text-slate-900">{option.priceLabel}</div>
+                    <div className="mt-1 font-black text-slate-900">{formatStageLabel(option.priceLabel)}</div>
                   </div>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
                     <div className="font-bold text-slate-500">목소리 수</div>
@@ -305,7 +312,7 @@ export default function AiOptionPickerModal({
                 ) : null}
 
                 <div className="flex flex-wrap gap-2 text-[11px] font-black">
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{option.priceLabel}</span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{formatStageLabel(option.priceLabel)}</span>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{option.qualityLabel}</span>
                   {option.speedLabel ? <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">{option.speedLabel}</span> : null}
                 </div>

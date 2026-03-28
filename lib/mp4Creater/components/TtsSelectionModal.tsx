@@ -84,21 +84,28 @@ const modelGroupOrder: Array<NonNullable<AiPickerOption['group']>> = [
 
 const modelGroupLabels: Record<NonNullable<AiPickerOption['group']>, string> = {
   sample: '샘플',
-  free: '무료',
-  budget: '유료',
-  premium: '프리미엄',
+  free: '최소 비용',
+  budget: '중간 비용',
+  premium: '고비용',
   provider: '모델 계열',
   voice: '목소리',
 };
 
 const modelGroupDescriptions: Record<NonNullable<AiPickerOption['group']>, string> = {
   sample: '실행 전 흐름 확인용 카드입니다.',
-  free: '비용 부담을 줄이면서 바로 시작하기 좋은 모델입니다.',
-  budget: '유료 기준에서 균형형으로 쓰기 좋은 모델입니다.',
-  premium: '표현력과 완성도를 우선할 때 보는 상위 모델입니다.',
+  free: '비용을 가장 아끼면서 바로 시작하기 좋은 모델입니다.',
+  budget: '비용과 품질의 균형을 잡아 쓰기 좋은 모델입니다.',
+  premium: '품질을 우선하고 비용 여유가 있을 때 보는 상위 모델입니다.',
   provider: '연동 계열 설명용 카드입니다.',
   voice: '목소리 전용 카드입니다.',
 };
+
+function formatStageLabel(value?: string | null) {
+  if (value === '무료') return '최소 비용';
+  if (value === '유료' || value === '보통') return '중간 비용';
+  if (value === '프리미엄') return '고비용';
+  return value || '';
+}
 
 function buildModelOptionId(provider: TtsSelectionProvider, modelId?: string | null) {
   if (provider === 'elevenLabs') return `elevenLabs:${modelId || CONFIG.DEFAULT_ELEVENLABS_MODEL}`;
@@ -453,7 +460,7 @@ export default function TtsSelectionModal({
             {option.avatarLabel || 'AI'}
           </div>
           <div className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${toneClassMap[tone]}`}>
-            {option.badge}
+            {formatStageLabel(option.badge)}
           </div>
         </div>
 
@@ -468,7 +475,7 @@ export default function TtsSelectionModal({
           <div className="grid grid-cols-2 gap-2 text-[11px] leading-5 text-slate-600">
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
               <div className="font-bold text-slate-500">비용 단계</div>
-              <div className="mt-1 font-black text-slate-900">{option.priceLabel}</div>
+              <div className="mt-1 font-black text-slate-900">{formatStageLabel(option.priceLabel)}</div>
             </div>
             <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
               <div className="font-bold text-slate-500">품질 톤</div>
@@ -546,7 +553,7 @@ export default function TtsSelectionModal({
               <h3 className="mt-2 text-2xl font-black text-slate-900">{title}</h3>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-500">
                 {step === 'model'
-                  ? '다른 API 선택 모달과 같은 카드 규칙으로 무료 / 유료 / 프리미엄 TTS 모델을 먼저 고르고, 이어서 해당 모델의 실제 목소리를 확인합니다. 저장 가능한 샘플 TTS는 없고, 무료 미리듣기 fallback만 브라우저 음성으로 동작합니다.'
+                  ? '다른 API 선택 모달과 같은 카드 규칙으로 최소 비용 / 중간 비용 / 고비용 TTS 모델을 먼저 고르고, 이어서 해당 모델의 실제 목소리를 확인합니다. 저장 가능한 샘플 TTS는 없고, 무료 미리듣기 fallback만 브라우저 음성으로 동작합니다.'
                   : '선택한 모델 안에서 실제로 사용할 목소리를 고르세요. 미리듣기 후 저장하면 현재 설정에 바로 반영됩니다.'}
               </p>
               {previewMessage ? <p className="mt-3 text-xs font-bold text-slate-500">{previewMessage}</p> : null}
@@ -568,7 +575,7 @@ export default function TtsSelectionModal({
                 <div className="rounded-[28px] border border-slate-200 bg-slate-50 px-5 py-4">
                   <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">모델 선택 규칙</div>
                   <div className="mt-2 text-sm leading-6 text-slate-500">
-                    무료 / 유료 / 프리미엄 구간으로 나눠서 보여주며, API가 연결되지 않은 모델은 회색으로 잠겨 있습니다.
+                    최소 비용 / 중간 비용 / 고비용 구간으로 나눠서 보여주며, API가 연결되지 않은 모델은 회색으로 잠겨 있습니다.
                     저장 가능한 샘플 TTS 런타임은 없고, 무료 미리듣기 실패 시에만 브라우저 음성으로 fallback 합니다.
                   </div>
                 </div>
@@ -612,7 +619,7 @@ export default function TtsSelectionModal({
                         {option.avatarLabel || 'AI'}
                       </div>
                       <div className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${toneClassMap[tone]}`}>
-                        {option.badge}
+                        {formatStageLabel(option.badge)}
                       </div>
                     </div>
 
@@ -627,7 +634,7 @@ export default function TtsSelectionModal({
                       <div className="grid grid-cols-2 gap-2 text-[11px] leading-5 text-slate-600">
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
                           <div className="font-bold text-slate-500">비용 수준</div>
-                          <div className="mt-1 font-black text-slate-900">{option.priceLabel}</div>
+                          <div className="mt-1 font-black text-slate-900">{formatStageLabel(option.priceLabel)}</div>
                         </div>
                         <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2">
                           <div className="font-bold text-slate-500">목소리 수</div>
@@ -755,7 +762,7 @@ export default function TtsSelectionModal({
                               <div className="flex flex-wrap items-center gap-2">
                                 <div className="text-lg font-black text-slate-900">{option.title}</div>
                                 <div className={`rounded-full px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] ${toneClassMap[tone]}`}>
-                                  {option.badge}
+                                  {formatStageLabel(option.badge)}
                                 </div>
                               </div>
                               <div className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-500">{option.provider}</div>
@@ -763,7 +770,7 @@ export default function TtsSelectionModal({
                               <div className="mt-3 flex flex-wrap gap-2 text-[11px] font-black text-slate-700">
                                 {option.genderLabel ? <span className="rounded-full bg-slate-100 px-3 py-1">{option.genderLabel}</span> : null}
                                 {option.voiceToneLabel ? <span className="rounded-full bg-slate-100 px-3 py-1">{option.voiceToneLabel}</span> : null}
-                                <span className="rounded-full bg-slate-100 px-3 py-1">{option.priceLabel}</span>
+                                <span className="rounded-full bg-slate-100 px-3 py-1">{formatStageLabel(option.priceLabel)}</span>
                               </div>
                               {disabled && option.disabledReason ? (
                                 <div className="mt-3 rounded-2xl border border-slate-300 bg-white/80 px-3 py-2 text-xs leading-5 text-slate-500">
@@ -831,7 +838,7 @@ export default function TtsSelectionModal({
               </div>
               <div className="mt-1 text-sm font-black text-slate-900">
                 {step === 'model'
-                  ? '무료 / 유료 / 프리미엄 모델 중 하나를 고르면 바로 해당 목소리 목록으로 이동합니다.'
+                  ? '최소 비용 / 중간 비용 / 고비용 모델 중 하나를 고르면 바로 해당 목소리 목록으로 이동합니다.'
                   : `${selectedModelOption?.title || 'TTS 모델'} · ${selectedVoiceOption?.title || '목소리를 선택해 주세요'}`}
               </div>
               {step === 'voice' ? (

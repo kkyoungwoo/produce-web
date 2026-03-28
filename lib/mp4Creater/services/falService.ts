@@ -15,13 +15,17 @@ export interface GeneratedVideoResult {
 
 type GoogleVideoModelConfig = {
   resolution: '720p' | '1080p';
-  durationSeconds: 4 | 6 | 8;
+  durationSeconds: 4 | 5 | 6 | 8;
 };
 
 const DEFAULT_GOOGLE_VIDEO_MODEL = 'veo-3.1-fast-generate-preview';
 const STATIC_SAMPLE_VIDEO_URL = '/mp4Creater/samples/videos/scene_preview_sample.webm';
 
 const GOOGLE_VIDEO_MODEL_CONFIGS: Record<string, GoogleVideoModelConfig> = {
+  'veo-2.0-generate-001': {
+    resolution: '720p',
+    durationSeconds: 5,
+  },
   'veo-3.1-fast-generate-preview': {
     resolution: '720p',
     durationSeconds: 4,

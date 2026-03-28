@@ -766,7 +766,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       return {
         title: routing.ttsProvider === 'elevenLabs'
           ? `${selectedElevenModel?.title || 'ElevenLabs'} 음성 선택`
-          : 'Qwen 음성 선택',
+          : 'Gemini TTS 음성 선택',
         description: routing.ttsProvider === 'elevenLabs'
           ? '선택한 ElevenLabs 모델 안에서 사용할 최종 목소리를 고르세요. 모델만 선택해도 목소리는 아직 정해지지 않습니다.'
           : '이 단계에서 최종 목소리를 고르세요. 카드 설명과 미리듣기를 보고 확정하면 기본 TTS 목소리로 저장됩니다.',
@@ -1037,7 +1037,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       };
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(utterance);
-      setVoicePreviewMessage('Qwen3-TTS 음성을 브라우저 음성으로 미리 재생 중입니다.');
+      setVoicePreviewMessage('Gemini 2.5 Flash Preview TTS 음성을 브라우저 음성으로 미리 재생 중입니다.');
       return;
     }
 
@@ -1076,7 +1076,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       await audio.play();
 
       if (provider === 'qwen3Tts') {
-        setVoicePreviewMessage('Qwen3-TTS 음성을 재생 중입니다.');
+        setVoicePreviewMessage('Gemini 2.5 Flash Preview TTS 음성을 재생 중입니다.');
         return;
       }
 
@@ -1918,13 +1918,13 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">API 연결</h3>
-                <p className="mt-1 text-xs text-slate-600">Google AI Studio는 텍스트, 이미지, 영상 생성에 사용하고 ElevenLabs는 음성과 음악 샘플 고도화에 사용합니다.</p>
+                <p className="mt-1 text-xs text-slate-600">Google AI Studio는 텍스트, 이미지, 영상, 기본 TTS 생성에 사용하고 ElevenLabs는 음성과 음악 샘플 고도화에 사용합니다.</p>
               </div>
             </div>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
                 <div className="text-xs font-black text-slate-900">Google AI Studio API 키</div>
-                <div className="mt-1 text-[11px] text-slate-500">Gemini 텍스트/이미지와 Veo 영상 생성 연결에 공통 사용합니다.</div>
+                <div className="mt-1 text-[11px] text-slate-500">Gemini 텍스트/이미지, Veo 영상, 기본 TTS 생성 연결에 공통 사용합니다.</div>
                 <div className="mt-3 flex items-center gap-2">
                   <input
                     type={showSecrets.openRouterApiKey ? 'text' : 'password'}
@@ -1982,114 +1982,12 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
             </div>
           </section>
 
-          {youtubeSectionVariant === 'default' ? youtubeOAuthSection : null}
-
-          <section className={cardClass}>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-black text-slate-900">기본 API 선택</h3>
-                <p className="mt-1 text-xs text-slate-600">API 키가 연결되면 해당 모델이 바로 선택 가능해지고, 연결되지 않은 항목은 회색 비활성 카드로만 보여 드립니다. 헤더 설정은 새 프로젝트 기본값만 바꾸고, 프로젝트 안에서는 Step3/Step6에서 개별로 다시 조정할 수 있습니다.</p>
-              </div>
-              <span className={`rounded-full px-3 py-1 text-[11px] font-black ${hasAnyConnectedApi ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                {hasAnyConnectedApi ? 'API 연결됨' : '샘플 기본 세팅'}
-              </span>
-            </div>
-
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-black text-slate-900">음성</div>
-                <div className="mt-2">
-                  <div className="mb-1 text-xs font-bold text-slate-700">기본 TTS</div>
-                  <button
-                    type="button"
-                    onClick={() => setTtsSelectionModalOpen(true)}
-                    className="mb-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
-                  >
-                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">모델 / 목소리 변경</div>
-                    <div className="mt-1 text-sm font-black text-slate-900">
-                      {visibleTtsProvider === 'elevenLabs'
-                        ? `${selectedElevenModel?.title || 'ElevenLabs'} · ${selectedElevenVoice?.name || '기본 목소리'}`
-                          : `Qwen3-TTS · ${selectedQwenVoice?.name || 'qwen3-tts 기본 보이스'}`}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">같은 팝업 안에서 무료 / 유료 / 프리미엄 TTS 모델을 고르고, 이어서 그 모델의 실제 목소리를 들어본 뒤 저장합니다.</div>
-                  </button>
-                  <select value={ttsProviderPickerCurrentId} onChange={(e) => setRouting((prev) => ({ ...prev, ttsProvider: e.target.value as 'qwen3Tts' | 'elevenLabs', audioProvider: e.target.value as 'qwen3Tts' | 'elevenLabs' }))} className={`${inputClass} hidden`}>
-                    {ttsProviderPickerOptions.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.priceLabel === '무료' ? `🆓 ${item.title}` : `💳 ${item.title}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
-                  {visibleTtsProvider === 'elevenLabs'
-                    ? `현재 기본 TTS: ${selectedElevenModel?.title || 'ElevenLabs 모델'} · ${selectedElevenVoice?.name || 'ElevenLabs 기본 목소리'}${selectedElevenVoice?.labels?.gender ? ` · ${selectedElevenVoice.labels.gender}` : ''}`
-                      : `현재 기본 TTS: ${selectedQwenVoice?.name || 'qwen3-tts 기본 보이스'} · 무료 모델`}
-                </div>
-                <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
-                  Qwen, ElevenLabs 목소리는 모두 위의 `모델 / 목소리 변경` 팝업 안에서 같은 카드 디자인으로 선택합니다.
-                  헤더 설정은 새 프로젝트 기본값만 바꾸고, 프로젝트 안에서는 Step3/Step6에서 다시 덮어쓸 수 있습니다.
-                </div>
-                <button type="button" onClick={() => void playVoicePreview()} className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
-                  {isVoicePreviewing ? '음성 정지' : '음성 재생'}
-                </button>
-                {voicePreviewMessage ? <p className="mt-2 text-xs text-slate-500">{voicePreviewMessage}</p> : null}
-                {visibleTtsProvider === 'elevenLabs' && !providerValues.elevenLabsApiKey.trim() ? (
-                  <p className="mt-2 text-xs text-amber-600">선택한 음성 모델은 API 연결이 필요합니다. API 등록 후 다시 시도해 주세요.</p>
-                ) : null}
-                {isLoadingVoices ? <p className="mt-2 text-xs text-slate-500">보이스 목록을 불러오는 중입니다.</p> : null}
-              </div>
-
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="text-xs font-black text-slate-900">배경 음악</div>
-                <div className="mt-2">
-                  <div className="mb-1 text-xs font-bold text-slate-700">배경 음악 모델</div>
-                  <button
-                    type="button"
-                    onClick={() => setSettingsPicker({ kind: 'bgm-model' })}
-                    className="mb-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
-                  >
-                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Model picker</div>
-                    <div className="mt-1 text-sm font-black text-slate-900">
-                      {backgroundMusicPickerOptions.find((item) => item.id === (routing.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL))?.title || (routing.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL)}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">배경음 모델별 비용 수준과 생성 방식을 같은 카드 UI에서 비교하고 선택할 수 있습니다.</div>
-                  </button>
-                  <select
-                    value={routing.backgroundMusicModel || 'sample-ambient-v1'}
-                    onChange={(e) => {
-                      const nextModel = normalizeBackgroundMusicModelId(e.target.value);
-                      setRouting((prev) => ({
-                        ...prev,
-                        backgroundMusicModel: nextModel,
-                        backgroundMusicProvider: resolveBackgroundMusicProvider(nextModel, prev.backgroundMusicProvider || 'sample'),
-                      }));
-                    }}
-                    className={`${inputClass} hidden`}
-                  >
-                    {backgroundMusicModelOptions.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {`🆓 ${item.name}`}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <button type="button" onClick={() => void playBgmPreview()} className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
-                  {isBgmPreviewing ? '배경 음악 정지' : '배경 음악 재생'}
-                </button>
-                {bgmPreviewMessage ? <p className="mt-2 text-xs text-slate-500">{bgmPreviewMessage}</p> : null}
-                {isGoogleBgmModel(routing.backgroundMusicModel) ? (
-                  <p className="mt-2 text-xs text-blue-600">Google Lyria 3 모델은 현재 선택 상태 그대로 저장되고, API가 없거나 실패하면 실행 시 샘플 배경음으로만 안전하게 대체됩니다.</p>
-                ) : null}
-              </div>
-            </div>
-          </section>
 
           <section className={cardClass}>
             <div className="flex items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-black text-slate-900">텍스트 · 이미지 · 영상 모델</h3>
-                <p className="mt-1 text-xs text-slate-600">공통 카드 팝업에서 무료, 유료, 프리미엄 단계를 나눠 비교하고 선택할 수 있습니다. API가 없는 항목은 회색으로 잠겨 보여 줍니다.</p>
+                <p className="mt-1 text-xs text-slate-600">공통 카드 팝업에서 최소 비용, 중간 비용, 고비용 단계를 나눠 비교하고 선택할 수 있습니다. API가 없는 항목은 회색으로 잠겨 보여 줍니다.</p>
               </div>
               <span className={`rounded-full px-3 py-1 text-[11px] font-black ${hasGoogleApiKey ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
                 {hasGoogleApiKey ? 'Google API 연결됨' : '샘플 모델 기본 세팅'}
@@ -2199,7 +2097,108 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
               </div>
             </div>
           </section>
-          {youtubeSectionVariant === 'collapsed-bottom' ? youtubeOAuthSection : null}
+          <section className={cardClass}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <h3 className="text-base font-black text-slate-900">기본 API 선택</h3>
+                <p className="mt-1 text-xs text-slate-600">API 키가 연결되면 해당 모델이 바로 선택 가능해지고, 연결되지 않은 항목은 회색 비활성 카드로만 보여 드립니다. 헤더 설정은 새 프로젝트 기본값만 바꾸고, 프로젝트 안에서는 Step3/Step6에서 개별로 다시 조정할 수 있습니다.</p>
+              </div>
+              <span className={`rounded-full px-3 py-1 text-[11px] font-black ${hasAnyConnectedApi ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
+                {hasAnyConnectedApi ? 'API 연결됨' : '샘플 기본 세팅'}
+              </span>
+            </div>
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs font-black text-slate-900">음성</div>
+                <div className="mt-2">
+                  <div className="mb-1 text-xs font-bold text-slate-700">기본 TTS</div>
+                  <button
+                    type="button"
+                    onClick={() => setTtsSelectionModalOpen(true)}
+                    className="mb-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
+                  >
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">모델 / 목소리 변경</div>
+                    <div className="mt-1 text-sm font-black text-slate-900">
+                      {visibleTtsProvider === 'elevenLabs'
+                        ? `${selectedElevenModel?.title || 'ElevenLabs'} · ${selectedElevenVoice?.name || '기본 목소리'}`
+                          : `Gemini 2.5 Flash Preview TTS · ${selectedQwenVoice?.name || '기본 보이스'}`}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">같은 팝업 안에서 최소 비용 / 중간 비용 / 고비용 TTS 모델을 고르고, 이어서 그 모델의 실제 목소리를 들어본 뒤 저장합니다.</div>
+                  </button>
+                  <select value={ttsProviderPickerCurrentId} onChange={(e) => setRouting((prev) => ({ ...prev, ttsProvider: e.target.value as 'qwen3Tts' | 'elevenLabs', audioProvider: e.target.value as 'qwen3Tts' | 'elevenLabs' }))} className={`${inputClass} hidden`}>
+                    {ttsProviderPickerOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.priceLabel === '무료' ? `🆓 ${item.title}` : `💳 ${item.title}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mt-2 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
+                  {visibleTtsProvider === 'elevenLabs'
+                    ? `현재 기본 TTS: ${selectedElevenModel?.title || 'ElevenLabs 모델'} · ${selectedElevenVoice?.name || 'ElevenLabs 기본 목소리'}${selectedElevenVoice?.labels?.gender ? ` · ${selectedElevenVoice.labels.gender}` : ''}`
+                      : `현재 기본 TTS: ${selectedQwenVoice?.name || '기본 보이스'} · Gemini 2.5 Flash Preview TTS`}
+                </div>
+                <div className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-500">
+                  Gemini TTS, ElevenLabs 목소리는 모두 위의 `모델 / 목소리 변경` 팝업 안에서 같은 카드 디자인으로 선택합니다.
+                  헤더 설정은 새 프로젝트 기본값만 바꾸고, 프로젝트 안에서는 Step3/Step6에서 다시 덮어쓸 수 있습니다.
+                </div>
+                <button type="button" onClick={() => void playVoicePreview()} className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
+                  {isVoicePreviewing ? '음성 정지' : '음성 재생'}
+                </button>
+                {voicePreviewMessage ? <p className="mt-2 text-xs text-slate-500">{voicePreviewMessage}</p> : null}
+                {visibleTtsProvider === 'elevenLabs' && !providerValues.elevenLabsApiKey.trim() ? (
+                  <p className="mt-2 text-xs text-amber-600">선택한 음성 모델은 API 연결이 필요합니다. API 등록 후 다시 시도해 주세요.</p>
+                ) : null}
+                {isLoadingVoices ? <p className="mt-2 text-xs text-slate-500">보이스 목록을 불러오는 중입니다.</p> : null}
+              </div>
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-xs font-black text-slate-900">배경 음악</div>
+                <div className="mt-2">
+                  <div className="mb-1 text-xs font-bold text-slate-700">배경 음악 모델</div>
+                  <button
+                    type="button"
+                    onClick={() => setSettingsPicker({ kind: 'bgm-model' })}
+                    className="mb-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left hover:bg-slate-50"
+                  >
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-500">Model picker</div>
+                    <div className="mt-1 text-sm font-black text-slate-900">
+                      {backgroundMusicPickerOptions.find((item) => item.id === (routing.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL))?.title || (routing.backgroundMusicModel || CONFIG.DEFAULT_BGM_MODEL)}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">배경음 모델별 비용 수준과 생성 방식을 같은 카드 UI에서 비교하고 선택할 수 있습니다.</div>
+                  </button>
+                  <select
+                    value={routing.backgroundMusicModel || 'sample-ambient-v1'}
+                    onChange={(e) => {
+                      const nextModel = normalizeBackgroundMusicModelId(e.target.value);
+                      setRouting((prev) => ({
+                        ...prev,
+                        backgroundMusicModel: nextModel,
+                        backgroundMusicProvider: resolveBackgroundMusicProvider(nextModel, prev.backgroundMusicProvider || 'sample'),
+                      }));
+                    }}
+                    className={`${inputClass} hidden`}
+                  >
+                    {backgroundMusicModelOptions.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {`🆓 ${item.name}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button type="button" onClick={() => void playBgmPreview()} className="mt-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-black text-white hover:bg-slate-800">
+                  {isBgmPreviewing ? '배경 음악 정지' : '배경 음악 재생'}
+                </button>
+                {bgmPreviewMessage ? <p className="mt-2 text-xs text-slate-500">{bgmPreviewMessage}</p> : null}
+                {isGoogleBgmModel(routing.backgroundMusicModel) ? (
+                  <p className="mt-2 text-xs text-blue-600">Google Lyria 3 모델은 현재 선택 상태 그대로 저장되고, API가 없거나 실패하면 실행 시 샘플 배경음으로만 안전하게 대체됩니다.</p>
+                ) : null}
+              </div>
+            </div>
+          </section>
+
+          {youtubeOAuthSection}
         </div>
 
         {voiceSampleModalOpen && typeof document !== 'undefined' ? createPortal((

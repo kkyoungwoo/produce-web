@@ -54,6 +54,7 @@ export const SCRIPT_MODEL_OPTIONS = [
 
 export const VIDEO_MODEL_OPTIONS = [
   { id: 'sample-sequence-v1', name: '샘플 시퀀스 v1', provider: '샘플', tier: 'free' },
+  { id: 'veo-2.0-generate-001', name: 'Veo 2', provider: 'Google AI Studio', tier: 'paid' },
   { id: 'veo-3.1-fast-generate-preview', name: 'Veo 3.1 Fast Preview', provider: 'Google AI Studio', tier: 'paid' },
   { id: 'veo-3.1-generate-preview', name: 'Veo 3.1 Preview', provider: 'Google AI Studio', tier: 'paid' },
 ] as const;
@@ -91,6 +92,7 @@ export const PRICING = {
   VIDEO: {
     perVideo: 0.15,
     'sample-sequence-v1': 0,
+    'veo-2.0-generate-001': 1.75,
     'veo-3.1-fast-generate-preview': 1.2,
     'veo-3.1-generate-preview': 3.2,
   },
@@ -117,8 +119,8 @@ export const ELEVENLABS_MODELS = [
 export type ElevenLabsModelId = typeof ELEVENLABS_MODELS[number]['id'];
 
 export const QWEN_TTS_PRESET_OPTIONS = [
-  { id: 'qwen-default', name: 'qwen3-tts 기본 보이스' },
-  { id: 'qwen-soft', name: 'qwen3-tts 부드러운 보이스' },
+  { id: 'qwen-default', name: '기본 보이스' },
+  { id: 'qwen-soft', name: '부드러운 보이스' },
 ] as const;
 
 export const CHATTERBOX_TTS_PRESET_OPTIONS = [
