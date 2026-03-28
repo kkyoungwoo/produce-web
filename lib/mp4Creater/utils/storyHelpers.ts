@@ -5,10 +5,12 @@
 import { AspectRatio, ContentType, StorySelectionState } from '../types';
 import { buildFreshIdeaRule, buildSampleTheme, createCreativeDirection } from '../config/creativeVariance';
 import { getAspectRatioDimensions, getAspectRatioPrompt } from './aspectRatio';
+import { getRecommendedParagraphCount } from './scriptDuration';
 
 export interface StoryDraftOptions extends StorySelectionState {
   topic: string;
   contentType: ContentType;
+  expectedDurationMinutes?: number | null;
 }
 
 export function normalizeStoryText(text: string): string {
@@ -180,6 +182,31 @@ export function estimateClipDuration(text: string): number {
   return Math.min(MAX_SCENE_DURATION_SECONDS, Math.max(MIN_SCENE_DURATION_SECONDS, Number(seconds.toFixed(1))));
 }
 
+function compressStoryDraftParagraphs(paragraphs: string[], targetCount: number) {
+  const safeParagraphs = paragraphs.map((paragraph) => paragraph.trim()).filter(Boolean);
+  if (!safeParagraphs.length) return [];
+  if (safeParagraphs.length <= targetCount) return safeParagraphs;
+  if (targetCount <= 1) return [safeParagraphs.join(' ')];
+
+  const grouped: string[] = [];
+  let start = 0;
+
+  for (let index = 0; index < targetCount; index += 1) {
+    const end = Math.round(((index + 1) * safeParagraphs.length) / targetCount);
+    const nextChunk = safeParagraphs.slice(start, Math.max(start + 1, end)).join(' ').trim();
+    if (nextChunk) grouped.push(nextChunk);
+    start = Math.max(start + 1, end);
+  }
+
+  return grouped.filter(Boolean);
+}
+
+function buildDurationAwareStoryDraft(paragraphs: string[], options: StoryDraftOptions) {
+  const recommendedParagraphs = getRecommendedParagraphCount(options.contentType, options.expectedDurationMinutes);
+  const targetCount = Math.max(2, Math.min(options.contentType === 'music_video' ? 5 : 6, recommendedParagraphs));
+  return normalizeStoryText(compressStoryDraftParagraphs(paragraphs, targetCount).join('\n\n'));
+}
+
 export function buildSelectableStoryDraft(options: StoryDraftOptions): string {
   const topic = options.topic.trim() || '한밤중에 시작된 뜻밖의 이야기';
   const protagonist = options.protagonist.trim() || '주인공';
@@ -188,39 +215,39 @@ export function buildSelectableStoryDraft(options: StoryDraftOptions): string {
   const direction = createCreativeDirection(`${options.contentType}:${topic}:${protagonist}:${setting}:${conflict}`, 0, options.contentType);
 
   if (options.contentType === 'music_video') {
-    return normalizeStoryText([
-      `[Intro]\n${setting} 위로 젖은 불빛이 내려와\n${topic}의 첫 문장이 입술 끝에 맴돌아`,
-      `[Verse 1]\n${protagonist}의 걸음마다 ${options.mood} 밤이 번지고\n말하지 못한 ${conflict}만 박자처럼 남아\n${direction.narrativeAngle}\n같은 거리를 걸어도 오늘은 다르게 울려`,
-      `[Chorus]\n나는 너를 다시 불러, 후렴처럼 크게 불러\n사라진 줄 알았던 장면을 다시 살려\n끝난 줄 알았던 이 밤도 아직 노래가 돼\n${options.endingTone} 기분까지 안고 끝까지 갈래`,
-      `[Verse 2]\n젖은 창문 너머로 뒤늦은 진심이 번지고\n숨겨 둔 표정들이 한 줄씩 멜로디가 돼\n돌아설 수 있었던 순간도 천천히 지나가고\n이제는 미뤄 둔 마음까지 전부 따라와`,
-      `[Outro]\n마지막 불빛 아래서도 나는 멈추지 않아\n${direction.transitionBeat}\n남겨 둔 한마디까지 오늘의 노래로 안아`,
-    ].join('\n\n'));
+    return buildDurationAwareStoryDraft([
+      `${setting}에서 ${protagonist}은 ${topic}와 이어진 감정을 가장 먼저 마주한다. ${options.mood} 무드 속에서 시작 장면은 말보다 표정과 시선으로 먼저 열리고, ${direction.visualHook}이 첫 인상처럼 남는다.`,
+      `이어지는 장면에서는 ${conflict}이 점점 더 선명해진다. 숨겨 둔 마음과 망설임이 박자처럼 반복되면서, 같은 공간도 이전과는 다른 리듬으로 흔들리기 시작한다.`,
+      `${protagonist}은 돌아설 수 있었던 순간에도 감정을 외면하지 못하고 더 깊숙이 걸어 들어간다. 장면마다 멈칫하는 호흡과 움직임이 쌓이며 ${topic}의 정체성이 서서히 후렴처럼 커진다.`,
+      `클라이맥스에서는 감정이 가장 크게 터지고, 그동안 눌러 둔 진심이 화면 한가운데로 나온다. ${direction.narrativeAngle}을 따라 장면 전환이 이어지며, 이야기는 노래가 되기 직전의 결을 만든다.`,
+      `마지막은 ${options.endingTone} 여운으로 정리된다. 모든 것이 완전히 끝난 것처럼 닫기보다, ${direction.transitionBeat}과 함께 다음 한 줄의 가사로 바로 이어질 수 있는 열린 결말을 남긴다.`,
+    ], options);
   }
 
   if (options.contentType === 'cinematic') {
-    return normalizeStoryText([
+    return buildDurationAwareStoryDraft([
       `${setting}의 공기가 먼저 화면을 채우고, ${protagonist}은 ${topic}의 이상 징후를 가장 먼저 알아챈다. ${options.mood} 무드가 깔린 오프닝 안에서 관객은 설명보다 표정과 움직임으로 상황의 균열을 읽게 된다. ${direction.visualHook}`,
       `다음 장면에서는 사소해 보였던 단서들이 빠르게 겹치며 ${conflict}의 실체가 드러난다. ${protagonist}은 멈추지 않고 더 깊은 곳으로 들어가고, 장면의 긴장감은 영화처럼 한 컷씩 눌러 붙는다.`,
       `중반부에는 인물의 선택과 시선이 부딪히며 갈등이 정면으로 폭발한다. 말보다 공간의 온도, 조명, 소품이 먼저 의미를 만들고, ${topic}는 하나의 사건이 아니라 인물을 바꾸는 장면으로 보이기 시작한다.`,
       `엔딩은 ${options.endingTone} 결로 남긴다. 모든 설명을 닫아 버리기보다 마지막 표정과 여운을 남겨, 다음 컷이 자동으로 떠오르는 시네마틱 마감으로 정리한다.`,
-    ].join('\n\n'));
+    ], options);
   }
 
   if (options.contentType === 'info_delivery') {
-    return normalizeStoryText([
+    return buildDurationAwareStoryDraft([
       `먼저 ${topic}가 왜 지금 중요한지부터 짚는다. ${setting}에서 바로 마주칠 수 있는 상황을 예로 열고, 이번 영상에서 무엇을 이해하게 될지 ${options.mood} 톤으로 선명하게 예고한다.`,
       `이어서 핵심 구조를 한 단계씩 풀어 준다. ${protagonist} 시점에서 가장 먼저 확인해야 할 포인트를 짚고, ${conflict}이 실제로 어떤 문제를 만드는지 짧은 예시와 함께 설명한다.`,
       `중간 문단에서는 자주 헷갈리는 지점을 비교해 정리한다. 무엇을 먼저 보고 무엇을 나중에 판단해야 하는지, 실수하기 쉬운 흐름과 더 나은 선택을 나란히 보여 주며 이해를 돕는다. ${direction.subtitleTone}`,
       `마지막은 ${options.endingTone} 톤으로 요약한다. 지금 기억해야 할 한 줄과 바로 해 볼 다음 행동을 남겨, 시청자가 영상을 보고 곧바로 적용할 수 있게 마무리한다.`,
-    ].join('\n\n'));
+    ], options);
   }
 
-  return normalizeStoryText([
+  return buildDurationAwareStoryDraft([
     `${setting}에서 ${protagonist}은 ${topic}의 조짐을 처음 마주한다. ${options.mood} 톤으로 시작하지만, 화면 어딘가에는 이미 ${conflict}의 그림자가 놓여 있다. ${direction.visualHook}`,
     `처음엔 사소해 보였던 단서가 점점 커지면서 ${protagonist}의 일상은 흔들리기 시작한다. ${options.genre} 흐름답게 사건은 조용히 쌓이고, 작은 선택 하나가 다음 장면의 방향을 바꾼다.`,
     `결정적인 순간, ${protagonist}은 가장 숨기고 싶었던 감정과 정면으로 마주한다. 그동안 외면하던 ${conflict}가 드러나고, 이제는 같은 자리로 돌아갈 수 없다는 사실을 깨닫는다. ${direction.narrativeAngle}`,
     `마지막 장면은 ${options.endingTone} 감정으로 남긴다. 모든 것이 완전히 해결된 것처럼 보이지 않아도, ${protagonist}은 이전과는 다른 표정으로 앞으로 걸어간다.`,
-  ].join('\n\n'));
+  ], options);
 }
 
 export function buildLocalVisualPrompt(narration: string, sceneNumber: number, contentType: ContentType = 'story', aspectRatio: AspectRatio = '16:9'): string {

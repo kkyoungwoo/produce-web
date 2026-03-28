@@ -39,7 +39,11 @@ import {
   getSelectedWorkflowPromptTemplate,
   resolveWorkflowPromptTemplates,
 } from '../services/workflowPromptBuilder';
-import { buildWorkflowPromptStore, buildWorkflowStepContract } from '../services/workflowStepContractService';
+import {
+  buildWorkflowPromptStore,
+  buildWorkflowScriptGenerationMeta,
+  buildWorkflowStepContract,
+} from '../services/workflowStepContractService';
 import {
   buildStyleRecommendations,
   buildImageAwareUploadPrompt,
@@ -55,6 +59,7 @@ import { createTtsPreview } from '../services/ttsService';
 import { fetchElevenLabsVoices } from '../services/elevenLabsService';
 import { fetchHeyGenVoices } from '../services/heygenService';
 import { scrollElementIntoView } from '../utils/horizontalScroll';
+import { formatExpectedDurationLabel, normalizeExpectedDurationMinutes } from '../utils/scriptDuration';
 import {
   CONTENT_TYPE_CARDS,
   FIELD_OPTIONS_BY_TYPE,
@@ -81,8 +86,6 @@ import buildRouteStepViewModel from './inputSection/buildRouteStepViewModel';
 
 const CHARACTER_STYLE_OPTIONS = WORKFLOW_CHARACTER_STYLE_OPTIONS;
 
-const SCRIPT_DURATION_PRESETS = [1, 3, 5, 8, 10, 15, 20, 25, 30] as const;
-
 const CHARACTER_GENERATION_FAILSAFE_MS = 120000;
 
 const EMPTY_STORY_SELECTIONS: StorySelectionState = {
@@ -93,10 +96,6 @@ const EMPTY_STORY_SELECTIONS: StorySelectionState = {
   protagonist: '',
   conflict: '',
 };
-
-function normalizeScriptDurationPreset(value: number) {
-  return Number.isFinite(value) ? Math.max(1, Math.min(30, Math.round(value))) : 1;
-}
 
 interface InputSectionProps {
   step: GenerationStep;
@@ -180,6 +179,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     };
   }, [hasSelectedContentType, hasSelectedAspectRatio]);
   const [storyScript, setStoryScript] = useState(initial.script || '');
+  const [scriptGenerationMeta, setScriptGenerationMeta] = useState(workflowDraft?.scriptGenerationMeta || initial.scriptGenerationMeta || null);
 
   const applyGeneratedStoryScript = (value: string) => {
     setStoryScript(formatStoryTextForEditor(value));
@@ -228,7 +228,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [step3PanelMode, setStep3PanelMode] = useState<'balanced' | 'character-focus' | 'script-focus'>('balanced');
   const [newStyleName, setNewStyleName] = useState('');
   const [newStylePrompt, setNewStylePrompt] = useState('');
-  const [customScriptDurationMinutes, setCustomScriptDurationMinutes] = useState<number>(normalizeScriptDurationPreset(Number(initialCustomScriptSettings.expectedDurationMinutes || 1)));
+  const [customScriptDurationMinutes, setCustomScriptDurationMinutes] = useState<number>(normalizeExpectedDurationMinutes(Number(initialCustomScriptSettings.expectedDurationMinutes || 1)));
   const [customScriptSpeechStyle, setCustomScriptSpeechStyle] = useState<ScriptSpeechStyle>(initialCustomScriptSettings.speechStyle || 'default');
   const [customScriptLanguage, setCustomScriptLanguage] = useState<ScriptLanguageOption>(initialCustomScriptSettings.language || 'ko');
   const [customScriptReferenceText, setCustomScriptReferenceText] = useState(initialCustomScriptSettings.referenceText || '');
@@ -366,6 +366,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setHasSelectedContentType(Boolean(nextHasSelectedContentType));
     setHasSelectedAspectRatio(Boolean(nextHasSelectedAspectRatio));
     applyGeneratedStoryScript(workflowDraft?.script || '');
+    setScriptGenerationMeta(workflowDraft?.scriptGenerationMeta || null);
     setGenre(nextSelections.genre || FIELD_OPTIONS_BY_TYPE[nextType].genre[0]);
     setMood(nextSelections.mood || FIELD_OPTIONS_BY_TYPE[nextType].mood[0]);
     setEndingTone(nextSelections.endingTone || FIELD_OPTIONS_BY_TYPE[nextType].endingTone[0]);
@@ -399,7 +400,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setNewCharacterPrompt('');
     setNewStyleName('');
     setNewStylePrompt('');
-    setCustomScriptDurationMinutes(normalizeScriptDurationPreset(Number(workflowDraft?.customScriptSettings?.expectedDurationMinutes || 1)));
+    setCustomScriptDurationMinutes(normalizeExpectedDurationMinutes(Number(workflowDraft?.customScriptSettings?.expectedDurationMinutes || 1)));
     setCustomScriptSpeechStyle(workflowDraft?.customScriptSettings?.speechStyle || 'default');
     setCustomScriptLanguage(workflowDraft?.customScriptSettings?.language || 'ko');
     setCustomScriptReferenceText(workflowDraft?.customScriptSettings?.referenceText || '');
@@ -463,6 +464,13 @@ const InputSection: React.FC<InputSectionProps> = ({
   const effectiveTopic = useMemo(() => (
     topic.trim() || getTopicSuggestion(contentType, selections.genre) || getTopicSuggestion(contentType, '') || '샘플 주제'
   ), [contentType, selections.genre, topic]);
+  const seededStep2StoryDraft = useMemo(() => buildSelectableStoryDraft({
+    contentType,
+    topic: effectiveTopic,
+    expectedDurationMinutes: customScriptDurationMinutes,
+    ...selections,
+  }), [contentType, customScriptDurationMinutes, effectiveTopic, selections]);
+  const shouldUseCurrentStoryFoundation = Boolean(normalizedScript.trim()) && !scriptGenerationMeta?.generatedAt;
 
   const promptPack = useMemo(
     () => buildWorkflowPromptPack({ contentType, topic: effectiveTopic, selections, script: normalizedScript }),
@@ -675,7 +683,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const buildScriptReferenceSuggestionSet = () => {
     const base = [
       `${topic || '이번 주제'}의 핵심 메시지가 첫 문단에서 바로 드러나게 해 주세요.`,
-      `${Math.max(1, customScriptDurationMinutes)}분 분량에 맞춰 장면 호흡이 무리 없이 이어지게 해 주세요.`,
+      `${formatExpectedDurationLabel(customScriptDurationMinutes)} 분량에 맞춰 장면 호흡이 무리 없이 이어지게 해 주세요.`,
       `${customScriptLanguage === 'mute' ? '무음 영상용이라 대사보다 장면 흐름과 시각 정보 중심으로 구성해 주세요.' : '선택한 언어와 말투가 자연스럽게 들리도록 낭독 대본으로 정리해 주세요.'}`,
       `중간에는 실제 예시나 비유를 넣어 이해가 쉬운 대본으로 정리해 주세요.`,
     ].filter(Boolean);
@@ -916,19 +924,25 @@ const InputSection: React.FC<InputSectionProps> = ({
     .map((meta) => meta.id)
     .filter((stage) => stage <= activeStage && (!routeStep || stage === routeStep));
 
-  const buildDraftPayload = () => {
+  const buildDraftPayload = (
+    overrides?: Partial<Pick<WorkflowDraft, 'script' | 'extractedCharacters' | 'selectedCharacterIds' | 'scriptGenerationMeta'>>
+  ) => {
+    const resolvedScript = normalizeStoryText(overrides?.script ?? normalizedScript);
+    const resolvedExtractedCharacters = overrides?.extractedCharacters || extractedCharacters;
+    const resolvedSelectedCharacterIds = overrides?.selectedCharacterIds || effectiveSelectedCharacterIds;
+    const resolvedScriptGenerationMeta = overrides?.scriptGenerationMeta ?? scriptGenerationMeta ?? null;
     const baseDraft = {
       ...workflowDraft,
       contentType,
       aspectRatio,
       topic: effectiveTopic,
-      script: normalizedScript,
+      script: resolvedScript,
       activeStage,
       selections,
-      extractedCharacters,
+      extractedCharacters: resolvedExtractedCharacters,
       styleImages,
-      characterImages: extractedCharacters.flatMap((item) => item.generatedImages || []),
-      selectedCharacterIds: effectiveSelectedCharacterIds,
+      characterImages: resolvedExtractedCharacters.flatMap((item) => item.generatedImages || []),
+      selectedCharacterIds: resolvedSelectedCharacterIds,
       hasSelectedContentType,
       hasSelectedAspectRatio,
       selectedCharacterStyleId: selectedCharacterStyle?.id || null,
@@ -957,11 +971,12 @@ const InputSection: React.FC<InputSectionProps> = ({
         referenceLinks,
         scriptModel: selectedScriptGenerationModel,
       },
+      scriptGenerationMeta: resolvedScriptGenerationMeta,
       constitutionAnalysis,
       completedSteps: {
         step1: Boolean(hasSelectedContentType && hasSelectedAspectRatio),
         step2: Boolean(effectiveTopic.trim()),
-        step3: Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
+        step3: Boolean(resolvedScript.trim() && selectedPromptTemplateId && resolvedSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection),
         step4: Boolean(selectedCharacters.length && selectedCharacterStyleId && selectedCharactersReady),
         step5: Boolean(selectedStyleImageId),
       },
@@ -975,7 +990,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           ...baseDraft,
           promptStore,
         },
-        generationMeta: workflowDraft?.scriptGenerationMeta || null,
+        generationMeta: resolvedScriptGenerationMeta,
       }),
     };
   };
@@ -1015,18 +1030,22 @@ const InputSection: React.FC<InputSectionProps> = ({
       buildRolePromptAddition('STYLE CONTINUITY', rolePrompts?.style, 300),
       buildRolePromptAddition('SCENE CONTINUITY', rolePrompts?.scene, 460),
       buildRolePromptAddition('MOUTH SHAPE / DELIVERY', rolePrompts?.video, 300),
+      draftForExecution.script?.trim()
+        ? `### STORY FOUNDATION\n- 현재 Step3 텍스트는 Step2에서 먼저 정리한 1차 스토리로 간주한다. 사건 순서, 감정선, 핵심 장면은 유지하고 ${draftForExecution.contentType === 'music_video' ? '그 스토리를 바탕으로 최종 가사만 새로 쓴다.' : '그 스토리를 바탕으로 최종 대본만 새로 쓴다.'}`
+        : '',
     ].filter(Boolean);
   };
 
   const buildNavigationDraftPayload = (
     completedStage: StepId,
     nextStage?: StepId,
-    overrides?: Partial<Pick<WorkflowDraft, 'extractedCharacters' | 'selectedCharacterIds'>>
+    overrides?: Partial<Pick<WorkflowDraft, 'script' | 'extractedCharacters' | 'selectedCharacterIds' | 'scriptGenerationMeta'>>
   ) => {
     const nextActiveStage = nextStage ? normalizeStage(nextStage) : activeStage;
-    const payload = buildDraftPayload();
-    const effectiveExtractedCharacters = overrides?.extractedCharacters || payload.extractedCharacters;
-    const effectiveSelectedCharacterIds = overrides?.selectedCharacterIds || payload.selectedCharacterIds;
+    const payload = buildDraftPayload(overrides);
+    const effectiveExtractedCharacters = payload.extractedCharacters;
+    const effectiveSelectedCharacterIds = payload.selectedCharacterIds;
+    const effectiveScript = payload.script || '';
     return {
       ...payload,
       extractedCharacters: effectiveExtractedCharacters,
@@ -1036,7 +1055,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         ...payload.completedSteps,
         step1: completedStage >= 1 ? Boolean(hasSelectedContentType && hasSelectedAspectRatio) : payload.completedSteps.step1,
         step2: completedStage >= 2 ? Boolean(effectiveTopic.trim()) : payload.completedSteps.step2,
-        step3: completedStage >= 3 ? Boolean(normalizedScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection) : payload.completedSteps.step3,
+        step3: completedStage >= 3 ? Boolean(effectiveScript.trim() && selectedPromptTemplateId && effectiveSelectedCharacterIds.length && selectedCharactersHaveVoiceSelection) : payload.completedSteps.step3,
         step4: completedStage >= 4 ? Boolean(effectiveSelectedCharacterIds.length && selectedCharacterStyleId && selectedCharactersReady) : payload.completedSteps.step4,
         step5: completedStage >= 5 ? Boolean(selectedStyleImageId) : payload.completedSteps.step5,
       },
@@ -1085,7 +1104,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const handleCustomScriptDurationChange = (value: number) => {
-    setCustomScriptDurationMinutes(normalizeScriptDurationPreset(value));
+    setCustomScriptDurationMinutes(normalizeExpectedDurationMinutes(value));
     requestWorkflowDraftSave('action');
   };
 
@@ -1156,6 +1175,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     hasSelectedAspectRatio,
     selectedCharacterStyleId,
     selectedStyleImageId,
+    scriptGenerationMeta,
     customScriptDurationMinutes,
     customScriptSpeechStyle,
     customScriptLanguage,
@@ -1532,29 +1552,42 @@ const InputSection: React.FC<InputSectionProps> = ({
 
     if (nextStage) {
       const nextActiveStage = normalizeStage(nextStage);
-      let hydrationOverrides: Partial<Pick<WorkflowDraft, 'extractedCharacters' | 'selectedCharacterIds'>> | undefined;
+      let navigationOverrides: Partial<Pick<WorkflowDraft, 'script' | 'extractedCharacters' | 'selectedCharacterIds' | 'scriptGenerationMeta'>> | undefined;
+      if (stage === 2 && nextActiveStage === 3 && !normalizedScript.trim()) {
+        applyGeneratedStoryScript(seededStep2StoryDraft);
+        setScriptGenerationMeta(null);
+        navigationOverrides = {
+          ...navigationOverrides,
+          script: normalizeStoryText(formatStoryTextForEditor(seededStep2StoryDraft)),
+          scriptGenerationMeta: null,
+        };
+      }
       if (stage === 3 && nextActiveStage === 4) {
         const currentSelectedIds = selectedCharacterIds.filter((characterId) => extractedCharacters.some((character) => character.id === characterId));
         if (extractedCharacters.length && currentSelectedIds.length) {
-          hydrationOverrides = {
+          navigationOverrides = {
+            ...navigationOverrides,
             extractedCharacters,
             selectedCharacterIds: currentSelectedIds,
           };
         } else {
           const hydrated = await hydrateCharactersForScript({ preserveSelection: true });
           if (hydrated) {
-            hydrationOverrides = {
+            navigationOverrides = {
+              ...navigationOverrides,
               extractedCharacters: hydrated.characters,
               selectedCharacterIds: hydrated.selectedIds,
             };
           }
         }
       }
-      const navigationDraftPayload = buildNavigationDraftPayload(stage, nextStage, hydrationOverrides);
+      const navigationDraftPayload = buildNavigationDraftPayload(stage, nextStage, navigationOverrides);
       if (onSaveWorkflowDraft) {
         await Promise.resolve(onSaveWorkflowDraft(navigationDraftPayload));
       }
-      setNotice(`${stage}단계 완료. ${nextStage}단계로 이동합니다.`);
+      setNotice(stage === 2 && nextActiveStage === 3 && !normalizedScript.trim()
+        ? '2단계 완료. 3단계로 이동하며 1차 스토리를 먼저 채워 두었습니다.'
+        : `${stage}단계 완료. ${nextStage}단계로 이동합니다.`);
       if (routeStep) {
         await Promise.resolve(onNavigateStep?.(nextStage as 1 | 2 | 3 | 4 | 5));
         return true;
@@ -1768,9 +1801,10 @@ const InputSection: React.FC<InputSectionProps> = ({
   };
 
   const createDraftFromSelections = () => {
-    const draft = buildSelectableStoryDraft({ contentType, topic: effectiveTopic, ...selections });
-    applyGeneratedStoryScript(draft);
-    setNotice(contentType === 'music_video' ? '선택값으로 가사형 샘플을 만들었습니다.' : '선택값으로 대본 초안을 만들었습니다.');
+    applyGeneratedStoryScript(seededStep2StoryDraft);
+    setScriptGenerationMeta(null);
+    requestWorkflowDraftSave('action');
+    setNotice('선택값으로 Step3용 1차 스토리를 먼저 채워 두었습니다.');
     openStageWithIntent(3, false);
   };
 
@@ -1864,8 +1898,9 @@ const InputSection: React.FC<InputSectionProps> = ({
     const hasExistingScript = Boolean(normalizedScript.trim());
     const isNoAiScriptMode = selectedScriptGenerationModel === NO_AI_SCRIPT_MODEL_ID;
     const shouldGenerateSampleImmediately = !connectionSummary.text || isNoAiScriptMode;
+    const shouldUseStoryFoundationDirectly = hasExistingScript && !scriptGenerationMeta?.generatedAt;
 
-    if (shouldGenerateSampleImmediately || !hasExistingScript) {
+    if (shouldGenerateSampleImmediately || !hasExistingScript || shouldUseStoryFoundationDirectly) {
       void generateScriptByPrompt(targetTemplate?.mode === 'dialogue', targetTemplate);
       return;
     }
@@ -1918,9 +1953,21 @@ const InputSection: React.FC<InputSectionProps> = ({
           scriptModel: selectedScriptGenerationModel,
         },
       });
-      applyGeneratedStoryScript(result.text);
+      const nextScript = result.text || normalizedScript;
+      setScriptGenerationMeta(buildWorkflowScriptGenerationMeta({
+        draft: {
+          ...executionDraft,
+          script: nextScript,
+        },
+        source: result.source,
+        intent: 'expand',
+        conversationMode: targetTemplate.mode === 'dialogue',
+        usedSampleFallback: result.source !== 'ai',
+      }));
+      applyGeneratedStoryScript(nextScript);
+      requestWorkflowDraftSave('action');
       setConstitutionAnalysis(result.analysis || null);
-      await hydrateCharactersFromScriptText(result.text, { preserveSelection: false });
+      await hydrateCharactersFromScriptText(nextScript, { preserveSelection: false });
       setNotice(result.source === 'ai'
         ? `현재 대본을 약 ${chars}자 확장했습니다. 기존 내용을 유지한 채 뒤를 자연스럽게 이어 붙였습니다.`
         : contentType === 'music_video'
@@ -2003,14 +2050,15 @@ const InputSection: React.FC<InputSectionProps> = ({
       referenceLinks,
       scriptModel: selectedScriptGenerationModel,
     };
-    const executionDraft = buildDraftPayload();
+    const sourceStoryFoundation = shouldUseCurrentStoryFoundation ? normalizedScript : '';
+    const executionDraft = buildDraftPayload({ script: sourceStoryFoundation || normalizedScript });
     const promptAdditions = buildStep3PromptAdditions(executionDraft);
     const sampleDraft = buildSampleScriptDraft({
       contentType,
       topic: effectiveTopic,
       selections,
       template,
-      currentScript: '',
+      currentScript: sourceStoryFoundation,
       promptAdditions,
       model: selectedScriptGenerationModel,
       conversationMode,
@@ -2022,7 +2070,18 @@ const InputSection: React.FC<InputSectionProps> = ({
 
     const applySampleFallback = async (message: string) => {
       updateScriptGenerationProgress(100, 'Sample script is ready.');
+      setScriptGenerationMeta(buildWorkflowScriptGenerationMeta({
+        draft: {
+          ...executionDraft,
+          script: sampleDraft,
+        },
+        source: 'sample',
+        intent: 'draft',
+        conversationMode,
+        usedSampleFallback: true,
+      }));
       applyGeneratedStoryScript(sampleDraft);
+      requestWorkflowDraftSave('action');
       setConstitutionAnalysis(null);
       try {
         await hydrateCharactersFromScriptText(sampleDraft, { preserveSelection: false, forceSample: true });
@@ -2053,7 +2112,7 @@ const InputSection: React.FC<InputSectionProps> = ({
         topic: effectiveTopic,
         selections,
         template,
-        currentScript: '',
+        currentScript: sourceStoryFoundation,
         promptAdditions,
         model: selectedScriptGenerationModel,
         conversationMode,
@@ -2062,7 +2121,18 @@ const InputSection: React.FC<InputSectionProps> = ({
         customSettings: generationSettings,
       });
       const nextScript = (result.text || '').trim() ? result.text : sampleDraft;
+      setScriptGenerationMeta(buildWorkflowScriptGenerationMeta({
+        draft: {
+          ...executionDraft,
+          script: nextScript,
+        },
+        source: result.source,
+        intent: 'draft',
+        conversationMode,
+        usedSampleFallback: result.source !== 'ai',
+      }));
       applyGeneratedStoryScript(nextScript);
+      requestWorkflowDraftSave('action');
       setConstitutionAnalysis(result.analysis || null);
       await hydrateCharactersFromScriptText(nextScript, { preserveSelection: false, forceSample: result.source !== 'ai' });
       setNotice(result.source === 'ai' ? `선택한 프롬프트 "${template.name}"로 AI 초안을 만들었습니다.` : 'AI 연결 상태를 확인할 수 없어 Step 3 샘플 대본으로 안전하게 채웠습니다. 설정을 다시 연결하면 실제 AI 생성으로 전환됩니다.');
@@ -3039,7 +3109,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const step2Summary = (
     <>
       <SummaryChip accent="blue">주제 {topic || '미입력'}</SummaryChip>
-      <SummaryChip>{customScriptDurationMinutes}분</SummaryChip>
+      <SummaryChip>{formatExpectedDurationLabel(customScriptDurationMinutes)}</SummaryChip>
       <SummaryChip>{customScriptSpeechStyle}</SummaryChip>
       <SummaryChip>{customScriptLanguage}</SummaryChip>
     </>
@@ -3358,7 +3428,7 @@ const InputSection: React.FC<InputSectionProps> = ({
           <div className="rounded-[24px] border border-violet-200 bg-violet-50 p-4">
             <div className="text-sm font-black text-violet-900">새로 생성되는 기준</div>
             <p className="mt-2 text-sm leading-6 text-violet-800">
-              예상 길이 {customScriptDurationMinutes}분, {selectedPromptTemplate?.name || '현재 프롬프트'}, {selectedScriptGenerationModel} 기준으로
+              예상 길이 {formatExpectedDurationLabel(customScriptDurationMinutes)}, {selectedPromptTemplate?.name || '현재 프롬프트'}, {selectedScriptGenerationModel} 기준으로
               글자수 범위에 맞는 새 대본을 만듭니다.
             </p>
           </div>
