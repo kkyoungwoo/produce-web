@@ -33,6 +33,13 @@ export function triggerTextDownload(content: string, filename: string, mime = 't
   triggerBlobDownload(new Blob([content], { type: mime }), filename);
 }
 
+function normalizeBase64Input(value: string): string {
+  const compact = value.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+  const remainder = compact.length % 4;
+  if (remainder === 0) return compact;
+  return compact + '='.repeat(4 - remainder);
+}
+
 export function parseDataUrl(value: string | null | undefined, fallbackMime: string): { mime: string; bytes: Uint8Array } | null {
   if (!value) return null;
   const trimmed = value.trim();
@@ -45,13 +52,21 @@ export function parseDataUrl(value: string | null | undefined, fallbackMime: str
     return { mime, bytes: base64ToBytes(base64) };
   }
 
-  const normalized = trimmed.replace(/\s+/g, '');
-  if (!normalized) return null;
-  return { mime: fallbackMime, bytes: base64ToBytes(normalized) };
+  if (/^(blob:|https?:\/\/|\/)/i.test(trimmed)) return null;
+
+  const normalized = normalizeBase64Input(trimmed);
+  if (!normalized || !/^[A-Za-z0-9+/]+=*$/.test(normalized)) return null;
+
+  try {
+    return { mime: fallbackMime, bytes: base64ToBytes(normalized) };
+  } catch {
+    return null;
+  }
 }
 
 export function base64ToBytes(base64: string): Uint8Array {
-  const binary = atob(base64);
+  const normalized = normalizeBase64Input(base64);
+  const binary = atob(normalized);
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i += 1) {
     bytes[i] = binary.charCodeAt(i);

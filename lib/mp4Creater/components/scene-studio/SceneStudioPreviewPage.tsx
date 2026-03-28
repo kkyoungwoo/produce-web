@@ -3,7 +3,7 @@
 import React from 'react';
 import { BackgroundMusicTrack, GeneratedAsset, PreviewMixSettings } from '../../types';
 import { getAspectRatioClass } from '../../utils/aspectRatio';
-import { exportAssetsToZip } from '../../services/exportService';
+import { exportAssetsToZip, exportCapCutSubtitlePackage, exportDavinciResolvePackage } from '../../services/exportService';
 import { downloadProjectZip } from '../../utils/csvHelper';
 import { downloadSrt } from '../../services/srtService';
 
@@ -98,8 +98,12 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
   sequenceScene,
   previewMix,
   onPreviewMixChange,
+  backgroundMusicTracks,
   onOpenMediaLightbox,
 }) => {
+  const [isExportingDavinciPackage, setIsExportingDavinciPackage] = React.useState(false);
+  const [isExportingCapCutSubtitlePackage, setIsExportingCapCutSubtitlePackage] = React.useState(false);
+
   if (!open) return null;
 
   const safePreviewMix = previewMix || defaultPreviewMix;
@@ -116,11 +120,41 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
     (previewVideoStatus === 'loading' || isPreparingPreviewVideo || isExporting)
     && (progressMessage || activeOverallProgress !== null),
   );
+  const canExportDavinciPackage = Boolean(canShowRenderedPreview && finalVideoUrl && !isPreparingPreviewVideo && !isExporting);
   const mergedPreviewShellClass = previewAspectRatio === '9:16'
     ? 'mx-auto w-full max-w-[240px] sm:max-w-[280px]'
     : previewAspectRatio === '1:1'
       ? 'mx-auto w-full max-w-[320px] sm:max-w-[360px]'
       : 'mx-auto w-full max-w-[560px]';
+
+  const handleExportDavinciPackage = async () => {
+    if (isExportingDavinciPackage || !canExportDavinciPackage) return;
+    try {
+      setIsExportingDavinciPackage(true);
+      await exportDavinciResolvePackage(data, currentTopic || '프로젝트', {
+        backgroundTracks: backgroundMusicTracks,
+        previewMix: safePreviewMix,
+        finalVideoUrl,
+        finalVideoTitle,
+        finalVideoDuration,
+        aspectRatio: previewAspectRatio,
+      });
+    } finally {
+      setIsExportingDavinciPackage(false);
+    }
+  };
+
+  const handleExportCapCutSubtitlePackage = async () => {
+    if (isExportingCapCutSubtitlePackage) return;
+    try {
+      setIsExportingCapCutSubtitlePackage(true);
+      await exportCapCutSubtitlePackage(data, currentTopic || '프로젝트', {
+        aspectRatio: previewAspectRatio,
+      });
+    } finally {
+      setIsExportingCapCutSubtitlePackage(false);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 p-3 sm:p-6" onClick={onClose}>
@@ -326,11 +360,28 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                   </>
                 )}
 
-                {canShowRenderedPreview ? (
+                {data.length ? (
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    <button type="button" onClick={() => void handleExportDavinciPackage()} disabled={!canExportDavinciPackage || isExportingDavinciPackage} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400">{isExportingDavinciPackage ? 'DaVinci 패키지 내보내는 중...' : canExportDavinciPackage ? 'DaVinci 파일 내보내기' : 'DaVinci 파일 내보내기 (렌더 후 가능)'}</button>
+                    {canShowRenderedPreview ? (
                     <button type="button" onClick={() => exportAssetsToZip(data, 'mp4Creater_storyboard')} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">결과표 XLSX</button>
-                    <button type="button" onClick={() => downloadProjectZip(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">CSV / ZIP</button>
-                    <button type="button" onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">SRT</button>
+                    ) : null}
+                    {canShowRenderedPreview ? (
+                      <button type="button" onClick={() => downloadProjectZip(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">CSV / ZIP</button>
+                    ) : null}
+                    {canShowRenderedPreview ? (
+                      <>
+                        <button type="button" onClick={() => downloadSrt(data)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50">SRT</button>
+                        <button
+                          type="button"
+                          onClick={() => void handleExportCapCutSubtitlePackage()}
+                          disabled={isExportingCapCutSubtitlePackage}
+                          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
+                        >
+                          {isExportingCapCutSubtitlePackage ? 'CapCut 자막 내보내는 중...' : '캡컷 전용(XML/JSON) 자막'}
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
               </div>

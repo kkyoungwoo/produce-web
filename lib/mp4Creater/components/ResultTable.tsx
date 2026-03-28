@@ -453,6 +453,13 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const backgroundMusicTargetDuration = Math.max(10, Math.round(totalDuration || backgroundMusicSceneConfig?.durationSeconds || 20));
   const previewMixSnapshot = previewMix || { narrationVolume: 1, backgroundMusicVolume: 0.28 };
   const canRequestPreviewRerender = Boolean(onPreparePreviewVideo && !isPreparingPreviewVideo);
+  const isResultPreviewLocked = Boolean(
+    isGenerating
+    || isGeneratingAllVideos
+    || (animatingIndices?.size ?? 0) > 0
+    || Object.keys(sceneActionLocks).length > 0
+  );
+  const resultPreviewLockMessage = progressMessage || '이미지, 오디오, 영상 생성이 끝난 뒤 결과 미리보기를 열 수 있습니다.';
   const estimatedCostCards = totalCost ? [
     {
       id: 'image',
@@ -949,6 +956,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   };
 
   const openPreviewModal = async () => {
+    if (isResultPreviewLocked) return;
     setPreviewOpen(true);
   };
 
@@ -2296,9 +2304,11 @@ const ResultTable: React.FC<ResultTableProps> = ({
               onClick={() => {
                 void openPreviewModal();
               }}
-              className="min-w-[140px] rounded-full bg-slate-900 px-6 py-3 text-sm font-black text-white transition hover:bg-slate-800"
+              disabled={isResultPreviewLocked}
+              title={isResultPreviewLocked ? resultPreviewLockMessage : '결과 미리보기'}
+              className="min-w-[140px] rounded-full bg-slate-900 px-6 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:bg-slate-300 disabled:text-slate-500 disabled:hover:bg-slate-300"
             >
-              결과 미리보기
+              {isResultPreviewLocked ? '생성 완료 후 미리보기' : '결과 미리보기'}
             </button>
           </div>
         </div>
