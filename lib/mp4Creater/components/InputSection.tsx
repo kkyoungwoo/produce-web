@@ -313,7 +313,6 @@ const InputSection: React.FC<InputSectionProps> = ({
     ? [
         workflowDraft?.id || 'draft',
         routeStep,
-        workflowDraft?.updatedAt || 0,
         workflowDraft?.activeStage || 1,
         workflowDraft?.contentType || '',
         workflowDraft?.topic || '',
@@ -1210,6 +1209,28 @@ const InputSection: React.FC<InputSectionProps> = ({
     setScriptReferenceSuggestions([]);
     setSelectedCharacterStyleId(null);
     resetCharactersAndStyles();
+    requestWorkflowDraftSave('action');
+  };
+
+  const clearContentTypeSelection = () => {
+    setHasSelectedContentType(false);
+    requestWorkflowDraftSave('action');
+  };
+
+  const applyAspectRatioSelection = (nextAspectRatio: AspectRatio) => {
+    setAspectRatio(nextAspectRatio);
+    setHasSelectedAspectRatio(true);
+    requestWorkflowDraftSave('action');
+  };
+
+  const clearAspectRatioSelection = () => {
+    setHasSelectedAspectRatio(false);
+    requestWorkflowDraftSave('action');
+  };
+
+  const applyCharacterStyleSelection = (styleId: string | null) => {
+    setSelectedCharacterStyleId(styleId);
+    requestWorkflowDraftSave('action');
   };
 
   const clearSelectedCharacters = () => {
@@ -3046,6 +3067,9 @@ const InputSection: React.FC<InputSectionProps> = ({
     hasSelectedContentType,
     hasSelectedAspectRatio,
     aspectRatio,
+    clearContentTypeSelection,
+    applyAspectRatioSelection,
+    clearAspectRatioSelection,
     setHasSelectedContentType,
     setContentType,
     setTopic,
@@ -3060,6 +3084,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setStyleImages,
     setSelectedCharacterIds,
     selectedCharacterIds,
+    applyCharacterStyleSelection,
     setSelectedCharacterStyleId,
     setSelectedStyleImageId,
     setHasSelectedAspectRatio,

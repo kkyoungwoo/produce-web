@@ -15,6 +15,9 @@ export default function RouteStepView({ vm }: { vm: any }) {
     aspectRatio,
     hasSelectedContentType,
     hasSelectedAspectRatio,
+    clearContentTypeSelection,
+    applyAspectRatioSelection,
+    clearAspectRatioSelection,
     setHasSelectedContentType,
     setContentType,
     setTopic,
@@ -28,6 +31,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
     setExtractedCharacters,
     setStyleImages,
     setSelectedCharacterIds,
+    applyCharacterStyleSelection,
     setSelectedCharacterStyleId,
     applyContentTypeSelection,
     setSelectedStyleImageId,
@@ -145,6 +149,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
 
   const currentRouteStep = (routeStep || 1) as 1 | 2 | 3 | 4 | 5;
   const [stepShellVisible, setStepShellVisible] = useState(false);
+  const [isNavigatingNext, setIsNavigatingNext] = useState(false);
   const [step4LocalStage, setStep4LocalStage] = useState<'style' | 'workspace'>(
     selectedCharacterStyleId ? 'workspace' : 'style'
   );
@@ -173,6 +178,10 @@ export default function RouteStepView({ vm }: { vm: any }) {
     setStep4LocalStage('style');
   }, [currentRouteStep, selectedCharacterStyleId, step4LocalStage]);
 
+  useEffect(() => {
+    setIsNavigatingNext(false);
+  }, [currentRouteStep]);
+
   if (!routeStep) return null;
 
   const normalizedSelectedCharacterIds = Array.isArray(selectedCharacterIds)
@@ -195,15 +204,26 @@ export default function RouteStepView({ vm }: { vm: any }) {
           hasSelectedAspectRatio={hasSelectedAspectRatio}
           onSelectContentType={(value) => {
             if (hasSelectedContentType && contentType === value) {
-              setHasSelectedContentType(false);
+              if (typeof clearContentTypeSelection === 'function') {
+                clearContentTypeSelection();
+              } else {
+                setHasSelectedContentType(false);
+              }
               return;
             }
             applyContentTypeSelection(value);
-            setHasSelectedContentType(true);
           }}
           onSelectAspectRatio={(value) => {
             if (hasSelectedAspectRatio && aspectRatio === value) {
-              setHasSelectedAspectRatio(false);
+              if (typeof clearAspectRatioSelection === 'function') {
+                clearAspectRatioSelection();
+              } else {
+                setHasSelectedAspectRatio(false);
+              }
+              return;
+            }
+            if (typeof applyAspectRatioSelection === 'function') {
+              applyAspectRatioSelection(value);
               return;
             }
             setAspectRatio(value);
@@ -330,7 +350,13 @@ export default function RouteStepView({ vm }: { vm: any }) {
             void hydrateCharactersForScript({ preserveSelection: true });
           }}
           onLocalStageChange={setStep4LocalStage}
-          onSelectCharacterStyle={vm.setSelectedCharacterStyleId}
+          onSelectCharacterStyle={(styleId) => {
+            if (typeof applyCharacterStyleSelection === 'function') {
+              applyCharacterStyleSelection(styleId);
+              return;
+            }
+            setSelectedCharacterStyleId(styleId);
+          }}
           onUploadCharacterImage={handleCharacterUploadForId}
           onUploadNewCharacterImage={openCharacterUploadPicker}
           onToggleCharacter={toggleCharacterSelection}
@@ -373,9 +399,21 @@ export default function RouteStepView({ vm }: { vm: any }) {
     );
   };
 
-  const handleNextRouteStep = () => {
+  const runNextNavigation = async (action: () => Promise<unknown> | unknown) => {
+    if (isNavigatingNext) return;
+    setIsNavigatingNext(true);
+    try {
+      await Promise.resolve(action());
+    } finally {
+      setIsNavigatingNext(false);
+    }
+  };
+
+  const handleNextRouteStep = async () => {
+    if (isNavigatingNext) return;
+
     if (currentRouteStep === 5) {
-      void handleOpenSceneStudioClick();
+      await runNextNavigation(() => handleOpenSceneStudioClick());
       return;
     }
 
@@ -400,15 +438,20 @@ export default function RouteStepView({ vm }: { vm: any }) {
         return;
       }
 
-      window.requestAnimationFrame(() => {
-        void completeStage(currentRouteStep, nextRouteStep as StepId);
-      });
+      await runNextNavigation(
+        () =>
+          new Promise<void>((resolve) => {
+            window.requestAnimationFrame(() => {
+              void Promise.resolve(completeStage(currentRouteStep, nextRouteStep as StepId)).finally(resolve);
+            });
+          })
+      );
       return;
     }
 
     if (!canMoveNext) return;
 
-    void completeStage(currentRouteStep, nextRouteStep as StepId);
+    await runNextNavigation(() => completeStage(currentRouteStep, nextRouteStep as StepId));
   };
 
   const canMoveNext =
@@ -417,6 +460,7 @@ export default function RouteStepView({ vm }: { vm: any }) {
       : currentRouteStep === 4 && step4LocalStage === 'style'
         ? Boolean(selectedCharacterStyleId)
         : Boolean(routeStepCompleted[currentRouteStep]);
+  const nextButtonDisabled = !canMoveNext || isNavigatingNext;
 
   return (
     <div className="mp4-editor-shell mx-auto my-6 w-full max-w-[1520px] px-4 pb-32 sm:px-6 lg:px-8">
@@ -450,7 +494,9 @@ export default function RouteStepView({ vm }: { vm: any }) {
         <div className="mp4-glass-panel pointer-events-auto inline-flex items-center gap-3 rounded-full border border-slate-200 bg-white/95 px-3 py-3 shadow-xl shadow-slate-200/70 backdrop-blur-md">
           <button
             type="button"
+            disabled={isNavigatingNext}
             onClick={() => {
+              if (isNavigatingNext) return;
               if (currentRouteStep === 4 && step4LocalStage === 'workspace') {
                 setStep4LocalStage('style');
                 window.requestAnimationFrame(() => {
@@ -471,14 +517,23 @@ export default function RouteStepView({ vm }: { vm: any }) {
 
           <button
             type="button"
-            onClick={handleNextRouteStep}
-            aria-disabled={!canMoveNext}
+            onClick={() => {
+              void handleNextRouteStep();
+            }}
+            disabled={nextButtonDisabled}
+            aria-disabled={nextButtonDisabled}
+            aria-busy={isNavigatingNext}
             className={`min-w-[140px] rounded-full px-6 py-3 text-sm font-black transition ${
-              canMoveNext
-                ? 'bg-blue-600 text-white hover:bg-blue-500'
-                : 'cursor-pointer bg-slate-300 text-slate-100 hover:bg-slate-300'
+              nextButtonDisabled
+                ? `relative cursor-not-allowed bg-slate-300 ${isNavigatingNext ? 'text-transparent' : 'text-slate-100'}`
+                : 'bg-blue-600 text-white hover:bg-blue-500'
             }`}
           >
+            {isNavigatingNext && (
+              <span className="absolute inset-0 flex items-center justify-center text-slate-100">
+                {currentRouteStep === 5 ? '씬 준비 중...' : '이동 중...'}
+              </span>
+            )}
             {currentRouteStep === 5 ? '영상 제작하기' : '다음으로'}
           </button>
         </div>
