@@ -43,6 +43,8 @@
 - Header Settings background music selection should reuse the shared AI picker card flow so users compare BGM model options with the same interaction pattern as text/image/video model selection.
 - Sample background-music preview should reuse `public/mp4Creater/samples/audio/loop_main.wav`.
 - Active background-music picker choices should now be `sample-ambient-v1`, `lyria-3-clip-preview`, and `lyria-3-pro-preview`; legacy `lyria-002` ids must normalize into the Lyria 3 clip path instead of staying visible in UI.
+- Header Settings save must persist API keys first and then close the drawer in the same action so the saved key can immediately unlock the matching AI model picker options.
+- The top-level storage-folder block is intentionally hidden from Header Settings; hosted/server runtimes should not require that UI before AI settings can be saved.
 
 ## 2026-03 Runtime Notes
 - `lib/mp4Creater/services/googleAiStudioService.ts` is the shared Google key resolver used by script, image, video, and Google background-music flows.
@@ -57,6 +59,7 @@
 - Google live TTS preview audio arrives as `audio/L16;codec=pcm;rate=24000`, and the runtime must wrap it using the same `s16le` interpretation as the official Google example. Byte-swapping that payload produces noise instead of speech.
 - If no Google key is available, free preview should prefer browser speech preview rather than exposing a tone-like fallback.
 - Hidden local/custom free TTS experiments must not reappear in the active picker until they produce the same spoken output quality as live generation.
+- Hosted/server Header Settings saves must stay browser-first. Failure to persist the optional YouTube OAuth file must not block normal AI settings save or close behavior.
 - Adding a new model requires three aligned updates:
 - user-facing option metadata: `lib/mp4Creater/services/aiOptionCatalog.ts`
 - persisted default id / constants: `lib/mp4Creater/config.ts`

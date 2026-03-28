@@ -1196,14 +1196,18 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     setShowStartupWizard(false);
 
     if (currentProjectId && partial.routing) {
-      const currentProject = await updateProject(currentProjectId, {
-        settings: buildProjectSettingsSnapshot({
-          routing: nextState.routing,
-          workflowDraft: nextState.workflowDraft,
-        }),
-      });
-      if (currentProject) {
-        applyProjectListSnapshot([currentProject, ...savedProjects.filter((item) => item.id !== currentProject.id)]);
+      try {
+        const currentProject = await updateProject(currentProjectId, {
+          settings: buildProjectSettingsSnapshot({
+            routing: nextState.routing,
+            workflowDraft: nextState.workflowDraft,
+          }),
+        });
+        if (currentProject) {
+          applyProjectListSnapshot([currentProject, ...savedProjects.filter((item) => item.id !== currentProject.id)]);
+        }
+      } catch (error) {
+        console.warn('[mp4Creater] project settings sync failed after studio save', error);
       }
     }
 

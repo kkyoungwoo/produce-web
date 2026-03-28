@@ -92,6 +92,12 @@ let studioStateSaveFailureCount = 0;
 let studioStateSaveCooldownUntil = 0;
 const STUDIO_STATE_CACHE_MAX_PROJECTS = 80;
 const STUDIO_STATE_CACHE_SOFT_LIMIT = 1_800_000;
+const LOCAL_STUDIO_STORAGE_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
+
+function canUseServerStudioPersistence() {
+  if (typeof window === 'undefined') return true;
+  return LOCAL_STUDIO_STORAGE_HOSTNAMES.has(window.location.hostname);
+}
 
 function shouldBypassStudioStateSaveRequest() {
   return typeof window !== 'undefined' && Date.now() < studioStateSaveCooldownUntil;
@@ -612,6 +618,10 @@ export async function fetchStudioState(options?: { force?: boolean; storageDir?:
   const cachedState = getCachedStudioState();
   const hasConfiguredExternalStorage = Boolean(cachedDir.trim() || cachedState?.isStorageConfigured);
 
+  if (!canUseServerStudioPersistence()) {
+    return cachedState || createDefaultStudioState();
+  }
+
   if (!options?.force && cachedState && (cachedState.storageDir || '') === cachedDir) {
     return cachedState;
   }
@@ -632,6 +642,11 @@ export async function fetchStudioState(options?: { force?: boolean; storageDir?:
 }
 
 export async function fetchStudioProjects(options?: { storageDir?: string }): Promise<SavedProject[]> {
+  if (!canUseServerStudioPersistence()) {
+    const cachedProjects = getCachedStudioState()?.projects;
+    return Array.isArray(cachedProjects) ? cachedProjects.map(summarizeProjectForIndex) : [];
+  }
+
   const storageDir = options?.storageDir || getCachedStorageDir();
   if (!storageDir.trim()) {
     const cachedProjects = getCachedStudioState()?.projects;
@@ -645,6 +660,14 @@ export async function fetchStudioProjects(options?: { storageDir?: string }): Pr
 }
 
 export async function fetchStudioProjectById(projectId: string, options?: { storageDir?: string }): Promise<SavedProject | null> {
+  if (!canUseServerStudioPersistence()) {
+    const cachedProjects = getCachedStudioState()?.projects;
+    const cachedProject = Array.isArray(cachedProjects)
+      ? cachedProjects.find((project) => project.id === projectId)
+      : null;
+    return cachedProject ? normalizeProjectContentTypes(cachedProject) : null;
+  }
+
   const storageDir = options?.storageDir || getCachedStorageDir();
   if (!storageDir.trim()) return null;
   const query = new URLSearchParams();
@@ -659,6 +682,10 @@ export async function fetchStudioProjectById(projectId: string, options?: { stor
 }
 
 export async function saveStudioProject(project: SavedProject, options?: { storageDir?: string }): Promise<SavedProject> {
+  if (!canUseServerStudioPersistence()) {
+    return normalizeProjectContentTypes(project);
+  }
+
   const storageDir = options?.storageDir || getCachedStorageDir();
   if (!storageDir.trim()) return normalizeProjectContentTypes(project);
   const response = await requestJson<{ project?: SavedProject }>('/api/local-storage/project', {
@@ -669,6 +696,8 @@ export async function saveStudioProject(project: SavedProject, options?: { stora
 }
 
 export async function deleteStudioProjects(projectIds: string[], options?: { storageDir?: string }): Promise<void> {
+  if (!canUseServerStudioPersistence()) return;
+
   const storageDir = options?.storageDir || getCachedStorageDir();
   if (!storageDir.trim()) return;
   await requestJson('/api/local-storage/project', {
@@ -678,6 +707,18 @@ export async function deleteStudioProjects(projectIds: string[], options?: { sto
 }
 
 export async function configureStorage(storageDir: string): Promise<StudioState> {
+  if (!canUseServerStudioPersistence()) {
+    const cachedState = getCachedStudioState() || createDefaultStudioState();
+    const nextState = normalizeStudioStateContentTypes({
+      ...cachedState,
+      storageDir: '',
+      isStorageConfigured: false,
+      updatedAt: Date.now(),
+    });
+    syncStudioStateToLocalCache(nextState);
+    return nextState;
+  }
+
   const state = normalizeStudioStateContentTypes(await requestJson<StudioState>('/api/local-storage/config', {
     method: 'POST',
     body: JSON.stringify({ storageDir }),
@@ -705,6 +746,11 @@ export async function saveStudioState(partial: Partial<StudioState>): Promise<St
       }) as StudioState;
 
   const normalizedOptimisticState = normalizeStudioStateContentTypes(buildOptimisticState());
+
+  if (!canUseServerStudioPersistence()) {
+    syncStudioStateToLocalCache(normalizedOptimisticState);
+    return normalizedOptimisticState;
+  }
 
   if (!normalizedOptimisticState.isStorageConfigured || !normalizedOptimisticState.storageDir?.trim()) {
     syncStudioStateToLocalCache(normalizedOptimisticState);
@@ -745,6 +791,14 @@ export async function saveStudioState(partial: Partial<StudioState>): Promise<St
 
 export async function saveProjectsToStudio(projects: SavedProject[]): Promise<StudioState> {
   const cachedState = getCachedStudioState() || createDefaultStudioState();
+  if (!canUseServerStudioPersistence()) {
+    return saveStudioState({
+      ...cachedState,
+      projects: projects.map(summarizeProjectForIndex),
+      projectIndex: projects.map(summarizeProjectForIndex),
+      updatedAt: Date.now(),
+    });
+  }
   if (!cachedState.isStorageConfigured || !cachedState.storageDir) {
     throw new Error('저장 위치가 아직 설정되지 않았습니다. 먼저 JSON 저장 위치를 선택해 주세요.');
   }

@@ -70,6 +70,7 @@ const freeScriptModel = SCRIPT_MODEL_OPTIONS.find((item) => item.tier !== 'paid'
 const freeImageModel = IMAGE_MODELS.find((item) => item.tier !== 'paid')?.id || CONFIG.DEFAULT_IMAGE_MODEL;
 const freeVideoModel = VIDEO_MODEL_OPTIONS.find((item) => item.tier !== 'paid')?.id || CONFIG.DEFAULT_VIDEO_MODEL;
 const VOICE_SAMPLE_MAX_SECONDS = 15;
+const LOCAL_RUNTIME_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '0.0.0.0']);
 const GOOGLE_MODEL_DISABLED_REASON = 'Google AI Studio API 키를 연결하면 선택할 수 있습니다.';
 
 function markApiLockedOptions(options: AiPickerOption[], enabled: boolean, disabledReason: string) {
@@ -241,6 +242,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     redirectUri: '',
     source: 'missing' as 'env' | 'saved' | 'missing',
   });
+  const [loadedYoutubeClientId, setLoadedYoutubeClientId] = useState('');
   const [youtubeConnectionState, setYoutubeConnectionState] = useState<{
     isChecking: boolean;
     tone: 'success' | 'error' | 'info';
@@ -387,6 +389,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       googleClientId: '',
       googleClientSecret: '',
     });
+    setLoadedYoutubeClientId('');
     setYoutubeConfigState({
       isLoading: true,
       hasStoredSecret: false,
@@ -415,6 +418,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
             ...prev,
             googleClientId: typeof json?.clientId === 'string' ? json.clientId : '',
           }));
+          setLoadedYoutubeClientId(typeof json?.clientId === 'string' ? json.clientId : '');
           setYoutubeConfigState({
             isLoading: false,
             hasStoredSecret: Boolean(json?.clientSecretConfigured),
@@ -427,6 +431,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       } catch {}
 
       if (!cancelled) {
+        setLoadedYoutubeClientId('');
         setYoutubeConfigState({
           isLoading: false,
           hasStoredSecret: false,
@@ -1276,6 +1281,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       googleClientId: typeof json?.clientId === 'string' ? json.clientId : '',
       googleClientSecret: '',
     }));
+    setLoadedYoutubeClientId(typeof json?.clientId === 'string' ? json.clientId : '');
     setYoutubeConfigState({
       isLoading: false,
       hasStoredSecret: Boolean(json?.clientSecretConfigured),
@@ -1622,6 +1628,11 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     const elevenLabsApiKey = providerValues.elevenLabsApiKey.trim();
     const googleClientId = youtubeOAuthValues.googleClientId.trim();
     const googleClientSecret = youtubeOAuthValues.googleClientSecret.trim();
+    const isHostedRuntime = typeof window !== 'undefined' && !LOCAL_RUNTIME_HOSTNAMES.has(window.location.hostname);
+    const nextStorageDir = isHostedRuntime ? '' : storageDir;
+    const shouldPersistYoutubeConfigOnSave =
+      Boolean(googleClientSecret)
+      || googleClientId !== loadedYoutubeClientId;
     const nextScriptModel = routing.scriptModel || freeScriptModel;
     const nextPromptModel = routing.sceneModel || nextScriptModel;
     const nextImageModel = routing.imageModel || freeImageModel;
@@ -1661,18 +1672,29 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       paidModeEnabled,
     } as StudioState['routing'];
 
-    if (googleClientId || googleClientSecret || youtubeConfigState.source === 'saved') {
-      await persistYoutubeConfigFromInputs();
-      setYoutubeConnectionState({
-        isChecking: false,
-        tone: 'success',
-        message: '유튜브 OAuth 키가 저장되었습니다. 연결 확인 또는 연결 시작 버튼으로 바로 진행할 수 있습니다.',
-      });
+    if (shouldPersistYoutubeConfigOnSave) {
+      try {
+        await persistYoutubeConfigFromInputs();
+        setYoutubeConnectionState({
+          isChecking: false,
+          tone: 'success',
+          message: '유튜브 OAuth 키가 저장되었습니다. 연결 확인 또는 연결 시작 버튼으로 바로 진행할 수 있습니다.',
+        });
+      } catch (error) {
+        console.warn('[SettingsDrawer] youtube config save skipped while preserving AI settings', error);
+        setYoutubeConnectionState({
+          isChecking: false,
+          tone: 'error',
+          message: isHostedRuntime
+            ? '실서버 환경에서는 유튜브 OAuth 파일 저장이 제한될 수 있어 AI 설정만 먼저 저장했습니다.'
+            : (error instanceof Error ? error.message : '유튜브 OAuth 저장에 실패했습니다.'),
+        });
+      }
     }
 
     await onSave({
-      storageDir,
-      isStorageConfigured: Boolean(storageDir.trim()),
+      storageDir: nextStorageDir,
+      isStorageConfigured: Boolean(nextStorageDir.trim()),
       providers: {
         ...studioState.providers,
         openRouterApiKey: googleApiKey,
@@ -1688,6 +1710,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
   };
 
   if (!open || !studioState) return null;
+  const showStorageSection = false;
 
   const youtubeOAuthSection = (
     <section className={cardClass}>
@@ -1852,17 +1875,19 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
         </div>
 
         <div className="mt-5 grid gap-4">
-          <section className={cardClass}>
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h3 className="text-base font-black text-slate-900">저장 위치</h3>
-                <p className="mt-1 text-xs text-slate-600">프로젝트 JSON 저장소와 생성 결과 메타데이터를 저장할 기본 위치입니다.</p>
+          {showStorageSection ? (
+            <section className={cardClass}>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-black text-slate-900">저장 위치</h3>
+                  <p className="mt-1 text-xs text-slate-600">프로젝트 JSON 저장소와 생성 결과 메타데이터를 저장할 기본 위치입니다.</p>
+                </div>
+                <button type="button" onClick={handleFolderPick} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-500">폴더 선택</button>
               </div>
-              <button type="button" onClick={handleFolderPick} className="rounded-xl bg-blue-600 px-3 py-2 text-xs font-black text-white hover:bg-blue-500">폴더 선택</button>
-            </div>
-            <input value={storageDir} onChange={(e) => setStorageDir(e.target.value)} className={`${inputClass} mt-3`} placeholder="./local-data/tubegen-studio" />
-            {pickedFolderLabel ? <p className="mt-2 text-xs text-slate-500">선택한 위치: {pickedFolderLabel}</p> : null}
-          </section>
+              <input value={storageDir} onChange={(e) => setStorageDir(e.target.value)} className={`${inputClass} mt-3`} placeholder="./local-data/tubegen-studio" />
+              {pickedFolderLabel ? <p className="mt-2 text-xs text-slate-500">선택한 위치: {pickedFolderLabel}</p> : null}
+            </section>
+          ) : null}
 
           <section className={cardClass}>
             <div className="flex items-center justify-between gap-3">

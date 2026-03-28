@@ -183,12 +183,15 @@
 - Project reopen, export, import, and copy must always resolve against the full detailed project payload so thumbnails, prompts, scene media, TTS, preview state, and project-applied AI settings stay intact.
 - `saveStudioState(...)` and project autosave must still work when no storage folder is configured; front-only deploys should not require `storageDir` before project persistence starts.
 - `/api/local-storage/*` is now an optional external JSON mirror only. If no external storage is configured, project saves must stay in IndexedDB/local cache without throwing.
+- Hosted/server runtimes must prefer browser cache + IndexedDB even when the old local-folder settings payload exists. Import/export/save/delete flows should continue to work without a writable server filesystem.
 - Project-level saved settings must contain only the values that affected that project result: script/image/video/TTS/BGM model choices, selected voice preset, prompt bundles, output mode, aspect ratio, and scene/thumbnail state.
 - Global app settings, API keys, and shared provider secrets must stay outside project export/import payloads.
 - Import/export payloads must stay versioned and standalone enough to restore a project on another browser or PC with thumbnail history, prompts, generated media, and project settings snapshot intact.
 
 ## 2026-03 Runtime Baseline
 - Browser-first operation is the default baseline: project persistence lives in IndexedDB, and `/api/local-storage/*` is only an optional mirror.
+- Header Settings save in hosted/server deploys must update browser-side studio state first, close the drawer, and avoid blocking on optional filesystem-backed YouTube OAuth persistence.
+- The Header Settings storage-folder picker is intentionally hidden in the current UI; local folder sync remains an optional local-runtime mirror, not a required first step.
 - `lib/mp4Creater/services/googleAiStudioService.ts` is the shared key resolver for Google-backed live paths.
 - Current live AI execution paths:
 - script: `lib/mp4Creater/services/textAiService.ts`
