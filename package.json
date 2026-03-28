@@ -16,6 +16,8 @@
   "scripts": {
     "dev": "next dev --webpack",
     "build": "next build",
+    "deploy:firebase": "node scripts/firebase-apphosting-deploy.mjs",
+    "firebase:deploy": "node scripts/firebase-apphosting-deploy.mjs",
     "postinstall": "node scripts/ensure-ffmpeg-binary.mjs",
     "start": "next dev --webpack",
     "serve": "next start",

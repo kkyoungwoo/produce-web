@@ -1,7 +1,14 @@
-﻿# Manual deploy only (auto deploy disabled)
-name: Deploy to Firebase Hosting (manual)
+name: Deploy to Firebase App Hosting
 'on':
+  push:
+    branches:
+      - main
   workflow_dispatch:
+    inputs:
+      backend_id:
+        description: Firebase App Hosting backend ID (optional when repo secret is set)
+        required: false
+        type: string
 
 jobs:
   build_and_deploy:
@@ -13,10 +20,31 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build
-      - uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: '${{ secrets.GITHUB_TOKEN }}'
-          firebaseServiceAccount: '${{ secrets.FIREBASE_SERVICE_ACCOUNT_GORHROD_CODEX }}'
-          channelId: live
-          projectId: gorhrod-codex
+      - name: Resolve backend id
+        id: backend
+        shell: bash
+        run: |
+          backend_id="${{ github.event.inputs.backend_id }}"
+          if [ -z "$backend_id" ]; then
+            backend_id="${{ secrets.FIREBASE_APPHOSTING_BACKEND_ID }}"
+          fi
+          if [ -z "$backend_id" ]; then
+            echo "Set FIREBASE_APPHOSTING_BACKEND_ID or provide backend_id when running this workflow manually."
+            exit 1
+          fi
+          echo "backend_id=$backend_id" >> "$GITHUB_OUTPUT"
+      - name: Write Firebase service account
+        shell: bash
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GORHROD_CODEX }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "Missing FIREBASE_SERVICE_ACCOUNT_GORHROD_CODEX secret."
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
+      - run: npm run deploy:firebase -- --non-interactive
+        env:
+          FIREBASE_PROJECT_ID: gorhrod-codex
+          FIREBASE_APPHOSTING_BACKEND_ID: ${{ steps.backend.outputs.backend_id }}

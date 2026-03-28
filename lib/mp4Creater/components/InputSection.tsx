@@ -141,6 +141,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const autoSelectedCharacterSignatureRef = useRef('');
 
   const initial = workflowDraft || ({} as WorkflowDraft);
+  const latestLocalDraftMutationRef = useRef(Number(initial.updatedAt || 0));
   const initialStage = normalizeStage(initial.activeStage || 1);
   const initialContentType = initial.contentType || studioState?.lastContentType || 'story';
   const initialSelections = initial.selections || FIELD_OPTIONS_BY_TYPE[initialContentType];
@@ -313,6 +314,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     ? [
         workflowDraft?.id || 'draft',
         routeStep,
+        workflowDraft?.updatedAt || 0,
         workflowDraft?.activeStage || 1,
         workflowDraft?.contentType || '',
         workflowDraft?.topic || '',
@@ -323,17 +325,25 @@ const InputSection: React.FC<InputSectionProps> = ({
         workflowDraft?.extractedCharacters?.length || 0,
         workflowDraft?.styleImages?.length || 0,
       ].join('::')
-    : (workflowDraft?.id || 'draft');
+    : [workflowDraft?.id || 'draft', workflowDraft?.updatedAt || 0].join('::');
 
   useEffect(() => {
     if (hydratedDraftIdRef.current === workflowHydrationKey) return;
     const previousDraftId = hydratedDraftIdRef.current.split('::')[0] || '';
+    const currentDraftId = workflowDraft?.id || 'draft';
+    const incomingDraftUpdatedAt = Number(workflowDraft?.updatedAt || 0);
+    const shouldSkipStaleHydration = previousDraftId === currentDraftId
+      && incomingDraftUpdatedAt > 0
+      && incomingDraftUpdatedAt < latestLocalDraftMutationRef.current;
+
+    if (shouldSkipStaleHydration) return;
+
     hydratedDraftIdRef.current = workflowHydrationKey;
+    latestLocalDraftMutationRef.current = Math.max(latestLocalDraftMutationRef.current, incomingDraftUpdatedAt);
 
     const nextType = workflowDraft?.contentType || studioState?.lastContentType || 'story';
     const nextSelections = workflowDraft?.selections || FIELD_OPTIONS_BY_TYPE[nextType];
     const nextStage = normalizeStage(workflowDraft?.activeStage || 1);
-    const currentDraftId = workflowDraft?.id || 'draft';
     const shouldPreserveStep1Selection = previousDraftId === currentDraftId;
     const nextPromptPack = buildWorkflowPromptPack({
       contentType: nextType,
@@ -1069,6 +1079,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const pendingDraftSaveTokenRef = useRef(0);
 
   const requestWorkflowDraftSave = (reason: 'input' | 'action' = 'action') => {
+    latestLocalDraftMutationRef.current = Date.now();
     pendingDraftSaveReasonRef.current = reason;
     pendingDraftSaveTokenRef.current += 1;
   };

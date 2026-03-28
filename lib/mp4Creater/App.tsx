@@ -164,32 +164,212 @@ function mergeLoadedWorkflowDraft(baseDraft?: WorkflowDraft | null, incomingDraf
     ? ensureWorkflowDraft({ workflowDraft: baseDraft, lastContentType: baseDraft.contentType } as StudioState)
     : createDefaultWorkflowDraft(incomingDraft.contentType || 'story');
   const ensuredIncoming = ensureWorkflowDraft({ workflowDraft: incomingDraft, lastContentType: incomingDraft.contentType || fallbackBase.contentType } as StudioState);
+  const baseUpdatedAt = Number(fallbackBase.updatedAt || 0);
+  const incomingUpdatedAt = Number(ensuredIncoming.updatedAt || 0);
+  const preferBaseDraft = Boolean(baseDraft && baseUpdatedAt > incomingUpdatedAt);
+  const preferredDraft = preferBaseDraft ? fallbackBase : ensuredIncoming;
+  const secondaryDraft = preferBaseDraft ? ensuredIncoming : fallbackBase;
+  const defaultWorkflowDraft = createDefaultWorkflowDraft(preferredDraft.contentType || secondaryDraft.contentType || fallbackBase.contentType);
+  const defaultPromptPack = defaultWorkflowDraft.promptPack;
+  const defaultReferenceImages = defaultWorkflowDraft.referenceImages;
+  const defaultCustomScriptSettings = defaultWorkflowDraft.customScriptSettings || {
+    expectedDurationMinutes: 1,
+    speechStyle: 'default',
+    language: 'ko',
+    referenceText: '',
+    referenceLinks: [],
+    scriptModel: defaultWorkflowDraft.openRouterModel,
+  };
+  const defaultBackgroundMusicScene = defaultWorkflowDraft.backgroundMusicScene || {
+    enabled: false,
+    prompt: '',
+    provider: 'sample',
+    modelId: '',
+    title: '',
+    durationSeconds: 20,
+    promptSections: undefined,
+    selectedTrackId: null,
+  };
+  const defaultSampleMode = defaultWorkflowDraft.sampleMode || {
+    text: true,
+    tts: true,
+    backgroundMusic: true,
+    musicVideo: true,
+  };
+  const defaultCompletedSteps = defaultWorkflowDraft.completedSteps;
+  const pickNonEmptyArray = <T,>(preferred?: T[] | null, secondary?: T[] | null): T[] => {
+    if (Array.isArray(preferred) && preferred.length) return preferred;
+    return Array.isArray(secondary) ? secondary : [];
+  };
+  const pickString = (preferred?: string | null, secondary?: string | null) => preferred || secondary || '';
 
   return {
-    ...fallbackBase,
-    ...ensuredIncoming,
-    extractedCharacters: Array.isArray(ensuredIncoming.extractedCharacters) && ensuredIncoming.extractedCharacters.length
-      ? ensuredIncoming.extractedCharacters
-      : (fallbackBase.extractedCharacters || []),
-    styleImages: Array.isArray(ensuredIncoming.styleImages) && ensuredIncoming.styleImages.length
-      ? ensuredIncoming.styleImages
-      : (fallbackBase.styleImages || []),
-    characterImages: Array.isArray(ensuredIncoming.characterImages) && ensuredIncoming.characterImages.length
-      ? ensuredIncoming.characterImages
-      : (fallbackBase.characterImages || []),
-    selectedCharacterIds: Array.isArray(ensuredIncoming.selectedCharacterIds) && ensuredIncoming.selectedCharacterIds.length
-      ? ensuredIncoming.selectedCharacterIds
-      : (fallbackBase.selectedCharacterIds || []),
-    selectedCharacterStyleId: ensuredIncoming.selectedCharacterStyleId ?? fallbackBase.selectedCharacterStyleId ?? null,
-    selectedCharacterStyleLabel: ensuredIncoming.selectedCharacterStyleLabel || fallbackBase.selectedCharacterStyleLabel || '',
-    selectedCharacterStylePrompt: ensuredIncoming.selectedCharacterStylePrompt || fallbackBase.selectedCharacterStylePrompt || '',
-    selectedStyleImageId: ensuredIncoming.selectedStyleImageId ?? fallbackBase.selectedStyleImageId ?? null,
-    promptTemplates: Array.isArray(ensuredIncoming.promptTemplates) && ensuredIncoming.promptTemplates.length
-      ? ensuredIncoming.promptTemplates
-      : (fallbackBase.promptTemplates || []),
-    selectedPromptTemplateId: ensuredIncoming.selectedPromptTemplateId || fallbackBase.selectedPromptTemplateId,
-    updatedAt: ensuredIncoming.updatedAt || Date.now(),
+    ...secondaryDraft,
+    ...preferredDraft,
+    promptPack: {
+      storyPrompt: preferredDraft.promptPack?.storyPrompt
+        ?? secondaryDraft.promptPack?.storyPrompt
+        ?? defaultPromptPack.storyPrompt,
+      lyricsPrompt: preferredDraft.promptPack?.lyricsPrompt
+        ?? secondaryDraft.promptPack?.lyricsPrompt
+        ?? defaultPromptPack.lyricsPrompt,
+      characterPrompt: preferredDraft.promptPack?.characterPrompt
+        ?? secondaryDraft.promptPack?.characterPrompt
+        ?? defaultPromptPack.characterPrompt,
+      scenePrompt: preferredDraft.promptPack?.scenePrompt
+        ?? secondaryDraft.promptPack?.scenePrompt
+        ?? defaultPromptPack.scenePrompt,
+      actionPrompt: preferredDraft.promptPack?.actionPrompt
+        ?? secondaryDraft.promptPack?.actionPrompt
+        ?? defaultPromptPack.actionPrompt,
+      persuasionStoryPrompt: preferredDraft.promptPack?.persuasionStoryPrompt
+        ?? secondaryDraft.promptPack?.persuasionStoryPrompt
+        ?? defaultPromptPack.persuasionStoryPrompt,
+    },
+    referenceImages: {
+      character: preferredDraft.referenceImages?.character
+        ?? secondaryDraft.referenceImages?.character
+        ?? defaultReferenceImages.character,
+      style: preferredDraft.referenceImages?.style
+        ?? secondaryDraft.referenceImages?.style
+        ?? defaultReferenceImages.style,
+      characterStrength: preferredDraft.referenceImages?.characterStrength
+        ?? secondaryDraft.referenceImages?.characterStrength
+        ?? defaultReferenceImages.characterStrength,
+      styleStrength: preferredDraft.referenceImages?.styleStrength
+        ?? secondaryDraft.referenceImages?.styleStrength
+        ?? defaultReferenceImages.styleStrength,
+    },
+    customScriptSettings: {
+      expectedDurationMinutes: preferredDraft.customScriptSettings?.expectedDurationMinutes
+        ?? secondaryDraft.customScriptSettings?.expectedDurationMinutes
+        ?? defaultCustomScriptSettings.expectedDurationMinutes,
+      speechStyle: preferredDraft.customScriptSettings?.speechStyle
+        ?? secondaryDraft.customScriptSettings?.speechStyle
+        ?? defaultCustomScriptSettings.speechStyle,
+      language: preferredDraft.customScriptSettings?.language
+        ?? secondaryDraft.customScriptSettings?.language
+        ?? defaultCustomScriptSettings.language,
+      referenceText: preferredDraft.customScriptSettings?.referenceText
+        ?? secondaryDraft.customScriptSettings?.referenceText
+        ?? defaultCustomScriptSettings.referenceText,
+      referenceLinks: preferredDraft.customScriptSettings?.referenceLinks
+        ?? secondaryDraft.customScriptSettings?.referenceLinks
+        ?? defaultCustomScriptSettings.referenceLinks,
+      scriptModel: preferredDraft.customScriptSettings?.scriptModel
+        ?? secondaryDraft.customScriptSettings?.scriptModel
+        ?? defaultCustomScriptSettings.scriptModel,
+    },
+    backgroundMusicScene: {
+      enabled: preferredDraft.backgroundMusicScene?.enabled
+        ?? secondaryDraft.backgroundMusicScene?.enabled
+        ?? defaultBackgroundMusicScene.enabled,
+      prompt: preferredDraft.backgroundMusicScene?.prompt
+        ?? secondaryDraft.backgroundMusicScene?.prompt
+        ?? defaultBackgroundMusicScene.prompt,
+      provider: preferredDraft.backgroundMusicScene?.provider
+        ?? secondaryDraft.backgroundMusicScene?.provider
+        ?? defaultBackgroundMusicScene.provider,
+      modelId: preferredDraft.backgroundMusicScene?.modelId
+        ?? secondaryDraft.backgroundMusicScene?.modelId
+        ?? defaultBackgroundMusicScene.modelId,
+      title: preferredDraft.backgroundMusicScene?.title
+        ?? secondaryDraft.backgroundMusicScene?.title
+        ?? defaultBackgroundMusicScene.title,
+      durationSeconds: preferredDraft.backgroundMusicScene?.durationSeconds
+        ?? secondaryDraft.backgroundMusicScene?.durationSeconds
+        ?? defaultBackgroundMusicScene.durationSeconds,
+      promptSections: preferredDraft.backgroundMusicScene?.promptSections
+        ?? secondaryDraft.backgroundMusicScene?.promptSections
+        ?? defaultBackgroundMusicScene.promptSections,
+      selectedTrackId: preferredDraft.backgroundMusicScene?.selectedTrackId
+        ?? secondaryDraft.backgroundMusicScene?.selectedTrackId
+        ?? defaultBackgroundMusicScene.selectedTrackId,
+    },
+    sampleMode: {
+      text: preferredDraft.sampleMode?.text
+        ?? secondaryDraft.sampleMode?.text
+        ?? defaultSampleMode.text,
+      tts: preferredDraft.sampleMode?.tts
+        ?? secondaryDraft.sampleMode?.tts
+        ?? defaultSampleMode.tts,
+      backgroundMusic: preferredDraft.sampleMode?.backgroundMusic
+        ?? secondaryDraft.sampleMode?.backgroundMusic
+        ?? defaultSampleMode.backgroundMusic,
+      musicVideo: preferredDraft.sampleMode?.musicVideo
+        ?? secondaryDraft.sampleMode?.musicVideo
+        ?? defaultSampleMode.musicVideo,
+    },
+    completedSteps: {
+      step1: preferredDraft.completedSteps?.step1
+        ?? secondaryDraft.completedSteps?.step1
+        ?? defaultCompletedSteps.step1,
+      step2: preferredDraft.completedSteps?.step2
+        ?? secondaryDraft.completedSteps?.step2
+        ?? defaultCompletedSteps.step2,
+      step3: preferredDraft.completedSteps?.step3
+        ?? secondaryDraft.completedSteps?.step3
+        ?? defaultCompletedSteps.step3,
+      step4: preferredDraft.completedSteps?.step4
+        ?? secondaryDraft.completedSteps?.step4
+        ?? defaultCompletedSteps.step4,
+      step5: preferredDraft.completedSteps?.step5
+        ?? secondaryDraft.completedSteps?.step5
+        ?? defaultCompletedSteps.step5,
+    },
+    extractedCharacters: pickNonEmptyArray(preferredDraft.extractedCharacters, secondaryDraft.extractedCharacters),
+    styleImages: pickNonEmptyArray(preferredDraft.styleImages, secondaryDraft.styleImages),
+    characterImages: pickNonEmptyArray(preferredDraft.characterImages, secondaryDraft.characterImages),
+    selectedCharacterIds: pickNonEmptyArray(preferredDraft.selectedCharacterIds, secondaryDraft.selectedCharacterIds),
+    hasSelectedContentType: preferredDraft.hasSelectedContentType ?? secondaryDraft.hasSelectedContentType ?? false,
+    hasSelectedAspectRatio: preferredDraft.hasSelectedAspectRatio ?? secondaryDraft.hasSelectedAspectRatio ?? false,
+    selectedCharacterStyleId: preferredDraft.selectedCharacterStyleId ?? secondaryDraft.selectedCharacterStyleId ?? null,
+    selectedCharacterStyleLabel: pickString(preferredDraft.selectedCharacterStyleLabel, secondaryDraft.selectedCharacterStyleLabel),
+    selectedCharacterStylePrompt: pickString(preferredDraft.selectedCharacterStylePrompt, secondaryDraft.selectedCharacterStylePrompt),
+    selectedStyleImageId: preferredDraft.selectedStyleImageId ?? secondaryDraft.selectedStyleImageId ?? null,
+    promptTemplates: pickNonEmptyArray(preferredDraft.promptTemplates, secondaryDraft.promptTemplates),
+    selectedPromptTemplateId: preferredDraft.selectedPromptTemplateId || secondaryDraft.selectedPromptTemplateId || null,
+    updatedAt: Math.max(baseUpdatedAt, incomingUpdatedAt, Date.now()),
   };
+}
+
+function buildWorkflowDraftSignature(draft: WorkflowDraft) {
+  return JSON.stringify({
+    id: draft.id,
+    contentType: draft.contentType,
+    aspectRatio: draft.aspectRatio,
+    topic: draft.topic,
+    outputMode: draft.outputMode,
+    activeStage: draft.activeStage,
+    selections: draft.selections,
+    script: draft.script,
+    completedSteps: draft.completedSteps,
+    hasSelectedContentType: draft.hasSelectedContentType,
+    hasSelectedAspectRatio: draft.hasSelectedAspectRatio,
+    selectedCharacterIds: draft.selectedCharacterIds,
+    selectedCharacterStyleId: draft.selectedCharacterStyleId,
+    selectedCharacterStyleLabel: draft.selectedCharacterStyleLabel,
+    selectedCharacterStylePrompt: draft.selectedCharacterStylePrompt,
+    selectedStyleImageId: draft.selectedStyleImageId,
+    extractedCharacters: draft.extractedCharacters,
+    styleImages: draft.styleImages,
+    characterImages: draft.characterImages,
+    promptPack: draft.promptPack,
+    promptTemplates: draft.promptTemplates,
+    selectedPromptTemplateId: draft.selectedPromptTemplateId,
+    customScriptSettings: draft.customScriptSettings,
+    constitutionAnalysis: draft.constitutionAnalysis,
+    ttsProvider: draft.ttsProvider,
+    elevenLabsVoiceId: draft.elevenLabsVoiceId,
+    elevenLabsModelId: draft.elevenLabsModelId,
+    heygenVoiceId: draft.heygenVoiceId,
+    qwenVoicePreset: draft.qwenVoicePreset,
+    chatterboxVoicePreset: draft.chatterboxVoicePreset,
+    qwenStylePreset: draft.qwenStylePreset,
+    voiceReferenceName: draft.voiceReferenceName,
+    voiceReferenceMimeType: draft.voiceReferenceMimeType,
+    referenceImages: draft.referenceImages,
+  });
 }
 
 const resolveBasePath = (pathname?: string | null) => {
@@ -488,6 +668,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
         updatedAt: Date.now(),
       });
       pendingWorkflowDraftRef.current = null;
+      lastWorkflowDraftSignatureRef.current = buildWorkflowDraftSignature(pendingDraft);
       setStudioState(nextState);
     } catch (error) {
       console.error('[mp4Creater] workflow draft save failed', error);
@@ -918,11 +1099,17 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
     setStudioState(nextState);
 
     if (mergedWorkflowDraft) {
-      pendingWorkflowDraftRef.current = mergedWorkflowDraft;
-      if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
-      workflowDraftSaveTimerRef.current = window.setTimeout(() => {
-        void commitPendingWorkflowDraft();
-      }, 180);
+      const mergedDraftSignature = buildWorkflowDraftSignature(mergedWorkflowDraft);
+      const currentDraftSignature = sameProjectDraft ? buildWorkflowDraftSignature(sameProjectDraft) : '';
+      lastWorkflowDraftSignatureRef.current = mergedDraftSignature;
+
+      if (mergedDraftSignature !== currentDraftSignature) {
+        pendingWorkflowDraftRef.current = mergedWorkflowDraft;
+        if (workflowDraftSaveTimerRef.current) window.clearTimeout(workflowDraftSaveTimerRef.current);
+        workflowDraftSaveTimerRef.current = window.setTimeout(() => {
+          void commitPendingWorkflowDraft();
+        }, 180);
+      }
     }
   }, [commitPendingWorkflowDraft, currentProjectId]);
 
@@ -1060,29 +1247,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
       ...draftPatch,
       updatedAt: Date.now(),
     };
-    const draftSignature = JSON.stringify({
-      id: nextDraft.id,
-      contentType: nextDraft.contentType,
-      aspectRatio: nextDraft.aspectRatio,
-      topic: nextDraft.topic,
-      activeStage: nextDraft.activeStage,
-      updatedAt: nextDraft.updatedAt,
-      selectedCharacterIds: nextDraft.selectedCharacterIds,
-      selectedStyleImageId: nextDraft.selectedStyleImageId,
-      script: nextDraft.script,
-      completedSteps: nextDraft.completedSteps,
-      extractedCharacters: nextDraft.extractedCharacters,
-      styleImages: nextDraft.styleImages,
-      promptTemplates: nextDraft.promptTemplates,
-      selectedPromptTemplateId: nextDraft.selectedPromptTemplateId,
-      ttsProvider: nextDraft.ttsProvider,
-      elevenLabsVoiceId: nextDraft.elevenLabsVoiceId,
-      elevenLabsModelId: nextDraft.elevenLabsModelId,
-      heygenVoiceId: nextDraft.heygenVoiceId,
-      qwenVoicePreset: nextDraft.qwenVoicePreset,
-      chatterboxVoicePreset: nextDraft.chatterboxVoicePreset,
-      qwenStylePreset: nextDraft.qwenStylePreset,
-    });
+    const draftSignature = buildWorkflowDraftSignature(nextDraft);
 
     if (lastWorkflowDraftSignatureRef.current === draftSignature) return;
     lastWorkflowDraftSignatureRef.current = draftSignature;
