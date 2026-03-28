@@ -26,14 +26,23 @@ jobs:
         run: |
           backend_id="${{ github.event.inputs.backend_id }}"
           if [ -z "$backend_id" ]; then
+            backend_id="${{ vars.FIREBASE_APPHOSTING_BACKEND_ID }}"
+          fi
+          if [ -z "$backend_id" ]; then
             backend_id="${{ secrets.FIREBASE_APPHOSTING_BACKEND_ID }}"
           fi
           if [ -z "$backend_id" ]; then
-            echo "Set FIREBASE_APPHOSTING_BACKEND_ID or provide backend_id when running this workflow manually."
-            exit 1
+            if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+              echo "::error::Set FIREBASE_APPHOSTING_BACKEND_ID secret or variable, or provide backend_id when running this workflow manually."
+              exit 1
+            fi
+            echo "::warning::Skipping Firebase App Hosting deploy because FIREBASE_APPHOSTING_BACKEND_ID is not configured."
+            echo "skip_deploy=true" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
           echo "backend_id=$backend_id" >> "$GITHUB_OUTPUT"
       - name: Write Firebase service account
+        if: steps.backend.outputs.skip_deploy != 'true'
         shell: bash
         env:
           FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_GORHROD_CODEX }}
@@ -45,6 +54,7 @@ jobs:
           printf '%s' "$FIREBASE_SERVICE_ACCOUNT_JSON" > "$RUNNER_TEMP/firebase-service-account.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-service-account.json" >> "$GITHUB_ENV"
       - run: npm run deploy:firebase -- --non-interactive
+        if: steps.backend.outputs.skip_deploy != 'true'
         env:
           FIREBASE_PROJECT_ID: gorhrod-codex
           FIREBASE_APPHOSTING_BACKEND_ID: ${{ steps.backend.outputs.backend_id }}
