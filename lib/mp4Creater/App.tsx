@@ -1395,7 +1395,7 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
           void refreshProjects({ silent: true });
         })
         .catch((saveError) => {
-          console.error('[mp4Creater] scene studio background save failed', saveError);
+          console.warn('[mp4Creater] scene bootstrap save skipped', saveError);
         });
 
       router.push(`${basePath}/step-6?projectId=${encodeURIComponent(optimisticSceneProject.id)}`, { scroll: true });

@@ -9,7 +9,8 @@ import { SavedProject, GeneratedAsset, CostBreakdown, BackgroundMusicPromptSecti
 import { buildProjectSettingsSnapshot } from './projectSettingsSnapshot';
 import { compactWorkflowDraftForStorage } from './workflowDraftService';
 import { deleteStudioProjects, fetchStudioProjectById, fetchStudioProjects, getCachedStudioState, saveProjectsToStudio, saveStudioProject, summarizeProjectForIndex } from './localFileApi';
-import { buildSceneStudioSnapshotPayload, writeSceneStudioSnapshot } from './sceneStudioSnapshotCache';
+import { buildSceneStudioSnapshotPayload, clearSceneStudioSnapshot, writeSceneStudioSnapshot } from './sceneStudioSnapshotCache';
+import { clearProjectNavigationProject } from './projectNavigationCache';
 
 const DB_NAME = 'TubeGenAI';
 const DB_VERSION = 2;
@@ -21,6 +22,48 @@ const STUDIO_SYNC_DEBOUNCE_MS = 120;
 let pendingStudioSyncProjects: SavedProject[] | null = null;
 let studioSyncTimer: ReturnType<typeof setTimeout> | null = null;
 let studioSyncInFlight = false;
+
+const PROJECT_DELETE_GUARD_TTL_MS = 30_000;
+const projectDeleteGuardExpiresById = new Map<string, number>();
+
+function pruneProjectDeleteGuards(now = Date.now()) {
+  projectDeleteGuardExpiresById.forEach((expiresAt, projectId) => {
+    if (!projectId || expiresAt <= now) {
+      projectDeleteGuardExpiresById.delete(projectId);
+    }
+  });
+}
+
+function markProjectsAsRecentlyDeleted(projectIds: string[]) {
+  if (!Array.isArray(projectIds) || !projectIds.length) return;
+  const expiresAt = Date.now() + PROJECT_DELETE_GUARD_TTL_MS;
+  projectIds.forEach((projectId) => {
+    if (!projectId) return;
+    projectDeleteGuardExpiresById.set(projectId, expiresAt);
+  });
+  pruneProjectDeleteGuards();
+}
+
+function isProjectRecentlyDeleted(projectId?: string | null) {
+  if (!projectId) return false;
+  pruneProjectDeleteGuards();
+  const expiresAt = projectDeleteGuardExpiresById.get(projectId);
+  return typeof expiresAt === 'number' && expiresAt > Date.now();
+}
+
+function filterRecentlyDeletedProjects(projects: SavedProject[] = []) {
+  pruneProjectDeleteGuards();
+  return projects.filter((project) => !isProjectRecentlyDeleted(project?.id));
+}
+
+function clearDeletedProjectRuntimeCaches(projectIds: string[]) {
+  if (!Array.isArray(projectIds) || !projectIds.length) return;
+  projectIds.forEach((projectId) => {
+    if (!projectId) return;
+    clearSceneStudioSnapshot(projectId);
+    clearProjectNavigationProject(projectId);
+  });
+}
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -477,7 +520,21 @@ async function syncProjectsAcrossStorage(
   projects: SavedProject[],
   options?: { immediateStudioSync?: boolean; changedProjects?: SavedProject[]; removedProjectIds?: string[] }
 ): Promise<void> {
-  await writeIndexedProjects(projects);
+  const removedProjectIds = Array.isArray(options?.removedProjectIds)
+    ? Array.from(new Set(options.removedProjectIds.filter(Boolean)))
+    : [];
+
+  if (removedProjectIds.length) {
+    markProjectsAsRecentlyDeleted(removedProjectIds);
+    clearDeletedProjectRuntimeCaches(removedProjectIds);
+  }
+
+  const safeProjects = filterRecentlyDeletedProjects(projects);
+  const safeChangedProjects = Array.isArray(options?.changedProjects)
+    ? filterRecentlyDeletedProjects(options.changedProjects)
+    : [];
+
+  await writeIndexedProjects(safeProjects);
 
   if (options?.immediateStudioSync) {
     pendingStudioSyncProjects = null;
@@ -492,12 +549,12 @@ async function syncProjectsAcrossStorage(
     }
 
     try {
-      const syncTasks: Promise<unknown>[] = [saveProjectsToStudio(projects)];
-      if (Array.isArray(options?.changedProjects) && options.changedProjects.length) {
-        syncTasks.push(Promise.all(options.changedProjects.map((project) => saveStudioProject(project))));
+      const syncTasks: Promise<unknown>[] = [saveProjectsToStudio(safeProjects)];
+      if (safeChangedProjects.length) {
+        syncTasks.push(Promise.all(safeChangedProjects.map((project) => saveStudioProject(project))));
       }
-      if (Array.isArray(options?.removedProjectIds) && options.removedProjectIds.length) {
-        syncTasks.push(deleteStudioProjects(options.removedProjectIds));
+      if (removedProjectIds.length) {
+        syncTasks.push(deleteStudioProjects(removedProjectIds));
       }
       await Promise.all(syncTasks);
     } catch (error) {
@@ -506,7 +563,7 @@ async function syncProjectsAcrossStorage(
     return;
   }
 
-  scheduleStudioSync(projects);
+  scheduleStudioSync(safeProjects);
 }
 
 function mergeProjectsForStudioSync(updatedProject: SavedProject, fallbackProjects?: SavedProject[]) {
@@ -703,13 +760,13 @@ async function readIndexedProjectById(id: string): Promise<SavedProject | null> 
 }
 
 async function readProjectsForMutation(): Promise<SavedProject[]> {
-  const indexed = await readIndexedProjectDetails();
+  const indexed = filterRecentlyDeletedProjects(await readIndexedProjectDetails());
   if (indexed.length) {
     return indexed;
   }
 
   const cachedProjects = Array.isArray(getCachedStudioState()?.projects)
-    ? getCachedStudioState()!.projects.map(normalizeProject)
+    ? filterRecentlyDeletedProjects(getCachedStudioState()!.projects.map(normalizeProject))
     : [];
 
   return cachedProjects.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -761,6 +818,9 @@ export async function saveProject(
   }
 ): Promise<SavedProject> {
   const id = extras?.projectId?.trim() || `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  if (isProjectRecentlyDeleted(id)) {
+    throw new Error('삭제된 프로젝트는 자동 저장으로 다시 복구하지 않습니다.');
+  }
   const now = Date.now();
   let thumbnail: string | null = null;
   const firstImageAsset = assets.find(a => a.imageData);
@@ -989,6 +1049,8 @@ export async function updateProject(
   id: string,
   patch: Partial<SavedProject>
 ): Promise<SavedProject | null> {
+  if (isProjectRecentlyDeleted(id)) return null;
+
   const target = await readIndexedProjectById(id);
   if (!target) return null;
 
@@ -1039,11 +1101,11 @@ export async function updateProject(
 
 
 export async function getSavedProjects(options?: { forceSync?: boolean; localOnly?: boolean }): Promise<SavedProject[]> {
-  const indexed = await readIndexedProjectSummaries();
-  const indexedDetails = options?.forceSync ? await readIndexedProjectDetails() : [];
+  const indexed = filterRecentlyDeletedProjects(await readIndexedProjectSummaries());
+  const indexedDetails = options?.forceSync ? filterRecentlyDeletedProjects(await readIndexedProjectDetails()) : [];
   const cachedState = getCachedStudioState();
   const cachedProjects = Array.isArray(cachedState?.projects)
-    ? cachedState.projects.map(summarizeProjectForIndex).sort((a, b) => b.createdAt - a.createdAt)
+    ? filterRecentlyDeletedProjects(cachedState.projects.map(summarizeProjectForIndex)).sort((a, b) => b.createdAt - a.createdAt)
     : [];
 
   const localProjects = indexed.length ? indexed : mergeSavedProjects(indexed, cachedProjects);
@@ -1062,7 +1124,7 @@ export async function getSavedProjects(options?: { forceSync?: boolean; localOnl
   }
 
   try {
-    const projects = (await fetchStudioProjects()).map(normalizeProject).sort((a, b) => b.createdAt - a.createdAt);
+    const projects = filterRecentlyDeletedProjects((await fetchStudioProjects()).map(normalizeProject)).sort((a, b) => b.createdAt - a.createdAt);
     const remoteExists = projects.length > 0;
     if (remoteExists || options?.forceSync) {
       const mergedRemote = mergeSavedProjects(indexedDetails.length ? indexedDetails : indexed, projects);
@@ -1075,6 +1137,8 @@ export async function getSavedProjects(options?: { forceSync?: boolean; localOnl
 }
 
 export async function getProjectById(id: string, options?: { forceSync?: boolean; localOnly?: boolean }): Promise<SavedProject | null> {
+  if (isProjectRecentlyDeleted(id)) return null;
+
   const direct = await readIndexedProjectById(id);
   const hasDirectDetail = hasDetailedProjectPayload(direct);
   if (direct && !options?.forceSync && hasDirectDetail) return direct;
