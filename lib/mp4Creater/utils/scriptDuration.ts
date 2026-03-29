@@ -1,6 +1,6 @@
 import { ContentType } from '../types';
 
-const SHORT_FORM_DURATION_PRESETS = [10 / 60, 30 / 60, 45 / 60] as const;
+const SHORT_FORM_DURATION_PRESETS = [15 / 60, 30 / 60, 45 / 60] as const;
 const LONG_FORM_DURATION_PRESETS = [1, 3, 5, 10, 15, 20, 30] as const;
 
 export const SCRIPT_DURATION_PRESETS = [
@@ -8,6 +8,7 @@ export const SCRIPT_DURATION_PRESETS = [
   ...LONG_FORM_DURATION_PRESETS,
 ] as const;
 
+const DEFAULT_EXPECTED_DURATION_MINUTES = 30 / 60;
 const MIN_EXPECTED_DURATION_MINUTES = SHORT_FORM_DURATION_PRESETS[0];
 const MAX_EXPECTED_DURATION_MINUTES = LONG_FORM_DURATION_PRESETS[LONG_FORM_DURATION_PRESETS.length - 1];
 
@@ -19,7 +20,7 @@ function getNearestShortFormDuration(value: number) {
 
 export function normalizeExpectedDurationMinutes(value?: number | null) {
   const numericValue = Number(value);
-  if (!Number.isFinite(numericValue)) return 1;
+  if (!Number.isFinite(numericValue)) return DEFAULT_EXPECTED_DURATION_MINUTES;
 
   if (numericValue < 1) {
     const clamped = Math.max(MIN_EXPECTED_DURATION_MINUTES, Math.min(1, numericValue));
@@ -30,7 +31,7 @@ export function normalizeExpectedDurationMinutes(value?: number | null) {
 }
 
 export function getExpectedDurationSeconds(value?: number | null) {
-  return Math.max(10, Math.round(normalizeExpectedDurationMinutes(value) * 60));
+  return Math.max(15, Math.round(normalizeExpectedDurationMinutes(value) * 60));
 }
 
 export function formatExpectedDurationLabel(value?: number | null) {

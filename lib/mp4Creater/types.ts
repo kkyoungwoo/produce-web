@@ -212,6 +212,8 @@ export interface BackgroundMusicTrack {
   requestedDuration?: number | null;
   promptSections?: BackgroundMusicPromptSections | null;
   parentTrackId?: string | null;
+  timelineStartSeconds?: number | null;
+  timelineEndSeconds?: number | null;
 }
 
 export interface BackgroundMusicSceneConfig {
@@ -649,6 +651,134 @@ export interface PreviewMixSettings {
   backgroundMusicVolume: number;
 }
 
+export type TimelineSnapMode = 'frame' | 'beat' | 'scene' | 'off';
+export type TimelineTrackKind = 'scene' | 'visual' | 'narration' | 'cast' | 'lyric' | 'bgm' | 'subtitle' | 'overlay';
+
+export interface TimelineRangeSelection {
+  startMs: number;
+  endMs: number;
+}
+
+export interface TimelineTrack {
+  id: string;
+  kind: TimelineTrackKind;
+  title: string;
+  order: number;
+  locked: boolean;
+  muted: boolean;
+  height: number;
+  laneGroup?: string | null;
+}
+
+export interface TimelineClip {
+  id: string;
+  trackId: string;
+  sceneId: string | null;
+  segmentId: string | null;
+  assetId: string | null;
+  startMs: number;
+  endMs: number;
+  trimInMs: number;
+  trimOutMs: number;
+  draggable: boolean;
+  trimmable: boolean;
+  splittable: boolean;
+  resizable: boolean;
+  linkedClipIds: string[];
+  locked: boolean;
+  role?: 'narrator' | 'dialogue' | 'lyric' | 'caption' | 'bgm' | 'scene';
+}
+
+export interface TimelineStateV2 {
+  tracks: TimelineTrack[];
+  clips: TimelineClip[];
+  playheadMs: number;
+  zoomLevel: number;
+  snapMode: TimelineSnapMode;
+  rippleMode: boolean;
+  selectedClipIds: string[];
+  selectedTrackId: string | null;
+  rangeSelection: TimelineRangeSelection | null;
+  scrollLeftPx: number;
+  scrollTopPx: number;
+}
+
+export interface ScriptSegmentV1 {
+  id: string;
+  role: 'narrator' | 'dialogue' | 'lyric' | 'caption' | 'sfx';
+  text: string;
+  estimatedDurationMs: number;
+  beatIndex?: number | null;
+  minuteBlockIndex?: number | null;
+  sceneHint?: string | null;
+  speakerId?: string | null;
+}
+
+export interface ScriptDocumentV1 {
+  runtimeMode: 'per-second' | 'per-minute';
+  targetDurationSeconds: number;
+  plannerSummary: Record<string, unknown>;
+  segments: ScriptSegmentV1[];
+}
+
+export interface MusicStateV2 {
+  activeTrackId: string | null;
+  trackIds: string[];
+  previewMix: PreviewMixSettings | null;
+}
+
+export interface SubtitleStateV2 {
+  enabled: boolean;
+  subtitlePreset: SubtitlePresetState | null;
+}
+
+export interface EditorStateV2 {
+  selectedClipIds: string[];
+  selectedTrackId: string | null;
+  playheadMs: number;
+  zoomLevel: number;
+  rangeSelection: TimelineRangeSelection | null;
+  scrollLeftPx: number;
+  scrollTopPx: number;
+  openedInspectorTab?: 'scene' | 'timeline' | 'subtitle' | 'thumbnail' | 'asset';
+}
+
+export interface ContinuityStateV1 {
+  sourceProjectId?: string | null;
+  continuationMode?: string | null;
+  inheritedStylePackIds?: string[];
+  inheritedCharacterPackIds?: string[];
+}
+
+export interface ProjectMetadataV4 {
+  id: string;
+  schemaVersion: 4;
+  name: string;
+  projectNumber: number;
+  createdAt: number;
+  updatedAt: number;
+  activeStep: number;
+  aspectRatio: '16:9' | '9:16' | '1:1';
+  runtimeMode: 'per-second' | 'per-minute';
+  estimatedDurationSeconds: number;
+  sceneCount: number;
+  status: 'draft' | 'ready' | 'rendering' | 'done' | 'error';
+  thumbnailAssetId?: string | null;
+}
+
+export interface ProjectWorkfileV4 {
+  projectId: string;
+  scriptDocument: ScriptDocumentV1;
+  sceneDocument: {
+    sceneIds: string[];
+  };
+  timelineState: TimelineStateV2;
+  musicState: MusicStateV2;
+  subtitleState: SubtitleStateV2;
+  editorState: EditorStateV2;
+  continuityState: ContinuityStateV1;
+  derivationMeta?: Record<string, unknown> | null;
+}
 
 export interface SavedProject {
   id: string;
@@ -729,6 +859,8 @@ export interface SavedProject {
   youtubeTags?: string[];
   isShortsEligible?: boolean;
   uploadErrorMessage?: string | null;
+  metadataV4?: ProjectMetadataV4 | null;
+  workfileV4?: ProjectWorkfileV4 | null;
 }
 
 export type AiTaskKind =

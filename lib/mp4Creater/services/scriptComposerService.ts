@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { translatePromptToEnglish } from './promptTranslationService';
 import { buildSelectableStoryDraft, formatStoryTextForEditor, normalizeStoryText } from '../utils/storyHelpers';
+import { formatExpectedDurationEnglish, formatExpectedDurationLabel, getRecommendedParagraphCount as getDurationRecommendedParagraphCount, normalizeExpectedDurationMinutes } from '../utils/scriptDuration';
 import { runTextAi } from './textAiService';
 import { getPromptRegistry } from './promptRegistryService';
 import { buildCreativeDirectionBlock, createCreativeDirection } from '../config/creativeVariance';
@@ -85,7 +86,7 @@ function pickSample<T>(items: T[], random: () => number): T {
 }
 
 function getScriptCharacterRange(contentType: ContentType, minutes: number) {
-  const safeMinutes = Math.max(1, Math.min(30, Math.round(minutes || 1)));
+  const safeMinutes = normalizeExpectedDurationMinutes(minutes);
   const range = SCRIPT_CHARACTER_RANGE_BY_TYPE[contentType] || SCRIPT_CHARACTER_RANGE_BY_TYPE.story;
   return {
     min: safeMinutes * range.min,
@@ -204,8 +205,8 @@ function createNoAiModelSampleScript(options: ScriptComposerOptions) {
   const conflict = options.selections.conflict || '아직 정리되지 않은 문제';
   const mood = options.selections.mood || '몰입감 있는';
   const endingTone = options.selections.endingTone || '잔잔한 여운';
-  const minutes = Math.max(1, Math.min(12, Math.round(options.customSettings?.expectedDurationMinutes || 1)));
-  const paragraphCount = Math.max(3, Math.min(10, Math.round(minutes * 1.4)));
+  const minutes = normalizeExpectedDurationMinutes(options.customSettings?.expectedDurationMinutes);
+  const paragraphCount = Math.max(2, Math.min(10, getDurationRecommendedParagraphCount(options.contentType, minutes)));
   const random = createSeededRandom([
     'no-ai-model',
     options.contentType,
@@ -422,8 +423,7 @@ function createDialogueFallback(topic: string, selections: StorySelectionState, 
 }
 
 function formatDuration(minutes: number) {
-  const safeMinutes = Math.max(1, Math.min(30, Math.round(minutes || 1)));
-  return `${safeMinutes} minute${safeMinutes > 1 ? 's' : ''}`;
+  return formatExpectedDurationEnglish(minutes);
 }
 
 function buildCharacterRangeGuide(options: ScriptComposerOptions) {
@@ -496,10 +496,11 @@ function buildConceptLockGuide(options: ScriptComposerOptions) {
 }
 
 function buildParagraphCountGuide(options: ScriptComposerOptions) {
-  const minutes = Math.max(1, Math.min(30, Math.round(options.customSettings?.expectedDurationMinutes || 1)));
+  const minutes = normalizeExpectedDurationMinutes(options.customSettings?.expectedDurationMinutes);
+  const recommendedCount = getDurationRecommendedParagraphCount(options.contentType, minutes);
   const baseCount = Math.max(
-    options.contentType === 'music_video' ? 4 : 3,
-    Math.min(options.contentType === 'music_video' ? 16 : 18, Math.round(minutes * 1.2)),
+    options.contentType === 'music_video' ? 2 : 2,
+    Math.min(options.contentType === 'music_video' ? 16 : 18, recommendedCount),
   );
   const minParagraphs = Math.max(options.contentType === 'music_video' ? 4 : 3, baseCount - 1);
   const maxParagraphs = Math.max(minParagraphs, Math.min(options.contentType === 'music_video' ? 18 : 20, baseCount + 1));
@@ -715,20 +716,22 @@ function buildLocalizedGuide(options: ScriptComposerOptions) {
   const settings = options.customSettings;
   if (!settings) return [] as string[];
 
-  const duration = Math.max(1, Math.min(30, Math.round(settings.expectedDurationMinutes || 1)));
+  const duration = normalizeExpectedDurationMinutes(settings.expectedDurationMinutes);
+  const durationLabelKo = formatExpectedDurationLabel(duration);
+  const durationLabelEn = formatExpectedDurationEnglish(duration);
   const topic = options.topic || 'Auto-generated topic';
   const reference = settings.referenceText?.trim();
   const speechStyle = resolveSpeechStyle(settings.speechStyle);
   const languageGuides: Record<CustomScriptSettings['language'], string[]> = {
     ko: [
-      `이 대본은 약 ${duration}분 분량을 목표로 합니다. 주제는 ${topic}이고 분위기는 ${options.selections.mood}, 배경은 ${options.selections.setting}입니다.`,
+      `이 대본은 약 ${durationLabelKo} 분량을 목표로 합니다. 주제는 ${topic}이고 분위기는 ${options.selections.mood}, 배경은 ${options.selections.setting}입니다.`,
       settings.language === 'mute'
         ? '무음 영상용 구성으로 작성하고 내레이션이나 대사는 넣지 않습니다. 화면 자막과 행동 흐름 중심으로 정리합니다.'
         : `말투는 ${formatSpeechStyleLabel(settings.speechStyle)}를 유지합니다.`,
       reference ? `참고 내용은 ${reference}${speechStyle === 'da' ? '를 반영한다.' : speechStyle === 'eum' ? ' 반영 바람.' : '를 반영해 주세요.'}` : '',
     ],
     en: [
-      `This script targets about ${formatDuration(duration)}. The topic is ${topic}, with a ${options.selections.mood} mood in ${options.selections.setting}.`,
+      `This script targets about ${durationLabelEn}. The topic is ${topic}, with a ${options.selections.mood} mood in ${options.selections.setting}.`,
       settings.language === 'mute'
         ? 'Create a silent visual script with no spoken dialogue or narration. Use scene actions and on-screen caption cues only.'
         : `Keep the speech style ${speechStyle === 'default' ? 'natural screenplay dialogue' : speechStyle === 'da' ? 'declarative' : speechStyle === 'eum' ? 'terse informal fragment style' : 'polite conversational'}.`,
@@ -759,7 +762,7 @@ function buildLocalizedGuide(options: ScriptComposerOptions) {
       reference ? `Tayanch matn: ${reference}` : '',
     ],
     mute: [
-      `이 구성안은 약 ${duration}분 분량의 무음 영상용입니다. 주제는 ${topic}이고 분위기는 ${options.selections.mood}, 배경은 ${options.selections.setting}입니다.`,
+      `이 구성안은 약 ${durationLabelKo} 분량의 무음 영상용입니다. 주제는 ${topic}이고 분위기는 ${options.selections.mood}, 배경은 ${options.selections.setting}입니다.`,
       '내레이션과 대사는 쓰지 말고 장면 설명, 화면 자막, 행동 흐름 중심으로 구성합니다.',
       reference ? `참고 내용은 ${reference}를 반영합니다.` : '',
     ],
@@ -777,7 +780,7 @@ function applyCustomFallback(baseText: string, options: ScriptComposerOptions) {
     .map((item) => item.trim())
     .filter(Boolean);
   const fillers = buildLengthPaddingParagraphs(options);
-  const targetParagraphCount = Math.max(3, Math.min(36, Math.round((settings.expectedDurationMinutes || 1) * 1.2)));
+  const targetParagraphCount = Math.max(2, Math.min(36, getDurationRecommendedParagraphCount(options.contentType, settings.expectedDurationMinutes)));
   const cloned = [...paragraphs];
   let fillerIndex = 0;
 
@@ -993,7 +996,7 @@ function ensureParagraphVideoScript(raw: string, options: ScriptComposerOptions)
     }
   }
 
-  const fallbackTarget = Math.max(3, Math.min(12, Math.round((options.customSettings?.expectedDurationMinutes || 1) * 1.2)));
+  const fallbackTarget = Math.max(2, Math.min(12, getDurationRecommendedParagraphCount(options.contentType, options.customSettings?.expectedDurationMinutes)));
   return normalizeStoryText(chunkSentencesForVideoScript(lines.join(' ') || cleaned, fallbackTarget).join('\n\n'));
 }
 
@@ -1178,7 +1181,7 @@ function buildScriptRequestMarkdown(
       ['Lead', options.selections.protagonist],
       ['Conflict', options.selections.conflict],
       ['Ending Tone', options.selections.endingTone],
-      ['Expected Duration', `${Math.max(1, Math.min(30, options.customSettings?.expectedDurationMinutes || 1))} minute(s)`],
+      ['Expected Duration', formatExpectedDurationEnglish(options.customSettings?.expectedDurationMinutes)],
       ['Script Language', formatScriptLanguageEnglish(options.customSettings?.language)],
       ['Speech Style', formatSpeechStyleEnglish(options.customSettings?.speechStyle)],
       ['Prompt Template', options.template.name],
@@ -1217,7 +1220,7 @@ function buildConstitutionUserPayload(options: ScriptComposerOptions) {
     `주인공/화자: ${options.selections.protagonist}`,
     `핵심 갈등: ${options.selections.conflict}`,
     `결말 톤: ${options.selections.endingTone}`,
-    `예상 길이: ${Math.max(1, Math.min(30, options.customSettings?.expectedDurationMinutes || 1))}분`,
+    `예상 길이: ${formatExpectedDurationLabel(options.customSettings?.expectedDurationMinutes)}`,
     `대본 언어: ${formatScriptLanguageLabel(options.customSettings?.language)}`,
     `선호 말투: ${formatSpeechStyleLabel(options.customSettings?.speechStyle)}`,
     `생성 작업: ${buildGenerationIntentGuide(options)}`,
@@ -1294,7 +1297,7 @@ Generation task: ${buildGenerationIntentGuide(options)}
 Concept lock guide: ${buildConceptLockGuide(options)}
 Paragraph structure guide: ${buildParagraphCountGuide(options)}
 Output format reminder: ${buildOutputFormatReminder(options)}
-Expected duration: ${options.customSettings?.expectedDurationMinutes || 1} minutes
+Expected duration: ${formatExpectedDurationEnglish(options.customSettings?.expectedDurationMinutes)}
 Preferred speech style: ${formatSpeechStyleEnglish(options.customSettings?.speechStyle)}
 Script language: ${formatScriptLanguageEnglish(options.customSettings?.language)}
 Character range guide: ${buildCharacterRangeGuide(options)}

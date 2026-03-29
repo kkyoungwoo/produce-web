@@ -16,6 +16,7 @@ import {
   getQwenVoicePickerOptions,
   getScriptModelPickerOptions,
 } from '../../../services/aiOptionCatalog';
+import { normalizeExpectedDurationMinutes } from '../../../utils/scriptDuration';
 
 interface Step3PanelProps {
   contentType: ContentType;
@@ -122,10 +123,10 @@ const SCRIPT_CHARACTER_RANGE_BY_TYPE: Record<ContentType, { min: number; max: nu
 };
 
 function formatRecommendedCharacterRange(contentType: ContentType, minutes: number) {
-  const safeMinutes = Math.max(1, Number.isFinite(minutes) ? Math.round(minutes) : 1);
+  const safeMinutes = normalizeExpectedDurationMinutes(minutes);
   const range = SCRIPT_CHARACTER_RANGE_BY_TYPE[contentType] || SCRIPT_CHARACTER_RANGE_BY_TYPE.story;
-  const min = safeMinutes * range.min;
-  const max = safeMinutes * range.max;
+  const min = Math.round(safeMinutes * range.min);
+  const max = Math.round(safeMinutes * range.max);
   return {
     min,
     max,

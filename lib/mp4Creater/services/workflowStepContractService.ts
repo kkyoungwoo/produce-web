@@ -13,6 +13,7 @@ import {
 import { createLightweightSceneAssetsFromDraft } from './sceneAssemblyService';
 import { DEFAULT_SELECTIONS } from './workflowDraftService';
 import { splitStoryIntoParagraphScenes } from '../utils/storyHelpers';
+import { getRecommendedParagraphCount as getDurationRecommendedParagraphCount, normalizeExpectedDurationMinutes } from '../utils/scriptDuration';
 import { buildBackgroundMusicPromptSections, combineBackgroundMusicPromptSections } from './musicService';
 
 export const SCRIPT_CHARS_PER_MINUTE_BY_CONTENT_TYPE: Record<ContentType, number> = {
@@ -23,15 +24,11 @@ export const SCRIPT_CHARS_PER_MINUTE_BY_CONTENT_TYPE: Record<ContentType, number
 };
 
 function normalizeDurationMinutes(value?: number | null) {
-  return Math.max(1, Math.min(30, Math.round(Number(value || 1))));
+  return normalizeExpectedDurationMinutes(value);
 }
 
 function normalizeParagraphRecommendation(contentType: ContentType, minutes: number) {
-  const safeMinutes = normalizeDurationMinutes(minutes);
-  if (contentType === 'music_video') return Math.max(4, Math.min(24, safeMinutes * 4));
-  if (contentType === 'info_delivery') return Math.max(3, Math.min(18, Math.round(safeMinutes * 1.5)));
-  if (contentType === 'cinematic') return Math.max(3, Math.min(15, Math.round(safeMinutes * 1.2)));
-  return Math.max(3, Math.min(15, Math.round(safeMinutes * 1.3)));
+  return getDurationRecommendedParagraphCount(contentType, minutes);
 }
 
 function countScenesFromScript(script: string) {
@@ -319,7 +316,7 @@ export function getCharsPerMinuteByContentType(contentType: ContentType) {
 }
 
 export function getRecommendedCharacterCount(contentType: ContentType, expectedDurationMinutes?: number | null) {
-  return getCharsPerMinuteByContentType(contentType) * normalizeDurationMinutes(expectedDurationMinutes);
+  return Math.round(getCharsPerMinuteByContentType(contentType) * normalizeDurationMinutes(expectedDurationMinutes));
 }
 
 export function getRecommendedParagraphCount(contentType: ContentType, expectedDurationMinutes?: number | null) {

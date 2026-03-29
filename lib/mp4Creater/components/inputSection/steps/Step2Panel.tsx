@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ScriptLanguageOption, ScriptSpeechStyle } from '../../../types';
+import { formatExpectedDurationLabel } from '../../../utils/scriptDuration';
 
 interface Step2PanelProps {
   topic: string;
@@ -29,8 +30,21 @@ const SCRIPT_LANGUAGE_OPTIONS: Array<{ value: ScriptLanguageOption; label: strin
   { value: 'uz', label: '우즈베크어', flag: '🇺🇿', hint: '우즈베크어 리듬 반영' },
 ];
 
-const QUICK_DURATION_OPTIONS = [1, 3, 5, 10, 15] as const;
-const DURATION_MARK_OPTIONS = [1, 3, 5, 8, 10, 15, 20, 25, 30] as const;
+const QUICK_DURATION_OPTIONS = [15 / 60, 30 / 60, 45 / 60] as const;
+const LONG_FORM_DURATION_OPTIONS = [1, 3, 5, 10, 15, 20, 30] as const;
+
+const DURATION_OPTION_ITEMS = [
+  ...QUICK_DURATION_OPTIONS.map((value) => ({
+    value,
+    label: formatExpectedDurationLabel(value),
+    hint: value <= 0.25 ? 'Shorts preset · 가장 압축적인 훅 중심 구성' : value <= 0.5 ? 'Shorts preset · 가장 무난한 쇼츠 호흡' : 'Shorts preset · 조금 더 서사와 설명을 담는 구성',
+  })),
+  ...LONG_FORM_DURATION_OPTIONS.map((value) => ({
+    value,
+    label: formatExpectedDurationLabel(value),
+    hint: value === 1 ? 'Long-form preset · 짧은 설명형' : value <= 5 ? 'Long-form preset · 기본 정보형' : value <= 15 ? 'Long-form preset · 본격 전개형' : 'Long-form preset · 긴 설명 / 리뷰형',
+  })),
+] as const;
 
 const SPEECH_STYLE_OPTIONS: Array<{ value: ScriptSpeechStyle; label: string; hint: string }> = [
   { value: 'default', label: '기본', hint: '가장 무난한 기본 대화체' },
@@ -316,14 +330,14 @@ function CompactOption({
       data-no-drag="true"
       data-option-index={index}
       onClick={onClick}
-      className={`${minWidth} shrink-0 snap-start rounded-[18px] border px-3 py-2.5 text-left transition-all duration-300 ${
+      className={`${minWidth} min-h-[76px] shrink-0 snap-start rounded-[18px] border px-3 py-3 text-left transition-all duration-300 ${
         active ? 'border-violet-400 bg-violet-50 ring-2 ring-violet-200' : 'border-slate-200 bg-white hover:bg-slate-50'
       }`}
     >
       <div className="flex items-start gap-2.5">
         {leading ? <div className="pt-0.5 text-lg leading-none">{leading}</div> : null}
         <div className="min-w-0">
-          <div className={`text-[13px] font-black ${active ? 'text-violet-700' : 'text-slate-900'}`}>{title}</div>
+          <div className={`text-sm font-black ${active ? 'text-violet-700' : 'text-slate-900'}`}>{title}</div>
           {subtitle ? <div className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{subtitle}</div> : null}
         </div>
       </div>
@@ -437,26 +451,28 @@ export default function Step2Panel({
         <div className="mt-4 grid gap-3 xl:grid-cols-3">
           <SettingBlock
             label="영상 예상 길이"
-            helper="카드를 드래그하거나 화살표로 넘기며 길이를 정합니다. 클릭만 하면 바로 선택됩니다."
-            selectedLabel={<>{customScriptDurationMinutes}분</>}
+            helper="대화체, 대본 언어와 같은 높이와 버튼 밀도로 맞췄습니다. 기존 1분~30분은 유지하고 15초 · 30초 · 45초만 추가합니다."
+            selectedLabel={<>{formatExpectedDurationLabel(customScriptDurationMinutes)}</>}
           >
-            <div className="mt-3 rounded-[18px] border border-violet-100 bg-white px-3 py-3">
-              <input
-                type="range"
-                min={1}
-                max={30}
-                step={1}
-                value={customScriptDurationMinutes}
-                onChange={(event) => onCustomScriptDurationChange(Number(event.target.value))}
-                className="h-2.5 w-full cursor-pointer accent-violet-600"
-              />
-              <div className="mt-2 flex items-center justify-between text-[10px] font-black text-slate-400">
-                <span>1분</span>
-                <span>10분</span>
-                <span>20분</span>
-                <span>30분</span>
-              </div>
-            </div>
+            <HorizontalOptionRail
+              step={240}
+              selectedKey={customScriptDurationMinutes}
+              selectedIndex={DURATION_OPTION_ITEMS.findIndex((item) => item.value === customScriptDurationMinutes)}
+              itemCount={DURATION_OPTION_ITEMS.length}
+            >
+              {DURATION_OPTION_ITEMS.map((item, index) => (
+                <CompactOption
+                  key={`duration-${item.value}`}
+                  index={index}
+                  active={customScriptDurationMinutes === item.value}
+                  onClick={() => onCustomScriptDurationChange(item.value)}
+                  title={item.label}
+                  subtitle={item.hint}
+                  leading="⏱"
+                  minWidth="min-w-[148px]"
+                />
+              ))}
+            </HorizontalOptionRail>
           </SettingBlock>
 
           <SettingBlock

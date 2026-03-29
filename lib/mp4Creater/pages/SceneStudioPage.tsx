@@ -71,6 +71,8 @@ import {
   getVideoModelPickerOptions,
 } from '../services/aiOptionCatalog';
 import { generateSceneEditorContent, type SceneEditorPromptMode } from '../services/sceneEditorPromptService';
+import { buildProjectMetadataV4, buildProjectWorkfileV4 } from '../services/timelineWorkfileService';
+import type { GlobalAssetLibraryItem } from '../services/assetLibraryService';
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const DEFAULT_SCENE_DURATION = 1;
 const MAX_SCENE_DURATION = 6;
@@ -170,6 +172,8 @@ function createSceneStudioSnapshotFallbackProject(
     sceneStudioPreviewVideo: fallback?.sceneStudioPreviewVideo || null,
     sceneStudioPreviewStatus: fallback?.sceneStudioPreviewStatus || null,
     sceneStudioPreviewMessage: fallback?.sceneStudioPreviewMessage || null,
+    metadataV4: snapshot.metadataV4 || fallback?.metadataV4 || null,
+    workfileV4: snapshot.workfileV4 || fallback?.workfileV4 || null,
     script: fallback?.script ?? snapshot.workflowDraft?.script ?? null,
     scriptParagraphs: fallback?.scriptParagraphs || [],
     sceneList: fallback?.sceneList || [],
@@ -472,6 +476,7 @@ const SceneStudioPage: React.FC = () => {
   const [apiModalTitle, setApiModalTitle] = useState('API 키 등록');
   const [apiModalDescription, setApiModalDescription] = useState('필요한 키를 등록하면 실제 생성 품질이 올라갑니다.');
   const [apiModalFocusField, setApiModalFocusField] = useState<'openRouter' | 'elevenLabs' | 'heygen' | 'fal' | null>(null);
+  const [sceneStudioWorkspaceTab, setSceneStudioWorkspaceTab] = useState<'scene' | 'timeline'>('scene');
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [backgroundMusicTracks, setBackgroundMusicTracks] = useState<BackgroundMusicTrack[]>([]);
@@ -1000,6 +1005,12 @@ const SceneStudioPage: React.FC = () => {
     summarySelectedStyle,
   ]);
 
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('sceneStudioWorkspaceTab', sceneStudioWorkspaceTab);
+    } catch {}
+  }, [sceneStudioWorkspaceTab]);
+
   const renderSummaryJsonCard = useCallback((title: string, payload: unknown, accent: 'slate' | 'blue' | 'violet' = 'slate') => {
     const accentClass = accent === 'blue'
       ? 'border-blue-200 bg-blue-50'
@@ -1012,7 +1023,7 @@ const SceneStudioPage: React.FC = () => {
         ? 'text-violet-700'
         : 'text-slate-500';
 
-    return (
+  return (
       <div className={`rounded-[24px] border p-4 ${accentClass}`}>
         <div className={`text-[11px] font-black uppercase tracking-[0.16em] ${labelClass}`}>{title}</div>
         <pre className="mt-3 max-h-[420px] overflow-auto rounded-2xl bg-slate-950 p-4 text-[12px] leading-6 text-slate-100">{stringifySummaryJson(payload)}</pre>
@@ -1381,7 +1392,7 @@ const SceneStudioPage: React.FC = () => {
       projectPrompts: projectPromptContext,
     });
     const rolePrompts = promptStore.rolePrompts || null;
-    return {
+    const basePatch = {
       script: sceneDrivenScript || null,
       scriptParagraphs: buildScriptParagraphPlans(sceneDrivenScript),
       sceneList: buildScenePlanItems(assets),
@@ -1410,7 +1421,37 @@ const SceneStudioPage: React.FC = () => {
       },
       ...overrides,
     } satisfies Partial<SavedProject>;
-  }, [backgroundMusicSceneConfig.prompt, backgroundMusicSceneConfig.promptSections, draft, resolveSceneTtsOptions, studioState]);
+
+    const patchProjectId = overrides?.id || resolvedProjectId || currentProjectId || 'timeline-working-project';
+    const mergedProject = {
+      ...(currentProjectSummary || {}),
+      id: patchProjectId,
+      name: (currentProjectSummary?.name || draft.topic || 'SceneStudio 프로젝트'),
+      createdAt: currentProjectSummary?.createdAt || Date.now(),
+      lastSavedAt: Date.now(),
+      projectNumber: currentProjectSummary?.projectNumber || 0,
+      assets,
+      workflowDraft: draft,
+      backgroundMusicTracks,
+      activeBackgroundTrackId,
+      previewMix,
+      subtitlePreset,
+      sceneStudioPreviewStatus: previewVideoStatus,
+      sceneStudioPreviewVideo: currentProjectSummary?.sceneStudioPreviewVideo || null,
+      selectedThumbnailId: overrides?.selectedThumbnailId ?? currentProjectSummary?.selectedThumbnailId ?? null,
+    } as SavedProject;
+
+    basePatch.metadataV4 = buildProjectMetadataV4(mergedProject);
+    basePatch.workfileV4 = buildProjectWorkfileV4({
+      projectId: patchProjectId,
+      assets,
+      backgroundMusicTracks,
+      previewMix,
+      subtitlePreset,
+      existing: currentProjectSummary?.workfileV4 || null,
+    });
+    return basePatch;
+  }, [activeBackgroundTrackId, backgroundMusicSceneConfig.prompt, backgroundMusicSceneConfig.promptSections, backgroundMusicTracks, currentProjectId, currentProjectSummary, draft, previewMix, previewVideoStatus, resolveSceneTtsOptions, resolvedProjectId, studioState]);
 
   const buildReferenceImages = useCallback((): ReferenceImages => {
     const resolvedCharacterIds = draft.selectedCharacterIds.length ? draft.selectedCharacterIds : draft.extractedCharacters.map((item) => item.id);
@@ -1495,12 +1536,17 @@ const SceneStudioPage: React.FC = () => {
     previewMix?: PreviewMixSettings;
     workflowDraft?: WorkflowDraft | null;
     cost?: CostBreakdown | null;
+    metadataV4?: SavedProject['metadataV4'];
+    workfileV4?: SavedProject['workfileV4'];
   }) => {
     if (!projectId) return;
     const nextAssets = Array.isArray(options?.assets) ? options.assets : assetsRef.current;
     const nextWorkflowDraft = options && 'workflowDraft' in options
       ? options.workflowDraft ?? null
       : buildSceneStudioWorkflowDraft(draft, nextAssets);
+    const nextEnhancementPatch = buildProjectEnhancementPatch(nextAssets, {
+      workflowDraft: nextWorkflowDraft,
+    });
     writeSceneStudioSnapshot(buildSceneStudioSnapshotPayload({
       projectId,
       assets: nextAssets,
@@ -1509,8 +1555,10 @@ const SceneStudioPage: React.FC = () => {
       previewMix: options?.previewMix ?? previewMix,
       workflowDraft: nextWorkflowDraft,
       cost: options?.cost ?? currentCostRef.current,
+      metadataV4: options?.metadataV4 ?? nextEnhancementPatch.metadataV4 ?? null,
+      workfileV4: options?.workfileV4 ?? nextEnhancementPatch.workfileV4 ?? null,
     }));
-  }, [activeBackgroundTrackId, backgroundMusicTracks, buildSceneStudioWorkflowDraft, draft, previewMix]);
+  }, [activeBackgroundTrackId, backgroundMusicTracks, buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, previewMix]);
 
   const rememberSceneStudioWorkingProject = useCallback((projectId: string) => {
     if (!projectId) return;
@@ -1560,6 +1608,10 @@ const SceneStudioPage: React.FC = () => {
     const nextWorkflowDraft = patch && 'workflowDraft' in patch
       ? patch.workflowDraft ?? null
       : buildSceneStudioWorkflowDraft(draft, nextAssets);
+    const nextEnhancementPatch = buildProjectEnhancementPatch(nextAssets, {
+      workflowDraft: nextWorkflowDraft,
+      ...(patch || {}),
+    });
 
     writeSceneStudioLocalSnapshot(projectId, {
       assets: nextAssets,
@@ -1568,10 +1620,13 @@ const SceneStudioPage: React.FC = () => {
       previewMix: nextPreviewMix,
       workflowDraft: nextWorkflowDraft,
       cost: nextCost,
+      metadataV4: patch?.metadataV4 ?? nextEnhancementPatch.metadataV4 ?? null,
+      workfileV4: patch?.workfileV4 ?? nextEnhancementPatch.workfileV4 ?? null,
     });
     rememberSceneStudioWorkingProject(projectId);
 
     const savedProject = await updateProject(projectId, {
+      ...nextEnhancementPatch,
       ...patch,
       assets: nextAssets,
       backgroundMusicTracks: nextTracks,
@@ -3062,6 +3117,123 @@ const SceneStudioPage: React.FC = () => {
       : '빈 씬 카드를 추가했습니다. 대사 없이 이미지 / 영상 프롬프트만 채워 무음 영상 흐름으로 바로 이어서 제작할 수 있습니다.');
   }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, invalidateFinalPreview, persistSceneStudioSnapshot, resolvedProjectId, syncSceneStudioWorkingCopy]);
 
+  const handleSceneReorder = useCallback((fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    const nextAssets = [...assetsRef.current];
+    const [moved] = nextAssets.splice(fromIndex, 1);
+    if (!moved) return;
+    nextAssets.splice(toIndex, 0, moved);
+    const normalized = nextAssets.map((asset, index) => ({ ...asset, sceneNumber: index + 1 }));
+    invalidateFinalPreview('씬 순서가 바뀌어 합본 영상을 다시 렌더링해야 합니다.');
+    assetsRef.current = normalized;
+    setGeneratedData([...normalized]);
+    syncSceneStudioWorkingCopy(normalized);
+    if (resolvedProjectId) {
+      void persistSceneStudioSnapshot(resolvedProjectId, {
+        assets: normalized,
+        workflowDraft: buildSceneStudioWorkflowDraft(draft, normalized),
+        ...buildProjectEnhancementPatch(normalized),
+      });
+    }
+    setProgressMessage(`씬 ${fromIndex + 1}을(를) ${toIndex + 1} 위치로 이동했습니다.`);
+  }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, invalidateFinalPreview, persistSceneStudioSnapshot, resolvedProjectId, syncSceneStudioWorkingCopy]);
+
+  const handleSplitScene = useCallback((index: number, splitSeconds: number) => {
+    const asset = assetsRef.current[index];
+    if (!asset) return;
+    const totalSeconds = Math.max(DEFAULT_SCENE_DURATION, clampSceneDuration(asset.targetDuration || asset.audioDuration || asset.videoDuration || DEFAULT_SCENE_DURATION));
+    const leftSeconds = Math.max(DEFAULT_SCENE_DURATION, Math.min(splitSeconds, Math.max(DEFAULT_SCENE_DURATION, totalSeconds - DEFAULT_SCENE_DURATION)));
+    const rightSeconds = Math.max(DEFAULT_SCENE_DURATION, Number((totalSeconds - leftSeconds).toFixed(1)));
+    if (rightSeconds < DEFAULT_SCENE_DURATION) return;
+
+    const first: GeneratedAsset = {
+      ...asset,
+      targetDuration: leftSeconds,
+    };
+    const second: GeneratedAsset = {
+      ...asset,
+      sceneNumber: asset.sceneNumber + 1,
+      narration: '',
+      audioData: null,
+      audioDuration: null,
+      subtitleData: null,
+      targetDuration: rightSeconds,
+      status: asset.status === 'error' ? 'pending' : asset.status,
+    };
+    const normalized = [
+      ...assetsRef.current.slice(0, index),
+      first,
+      second,
+      ...assetsRef.current.slice(index + 1),
+    ].map((item, sceneIndex) => ({ ...item, sceneNumber: sceneIndex + 1 }));
+
+    invalidateFinalPreview('씬 분할로 타임라인과 자막 타이밍이 바뀌어 합본 영상을 다시 렌더링해야 합니다.');
+    assetsRef.current = normalized;
+    setGeneratedData([...normalized]);
+    syncSceneStudioWorkingCopy(normalized);
+    if (resolvedProjectId) {
+      void persistSceneStudioSnapshot(resolvedProjectId, {
+        assets: normalized,
+        workflowDraft: buildSceneStudioWorkflowDraft(draft, normalized),
+        ...buildProjectEnhancementPatch(normalized),
+      });
+    }
+    setProgressMessage(`씬 ${index + 1}을(를) ${leftSeconds.toFixed(1)}초 / ${rightSeconds.toFixed(1)}초로 분할했습니다.`);
+  }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, invalidateFinalPreview, persistSceneStudioSnapshot, resolvedProjectId, syncSceneStudioWorkingCopy]);
+
+
+  const handleReuseGlobalAsset = useCallback((index: number, asset: GlobalAssetLibraryItem) => {
+    const current = assetsRef.current[index];
+    if (!current) return;
+
+    const nextAsset: GeneratedAsset = {
+      ...current,
+      imageData: asset.kind === 'image' || asset.kind === 'thumbnail' ? asset.previewData : current.imageData,
+      videoData: asset.kind === 'video' ? asset.previewData : current.videoData,
+      audioData: asset.kind === 'audio' || asset.kind === 'bgm' ? asset.previewData : current.audioData,
+      sourceMode: asset.sourceMode === 'sample' ? 'sample' : 'ai',
+      selectedVisualType: asset.kind === 'video' ? 'video' : 'image',
+    };
+
+    const normalized = assetsRef.current.map((item, itemIndex) => itemIndex === index ? nextAsset : item);
+    invalidateFinalPreview('글로벌 에셋 라이브러리에서 자산을 교체해 합본 영상을 다시 렌더링해야 합니다.');
+    assetsRef.current = normalized;
+    setGeneratedData([...normalized]);
+    syncSceneStudioWorkingCopy(normalized);
+    if (resolvedProjectId) {
+      void persistSceneStudioSnapshot(resolvedProjectId, {
+        assets: normalized,
+        workflowDraft: buildSceneStudioWorkflowDraft(draft, normalized),
+        ...buildProjectEnhancementPatch(normalized),
+      });
+    }
+    setProgressMessage(`씬 ${index + 1}에 ${asset.projectName}의 ${asset.kind} 자산을 적용했습니다.`);
+  }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, invalidateFinalPreview, persistSceneStudioSnapshot, resolvedProjectId, syncSceneStudioWorkingCopy]);
+
+  const handlePinSceneAsThumbnail = useCallback((index: number) => {
+    const asset = assetsRef.current[index];
+    if (!asset?.imageData || !resolvedProjectId) {
+      window.alert('썸네일로 핀하려면 먼저 해당 씬의 이미지를 생성해 주세요.');
+      return;
+    }
+    const selectedThumbnailId = `scene-${index}`;
+    const thumbnailTitle = `씬 ${asset.sceneNumber} 대표 프레임`;
+    const thumbnailPrompt = asset.imagePrompt || asset.visualPrompt || asset.narration || null;
+    void persistSceneStudioSnapshot(resolvedProjectId, {
+      thumbnail: asset.imageData,
+      thumbnailTitle,
+      thumbnailPrompt,
+      selectedThumbnailId,
+      ...buildProjectEnhancementPatch(assetsRef.current, {
+        thumbnail: asset.imageData,
+        thumbnailTitle,
+        thumbnailPrompt,
+        selectedThumbnailId,
+      }),
+    });
+    setProgressMessage('썸네일이 저장되었습니다.');
+  }, [buildProjectEnhancementPatch, persistSceneStudioSnapshot, resolvedProjectId]);
+
   const handleGenerateThumbnail = useCallback(async () => {
     if (!currentProjectId || isThumbnailGenerating) return;
     setIsThumbnailGenerating(true);
@@ -3396,6 +3568,29 @@ const SceneStudioPage: React.FC = () => {
         )}
 
         {!(isProjectHydrating && !generatedData.length) && (
+        <>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-slate-200 bg-white/90 px-4 py-3 shadow-sm">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-700">Workspace</div>
+            <div className="mt-1 text-sm font-bold text-slate-600">Step6 카드 편집과 별도 타임라인 탭을 같은 프로젝트 데이터에 묶었습니다.</div>
+          </div>
+          <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setSceneStudioWorkspaceTab('scene')}
+              className={`rounded-2xl px-4 py-2 text-sm font-black transition ${sceneStudioWorkspaceTab === 'scene' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+            >
+              Step6 카드 편집
+            </button>
+            <button
+              type="button"
+              onClick={() => setSceneStudioWorkspaceTab('timeline')}
+              className={`rounded-2xl px-4 py-2 text-sm font-black transition ${sceneStudioWorkspaceTab === 'timeline' ? 'bg-violet-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+            >
+              타임라인 탭
+            </button>
+          </div>
+        </div>
         <SceneStudioResultPanel
           data={generatedData}
           onRegenerateImage={handleRegenerateImage}
@@ -3502,7 +3697,15 @@ const SceneStudioPage: React.FC = () => {
           storageDir={studioState.storageDir}
           projectId={currentProjectId}
           projectNumber={currentProjectSummary?.projectNumber || null}
+          selectedThumbnailId={currentProjectSummary?.selectedThumbnailId || null}
+          onSceneReorder={handleSceneReorder}
+          onSplitScene={handleSplitScene}
+          onPinSceneAsThumbnail={handlePinSceneAsThumbnail}
+          onReuseGlobalAsset={handleReuseGlobalAsset}
+          workspaceTab={sceneStudioWorkspaceTab}
+          onWorkspaceTabChange={setSceneStudioWorkspaceTab}
         />
+        </>
         )}
       </main>
     </div>

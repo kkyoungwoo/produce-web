@@ -17,6 +17,7 @@ import {
   resolveWorkflowPromptTemplates,
 } from './workflowPromptBuilder';
 import { buildBackgroundMusicPrompt, buildBackgroundMusicPromptSections, sanitizeBackgroundMusicDuration } from './musicService';
+import { normalizeExpectedDurationMinutes } from '../utils/scriptDuration';
 
 export const DEFAULT_SELECTIONS: Record<ContentType, StorySelectionState> = {
   music_video: {
@@ -89,7 +90,7 @@ export function createDefaultWorkflowDraft(contentType: ContentType = 'story', o
     selectedPromptTemplateId: getDefaultWorkflowPromptTemplateId(normalizedContentType),
     promptAdditions: [],
     customScriptSettings: {
-      expectedDurationMinutes: 1,
+      expectedDurationMinutes: 0.5,
       speechStyle: 'default',
       language: 'ko',
       referenceText: '',
@@ -288,7 +289,7 @@ export function ensureWorkflowDraft(studioState?: StudioState | null): WorkflowD
     promptTemplates,
     promptAdditions: Array.isArray(existing.promptAdditions) ? existing.promptAdditions.filter((item) => typeof item === 'string' && item.trim()) : [],
     customScriptSettings: {
-      expectedDurationMinutes: Math.max(1, Math.min(30, Number(existing.customScriptSettings?.expectedDurationMinutes || 1))),
+      expectedDurationMinutes: normalizeExpectedDurationMinutes(Number(existing.customScriptSettings?.expectedDurationMinutes ?? 0.5)),
       speechStyle: existing.customScriptSettings?.speechStyle || 'default',
       language: existing.customScriptSettings?.language || 'ko',
       referenceText: existing.customScriptSettings?.referenceText || '',

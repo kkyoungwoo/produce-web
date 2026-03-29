@@ -156,7 +156,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const initialHasSelectedAspectRatio = Boolean(initial.hasSelectedAspectRatio ?? initial.completedSteps?.step1 ?? (initialStage > 1));
   const step1SelectionRef = useRef({ contentType: initialHasSelectedContentType, aspectRatio: initialHasSelectedAspectRatio });
   const initialCustomScriptSettings = initial.customScriptSettings || {
-    expectedDurationMinutes: 1,
+    expectedDurationMinutes: 0.5,
     speechStyle: 'default' as ScriptSpeechStyle,
     language: 'ko' as ScriptLanguageOption,
     referenceText: '',
@@ -228,7 +228,7 @@ const InputSection: React.FC<InputSectionProps> = ({
   const [step3PanelMode, setStep3PanelMode] = useState<'balanced' | 'character-focus' | 'script-focus'>('balanced');
   const [newStyleName, setNewStyleName] = useState('');
   const [newStylePrompt, setNewStylePrompt] = useState('');
-  const [customScriptDurationMinutes, setCustomScriptDurationMinutes] = useState<number>(normalizeExpectedDurationMinutes(Number(initialCustomScriptSettings.expectedDurationMinutes || 1)));
+  const [customScriptDurationMinutes, setCustomScriptDurationMinutes] = useState<number>(normalizeExpectedDurationMinutes(Number(initialCustomScriptSettings.expectedDurationMinutes ?? 0.5)));
   const [customScriptSpeechStyle, setCustomScriptSpeechStyle] = useState<ScriptSpeechStyle>(initialCustomScriptSettings.speechStyle || 'default');
   const [customScriptLanguage, setCustomScriptLanguage] = useState<ScriptLanguageOption>(initialCustomScriptSettings.language || 'ko');
   const [customScriptReferenceText, setCustomScriptReferenceText] = useState(initialCustomScriptSettings.referenceText || '');
@@ -400,7 +400,7 @@ const InputSection: React.FC<InputSectionProps> = ({
     setNewCharacterPrompt('');
     setNewStyleName('');
     setNewStylePrompt('');
-    setCustomScriptDurationMinutes(normalizeExpectedDurationMinutes(Number(workflowDraft?.customScriptSettings?.expectedDurationMinutes || 1)));
+    setCustomScriptDurationMinutes(normalizeExpectedDurationMinutes(Number(workflowDraft?.customScriptSettings?.expectedDurationMinutes ?? 0.5)));
     setCustomScriptSpeechStyle(workflowDraft?.customScriptSettings?.speechStyle || 'default');
     setCustomScriptLanguage(workflowDraft?.customScriptSettings?.language || 'ko');
     setCustomScriptReferenceText(workflowDraft?.customScriptSettings?.referenceText || '');

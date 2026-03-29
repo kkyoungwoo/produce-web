@@ -677,13 +677,18 @@ export const generateVideoStaticFallback = async (
         const bgBuffer = await decodeAudio(track.audioData, audioCtx);
         const source = audioCtx.createBufferSource();
         const gainNode = audioCtx.createGain();
+        const bgStart = Math.max(0, Number(track.timelineStartSeconds ?? 0));
+        const bgEnd = typeof track.timelineEndSeconds === 'number' && Number.isFinite(track.timelineEndSeconds)
+          ? Math.max(bgStart + 0.1, Number(track.timelineEndSeconds))
+          : totalDuration;
+        const audibleDuration = Math.max(0.1, Math.min(totalDuration, bgEnd) - bgStart);
         source.buffer = bgBuffer;
         source.loop = true;
         gainNode.gain.value = previewMix.backgroundMusicVolume ?? track.volume ?? 0.28;
         source.connect(gainNode);
         gainNode.connect(destination);
-        source.start(masterStartTime);
-        source.stop(masterStartTime + totalDuration + 0.25);
+        source.start(masterStartTime + bgStart);
+        source.stop(masterStartTime + bgStart + audibleDuration + 0.05);
       } catch (error) {
         console.warn('[Video/Fallback] 배경음 디코딩 실패', error);
       }

@@ -463,6 +463,8 @@ function normalizeProject(raw: any): SavedProject {
     youtubeTags: Array.isArray(raw?.youtubeTags) ? raw.youtubeTags.filter((item: any) => typeof item === 'string') : [],
     isShortsEligible: typeof raw?.isShortsEligible === 'boolean' ? raw.isShortsEligible : false,
     uploadErrorMessage: typeof raw?.uploadErrorMessage === 'string' ? raw.uploadErrorMessage : null,
+    metadataV4: raw?.metadataV4 && typeof raw.metadataV4 === 'object' ? raw.metadataV4 : null,
+    workfileV4: raw?.workfileV4 && typeof raw.workfileV4 === 'object' ? raw.workfileV4 : null,
   };
 }
 
@@ -815,6 +817,8 @@ export async function saveProject(
     youtubeTags?: SavedProject['youtubeTags'];
     isShortsEligible?: SavedProject['isShortsEligible'];
     uploadErrorMessage?: SavedProject['uploadErrorMessage'];
+    metadataV4?: SavedProject['metadataV4'];
+    workfileV4?: SavedProject['workfileV4'];
   }
 ): Promise<SavedProject> {
   const id = extras?.projectId?.trim() || `project_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -898,6 +902,8 @@ export async function saveProject(
     youtubeTags: extras?.youtubeTags || [],
     isShortsEligible: Boolean(extras?.isShortsEligible),
     uploadErrorMessage: extras?.uploadErrorMessage || null,
+    metadataV4: extras?.metadataV4 || null,
+    workfileV4: extras?.workfileV4 || null,
   };
 
   const persistedProject = await persistProjectDetailIfPossible(project);
@@ -948,6 +954,8 @@ export async function upsertWorkflowProject(options: {
   youtubeTags?: SavedProject['youtubeTags'];
   isShortsEligible?: SavedProject['isShortsEligible'];
   uploadErrorMessage?: SavedProject['uploadErrorMessage'];
+  metadataV4?: SavedProject['metadataV4'];
+  workfileV4?: SavedProject['workfileV4'];
 }): Promise<SavedProject> {
   const safeTopic = options.topic?.trim() || '새 프로젝트';
   const patch = {
@@ -989,6 +997,8 @@ export async function upsertWorkflowProject(options: {
     youtubeTags: options.youtubeTags || [],
     isShortsEligible: Boolean(options.isShortsEligible),
     uploadErrorMessage: options.uploadErrorMessage || null,
+    metadataV4: options.metadataV4 || null,
+    workfileV4: options.workfileV4 || null,
   } as Partial<SavedProject>;
 
   if (options.projectId) {
@@ -1041,6 +1051,8 @@ export async function upsertWorkflowProject(options: {
       youtubeTags: options.youtubeTags || [],
       isShortsEligible: Boolean(options.isShortsEligible),
       uploadErrorMessage: options.uploadErrorMessage || null,
+      metadataV4: options.metadataV4 || null,
+      workfileV4: options.workfileV4 || null,
     }
   );
 }

@@ -173,7 +173,7 @@ function mergeLoadedWorkflowDraft(baseDraft?: WorkflowDraft | null, incomingDraf
   const defaultPromptPack = defaultWorkflowDraft.promptPack;
   const defaultReferenceImages = defaultWorkflowDraft.referenceImages;
   const defaultCustomScriptSettings = defaultWorkflowDraft.customScriptSettings || {
-    expectedDurationMinutes: 1,
+    expectedDurationMinutes: 0.5,
     speechStyle: 'default',
     language: 'ko',
     referenceText: '',

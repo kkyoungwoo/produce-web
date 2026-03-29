@@ -6,6 +6,7 @@ import {
   makeScenePlaceholderImage,
   splitStoryIntoParagraphScenes,
 } from '../utils/storyHelpers';
+import { getExpectedDurationSeconds } from '../utils/scriptDuration';
 import {
   buildConceptDirectionLines,
   buildMarkdownSection,
@@ -27,9 +28,8 @@ function clampSilentSceneDuration(value: number) {
 }
 
 function getMuteSceneCount(draft: WorkflowDraft) {
-  const minutes = Math.max(1, Math.round(draft.customScriptSettings?.expectedDurationMinutes || 1));
-  const totalSeconds = minutes * 60;
-  return Math.max(4, Math.ceil(totalSeconds / SILENT_SCENE_TARGET_SECONDS));
+  const totalSeconds = getExpectedDurationSeconds(draft.customScriptSettings?.expectedDurationMinutes);
+  return Math.max(3, Math.ceil(totalSeconds / SILENT_SCENE_TARGET_SECONDS));
 }
 
 function getSelectedCharacterNames(draft: WorkflowDraft) {
@@ -244,7 +244,7 @@ function buildRolePromptExecutionText(bundle?: WorkflowRolePromptBundle | null, 
 
 function buildAutoMuteScene(draft: WorkflowDraft, index: number, total: number): ScriptScene {
   const aspectRatio: AspectRatio = draft.aspectRatio || '16:9';
-  const totalSeconds = Math.max(60, Math.round((draft.customScriptSettings?.expectedDurationMinutes || 1) * 60));
+  const totalSeconds = getExpectedDurationSeconds(draft.customScriptSettings?.expectedDurationMinutes);
   const targetDuration = clampSilentSceneDuration(totalSeconds / Math.max(1, total));
   const narration = buildMuteSceneNarration(draft, index, total);
   const imagePrompt = buildLocalVisualPrompt(narration, index + 1, draft.contentType, aspectRatio);

@@ -5,6 +5,8 @@ import {
   PreviewMixSettings,
   SavedProject,
   WorkflowDraft,
+  ProjectMetadataV4,
+  ProjectWorkfileV4,
 } from '../types';
 import { compactWorkflowDraftForStorage } from './workflowDraftService';
 
@@ -21,6 +23,8 @@ export interface SceneStudioSnapshotPayload {
   previewMix: PreviewMixSettings | null;
   workflowDraft: WorkflowDraft | null;
   cost: CostBreakdown | null;
+  metadataV4?: ProjectMetadataV4 | null;
+  workfileV4?: ProjectWorkfileV4 | null;
 }
 
 function getStorageKey(projectId: string) {
@@ -185,6 +189,8 @@ export function buildSceneStudioSnapshotPayload(options: {
   previewMix?: PreviewMixSettings | null;
   workflowDraft?: WorkflowDraft | null;
   cost?: CostBreakdown | null;
+  metadataV4?: ProjectMetadataV4 | null;
+  workfileV4?: ProjectWorkfileV4 | null;
 }): SceneStudioSnapshotPayload {
   return {
     version: SNAPSHOT_VERSION,
@@ -198,6 +204,8 @@ export function buildSceneStudioSnapshotPayload(options: {
     previewMix: options.previewMix || null,
     workflowDraft: stripWorkflowDraftBinary(options.workflowDraft),
     cost: options.cost || null,
+    metadataV4: options.metadataV4 || null,
+    workfileV4: options.workfileV4 || null,
   };
 }
 
@@ -279,6 +287,8 @@ export function mergeSceneStudioSnapshotIntoProject(project: SavedProject, snaps
     previewMix: shouldUseSnapshotSceneState ? (snapshot.previewMix || project.previewMix) : project.previewMix,
     workflowDraft: shouldUseSnapshotDraft ? snapshot.workflowDraft : project.workflowDraft,
     cost: shouldUseSnapshotSceneState ? (snapshot.cost || project.cost) : project.cost,
+    metadataV4: shouldUseSnapshotSceneState ? (snapshot.metadataV4 || project.metadataV4 || null) : (project.metadataV4 || null),
+    workfileV4: shouldUseSnapshotSceneState ? (snapshot.workfileV4 || project.workfileV4 || null) : (project.workfileV4 || null),
     lastSavedAt: Math.max(project.lastSavedAt || 0, shouldUseSnapshotSceneState ? (snapshot.savedAt || 0) : 0),
   };
 }

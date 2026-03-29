@@ -25,7 +25,7 @@ type RenderAsset = {
 
 type RenderBody = {
   assets?: RenderAsset[];
-  backgroundTracks?: Array<{ audioData?: string | null; volume?: number | null }>;
+  backgroundTracks?: Array<{ audioData?: string | null; volume?: number | null; timelineStartSeconds?: number | null; timelineEndSeconds?: number | null }>;
   previewMix?: { narrationVolume?: number; backgroundMusicVolume?: number } | null;
   aspectRatio?: '16:9' | '1:1' | '9:16';
   qualityMode?: 'preview' | 'final';
@@ -393,13 +393,30 @@ export async function POST(request: NextRequest) {
       if (writtenBgm) {
         const narrationVolume = Math.max(0, Math.min(1.5, Number(body.previewMix?.narrationVolume ?? 1)));
         const backgroundVolume = Math.max(0, Math.min(1.2, Number(body.previewMix?.backgroundMusicVolume ?? bgm.volume ?? 0.28)));
+        const bgmStartSeconds = Math.max(0, Number(bgm.timelineStartSeconds ?? 0));
+        const bgmEndSeconds = typeof bgm.timelineEndSeconds === 'number' && Number.isFinite(bgm.timelineEndSeconds)
+          ? Math.max(bgmStartSeconds + 0.1, Number(bgm.timelineEndSeconds))
+          : null;
+        const bgmDurationSeconds = bgmEndSeconds !== null ? Math.max(0.1, bgmEndSeconds - bgmStartSeconds) : null;
+        const bgmDelayMs = Math.max(0, Math.round(bgmStartSeconds * 1000));
+        const bgmFilters = [`volume=${backgroundVolume}`];
+        if (bgmDurationSeconds !== null) {
+          bgmFilters.push(`atrim=0:${bgmDurationSeconds.toFixed(3)}`);
+          if (bgmDurationSeconds > 0.18) {
+            bgmFilters.push(`afade=t=out:st=${Math.max(0, bgmDurationSeconds - 0.12).toFixed(3)}:d=0.12`);
+          }
+        }
+        if (bgmDelayMs > 0) {
+          bgmFilters.push(`adelay=${bgmDelayMs}|${bgmDelayMs}`);
+        }
+        bgmFilters.push('apad');
         try {
           await runFfmpeg([
             '-y',
             '-i', mergedPath,
             '-stream_loop', '-1',
             '-i', bgmPath,
-            '-filter_complex', `[0:a]volume=${narrationVolume}[narr];[1:a]volume=${backgroundVolume}[bgm];[narr][bgm]amix=inputs=2:duration=first[aout]`,
+            '-filter_complex', `[0:a]volume=${narrationVolume}[narr];[1:a]${bgmFilters.join(',')}[bgm];[narr][bgm]amix=inputs=2:duration=first[aout]`,
             '-map', '0:v',
             '-map', '[aout]',
             '-c:v', 'copy',
@@ -418,7 +435,7 @@ export async function POST(request: NextRequest) {
             '-i', mergedPath,
             '-stream_loop', '-1',
             '-i', bgmPath,
-            '-filter_complex', `[1:a]volume=${backgroundVolume}[bgm]`,
+            '-filter_complex', `[1:a]${bgmFilters.join(',')}[bgm]`,
             '-map', '0:v',
             '-map', '[bgm]',
             '-c:v', 'copy',
