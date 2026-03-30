@@ -8,6 +8,7 @@ export interface TimelineUiSnapshot {
   rangeSelection: TimelineRangeSelection | null;
   backgroundTrackBounds?: { startMs: number; endMs: number } | null;
   clipOverrides?: Record<string, { startMs: number; endMs: number }>;
+  sceneStartOffsets?: number[];
   panelVisibility?: {
     selectedScene?: boolean;
     recentActions?: boolean;
@@ -29,6 +30,13 @@ function normalizeBoundsMap(value: unknown): Record<string, { startMs: number; e
     acc[key] = { startMs, endMs };
     return acc;
   }, {});
+}
+
+
+function normalizeSceneStartOffsets(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => (typeof entry === 'number' && Number.isFinite(entry) ? Math.max(0, Math.round(entry)) : 0));
 }
 
 export function readTimelineUiSnapshot(projectId?: string | null): TimelineUiSnapshot | null {
@@ -53,6 +61,7 @@ export function readTimelineUiSnapshot(projectId?: string | null): TimelineUiSna
           }
         : null,
       clipOverrides: normalizeBoundsMap(parsed.clipOverrides),
+      sceneStartOffsets: normalizeSceneStartOffsets(parsed.sceneStartOffsets),
       panelVisibility: parsed.panelVisibility && typeof parsed.panelVisibility === 'object'
         ? {
             selectedScene: Boolean(parsed.panelVisibility.selectedScene),

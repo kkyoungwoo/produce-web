@@ -62,6 +62,7 @@ import { blobFromDataValue, extensionFromMime, triggerBlobDownload } from '../ut
 import SceneStudioHeaderPanel from '../components/scene-studio/SceneStudioHeaderPanel';
 import { buildWorkflowPromptStore, buildWorkflowStepContract } from '../services/workflowStepContractService';
 import SceneStudioResultPanel from '../components/scene-studio/SceneStudioResultPanel';
+import TimelineWorkbench from '../components/editor/TimelineWorkbench';
 import { buildSceneStudioSnapshotPayload, mergeSceneStudioSnapshotIntoProject, readSceneStudioSnapshot, writeSceneStudioSnapshot, type SceneStudioSnapshotPayload } from '../services/sceneStudioSnapshotCache';
 import { hasDetailedSceneStudioProject } from './sceneStudio/helpers';
 import {
@@ -75,7 +76,8 @@ import { buildProjectMetadataV4, buildProjectWorkfileV4 } from '../services/time
 import type { GlobalAssetLibraryItem } from '../services/assetLibraryService';
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const DEFAULT_SCENE_DURATION = 1;
-const MAX_SCENE_DURATION = 6;
+const MIN_TIMELINE_SCENE_DURATION = 0.1;
+const MAX_SCENE_DURATION = 30;
 const MAX_GENERATION_QUEUE = 4;
 const clampSceneDuration = (value?: number | null) => Math.min(MAX_SCENE_DURATION, Math.max(0, Number((value || 0).toFixed(1))));
 const stripNarrationAudioFromAsset = (asset: GeneratedAsset): GeneratedAsset => ({
@@ -476,11 +478,24 @@ const SceneStudioPage: React.FC = () => {
   const [apiModalTitle, setApiModalTitle] = useState('API 키 등록');
   const [apiModalDescription, setApiModalDescription] = useState('필요한 키를 등록하면 실제 생성 품질이 올라갑니다.');
   const [apiModalFocusField, setApiModalFocusField] = useState<'openRouter' | 'elevenLabs' | 'heygen' | 'fal' | null>(null);
-  const [sceneStudioWorkspaceTab, setSceneStudioWorkspaceTab] = useState<'scene' | 'timeline'>('scene');
+  const [sceneStudioWorkspaceTab, setSceneStudioWorkspaceTab] = useState<'scene' | 'timeline'>(() => {
+    if (typeof window === 'undefined') return 'timeline';
+    try {
+      return window.localStorage.getItem('sceneStudioWorkspaceTab') === 'scene' ? 'scene' : 'timeline';
+    } catch {
+      return 'timeline';
+    }
+  });
   const [isVideoGenerating, setIsVideoGenerating] = useState(false);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
   const [backgroundMusicTracks, setBackgroundMusicTracks] = useState<BackgroundMusicTrack[]>([]);
   const [activeBackgroundTrackId, setActiveBackgroundTrackId] = useState<string | null>(null);
+  const [timelineUndoSnapshot, setTimelineUndoSnapshot] = useState<{
+    assets: GeneratedAsset[];
+    backgroundMusicTracks: BackgroundMusicTrack[];
+    activeBackgroundTrackId: string | null;
+  } | null>(null);
+  const timelineUndoCaptureQueuedRef = useRef(false);
   const [previewMix, setPreviewMix] = useState<PreviewMixSettings>(getDefaultPreviewMix());
   const [step4Open, setStep4Open] = useState(false);
   const [summarySection, setSummarySection] = useState<'step1' | 'step2' | 'step3' | 'step4' | 'step5' | 'step6'>('step1');
@@ -1841,6 +1856,19 @@ const SceneStudioPage: React.FC = () => {
     }
 
     const localScenes = createLocalScenesFromDraft(draft);
+    const manualExtraScenes = assetsRef.current.length > localScenes.length
+      ? assetsRef.current.slice(localScenes.length).map((asset, index) => ({
+          ...asset,
+          sceneNumber: localScenes.length + index + 1,
+          narration: asset.narration || `추가 장면 ${localScenes.length + index + 1}`,
+          visualPrompt: asset.imagePrompt || asset.visualPrompt || '',
+          imagePrompt: asset.imagePrompt || asset.visualPrompt || '',
+          videoPrompt: asset.videoPrompt || '',
+          targetDuration: clampSceneDuration(asset.targetDuration || estimateClipDuration(asset.narration || `추가 장면 ${localScenes.length + index + 1}`)),
+          aspectRatio: asset.aspectRatio || draft.aspectRatio || '16:9',
+        }))
+      : [];
+    const localScenesWithExtras = [...localScenes, ...manualExtraScenes];
     const referenceImages = buildReferenceImages();
     const hasReferenceImage = referenceImages.character.length + referenceImages.style.length > 0;
     try {
@@ -1849,11 +1877,53 @@ const SceneStudioPage: React.FC = () => {
         7000,
         [] as ScriptScene[]
       );
-      return applyDraftSelectionPromptsToScenes(mergeAiScenesIntoLocalScenes(localScenes, aiScenes), draft);
+      return applyDraftSelectionPromptsToScenes(mergeAiScenesIntoLocalScenes(localScenesWithExtras, aiScenes), draft);
     } catch {
-      return applyDraftSelectionPromptsToScenes(localScenes, draft);
+      return applyDraftSelectionPromptsToScenes(localScenesWithExtras, draft);
     }
   }, [draft, buildReferenceImages]);
+
+  const captureTimelineUndoSnapshot = useCallback(() => {
+    if (timelineUndoCaptureQueuedRef.current) return;
+    timelineUndoCaptureQueuedRef.current = true;
+    Promise.resolve().then(() => {
+      timelineUndoCaptureQueuedRef.current = false;
+    });
+    setTimelineUndoSnapshot({
+      assets: assetsRef.current.map((asset) => ({
+        ...asset,
+        imageHistory: asset.imageHistory ? [...asset.imageHistory] : [],
+        videoHistory: asset.videoHistory ? [...asset.videoHistory] : [],
+      })),
+      backgroundMusicTracks: backgroundMusicTracks.map((track) => ({ ...track })),
+      activeBackgroundTrackId,
+    });
+  }, [activeBackgroundTrackId, backgroundMusicTracks]);
+
+  const handleUndoTimelineChange = useCallback(() => {
+    if (!timelineUndoSnapshot) return;
+    invalidateFinalPreview('타임라인 편집을 되돌려 합본 영상을 다시 렌더링해야 합니다.');
+    assetsRef.current = timelineUndoSnapshot.assets.map((asset) => ({
+      ...asset,
+      imageHistory: asset.imageHistory ? [...asset.imageHistory] : [],
+      videoHistory: asset.videoHistory ? [...asset.videoHistory] : [],
+    }));
+    setGeneratedData([...assetsRef.current]);
+    setBackgroundMusicTracks(timelineUndoSnapshot.backgroundMusicTracks.map((track) => ({ ...track })));
+    setActiveBackgroundTrackId(timelineUndoSnapshot.activeBackgroundTrackId);
+    syncSceneStudioWorkingCopy(assetsRef.current);
+    if (resolvedProjectId) {
+      void persistSceneStudioSnapshot(resolvedProjectId, {
+        assets: assetsRef.current,
+        backgroundMusicTracks: timelineUndoSnapshot.backgroundMusicTracks,
+        activeBackgroundTrackId: timelineUndoSnapshot.activeBackgroundTrackId,
+        workflowDraft: buildSceneStudioWorkflowDraft(draft, assetsRef.current),
+        ...buildProjectEnhancementPatch(assetsRef.current),
+      });
+    }
+    setProgressMessage('직전 타임라인 편집을 되돌렸습니다.');
+    setTimelineUndoSnapshot(null);
+  }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, invalidateFinalPreview, persistSceneStudioSnapshot, resolvedProjectId, syncSceneStudioWorkingCopy, timelineUndoSnapshot]);
 
   const openApiModal = (options: { title?: string; description?: string; focusField?: 'openRouter' | 'elevenLabs' | 'heygen' | 'fal' | null }) => {
     setApiModalTitle(options.title || 'API 키 등록');
@@ -2209,21 +2279,32 @@ const SceneStudioPage: React.FC = () => {
       const baseAssets = preserveExistingCards ? assetsRef.current : [];
       setTaskProgressPercent(18);
 
-      const initialAssets: GeneratedAsset[] = scenes.map((scene, index) => {
-        const existing = baseAssets[index];
-        const fallbackPreview = sampleAssets[index];
-        const baseAsset: GeneratedAsset = {
-          ...fallbackPreview,
-          ...existing,
-          ...scene,
-          aspectRatio: scene.aspectRatio || existing?.aspectRatio || draft.aspectRatio || '16:9',
-          targetDuration: typeof existing?.targetDuration === 'number' ? clampSceneDuration(existing.targetDuration) : 0,
-          imageHistory: existing?.imageHistory || [],
-          videoHistory: existing?.videoHistory || [],
-          status: existing?.imageData ? 'completed' : 'pending',
-        };
-        return shouldGenerateSceneAudio ? baseAsset : stripNarrationAudioFromAsset(baseAsset);
-      });
+      const initialAssets: GeneratedAsset[] = [
+        ...scenes.map((scene, index) => {
+          const existing = baseAssets[index];
+          const fallbackPreview = sampleAssets[index];
+          const baseAsset: GeneratedAsset = {
+            ...fallbackPreview,
+            ...existing,
+            ...scene,
+            aspectRatio: scene.aspectRatio || existing?.aspectRatio || draft.aspectRatio || '16:9',
+            targetDuration: typeof existing?.targetDuration === 'number' ? clampSceneDuration(existing.targetDuration) : 0,
+            imageHistory: existing?.imageHistory || [],
+            videoHistory: existing?.videoHistory || [],
+            status: existing?.imageData ? 'completed' : 'pending',
+          };
+          return shouldGenerateSceneAudio ? baseAsset : stripNarrationAudioFromAsset(baseAsset);
+        }),
+        ...baseAssets.slice(scenes.length).map((asset, extraIndex) => ({
+          ...asset,
+          sceneNumber: scenes.length + extraIndex + 1,
+          aspectRatio: asset.aspectRatio || draft.aspectRatio || '16:9',
+          targetDuration: typeof asset.targetDuration === 'number' ? clampSceneDuration(asset.targetDuration) : DEFAULT_SCENE_DURATION,
+          imageHistory: asset.imageHistory || [],
+          videoHistory: asset.videoHistory || [],
+          status: asset.status || (asset.imageData ? 'completed' : 'pending'),
+        })),
+      ];
 
       assetsRef.current = initialAssets;
       setGeneratedData([...initialAssets]);
@@ -2231,7 +2312,7 @@ const SceneStudioPage: React.FC = () => {
       initialAssets.forEach((_, index) => setSceneProgress(index, 8, '생성 대기 중'));
 
       const initialTtsOptions = shouldGenerateSceneAudio ? resolveSceneTtsOptions() : null;
-      const isTtsAvailable = Boolean(initialTtsOptions && (initialTtsOptions.provider === 'qwen3Tts' || initialTtsOptions.apiKey));
+      const isTtsAvailable = Boolean(initialTtsOptions?.apiKey);
 
       for (let i = 0; i < initialAssets.length; i++) {
         const currentAspectRatio = assetsRef.current[i].aspectRatio || draft.aspectRatio || '16:9';
@@ -2305,7 +2386,7 @@ const SceneStudioPage: React.FC = () => {
         setSceneProgress(i, isTtsAvailable ? 72 : 100, isTtsAvailable ? '오디오 대기 중' : '이미지 준비 완료');
 
         const sceneTts = shouldGenerateSceneAudio ? resolveSceneTtsOptions() : null;
-        if (shouldGenerateSceneAudio && sceneTts && (sceneTts.provider === 'qwen3Tts' || sceneTts.apiKey)) {
+        if (shouldGenerateSceneAudio && sceneTts?.apiKey) {
           setProgressMessage(`씬 ${i + 1}/${initialAssets.length} 오디오와 자막을 준비하는 중...`);
           try {
             const audio = await withSoftTimeout(
@@ -2738,6 +2819,11 @@ const SceneStudioPage: React.FC = () => {
 
   const handleRegenerateAudio = async (index: number) => {
     if (!isNarrationAudioEnabled) return;
+    const currentTts = resolveSceneTtsOptions();
+    if (!currentTts.apiKey) {
+      window.alert('오디오 생성 실패: AI 연결이 필요합니다. 설정에서 Google AI Studio 또는 TTS API를 먼저 연결해 주세요.');
+      return;
+    }
     if (!acquireSceneActionLock(index, 'audio')) return;
     try {
       await enqueueGenerationTask(`씬 ${index + 1} 오디오 생성`, async () => {
@@ -2766,10 +2852,11 @@ const SceneStudioPage: React.FC = () => {
           }
           setSceneProgress(index, 100, '오디오 다시 생성 완료');
           setTaskProgressPercent(100);
-        } catch {
+        } catch (error: any) {
           updateAssetAt(index, { status: 'completed' });
           syncSceneStudioWorkingCopy();
           setSceneProgress(index, 100, '오디오 생성 대기 상태로 복귀했습니다.');
+          window.alert(`오디오 생성 실패: AI 연결이 필요합니다. 설정에서 Google AI Studio 또는 TTS API를 연결해 주세요.\n${error?.message ? `\n상세: ${error.message}` : ''}`);
         }
         window.setTimeout(() => setTaskProgressPercent(null), 700);
       });
@@ -2804,7 +2891,7 @@ const SceneStudioPage: React.FC = () => {
         ...buildProjectEnhancementPatch(clearedAssets),
       });
     }
-  }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, invalidateFinalPreview, persistSceneStudioSnapshot, resolvedProjectId, syncSceneStudioWorkingCopy]);
+  }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, captureTimelineUndoSnapshot, draft, invalidateFinalPreview, persistSceneStudioSnapshot, resolvedProjectId, syncSceneStudioWorkingCopy]);
 
   const handleGenerateAnimation = async (index: number, options?: { sourceImageData?: string | null }) => {
     if (!acquireSceneActionLock(index, 'video')) return;
@@ -3042,8 +3129,9 @@ const SceneStudioPage: React.FC = () => {
   };
 
   const handleDurationChange = (index: number, duration: number) => {
+    captureTimelineUndoSnapshot();
     invalidateFinalPreview();
-    updateAssetAt(index, { targetDuration: Math.max(DEFAULT_SCENE_DURATION, clampSceneDuration(duration)) });
+    updateAssetAt(index, { targetDuration: Math.max(MIN_TIMELINE_SCENE_DURATION, clampSceneDuration(duration)) });
     syncSceneStudioWorkingCopy();
   };
 
@@ -3087,7 +3175,7 @@ const SceneStudioPage: React.FC = () => {
       }, {});
     });
     setProgressMessage(`씬 ${targetAsset.sceneNumber} 문단을 삭제했습니다.`);
-  }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, invalidateFinalPreview, persistSceneStudioSnapshot, resolvedProjectId, syncSceneStudioWorkingCopy]);
+  }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, captureTimelineUndoSnapshot, draft, invalidateFinalPreview, persistSceneStudioSnapshot, resolvedProjectId, syncSceneStudioWorkingCopy]);
 
   const handleAddParagraphScene = useCallback(() => {
     invalidateFinalPreview();
@@ -3119,6 +3207,7 @@ const SceneStudioPage: React.FC = () => {
 
   const handleSceneReorder = useCallback((fromIndex: number, toIndex: number) => {
     if (fromIndex === toIndex) return;
+    captureTimelineUndoSnapshot();
     const nextAssets = [...assetsRef.current];
     const [moved] = nextAssets.splice(fromIndex, 1);
     if (!moved) return;
@@ -3141,6 +3230,7 @@ const SceneStudioPage: React.FC = () => {
   const handleSplitScene = useCallback((index: number, splitSeconds: number) => {
     const asset = assetsRef.current[index];
     if (!asset) return;
+    captureTimelineUndoSnapshot();
     const totalSeconds = Math.max(DEFAULT_SCENE_DURATION, clampSceneDuration(asset.targetDuration || asset.audioDuration || asset.videoDuration || DEFAULT_SCENE_DURATION));
     const leftSeconds = Math.max(DEFAULT_SCENE_DURATION, Math.min(splitSeconds, Math.max(DEFAULT_SCENE_DURATION, totalSeconds - DEFAULT_SCENE_DURATION)));
     const rightSeconds = Math.max(DEFAULT_SCENE_DURATION, Number((totalSeconds - leftSeconds).toFixed(1)));
@@ -3180,6 +3270,18 @@ const SceneStudioPage: React.FC = () => {
     }
     setProgressMessage(`씬 ${index + 1}을(를) ${leftSeconds.toFixed(1)}초 / ${rightSeconds.toFixed(1)}초로 분할했습니다.`);
   }, [buildProjectEnhancementPatch, buildSceneStudioWorkflowDraft, draft, invalidateFinalPreview, persistSceneStudioSnapshot, resolvedProjectId, syncSceneStudioWorkingCopy]);
+
+  const handleBackgroundTrackTimelineChange = useCallback((trackId: string, patch: { timelineStartSeconds?: number | null; timelineEndSeconds?: number | null }) => {
+    captureTimelineUndoSnapshot();
+    invalidateFinalPreview('배경음 구간이 바뀌어 합본 영상을 다시 렌더링해야 합니다.');
+    const nextTracks = backgroundMusicTracks.map((track) => track.id === trackId ? { ...track, ...patch } : track);
+    setBackgroundMusicTracks(nextTracks);
+    persistBackgroundMusicSnapshot(nextTracks, activeBackgroundTrackId, {
+      enabled: true,
+      selectedTrackId: activeBackgroundTrackId,
+    });
+    setProgressMessage('배경음 구간을 타임라인에 맞게 이동했습니다.');
+  }, [activeBackgroundTrackId, backgroundMusicTracks, captureTimelineUndoSnapshot, invalidateFinalPreview, persistBackgroundMusicSnapshot]);
 
 
   const handleReuseGlobalAsset = useCallback((index: number, asset: GlobalAssetLibraryItem) => {
@@ -3524,7 +3626,7 @@ const SceneStudioPage: React.FC = () => {
       <SettingsDrawer open={showSettings} studioState={studioState} onClose={() => setShowSettings(false)} onSave={handleSaveStudioState} />
       <ProviderQuickModal open={showApiModal} studioState={studioState} title={apiModalTitle} description={apiModalDescription} focusField={apiModalFocusField} onClose={handleApiModalClose} onSave={handleSaveStudioState} onOpenFullSettings={() => { setShowApiModal(false); setShowSettings(true); }} />
 
-      <main className="mx-auto w-full max-w-[1520px] px-4 py-6 sm:px-6 lg:px-8">
+      <main className={sceneStudioWorkspaceTab === 'timeline' ? 'w-full px-4 py-6 sm:px-6 lg:px-8' : 'mx-auto w-full max-w-[1520px] px-4 py-6 sm:px-6 lg:px-8'}>
         <SceneStudioHeaderPanel
           isThumbnailStudioRoute={isThumbnailStudioRoute}
           currentProjectNumber={currentProjectSummary?.projectNumber || null}
@@ -3577,134 +3679,180 @@ const SceneStudioPage: React.FC = () => {
           <div className="inline-flex rounded-2xl border border-slate-200 bg-slate-50 p-1 shadow-sm">
             <button
               type="button"
-              onClick={() => setSceneStudioWorkspaceTab('scene')}
-              className={`rounded-2xl px-4 py-2 text-sm font-black transition ${sceneStudioWorkspaceTab === 'scene' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
-            >
-              Step6 카드 편집
-            </button>
-            <button
-              type="button"
               onClick={() => setSceneStudioWorkspaceTab('timeline')}
               className={`rounded-2xl px-4 py-2 text-sm font-black transition ${sceneStudioWorkspaceTab === 'timeline' ? 'bg-violet-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
             >
               타임라인 탭
             </button>
+            <button
+              type="button"
+              onClick={() => setSceneStudioWorkspaceTab('scene')}
+              className={`rounded-2xl px-4 py-2 text-sm font-black transition ${sceneStudioWorkspaceTab === 'scene' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+            >
+              Step6 카드 편집
+            </button>
           </div>
         </div>
-        <SceneStudioResultPanel
-          data={generatedData}
-          onRegenerateImage={handleRegenerateImage}
-          onRegenerateAudio={isNarrationAudioEnabled ? handleRegenerateAudio : undefined}
-          onDeleteAllAudio={isNarrationAudioEnabled ? (() => void handleDeleteAllGeneratedAudio()) : undefined}
-          onExportVideo={triggerVideoExport}
-          onGenerateAnimation={handleGenerateAnimation}
-          onNarrationChange={handleNarrationChange}
-          onImagePromptChange={handleImagePromptChange}
-          onVideoPromptChange={handleVideoPromptChange}
-          onGenerateEditorContent={handleGenerateSceneEditorContent}
-          onSelectedVisualTypeChange={handleSelectedVisualTypeChange}
-          onDurationChange={handleDurationChange}
-          onAddParagraphScene={handleAddParagraphScene}
-          onOpenSettings={() => setShowSettings(true)}
-          onRequestProviderSetup={(kind) => openApiModal({
-            title: kind === 'audio' ? '오디오 / 자막 기능 연결' : kind === 'video' ? '영상 기능 연결' : '텍스트 AI 연결',
-            description: kind === 'audio'
-              ? '현재 위치에서 바로 오디오와 자막 생성을 이어가려면 ElevenLabs 키를 연결해 주세요.'
-              : kind === 'video'
-                ? '현재 위치에서 바로 영상 변환을 이어가려면 Google AI Studio 키를 연결해 주세요.'
-                : '현재 위치에서 바로 AI 보조 기능을 쓰려면 Google AI Studio 키를 연결해 주세요.',
-            focusField: kind === 'audio' ? 'elevenLabs' : 'openRouter',
-          })}
-          isExporting={isVideoGenerating}
-          animatingIndices={animatingIndices}
-          backgroundMusicTracks={backgroundMusicTracks}
-          activeBackgroundTrackId={activeBackgroundTrackId}
-          onSelectBackgroundTrack={handleSelectBackgroundTrack}
-          onCreateBackgroundTrack={createAnotherBackgroundTrack}
-          onDeleteBackgroundTrack={handleDeleteBackgroundTrack}
-          onExtendBackgroundTrack={handleExtendBackgroundTrack}
-          backgroundMusicSceneConfig={backgroundMusicSceneConfig}
-          onBackgroundMusicSceneChange={updateBackgroundMusicScene}
-          onAutoFillBackgroundMusicMood={handleAutoFillBackgroundMusicMood}
-          isMuteMode={isMuteProject}
-          isNarrationAudioEnabled={isNarrationAudioEnabled}
-          previewMix={previewMix}
-          onPreviewMixChange={handlePreviewMixChange}
-          currentTopic={draft.topic}
-          totalCost={currentCost || undefined}
-          isGenerating={isGeneratingScenes}
-          progressMessage={progressMessage}
-          progressPercent={taskProgressPercent}
-          progressLabel={isVideoGenerating ? '최종 MP4 출력 진행률' : isGeneratingAllVideos ? '전체 씬 영상 생성 진행률' : isGeneratingScenes ? '씬 생성 진행률' : '현재 작업 진행률'}
-          sceneProgressMap={sceneProgressMap}
-          finalVideoUrl={finalVideoUrl}
-          finalVideoTitle={finalVideoTitle}
-          finalVideoDuration={finalVideoDuration}
-          previewVideoStatus={previewVideoStatus}
-          previewVideoMessage={previewVideoMessage}
-          onPreparePreviewVideo={handlePreparePreviewVideo}
-          isPreparingPreviewVideo={isPreparingPreviewVideo}
-          onGenerateThumbnail={handleGenerateThumbnail}
-          isThumbnailGenerating={isThumbnailGenerating}
-          onGenerateAllImages={() => void handleGenerate({ preserveExistingCards: true, generateAudio: false })}
-          onGenerateAllVideos={() => void handleGenerateAllVideos()}
-          isGeneratingAllVideos={isGeneratingAllVideos}
-          imageModelSelector={{
-            currentId: selectedImageModelId,
-            currentLabel: selectedImageModelLabel,
-            options: quickImageModelCardOptions,
-            onSelect: handleQuickImageModelSelect,
-          }}
-          videoModelSelector={{
-            currentId: selectedVideoModel,
-            currentLabel: selectedVideoModelLabel,
-            options: quickVideoModelCardOptions,
-            onSelect: handleQuickVideoModelSelect,
-          }}
-          audioModelSelector={isNarrationAudioEnabled ? {
-            currentId: selectedAudioModelMeta.currentId,
-            currentLabel: selectedAudioModelMeta.currentLabel,
-            options: quickAudioModelCardOptions,
-            onSelect: handleQuickAudioModelSelect,
-          } : undefined}
-          backgroundMusicModelSelector={{
-            currentId: backgroundMusicSceneConfig.modelId,
-            currentLabel: selectedBackgroundMusicModelLabel,
-            options: backgroundMusicModelCardOptions,
-            onSelect: (modelId) => {
-              updateBackgroundMusicScene({ enabled: true, modelId });
-            },
-          }}
-          audioTtsSelectionFlow={isNarrationAudioEnabled ? {
-            currentProvider: resolveSceneTtsOptions().provider,
-            currentModelId: resolveSceneTtsOptions().modelId,
-            currentVoiceId: resolveSceneTtsOptions().voiceId,
-            googleApiKey: studioState?.providers?.openRouterApiKey || null,
-            elevenLabsApiKey: studioState?.providers?.elevenLabsApiKey || null,
-            hasElevenLabsApiKey: Boolean(studioState?.providers?.elevenLabsApiKey),
-            elevenLabsVoices: sceneElevenLabsVoices,
-            voiceReferenceAudioData: resolveSceneTtsOptions().voiceReferenceAudioData,
-            voiceReferenceMimeType: resolveSceneTtsOptions().voiceReferenceMimeType,
-            voiceReferenceName: draft.voiceReferenceName || studioState?.routing?.voiceReferenceName || null,
-            onApply: (selection) => {
-              applyQuickAudioSelection(selection);
-            },
-          } : undefined}
-          onFooterBack={handleGoBackToWorkflow}
-          footerBackLabel="이전으로"
-          thumbnailToolbarRef={thumbnailToolbarRef}
-          onDeleteParagraphScene={handleDeleteParagraphScene}
-          storageDir={studioState.storageDir}
-          projectId={currentProjectId}
-          projectNumber={currentProjectSummary?.projectNumber || null}
-          selectedThumbnailId={currentProjectSummary?.selectedThumbnailId || null}
-          onSceneReorder={handleSceneReorder}
-          onSplitScene={handleSplitScene}
-          onPinSceneAsThumbnail={handlePinSceneAsThumbnail}
-          onReuseGlobalAsset={handleReuseGlobalAsset}
-          workspaceTab={sceneStudioWorkspaceTab}
-          onWorkspaceTabChange={setSceneStudioWorkspaceTab}
-        />
+        {sceneStudioWorkspaceTab === 'timeline' ? (
+          generatedData.length ? (
+            <div className="overflow-hidden rounded-[28px] border border-slate-800 bg-[#050b15] shadow-[0_24px_60px_-32px_rgba(15,23,42,0.55)]">
+              <TimelineWorkbench
+                projectId={currentProjectId}
+                data={generatedData}
+                backgroundMusicTracks={backgroundMusicTracks}
+                previewMix={previewMix}
+                selectedThumbnailId={currentProjectSummary?.selectedThumbnailId || null}
+                onDurationChange={handleDurationChange}
+                onSceneReorder={handleSceneReorder}
+                onSplitScene={handleSplitScene}
+                onPinSceneAsThumbnail={handlePinSceneAsThumbnail}
+                onReuseGlobalAsset={handleReuseGlobalAsset}
+                onBackgroundTrackTimelineChange={handleBackgroundTrackTimelineChange}
+                onUndoTimelineChange={handleUndoTimelineChange}
+                canUndoTimelineChange={Boolean(timelineUndoSnapshot)}
+                narrationLabel={isNarrationAudioEnabled ? selectedAudioModelMeta.currentLabel : undefined}
+              />
+            </div>
+          ) : (
+            <div className="rounded-[28px] border border-slate-200 bg-white p-8 text-center shadow-sm">
+              <div className="text-4xl">🎬</div>
+              <h3 className="mt-4 text-xl font-black text-slate-900">타임라인을 열 준비가 끝났습니다</h3>
+              <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">아직 씬이 없어서 비어 보일 수 있습니다. 아래 버튼으로 문단(씬)을 추가하면 즉시 타임라인과 Step6 카드 편집에 같은 데이터가 연결됩니다.</p>
+              <div className="mx-auto mt-5 max-w-md">
+                <button
+                  type="button"
+                  onClick={() => void handleAddParagraphScene()}
+                  className="flex w-full items-center justify-center gap-3 rounded-[24px] border border-dashed border-blue-300 bg-blue-50 px-5 py-5 text-center transition hover:bg-blue-100"
+                >
+                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-600 text-2xl font-black text-white">+</span>
+                  <span className="text-left">
+                    <span className="block text-sm font-black text-slate-900">문단 추가</span>
+                    <span className="block text-xs leading-5 text-slate-500">추가한 씬은 바로 타임라인에서 길이, 순서, 배경음과 함께 조절할 수 있습니다.</span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          )
+        ) : (
+          <SceneStudioResultPanel
+            data={generatedData}
+            onRegenerateImage={handleRegenerateImage}
+            onRegenerateAudio={isNarrationAudioEnabled ? handleRegenerateAudio : undefined}
+            onDeleteAllAudio={isNarrationAudioEnabled ? (() => void handleDeleteAllGeneratedAudio()) : undefined}
+            onExportVideo={triggerVideoExport}
+            onGenerateAnimation={handleGenerateAnimation}
+            onNarrationChange={handleNarrationChange}
+            onImagePromptChange={handleImagePromptChange}
+            onVideoPromptChange={handleVideoPromptChange}
+            onGenerateEditorContent={handleGenerateSceneEditorContent}
+            onSelectedVisualTypeChange={handleSelectedVisualTypeChange}
+            onDurationChange={handleDurationChange}
+            onAddParagraphScene={handleAddParagraphScene}
+            onOpenSettings={() => setShowSettings(true)}
+            onRequestProviderSetup={(kind) => openApiModal({
+              title: kind === 'audio' ? '오디오 / 자막 기능 연결' : kind === 'video' ? '영상 기능 연결' : '텍스트 AI 연결',
+              description: kind === 'audio'
+                ? '현재 위치에서 바로 오디오와 자막 생성을 이어가려면 ElevenLabs 키를 연결해 주세요.'
+                : kind === 'video'
+                  ? '현재 위치에서 바로 영상 변환을 이어가려면 Google AI Studio 키를 연결해 주세요.'
+                  : '현재 위치에서 바로 AI 보조 기능을 쓰려면 Google AI Studio 키를 연결해 주세요.',
+              focusField: kind === 'audio' ? 'elevenLabs' : 'openRouter',
+            })}
+            isExporting={isVideoGenerating}
+            animatingIndices={animatingIndices}
+            backgroundMusicTracks={backgroundMusicTracks}
+            activeBackgroundTrackId={activeBackgroundTrackId}
+            onSelectBackgroundTrack={handleSelectBackgroundTrack}
+            onCreateBackgroundTrack={createAnotherBackgroundTrack}
+            onDeleteBackgroundTrack={handleDeleteBackgroundTrack}
+            onExtendBackgroundTrack={handleExtendBackgroundTrack}
+            backgroundMusicSceneConfig={backgroundMusicSceneConfig}
+            onBackgroundMusicSceneChange={updateBackgroundMusicScene}
+            onAutoFillBackgroundMusicMood={handleAutoFillBackgroundMusicMood}
+            isMuteMode={isMuteProject}
+            isNarrationAudioEnabled={isNarrationAudioEnabled}
+            previewMix={previewMix}
+            onPreviewMixChange={handlePreviewMixChange}
+            currentTopic={draft.topic}
+            totalCost={currentCost || undefined}
+            isGenerating={isGeneratingScenes}
+            progressMessage={progressMessage}
+            progressPercent={taskProgressPercent}
+            progressLabel={isVideoGenerating ? '최종 MP4 출력 진행률' : isGeneratingAllVideos ? '전체 씬 영상 생성 진행률' : isGeneratingScenes ? '씬 생성 진행률' : '현재 작업 진행률'}
+            sceneProgressMap={sceneProgressMap}
+            finalVideoUrl={finalVideoUrl}
+            finalVideoTitle={finalVideoTitle}
+            finalVideoDuration={finalVideoDuration}
+            previewVideoStatus={previewVideoStatus}
+            previewVideoMessage={previewVideoMessage}
+            onPreparePreviewVideo={handlePreparePreviewVideo}
+            isPreparingPreviewVideo={isPreparingPreviewVideo}
+            onGenerateThumbnail={handleGenerateThumbnail}
+            isThumbnailGenerating={isThumbnailGenerating}
+            onGenerateAllImages={() => void handleGenerate({ preserveExistingCards: true, generateAudio: false })}
+            onGenerateAllVideos={() => void handleGenerateAllVideos()}
+            isGeneratingAllVideos={isGeneratingAllVideos}
+            imageModelSelector={{
+              currentId: selectedImageModelId,
+              currentLabel: selectedImageModelLabel,
+              options: quickImageModelCardOptions,
+              onSelect: handleQuickImageModelSelect,
+            }}
+            videoModelSelector={{
+              currentId: selectedVideoModel,
+              currentLabel: selectedVideoModelLabel,
+              options: quickVideoModelCardOptions,
+              onSelect: handleQuickVideoModelSelect,
+            }}
+            audioModelSelector={isNarrationAudioEnabled ? {
+              currentId: selectedAudioModelMeta.currentId,
+              currentLabel: selectedAudioModelMeta.currentLabel,
+              options: quickAudioModelCardOptions,
+              onSelect: handleQuickAudioModelSelect,
+            } : undefined}
+            backgroundMusicModelSelector={{
+              currentId: backgroundMusicSceneConfig.modelId,
+              currentLabel: selectedBackgroundMusicModelLabel,
+              options: backgroundMusicModelCardOptions,
+              onSelect: (modelId) => {
+                updateBackgroundMusicScene({ enabled: true, modelId });
+              },
+            }}
+            audioTtsSelectionFlow={isNarrationAudioEnabled ? {
+              currentProvider: resolveSceneTtsOptions().provider,
+              currentModelId: resolveSceneTtsOptions().modelId,
+              currentVoiceId: resolveSceneTtsOptions().voiceId,
+              googleApiKey: studioState?.providers?.openRouterApiKey || null,
+              elevenLabsApiKey: studioState?.providers?.elevenLabsApiKey || null,
+              hasElevenLabsApiKey: Boolean(studioState?.providers?.elevenLabsApiKey),
+              elevenLabsVoices: sceneElevenLabsVoices,
+              voiceReferenceAudioData: resolveSceneTtsOptions().voiceReferenceAudioData,
+              voiceReferenceMimeType: resolveSceneTtsOptions().voiceReferenceMimeType,
+              voiceReferenceName: draft.voiceReferenceName || studioState?.routing?.voiceReferenceName || null,
+              onApply: (selection) => {
+                applyQuickAudioSelection(selection);
+              },
+            } : undefined}
+            onFooterBack={handleGoBackToWorkflow}
+            footerBackLabel="이전으로"
+            thumbnailToolbarRef={thumbnailToolbarRef}
+            onDeleteParagraphScene={handleDeleteParagraphScene}
+            storageDir={studioState.storageDir}
+            projectId={currentProjectId}
+            projectNumber={currentProjectSummary?.projectNumber || null}
+            selectedThumbnailId={currentProjectSummary?.selectedThumbnailId || null}
+            onSceneReorder={handleSceneReorder}
+            onSplitScene={handleSplitScene}
+            onPinSceneAsThumbnail={handlePinSceneAsThumbnail}
+            onReuseGlobalAsset={handleReuseGlobalAsset}
+            onBackgroundTrackTimelineChange={handleBackgroundTrackTimelineChange}
+            onUndoTimelineChange={handleUndoTimelineChange}
+            canUndoTimelineChange={Boolean(timelineUndoSnapshot)}
+            timelineNarrationLabel={isNarrationAudioEnabled ? selectedAudioModelMeta.currentLabel : undefined}
+            workspaceTab={sceneStudioWorkspaceTab}
+            onWorkspaceTabChange={setSceneStudioWorkspaceTab}
+          />
+        )}
         </>
         )}
       </main>

@@ -1417,7 +1417,8 @@ const App: React.FC<AppProps> = ({ routeStep = null }) => {
 
   const handleDurationChange = (index: number, duration: number) => {
     requestProjectSave('input');
-    setGeneratedData((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, targetDuration: Math.min(6, Math.max(3, duration)) } : item));
+    const safeDuration = Math.min(30, Math.max(0.1, Number(duration.toFixed(1))));
+    setGeneratedData((prev) => prev.map((item, itemIndex) => itemIndex === index ? { ...item, targetDuration: safeDuration } : item));
   };
 
   return (

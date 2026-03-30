@@ -2,7 +2,6 @@
 
 import React from 'react';
 import { BackgroundMusicTrack, GeneratedAsset, PreviewMixSettings } from '../../types';
-import { getAspectRatioClass } from '../../utils/aspectRatio';
 import { exportAssetsToZip, exportCapCutSubtitlePackage, exportDavinciResolvePackage } from '../../services/exportService';
 import { downloadProjectZip } from '../../utils/csvHelper';
 import { downloadSrt } from '../../services/srtService';
@@ -110,7 +109,7 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
   const narrationVolume = safePreviewMix.narrationVolume ?? 0.5;
   const backgroundMusicVolume = safePreviewMix.backgroundMusicVolume ?? 0.5;
   const previewAspectRatio = sequenceScene?.aspectRatio || data[0]?.aspectRatio || '16:9';
-  const hasPreviewRenderStarted = previewVideoStatus !== 'idle' || Boolean(isPreparingPreviewVideo);
+  const hasPreviewRenderStarted = previewVideoStatus !== 'idle' || Boolean(isPreparingPreviewVideo) || Boolean(finalVideoUrl);
   const canShowRenderedPreview = Boolean(finalVideoUrl);
   const showFinalRenderButton = Boolean(onPreparePreviewVideo && !isPreparingPreviewVideo);
   const showFinalOutputButton = Boolean(canShowRenderedPreview && onExportVideo);
@@ -121,11 +120,7 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
     && (progressMessage || activeOverallProgress !== null),
   );
   const canExportDavinciPackage = Boolean(canShowRenderedPreview && finalVideoUrl && !isPreparingPreviewVideo && !isExporting);
-  const mergedPreviewShellClass = previewAspectRatio === '9:16'
-    ? 'mx-auto w-full max-w-[240px] sm:max-w-[280px]'
-    : previewAspectRatio === '1:1'
-      ? 'mx-auto w-full max-w-[320px] sm:max-w-[360px]'
-      : 'mx-auto w-full max-w-[560px]';
+  const mergedPreviewShellClass = 'mx-auto flex h-[600px] w-full max-w-[1200px] items-center justify-center';
 
   const handleExportDavinciPackage = async () => {
     if (isExportingDavinciPackage || !canExportDavinciPackage) return;
@@ -159,7 +154,7 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/60 p-3 sm:p-6" onClick={onClose}>
       <div className="flex min-h-full items-center justify-center" onClick={(event) => event.stopPropagation()}>
-        <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
+        <div className="flex max-h-[92vh] w-full max-w-[1280px] flex-col overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-2xl">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4 sm:px-6">
             <div>
               <div className="text-xs font-black uppercase tracking-[0.24em] text-blue-600">결과 미리보기</div>
@@ -343,7 +338,7 @@ const SceneStudioPreviewPage: React.FC<SceneStudioPreviewPageProps> = ({
                             <video
                               key={finalVideoUrl!}
                               src={finalVideoUrl!}
-                              className={`${getAspectRatioClass(previewAspectRatio)} w-full rounded-[20px] bg-black object-contain`}
+                              className="h-full w-full rounded-[20px] bg-black object-contain"
                               controls
                               playsInline
                               preload="metadata"

@@ -127,11 +127,14 @@ interface ResultTableProps {
   onPinSceneAsThumbnail?: (index: number) => void;
   onReuseGlobalAsset?: (index: number, asset: GlobalAssetLibraryItem) => void;
   onBackgroundTrackTimelineChange?: (trackId: string, patch: { timelineStartSeconds?: number | null; timelineEndSeconds?: number | null }) => void;
+  onUndoTimelineChange?: () => void;
+  canUndoTimelineChange?: boolean;
   imageModelSelector?: QuickModelSelector;
   videoModelSelector?: QuickModelSelector;
   audioModelSelector?: QuickModelSelector;
   backgroundMusicModelSelector?: QuickModelSelector;
   audioTtsSelectionFlow?: AudioTtsSelectionFlow;
+  timelineNarrationLabel?: string;
   workspaceTab?: 'scene' | 'timeline';
   onWorkspaceTabChange?: (tab: 'scene' | 'timeline') => void;
 }
@@ -403,13 +406,14 @@ const ResultTable: React.FC<ResultTableProps> = ({
   onPinSceneAsThumbnail,
   onReuseGlobalAsset,
   onBackgroundTrackTimelineChange,
+  onUndoTimelineChange,
+  canUndoTimelineChange,
   workspaceTab,
   onWorkspaceTabChange,
+  timelineNarrationLabel,
 }) => {
   const narrationAudioEnabled = !isMuteMode && isNarrationAudioEnabled;
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewSelectionMode, setPreviewSelectionMode] = useState<'all' | 'range'>('all');
-  const [timelineRangePreview, setTimelineRangePreview] = useState<{ startIndex: number; endIndex: number } | null>(null);
   const downloadQuality: 'preview' | 'final' = 'final';
   const [sequenceSceneIndex, setSequenceSceneIndex] = useState(0);
   const [sequencePlaying, setSequencePlaying] = useState(false);
@@ -422,6 +426,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const previewSequenceTimerRef = useRef<number | null>(null);
   const bgmStripRef = useRef<HTMLDivElement | null>(null);
   const sceneStripRef = useRef<HTMLDivElement | null>(null);
+  const timelineWorkbenchRef = useRef<HTMLDivElement | null>(null);
   const sceneCardRefs = useRef<Record<number, HTMLDivElement | null>>({});
   const sceneMediaStripRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const [previewImageMap, setPreviewImageMap] = useState<Record<string, string>>({});
@@ -439,7 +444,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   const [activeModelPicker, setActiveModelPicker] = useState<{ index: number; kind: ModelPickerKind } | null>(null);
   const [backgroundMusicPickerOpen, setBackgroundMusicPickerOpen] = useState(false);
   const [sceneInlineSettingsOpen, setSceneInlineSettingsOpen] = useState<Record<number, boolean>>({});
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'scene' | 'timeline'>(() => workspaceTab || 'scene');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'scene' | 'timeline'>(() => workspaceTab || 'timeline');
   const sceneWorkspaceScrollTopRef = useRef(0);
   const workspaceTabInitializedRef = useRef(false);
   const sceneActionLocksRef = useRef<Record<string, boolean>>({});
@@ -485,7 +490,14 @@ const ResultTable: React.FC<ResultTableProps> = ({
     }
     if (activeWorkspaceTab === 'timeline') {
       sceneWorkspaceScrollTopRef.current = window.scrollY;
-      window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'auto' }));
+      window.requestAnimationFrame(() => {
+        const top = timelineWorkbenchRef.current?.getBoundingClientRect().top;
+        if (typeof top === 'number' && Number.isFinite(top)) {
+          window.scrollTo({ top: Math.max(0, window.scrollY + top - 24), behavior: 'auto' });
+          return;
+        }
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      });
       return;
     }
     const restoreTop = sceneWorkspaceScrollTopRef.current;
@@ -557,17 +569,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
 
   const displayedScenes = data;
 
-  const previewSceneEntries = useMemo(() => {
-    if (previewSelectionMode === 'range' && timelineRangePreview) {
-      const safeStart = Math.max(0, Math.min(timelineRangePreview.startIndex, data.length - 1));
-      const safeEnd = Math.max(safeStart, Math.min(timelineRangePreview.endIndex, data.length - 1));
-      return data.slice(safeStart, safeEnd + 1).map((row, offset) => ({
-        row,
-        originalIndex: safeStart + offset,
-      }));
-    }
-    return data.map((row, index) => ({ row, originalIndex: index }));
-  }, [data, previewSelectionMode, timelineRangePreview]);
+  const previewSceneEntries = useMemo(() => data.map((row, index) => ({ row, originalIndex: index })), [data]);
 
   const previewSceneData = previewSceneEntries.map((entry) => entry.row);
   const sequenceSceneEntry = previewSceneEntries[sequenceSceneIndex] || null;
@@ -1037,15 +1039,13 @@ const ResultTable: React.FC<ResultTableProps> = ({
     event.preventDefault();
   };
 
-  const openPreviewModal = async (mode: 'all' | 'range' = 'all') => {
+  const openPreviewModal = async () => {
     if (isResultPreviewLocked) return;
-    setPreviewSelectionMode(mode);
     setPreviewOpen(true);
   };
 
   const openPreviewAtScene = (index: number, autoplay: boolean = true) => {
-    setPreviewSelectionMode('all');
-    void openPreviewModal('all');
+    void openPreviewModal();
     setSequenceSceneIndex(index);
     if (!autoplay) return;
     window.setTimeout(() => {
@@ -1213,14 +1213,7 @@ const ResultTable: React.FC<ResultTableProps> = ({
   }, [data, narrationAudioEnabled, sceneAudioHistory, sceneAudioIndices, sceneMediaIndices, scenePreviewModes]);
 
 
-  const previewModalData = useMemo(() => {
-    if (previewSelectionMode === 'range' && timelineRangePreview) {
-      const safeStart = Math.max(0, Math.min(timelineRangePreview.startIndex, resolvedSceneData.length - 1));
-      const safeEnd = Math.max(safeStart, Math.min(timelineRangePreview.endIndex, resolvedSceneData.length - 1));
-      return resolvedSceneData.slice(safeStart, safeEnd + 1);
-    }
-    return resolvedSceneData;
-  }, [previewSelectionMode, resolvedSceneData, timelineRangePreview]);
+  const previewModalData = useMemo(() => resolvedSceneData, [resolvedSceneData]);
 
   const previewModalSummary = useMemo(() => ({
     imageCount: previewModalData.filter((item) => item.imageData).length,
@@ -1670,28 +1663,29 @@ const ResultTable: React.FC<ResultTableProps> = ({
           <div className="inline-flex rounded-2xl border border-slate-200 bg-white p-1 shadow-sm">
             <button
               type="button"
-              onClick={() => handleWorkspaceTabChange('scene')}
-              className={`rounded-2xl px-4 py-2 text-sm font-black transition ${activeWorkspaceTab === 'scene' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
-            >
-              씬 편집
-            </button>
-            <button
-              type="button"
               onClick={() => handleWorkspaceTabChange('timeline')}
               className={`rounded-2xl px-4 py-2 text-sm font-black transition ${activeWorkspaceTab === 'timeline' ? 'bg-violet-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
             >
               타임라인
+            </button>
+            <button
+              type="button"
+              onClick={() => handleWorkspaceTabChange('scene')}
+              className={`rounded-2xl px-4 py-2 text-sm font-black transition ${activeWorkspaceTab === 'scene' ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'}`}
+            >
+              씬 편집
             </button>
           </div>
           <div className="text-xs font-bold leading-5 text-slate-500">타임라인 탭은 Step6와 같은 데이터에 연결됩니다.</div>
         </div>
 
         {activeWorkspaceTab === 'timeline' ? (
-          <div className="mt-5">
+          <div ref={timelineWorkbenchRef} className="mt-5">
             <TimelineWorkbench
               projectId={projectId}
               data={data}
               backgroundMusicTracks={backgroundMusicTracks}
+              previewMix={previewMix}
               selectedThumbnailId={selectedThumbnailId}
               onDurationChange={onDurationChange}
               onSceneReorder={onSceneReorder}
@@ -1699,11 +1693,9 @@ const ResultTable: React.FC<ResultTableProps> = ({
               onPinSceneAsThumbnail={onPinSceneAsThumbnail}
               onReuseGlobalAsset={onReuseGlobalAsset}
               onBackgroundTrackTimelineChange={onBackgroundTrackTimelineChange}
-              onPreviewRange={(range) => {
-                setTimelineRangePreview(range);
-                setSequenceSceneIndex(0);
-                void openPreviewModal('range');
-              }}
+              onUndoTimelineChange={onUndoTimelineChange}
+              canUndoTimelineChange={canUndoTimelineChange}
+              narrationLabel={timelineNarrationLabel}
             />
           </div>
         ) : null}
@@ -2455,31 +2447,17 @@ const ResultTable: React.FC<ResultTableProps> = ({
             >
               {activeWorkspaceTab === 'timeline' ? '씬 편집 보기' : '타임라인 보기'}
             </button>
-            {timelineRangePreview ? (
-              <button
-                type="button"
-                onClick={() => {
-                  setSequenceSceneIndex(0);
-                  void openPreviewModal('range');
-                }}
-                disabled={isResultPreviewLocked}
-                title={isResultPreviewLocked ? resultPreviewLockMessage : '선택 범위 미리보기'}
-                className="min-w-[140px] rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-400"
-              >
-                범위 미리보기
-              </button>
-            ) : null}
             <button
               type="button"
               onClick={() => {
                 setSequenceSceneIndex(0);
-                void openPreviewModal('all');
+                void openPreviewModal();
               }}
               disabled={isResultPreviewLocked}
               title={isResultPreviewLocked ? resultPreviewLockMessage : '결과 미리보기'}
               className="min-w-[140px] rounded-full bg-slate-900 px-6 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:bg-slate-300 disabled:text-slate-500 disabled:hover:bg-slate-300"
             >
-              {isResultPreviewLocked ? '생성 완료 후 미리보기' : previewSelectionMode === 'range' ? '전체 미리보기' : '결과 미리보기'}
+              {isResultPreviewLocked ? '생성 완료 후 미리보기' : '결과 미리보기'}
             </button>
           </div>
         </div>

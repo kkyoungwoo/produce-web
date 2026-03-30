@@ -1430,8 +1430,11 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
     setIsCheckingProviders((prev) => ({ ...prev, [field]: true }));
     try {
       const result = await validateProviderConnection(kind, value);
-      setProviderFeedback((prev) => ({ ...prev, [field]: result }));
-      return result;
+      const normalized = result?.tone === 'success'
+        ? { tone: 'success' as const, message: '연결되었습니다.' }
+        : result;
+      setProviderFeedback((prev) => ({ ...prev, [field]: normalized }));
+      return normalized;
     } finally {
       setIsCheckingProviders((prev) => ({ ...prev, [field]: false }));
     }
@@ -1481,7 +1484,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
       setYoutubeConnectionState({
         isChecking: false,
         tone: 'success',
-        message: parts.length ? `연결됨: ${parts.join(' · ')}` : '유튜브 계정 연결이 확인되었습니다.',
+        message: '연결되었습니다.',
       });
       stopYoutubeConnectPolling();
       closeYoutubePopup();
@@ -1798,7 +1801,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 {isCheckingYoutubeFields.googleClientId ? '확인 중...' : '연결 확인'}
               </button>
               {youtubeFieldFeedback.googleClientId?.message ? (
-                <p className={`mt-2 text-xs ${youtubeFieldFeedback.googleClientId.tone === 'success' ? 'text-emerald-600' : youtubeFieldFeedback.googleClientId.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+                <p className={`mt-2 text-xs ${youtubeFieldFeedback.googleClientId.tone === 'success' ? 'text-blue-600' : youtubeFieldFeedback.googleClientId.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
                   {youtubeFieldFeedback.googleClientId.message}
                 </p>
               ) : null}
@@ -1838,7 +1841,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 {isCheckingYoutubeFields.googleClientSecret ? '확인 중...' : '연결 확인'}
               </button>
               {youtubeFieldFeedback.googleClientSecret?.message ? (
-                <p className={`mt-2 text-xs ${youtubeFieldFeedback.googleClientSecret.tone === 'success' ? 'text-emerald-600' : youtubeFieldFeedback.googleClientSecret.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+                <p className={`mt-2 text-xs ${youtubeFieldFeedback.googleClientSecret.tone === 'success' ? 'text-blue-600' : youtubeFieldFeedback.googleClientSecret.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
                   {youtubeFieldFeedback.googleClientSecret.message}
                 </p>
               ) : null}
@@ -1865,8 +1868,8 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
               유튜브 연결 시작
             </button>
           </div>
-          {youtubeConnectionState?.message ? (
-            <p className={`mt-2 text-xs ${youtubeConnectionState.tone === 'success' ? 'text-emerald-600' : youtubeConnectionState.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>
+          {youtubeConnectionState?.tone === 'success' && youtubeConnectionState?.message ? (
+            <p className="mt-2 text-xs text-blue-600">
               {youtubeConnectionState.message}
             </p>
           ) : null}
@@ -1948,7 +1951,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                   </button>
                 </div>
                 <button type="button" onClick={() => void runProviderCheck('openRouterApiKey')} disabled={!providerValues.openRouterApiKey.trim() || isCheckingProviders.openRouterApiKey} className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400">{isCheckingProviders.openRouterApiKey ? '확인 중...' : '연결 확인'}</button>
-                {providerFeedback.openRouterApiKey?.message ? <p className="mt-2 text-xs text-slate-500">{providerFeedback.openRouterApiKey.message}</p> : null}
+                {providerFeedback.openRouterApiKey?.message ? <p className={`mt-2 text-xs ${providerFeedback.openRouterApiKey.tone === 'success' ? 'text-blue-600' : providerFeedback.openRouterApiKey.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>{providerFeedback.openRouterApiKey.message}</p> : null}
               </div>
 
               <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -1977,7 +1980,7 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                   </button>
                 </div>
                 <button type="button" onClick={() => void runProviderCheck('elevenLabsApiKey')} disabled={!providerValues.elevenLabsApiKey.trim() || isCheckingProviders.elevenLabsApiKey} className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400">{isCheckingProviders.elevenLabsApiKey ? '확인 중...' : '연결 확인'}</button>
-                {providerFeedback.elevenLabsApiKey?.message ? <p className="mt-2 text-xs text-slate-500">{providerFeedback.elevenLabsApiKey.message}</p> : null}
+                {providerFeedback.elevenLabsApiKey?.message ? <p className={`mt-2 text-xs ${providerFeedback.elevenLabsApiKey.tone === 'success' ? 'text-blue-600' : providerFeedback.elevenLabsApiKey.tone === 'error' ? 'text-rose-600' : 'text-slate-500'}`}>{providerFeedback.elevenLabsApiKey.message}</p> : null}
               </div>
             </div>
           </section>
@@ -1989,9 +1992,6 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 <h3 className="text-base font-black text-slate-900">텍스트 · 이미지 · 영상 모델</h3>
                 <p className="mt-1 text-xs text-slate-600">공통 카드 팝업에서 최소 비용, 중간 비용, 고비용 단계를 나눠 비교하고 선택할 수 있습니다. API가 없는 항목은 회색으로 잠겨 보여 줍니다.</p>
               </div>
-              <span className={`rounded-full px-3 py-1 text-[11px] font-black ${hasGoogleApiKey ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                {hasGoogleApiKey ? 'Google API 연결됨' : '샘플 모델 기본 세팅'}
-              </span>
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -2103,9 +2103,6 @@ const SettingsDrawer: React.FC<SettingsDrawerProps> = ({ open, studioState, onCl
                 <h3 className="text-base font-black text-slate-900">기본 API 선택</h3>
                 <p className="mt-1 text-xs text-slate-600">API 키가 연결되면 해당 모델이 바로 선택 가능해지고, 연결되지 않은 항목은 회색 비활성 카드로만 보여 드립니다. 헤더 설정은 새 프로젝트 기본값만 바꾸고, 프로젝트 안에서는 Step3/Step6에서 개별로 다시 조정할 수 있습니다.</p>
               </div>
-              <span className={`rounded-full px-3 py-1 text-[11px] font-black ${hasAnyConnectedApi ? 'bg-blue-50 text-blue-700' : 'bg-slate-100 text-slate-500'}`}>
-                {hasAnyConnectedApi ? 'API 연결됨' : '샘플 기본 세팅'}
-              </span>
             </div>
 
             <div className="mt-3 grid gap-3 md:grid-cols-2">

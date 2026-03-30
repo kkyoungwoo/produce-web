@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { BackgroundMusicTrack, GeneratedAsset, TimelineClip, TimelineRangeSelection, TimelineSnapMode } from '../../types';
+import { BackgroundMusicTrack, GeneratedAsset, PreviewMixSettings, TimelineClip, TimelineRangeSelection, TimelineSnapMode } from '../../types';
 import { clampTimelineZoom, msToPx, pxToMs, TIMELINE_MIN_CLIP_MS } from '../../services/timelineMath';
 import { readTimelineUiSnapshot, writeTimelineUiSnapshot } from '../../services/timelineUiSnapshotService';
 import { getGlobalAssetLibrary, GlobalAssetLibraryItem } from '../../services/assetLibraryService';
@@ -12,14 +12,17 @@ interface TimelineWorkbenchProps {
   projectId?: string | null;
   data: GeneratedAsset[];
   backgroundMusicTracks?: BackgroundMusicTrack[];
+  previewMix?: PreviewMixSettings;
   selectedThumbnailId?: string | null;
   onDurationChange?: (index: number, duration: number) => void;
   onSceneReorder?: (fromIndex: number, toIndex: number) => void;
   onSplitScene?: (index: number, splitSeconds: number) => void;
   onPinSceneAsThumbnail?: (index: number) => void;
-  onPreviewRange?: (range: { startIndex: number; endIndex: number }) => void;
   onReuseGlobalAsset?: (index: number, asset: GlobalAssetLibraryItem) => void;
   onBackgroundTrackTimelineChange?: (trackId: string, patch: { timelineStartSeconds?: number | null; timelineEndSeconds?: number | null }) => void;
+  onUndoTimelineChange?: () => void;
+  canUndoTimelineChange?: boolean;
+  narrationLabel?: string;
 }
 
 type TrackKey = 'scene' | 'narration' | 'subtitle' | 'bgm';
@@ -48,7 +51,7 @@ interface DragPreview {
 }
 
 interface TrimPreview {
-  kind: 'resize-left' | 'resize-right';
+  kind: 'move' | 'resize-left' | 'resize-right';
   sceneIndex: number;
   trackKey?: TrackKey | null;
   clipId?: string | null;
@@ -88,9 +91,10 @@ const TRACK_HEIGHT = 58;
 const TRACK_GAP = 8;
 const RULER_HEIGHT = 42;
 const TIMELINE_PADDING_RIGHT = 160;
-const DRAG_THRESHOLD_PX = 4;
-const MIN_SCENE_DURATION_MS = 1000;
-const MIN_BGM_DURATION_MS = 400;
+const DRAG_THRESHOLD_PX = 2;
+const MIN_TIMELINE_EDIT_DURATION_MS = 100;
+const MIN_SCENE_DURATION_MS = MIN_TIMELINE_EDIT_DURATION_MS;
+const MIN_BGM_DURATION_MS = MIN_TIMELINE_EDIT_DURATION_MS;
 const FRAME_STEP_MS = 1000 / 30;
 const PREVIEW_ASPECT_BY_RATIO: Record<NonNullable<GeneratedAsset['aspectRatio']>, string> = {
   '16:9': '16 / 9',
@@ -147,7 +151,8 @@ function formatTimelineTime(ms: number) {
 }
 
 function getSceneDurationSeconds(asset: GeneratedAsset, override?: number | null) {
-  if (typeof override === 'number' && override > 0) return Math.max(1, Number(override.toFixed(1)));
+  const minDurationSeconds = MIN_TIMELINE_EDIT_DURATION_MS / 1000;
+  if (typeof override === 'number' && override > 0) return Math.max(minDurationSeconds, Number(override.toFixed(1)));
   const value = typeof asset.targetDuration === 'number' && asset.targetDuration > 0
     ? asset.targetDuration
     : typeof asset.audioDuration === 'number' && asset.audioDuration > 0
@@ -155,7 +160,7 @@ function getSceneDurationSeconds(asset: GeneratedAsset, override?: number | null
       : typeof asset.videoDuration === 'number' && asset.videoDuration > 0
         ? asset.videoDuration
         : 3;
-  return Math.max(1, Number(value.toFixed(1)));
+  return Math.max(minDurationSeconds, Number(value.toFixed(1)));
 }
 
 function resolveImageSrc(value?: string | null) {
@@ -168,6 +173,12 @@ function resolveVideoSrc(value?: string | null) {
   if (!value) return '';
   if (value.startsWith('data:') || value.startsWith('blob:') || value.startsWith('http')) return value;
   return value;
+}
+
+function resolveAudioSrc(value?: string | null) {
+  if (!value) return '';
+  if (value.startsWith('data:') || value.startsWith('blob:') || value.startsWith('http') || value.startsWith('/')) return value;
+  return `data:audio/mpeg;base64,${value}`;
 }
 
 function tokenizeSubtitle(text: string) {
@@ -200,6 +211,272 @@ function arrayMove<T>(items: T[], fromIndex: number, toIndex: number) {
   if (typeof moved === 'undefined') return items;
   next.splice(toIndex, 0, moved);
   return next;
+}
+
+function sortTrackClips(clips: RenderClip[]) {
+  return [...clips].sort((a, b) => (a.startMs - b.startMs) || a.id.localeCompare(b.id));
+}
+
+function getSceneIndexFromClipId(clipId: string) {
+  const sceneMatch = clipId.match(/^(?:scene|narration)-(\d+)$/);
+  if (sceneMatch) return Number(sceneMatch[1]);
+  const subtitleMatch = clipId.match(/^subtitle-(\d+)-\d+$/);
+  if (subtitleMatch) return Number(subtitleMatch[1]);
+  return null;
+}
+
+function shiftClipBounds(bounds: { startMs: number; endMs: number }, deltaMs: number, minDurationMs: number) {
+  const nextStartMs = Math.max(0, bounds.startMs + deltaMs);
+  const nextEndMs = Math.max(nextStartMs + minDurationMs, bounds.endMs + deltaMs);
+  return { startMs: nextStartMs, endMs: nextEndMs };
+}
+
+function buildNonOverlappingClipBounds(
+  clips: RenderClip[],
+  targetClipId: string,
+  proposedBounds: { startMs: number; endMs: number },
+  minDurationMs: number,
+) {
+  const ordered = sortTrackClips(clips);
+  const targetIndex = ordered.findIndex((clip) => clip.id === targetClipId);
+  if (targetIndex < 0) return { [targetClipId]: proposedBounds };
+
+  const previousClip = targetIndex > 0 ? ordered[targetIndex - 1] : null;
+  const nextBounds: Record<string, { startMs: number; endMs: number }> = {};
+  const durationMs = Math.max(minDurationMs, proposedBounds.endMs - proposedBounds.startMs);
+  const clampedStartMs = Math.max(previousClip?.endMs ?? 0, proposedBounds.startMs);
+  let currentBounds = {
+    startMs: clampedStartMs,
+    endMs: clampedStartMs + durationMs,
+  };
+
+  nextBounds[targetClipId] = currentBounds;
+
+  for (let index = targetIndex + 1; index < ordered.length; index += 1) {
+    const clip = ordered[index];
+    const clipDurationMs = Math.max(minDurationMs, clip.endMs - clip.startMs);
+    if (currentBounds.endMs > clip.startMs) {
+      const shiftedStartMs = currentBounds.endMs;
+      currentBounds = {
+        startMs: shiftedStartMs,
+        endMs: shiftedStartMs + clipDurationMs,
+      };
+      nextBounds[clip.id] = currentBounds;
+      continue;
+    }
+    currentBounds = { startMs: clip.startMs, endMs: clip.endMs };
+  }
+
+  return nextBounds;
+}
+
+function buildIndependentClipBounds(
+  targetClipId: string,
+  proposedBounds: { startMs: number; endMs: number },
+  minDurationMs: number,
+) {
+  const startMs = Math.max(0, proposedBounds.startMs);
+  const durationMs = Math.max(minDurationMs, proposedBounds.endMs - proposedBounds.startMs);
+  return {
+    [targetClipId]: {
+      startMs,
+      endMs: startMs + durationMs,
+    },
+  };
+}
+
+function buildRippleSceneClipBounds(
+  clips: RenderClip[],
+  targetClipId: string,
+  proposedBounds: { startMs: number; endMs: number },
+  minDurationMs: number,
+) {
+  const ordered = sortTrackClips(clips);
+  const targetIndex = ordered.findIndex((clip) => clip.id === targetClipId);
+  if (targetIndex < 0) return { [targetClipId]: proposedBounds };
+
+  const previousClip = targetIndex > 0 ? ordered[targetIndex - 1] : null;
+  const nextBounds: Record<string, { startMs: number; endMs: number }> = {};
+  const durationMs = Math.max(minDurationMs, proposedBounds.endMs - proposedBounds.startMs);
+  const clampedStartMs = Math.max(previousClip?.endMs ?? 0, proposedBounds.startMs);
+  let currentStartMs = clampedStartMs;
+  let currentEndMs = clampedStartMs + durationMs;
+
+  nextBounds[targetClipId] = {
+    startMs: currentStartMs,
+    endMs: currentEndMs,
+  };
+
+  for (let index = targetIndex + 1; index < ordered.length; index += 1) {
+    const clip = ordered[index];
+    const clipDurationMs = Math.max(minDurationMs, clip.endMs - clip.startMs);
+    currentStartMs = currentEndMs;
+    currentEndMs = currentStartMs + clipDurationMs;
+    nextBounds[clip.id] = {
+      startMs: currentStartMs,
+      endMs: currentEndMs,
+    };
+  }
+
+  return nextBounds;
+}
+
+function buildSceneBoundaryTrimPreview(
+  clips: RenderClip[],
+  targetClipId: string,
+  edge: 'left' | 'right',
+  boundaryMs: number,
+  minDurationMs: number,
+) {
+  const ordered = sortTrackClips(clips);
+  const targetIndex = ordered.findIndex((clip) => clip.id === targetClipId);
+  if (targetIndex < 0) {
+    return {
+      boundaryMs,
+      nextDurations: {},
+      clipBounds: { [targetClipId]: { startMs: 0, endMs: Math.max(minDurationMs, boundaryMs) } },
+    };
+  }
+
+  const targetClip = ordered[targetIndex];
+  const previousClip = targetIndex > 0 ? ordered[targetIndex - 1] : null;
+  const nextClip = targetIndex < ordered.length - 1 ? ordered[targetIndex + 1] : null;
+  const nextDurations: Record<number, number> = {};
+  const clipBounds: Record<string, { startMs: number; endMs: number }> = {};
+
+  if (edge === 'right') {
+    const minBoundaryMs = targetClip.startMs + minDurationMs;
+    const maxBoundaryMs = nextClip ? (nextClip.endMs - minDurationMs) : Number.POSITIVE_INFINITY;
+    const clampedBoundaryMs = Math.max(minBoundaryMs, Math.min(maxBoundaryMs, boundaryMs));
+
+    clipBounds[targetClip.id] = {
+      startMs: targetClip.startMs,
+      endMs: clampedBoundaryMs,
+    };
+    nextDurations[targetClip.sceneIndex] = Number(((clampedBoundaryMs - targetClip.startMs) / 1000).toFixed(1));
+
+    if (nextClip) {
+      clipBounds[nextClip.id] = {
+        startMs: clampedBoundaryMs,
+        endMs: nextClip.endMs,
+      };
+      nextDurations[nextClip.sceneIndex] = Number(((nextClip.endMs - clampedBoundaryMs) / 1000).toFixed(1));
+    }
+
+    return {
+      boundaryMs: clampedBoundaryMs,
+      nextDurations,
+      clipBounds,
+    };
+  }
+
+  if (!previousClip) {
+    return {
+      boundaryMs: targetClip.startMs,
+      nextDurations: {
+        [targetClip.sceneIndex]: Number(((targetClip.endMs - targetClip.startMs) / 1000).toFixed(1)),
+      },
+      clipBounds: {
+        [targetClip.id]: {
+          startMs: targetClip.startMs,
+          endMs: targetClip.endMs,
+        },
+      },
+    };
+  }
+
+  const minBoundaryMs = previousClip.startMs + minDurationMs;
+  const maxBoundaryMs = targetClip.endMs - minDurationMs;
+  const clampedBoundaryMs = Math.max(minBoundaryMs, Math.min(maxBoundaryMs, boundaryMs));
+
+  clipBounds[previousClip.id] = {
+    startMs: previousClip.startMs,
+    endMs: clampedBoundaryMs,
+  };
+  clipBounds[targetClip.id] = {
+    startMs: clampedBoundaryMs,
+    endMs: targetClip.endMs,
+  };
+  nextDurations[previousClip.sceneIndex] = Number(((clampedBoundaryMs - previousClip.startMs) / 1000).toFixed(1));
+  nextDurations[targetClip.sceneIndex] = Number(((targetClip.endMs - clampedBoundaryMs) / 1000).toFixed(1));
+
+  return {
+    boundaryMs: clampedBoundaryMs,
+    nextDurations,
+    clipBounds,
+  };
+}
+
+function shiftSceneLinkedOverrides(
+  overrides: Record<string, { startMs: number; endMs: number }>,
+  afterSceneIndex: number,
+  deltaMs: number,
+) {
+  if (Math.abs(deltaMs) < 0.5) return overrides;
+  return Object.entries(overrides).reduce<Record<string, { startMs: number; endMs: number }>>((acc, [key, bounds]) => {
+    const sceneIndex = getSceneIndexFromClipId(key);
+    if (sceneIndex !== null && sceneIndex > afterSceneIndex) {
+      const shifted = shiftClipBounds(bounds, deltaMs, MIN_TIMELINE_EDIT_DURATION_MS);
+      acc[key] = shifted;
+      return acc;
+    }
+    acc[key] = bounds;
+    return acc;
+  }, {});
+}
+
+function isSceneClipOverrideKey(key: string) {
+  return /^scene-\d+$/.test(key);
+}
+
+function stripSceneClipOverrides(overrides: Record<string, { startMs: number; endMs: number }>) {
+  return Object.entries(overrides || {}).reduce<Record<string, { startMs: number; endMs: number }>>((acc, [key, bounds]) => {
+    if (!isSceneClipOverrideKey(key)) acc[key] = bounds;
+    return acc;
+  }, {});
+}
+
+function applySceneClipOverridesToSpans(
+  sceneSpans: SceneSpan[],
+  overrides: Record<string, { startMs: number; endMs: number }>,
+) {
+  return sceneSpans.map((span) => {
+    const bounds = overrides[`scene-${span.index}`];
+    if (!bounds) return span;
+    const startMs = Math.max(0, Math.round(bounds.startMs));
+    const endMs = Math.max(startMs + MIN_SCENE_DURATION_MS, Math.round(bounds.endMs));
+    return {
+      ...span,
+      startMs,
+      endMs,
+      durationMs: endMs - startMs,
+    } satisfies SceneSpan;
+  });
+}
+
+function mergeSceneMasterClipOverrides(
+  current: Record<string, { startMs: number; endMs: number }>,
+  nextSceneBounds: Record<string, { startMs: number; endMs: number }>,
+) {
+  const affectedSceneIndices = new Set<number>();
+  Object.keys(nextSceneBounds).forEach((key) => {
+    const sceneIndex = getSceneIndexFromClipId(key);
+    if (sceneIndex !== null) affectedSceneIndices.add(sceneIndex);
+  });
+
+  if (!affectedSceneIndices.size) return { ...current, ...nextSceneBounds };
+
+  const merged = Object.entries(current).reduce<Record<string, { startMs: number; endMs: number }>>((acc, [key, bounds]) => {
+    const sceneIndex = getSceneIndexFromClipId(key);
+    if (sceneIndex !== null && affectedSceneIndices.has(sceneIndex)) return acc;
+    acc[key] = bounds;
+    return acc;
+  }, {});
+
+  return {
+    ...merged,
+    ...nextSceneBounds,
+  };
 }
 
 function getTrackConfig(hasSubtitle: boolean, hasBgm: boolean) {
@@ -255,6 +532,16 @@ function applySnap(valueMs: number, targets: number[], snapMode: TimelineSnapMod
   return best;
 }
 
+function omitSnapTargets(targets: number[], values: Array<number | null | undefined>) {
+  const forbidden = new Set(
+    values
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+      .map((value) => Math.round(value)),
+  );
+  if (!forbidden.size) return targets;
+  return targets.filter((target) => !forbidden.has(Math.round(target)));
+}
+
 function buildRenderClips(
   data: GeneratedAsset[],
   sceneSpans: SceneSpan[],
@@ -262,6 +549,7 @@ function buildRenderClips(
   subtitleEnabled: boolean,
   totalDurationMs: number,
   backgroundTrackBounds: { startMs: number; endMs: number } | null,
+  narrationLabel?: string,
 ): RenderClip[] {
   const clips: RenderClip[] = [];
   sceneSpans.forEach((span) => {
@@ -299,14 +587,16 @@ function buildRenderClips(
       endMs: span.endMs,
       trimInMs: 0,
       trimOutMs: 0,
-      draggable: false,
-      trimmable: false,
+      draggable: true,
+      trimmable: true,
       splittable: false,
-      resizable: false,
+      resizable: true,
       linkedClipIds: [`scene-${span.index}`],
       locked: false,
       role: 'narrator',
-      label: asset.audioData ? 'Narration ready' : 'TTS pending',
+      label: asset.audioData
+        ? `${asset.sceneNumber || span.index + 1}씬 · ${narrationLabel || 'TTS 준비됨'}`
+        : `${asset.sceneNumber || span.index + 1}씬 · TTS 대기`,
       trackKey: 'narration',
       sceneIndex: span.index,
       accentClass: 'border-violet-500/30 bg-violet-500/12',
@@ -325,10 +615,10 @@ function buildRenderClips(
           endMs: span.endMs,
           trimInMs: 0,
           trimOutMs: 0,
-          draggable: false,
-          trimmable: false,
+          draggable: true,
+          trimmable: true,
           splittable: false,
-          resizable: false,
+          resizable: true,
           linkedClipIds: [`scene-${span.index}`],
           locked: false,
           role: 'caption',
@@ -352,10 +642,10 @@ function buildRenderClips(
             endMs,
             trimInMs: 0,
             trimOutMs: 0,
-            draggable: false,
-            trimmable: false,
+            draggable: true,
+            trimmable: true,
             splittable: false,
-            resizable: false,
+            resizable: true,
             linkedClipIds: [`scene-${span.index}`],
             locked: false,
             role: 'caption',
@@ -386,7 +676,7 @@ function buildRenderClips(
       endMs: safeEndMs,
       trimInMs: 0,
       trimOutMs: 0,
-      draggable: false,
+      draggable: true,
       trimmable: true,
       splittable: false,
       resizable: true,
@@ -414,14 +704,17 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
   projectId,
   data,
   backgroundMusicTracks = [],
+  previewMix,
   selectedThumbnailId,
   onDurationChange,
   onSceneReorder,
   onSplitScene,
   onPinSceneAsThumbnail,
-  onPreviewRange,
   onReuseGlobalAsset,
   onBackgroundTrackTimelineChange,
+  onUndoTimelineChange,
+  canUndoTimelineChange,
+  narrationLabel,
 }) => {
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1.45);
@@ -452,6 +745,18 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
   const playbackPrevTimeRef = useRef<number | null>(null);
   const interactionFrameRef = useRef<number | null>(null);
   const pendingPointerEventRef = useRef<PointerEvent | null>(null);
+  const narrationAudioRef = useRef<HTMLAudioElement | null>(null);
+  const bgmAudioRef = useRef<HTMLAudioElement | null>(null);
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const activeNarrationSceneIndexRef = useRef<number | null>(null);
+  const [bgmWaveform, setBgmWaveform] = useState<number[]>([]);
+  const keyboardStateRef = useRef({
+    data,
+    displayTotalDurationMs: 0,
+    onSceneReorder,
+    projectId,
+    selectedSceneIndices,
+  });
 
   useEffect(() => {
     const snapshot = readTimelineUiSnapshot(projectId);
@@ -522,25 +827,68 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
   const sceneSpans = useMemo(() => getSceneSpans(data, {}), [data]);
   const displaySceneSpans = useMemo(() => (trimPreview?.nextDurations ? getSceneSpans(data, trimPreview.nextDurations) : sceneSpans), [data, sceneSpans, trimPreview]);
   const sceneSpanMap = useMemo(() => new Map(sceneSpans.map((span) => [span.index, span])), [sceneSpans]);
-  const displaySceneSpanMap = useMemo(() => new Map(displaySceneSpans.map((span) => [span.index, span])), [displaySceneSpans]);
   const totalDurationMs = sceneSpans.length ? sceneSpans[sceneSpans.length - 1].endMs : 0;
-  const displayTotalDurationMs = displaySceneSpans.length ? displaySceneSpans[displaySceneSpans.length - 1].endMs : totalDurationMs;
   const trackConfig = useMemo(() => getTrackConfig(subtitleEnabled, backgroundMusicTracks.length > 0), [backgroundMusicTracks.length, subtitleEnabled]);
   const effectiveBackgroundTrackBounds = trimPreview?.backgroundTrackBounds || backgroundTrackBounds;
   const effectiveClipBounds = useMemo(() => ({ ...clipOverrides, ...(trimPreview?.clipBounds || {}) }), [clipOverrides, trimPreview]);
-  const renderClips = useMemo(() => buildRenderClips(data, sceneSpans, backgroundMusicTracks, subtitleEnabled, totalDurationMs, effectiveBackgroundTrackBounds).map((clip) => {
-    if (clip.trackKey === 'scene' || clip.trackKey === 'bgm') return clip;
+  const effectiveRenderSceneSpans = useMemo(() => applySceneClipOverridesToSpans(displaySceneSpans, effectiveClipBounds), [displaySceneSpans, effectiveClipBounds]);
+  const displaySceneSpanMap = useMemo(() => new Map(effectiveRenderSceneSpans.map((span) => [span.index, span])), [effectiveRenderSceneSpans]);
+  const renderBaseTotalDurationMs = useMemo(() => effectiveRenderSceneSpans.reduce((max, span) => Math.max(max, span.endMs), 0), [effectiveRenderSceneSpans]);
+  const renderClips = useMemo(() => buildRenderClips(data, effectiveRenderSceneSpans, backgroundMusicTracks, subtitleEnabled, renderBaseTotalDurationMs, effectiveBackgroundTrackBounds, narrationLabel).map((clip) => {
+    if (clip.trackKey === 'bgm') return clip;
     const override = effectiveClipBounds[clip.id];
-    if (!override) return { ...clip, draggable: true, trimmable: true, resizable: true };
+    const nextClip = override
+      ? {
+          ...clip,
+          startMs: override.startMs,
+          endMs: override.endMs,
+        }
+      : clip;
     return {
-      ...clip,
-      startMs: override.startMs,
-      endMs: override.endMs,
+      ...nextClip,
       draggable: true,
       trimmable: true,
       resizable: true,
     };
-  }), [backgroundMusicTracks, data, effectiveBackgroundTrackBounds, effectiveClipBounds, sceneSpans, subtitleEnabled, totalDurationMs]);
+  }), [backgroundMusicTracks, data, effectiveBackgroundTrackBounds, effectiveClipBounds, effectiveRenderSceneSpans, narrationLabel, renderBaseTotalDurationMs, subtitleEnabled]);
+  const sceneTimelineSpans = useMemo(() => renderClips
+    .filter((clip) => clip.trackKey === 'scene')
+    .map((clip) => ({
+      index: clip.sceneIndex,
+      startMs: clip.startMs,
+      endMs: clip.endMs,
+      durationMs: Math.max(MIN_SCENE_DURATION_MS, clip.endMs - clip.startMs),
+    }))
+    .sort((a, b) => (a.startMs - b.startMs) || (a.index - b.index)), [renderClips]);
+  const sceneTimelineSpanMap = useMemo(() => new Map(sceneTimelineSpans.map((span) => [span.index, span])), [sceneTimelineSpans]);
+  const sceneTimelineSpansByIndex = useMemo(() => data.map((_, index) => sceneTimelineSpanMap.get(index) || sceneSpans[index] || {
+    index,
+    startMs: 0,
+    endMs: MIN_SCENE_DURATION_MS,
+    durationMs: MIN_SCENE_DURATION_MS,
+  }), [data, sceneSpans, sceneTimelineSpanMap]);
+  const trackClipCollections = useMemo(() => ({
+    scene: sortTrackClips(renderClips.filter((clip) => clip.trackKey === 'scene')),
+    narration: sortTrackClips(renderClips.filter((clip) => clip.trackKey === 'narration')),
+    subtitle: sortTrackClips(renderClips.filter((clip) => clip.trackKey === 'subtitle')),
+    bgm: sortTrackClips(renderClips.filter((clip) => clip.trackKey === 'bgm')),
+  }), [renderClips]);
+  const narrationTimelineClips = trackClipCollections.narration;
+  const subtitleTimelineClips = trackClipCollections.subtitle;
+  const displayTotalDurationMs = useMemo(() => {
+    const maxClipEnd = renderClips.reduce((max, clip) => Math.max(max, clip.endMs), totalDurationMs);
+    return Math.max(totalDurationMs, maxClipEnd);
+  }, [renderClips, totalDurationMs]);
+
+  useEffect(() => {
+    keyboardStateRef.current = {
+      data,
+      displayTotalDurationMs,
+      onSceneReorder,
+      projectId,
+      selectedSceneIndices,
+    };
+  }, [data, displayTotalDurationMs, onSceneReorder, projectId, selectedSceneIndices]);
   const totalCanvasWidth = TRACK_LABEL_WIDTH + msToPx(Math.max(displayTotalDurationMs, 1000), zoomLevel) + TIMELINE_PADDING_RIGHT;
   const visibleStartMs = Math.max(0, pxToMs(viewportState.scrollLeft - 220, zoomLevel));
   const visibleEndMs = Math.max(visibleStartMs + 1200, pxToMs(viewportState.scrollLeft + viewportState.width + 220, zoomLevel));
@@ -573,17 +921,30 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
   }, []);
 
   const selectedSceneIndex = selectedSceneIndices[0] ?? 0;
-  const selectedScene = sceneSpans[selectedSceneIndex] || null;
+  const selectedScene = sceneTimelineSpanMap.get(selectedSceneIndex) || sceneSpans[selectedSceneIndex] || null;
   const selectedAsset = data[selectedSceneIndex] || null;
   const selectedImageSrc = useMemo(() => resolveImageSrc(selectedAsset?.imageData), [selectedAsset?.imageData]);
   const selectedVideoSrc = useMemo(() => resolveVideoSrc(selectedAsset?.videoData), [selectedAsset?.videoData]);
-  const effectivePreviewSceneIndex = useMemo(() => {
-    const atPlayhead = sceneSpans.find((span) => playheadMs >= span.startMs && playheadMs < span.endMs);
-    return atPlayhead?.index ?? selectedSceneIndex;
-  }, [playheadMs, sceneSpans, selectedSceneIndex]);
-  const previewSceneAsset = data[effectivePreviewSceneIndex] || selectedAsset;
+  const activeSceneAtPlayhead = useMemo(() => sceneTimelineSpans.find((span) => playheadMs >= span.startMs && playheadMs < span.endMs) || null, [playheadMs, sceneTimelineSpans]);
+  const effectivePreviewSceneIndex = activeSceneAtPlayhead?.index ?? null;
+  const previewSceneAsset = effectivePreviewSceneIndex !== null ? (data[effectivePreviewSceneIndex] || null) : null;
+  const previewSceneSpan = activeSceneAtPlayhead || null;
+  const activeNarrationClip = useMemo(() => narrationTimelineClips.find((clip) => playheadMs >= clip.startMs && playheadMs < clip.endMs) || null, [narrationTimelineClips, playheadMs]);
+  const activeNarrationAsset = activeNarrationClip && activeNarrationClip.sceneIndex >= 0 ? data[activeNarrationClip.sceneIndex] || null : null;
+  const activeSubtitleClip = useMemo(() => subtitleTimelineClips.find((clip) => playheadMs >= clip.startMs && playheadMs < clip.endMs) || null, [playheadMs, subtitleTimelineClips]);
   const previewImageSrc = useMemo(() => resolveImageSrc(previewSceneAsset?.imageData), [previewSceneAsset?.imageData]);
   const previewVideoSrc = useMemo(() => resolveVideoSrc(previewSceneAsset?.videoData), [previewSceneAsset?.videoData]);
+  const previewNarrationSrc = useMemo(() => resolveAudioSrc(activeNarrationAsset?.audioData || previewSceneAsset?.audioData), [activeNarrationAsset?.audioData, previewSceneAsset?.audioData]);
+  const previewSubtitleText = activeSubtitleClip?.label || previewSceneAsset?.narration || '현재 선택한 씬의 나레이션이 여기에 표시됩니다.';
+  const previewSceneProgress = useMemo(() => {
+    if (!previewSceneSpan || previewSceneSpan.durationMs <= 0) return 0;
+    return clamp((playheadMs - previewSceneSpan.startMs) / previewSceneSpan.durationMs, 0, 1);
+  }, [playheadMs, previewSceneSpan]);
+  const previewImageScale = 1 + (previewSceneProgress * 0.06);
+  const primaryBackgroundTrack = backgroundMusicTracks[0] || null;
+  const previewBgmSrc = useMemo(() => resolveAudioSrc(primaryBackgroundTrack?.audioData), [primaryBackgroundTrack?.audioData]);
+  const previewNarrationVolume = Math.max(0, Math.min(1, previewMix?.narrationVolume ?? 0.5));
+  const previewBgmVolume = Math.max(0, Math.min(1, previewMix?.backgroundMusicVolume ?? 0.28));
 
   useEffect(() => {
     if (!backgroundMusicTracks.length) {
@@ -605,7 +966,55 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
     setPreviewMediaLoading(Boolean(previewVideoSrc || previewImageSrc));
   }, [previewImageSrc, previewVideoSrc]);
 
-  const rangeIndices = useMemo(() => getRangeIndices(rangeSelection, sceneSpans), [rangeSelection, sceneSpans]);
+  useEffect(() => {
+    let cancelled = false;
+    const source = previewBgmSrc;
+    if (!source || typeof window === 'undefined') {
+      setBgmWaveform([]);
+      return;
+    }
+    const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext) as (typeof AudioContext | undefined);
+    if (!AudioContextClass) {
+      setBgmWaveform([]);
+      return;
+    }
+    const context = new AudioContextClass();
+
+    const loadWaveform = async () => {
+      try {
+        const response = await fetch(source);
+        const buffer = await response.arrayBuffer();
+        const decoded = await context.decodeAudioData(buffer.slice(0));
+        const channel = decoded.getChannelData(0);
+        const bucketCount = 56;
+        const bucketSize = Math.max(1, Math.floor(channel.length / bucketCount));
+        const nextBars = Array.from({ length: bucketCount }, (_, index) => {
+          const start = index * bucketSize;
+          const end = Math.min(channel.length, start + bucketSize);
+          let peak = 0;
+          for (let cursor = start; cursor < end; cursor += 1) {
+            peak = Math.max(peak, Math.abs(channel[cursor] || 0));
+          }
+          return Number(Math.max(0.08, Math.min(1, peak)).toFixed(3));
+        });
+        if (!cancelled) {
+          setBgmWaveform(nextBars);
+        }
+      } catch {
+        if (!cancelled) setBgmWaveform([]);
+      } finally {
+        void context.close().catch(() => undefined);
+      }
+    };
+
+    void loadWaveform();
+    return () => {
+      cancelled = true;
+      void context.close().catch(() => undefined);
+    };
+  }, [previewBgmSrc]);
+
+  const rangeIndices = useMemo(() => getRangeIndices(rangeSelection, sceneTimelineSpans), [rangeSelection, sceneTimelineSpans]);
 
   const telemetry = useMemo(() => readEditorTelemetry(projectId || null).slice(0, 5), [projectId, telemetryTick]);
   const timelineQa = useMemo(() => runTimelineQa({
@@ -623,17 +1032,19 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
   }), [playheadMs, rangeSelection, renderClips, selectedSceneIndices, snapMode, trackConfig, viewportState.scrollLeft, zoomLevel]);
 
   useEffect(() => {
-    setPlayheadMs((current) => clamp(current, 0, totalDurationMs));
-    if (rangeSelection && rangeSelection.endMs > totalDurationMs) {
+    setPlayheadMs((current) => clamp(current, 0, displayTotalDurationMs));
+    if (rangeSelection && rangeSelection.endMs > displayTotalDurationMs) {
       setRangeSelection({
-        startMs: clamp(rangeSelection.startMs, 0, totalDurationMs),
-        endMs: totalDurationMs,
+        startMs: clamp(rangeSelection.startMs, 0, displayTotalDurationMs),
+        endMs: displayTotalDurationMs,
       });
     }
-  }, [rangeSelection, totalDurationMs]);
+  }, [displayTotalDurationMs, rangeSelection]);
 
   useEffect(() => {
     if (!isPlaying) {
+      narrationAudioRef.current?.pause();
+      bgmAudioRef.current?.pause();
       playbackPrevTimeRef.current = null;
       if (playbackRafRef.current !== null) {
         window.cancelAnimationFrame(playbackRafRef.current);
@@ -648,9 +1059,9 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
       playbackPrevTimeRef.current = timestamp;
       setPlayheadMs((current) => {
         const next = current + delta;
-        if (next >= totalDurationMs) {
+        if (next >= displayTotalDurationMs) {
           setIsPlaying(false);
-          return totalDurationMs;
+          return displayTotalDurationMs;
         }
         return next;
       });
@@ -665,22 +1076,165 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
       }
       playbackPrevTimeRef.current = null;
     };
-  }, [isPlaying, totalDurationMs]);
+  }, [displayTotalDurationMs, isPlaying]);
+
+  useEffect(() => {
+    const narrationElement = narrationAudioRef.current;
+    const bgmElement = bgmAudioRef.current;
+    if (narrationElement) narrationElement.volume = previewNarrationVolume;
+    if (bgmElement) bgmElement.volume = previewBgmVolume;
+  }, [previewBgmVolume, previewNarrationVolume]);
+
+  useEffect(() => {
+    const videoElement = previewVideoRef.current;
+    if (!videoElement || !previewVideoSrc || !previewSceneSpan) {
+      previewVideoRef.current?.pause();
+      return;
+    }
+
+    const sceneOffsetSeconds = Math.max(0, (playheadMs - previewSceneSpan.startMs) / 1000);
+    const applyPlaybackState = () => {
+      const safeDuration = Number.isFinite(videoElement.duration) ? Math.max(0, videoElement.duration) : null;
+      const nextTime = safeDuration === null
+        ? sceneOffsetSeconds
+        : Math.min(sceneOffsetSeconds, Math.max(0, safeDuration - 0.001));
+
+      if (Math.abs((videoElement.currentTime || 0) - nextTime) > 0.08) {
+        try { videoElement.currentTime = nextTime; } catch {}
+      }
+
+      if (isPlaying) {
+        void videoElement.play().catch(() => undefined);
+      } else {
+        videoElement.pause();
+      }
+    };
+
+    if (videoElement.readyState >= 1) {
+      applyPlaybackState();
+      return;
+    }
+
+    const handleLoadedMetadata = () => {
+      applyPlaybackState();
+    };
+
+    videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+    return () => {
+      videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
+    };
+  }, [isPlaying, playheadMs, previewSceneSpan, previewVideoSrc]);
+
+  useEffect(() => {
+    const narrationElement = narrationAudioRef.current;
+    const bgmElement = bgmAudioRef.current;
+
+    if (!isPlaying) {
+      activeNarrationSceneIndexRef.current = effectivePreviewSceneIndex;
+      return;
+    }
+
+    const shouldPlayNarration = Boolean(narrationElement && previewNarrationSrc && activeNarrationClip);
+    if (shouldPlayNarration && narrationElement && activeNarrationClip) {
+      const narrationOffsetSeconds = Math.max(0, (playheadMs - activeNarrationClip.startMs) / 1000);
+      const activeNarrationIndex = activeNarrationClip.sceneIndex >= 0 ? activeNarrationClip.sceneIndex : effectivePreviewSceneIndex;
+      const shouldReloadNarration = activeNarrationSceneIndexRef.current !== activeNarrationIndex || narrationElement.src !== previewNarrationSrc;
+      if (shouldReloadNarration) {
+        narrationElement.src = previewNarrationSrc;
+      }
+      if (Math.abs((narrationElement.currentTime || 0) - narrationOffsetSeconds) > 0.18 || shouldReloadNarration) {
+        try { narrationElement.currentTime = narrationOffsetSeconds; } catch {}
+      }
+      narrationElement.volume = previewNarrationVolume;
+      void narrationElement.play().catch(() => undefined);
+      activeNarrationSceneIndexRef.current = activeNarrationIndex;
+    } else if (narrationElement) {
+      narrationElement.pause();
+      activeNarrationSceneIndexRef.current = effectivePreviewSceneIndex;
+    }
+
+    const currentBgmBounds = effectiveBackgroundTrackBounds || backgroundTrackBounds;
+    if (bgmElement && previewBgmSrc && currentBgmBounds && playheadMs >= currentBgmBounds.startMs && playheadMs <= currentBgmBounds.endMs) {
+      if (bgmElement.src !== previewBgmSrc) {
+        bgmElement.src = previewBgmSrc;
+      }
+      const bgmOffsetSeconds = Math.max(0, (playheadMs - currentBgmBounds.startMs) / 1000);
+      if (Math.abs((bgmElement.currentTime || 0) - bgmOffsetSeconds) > 0.2) {
+        try { bgmElement.currentTime = bgmOffsetSeconds; } catch {}
+      }
+      bgmElement.volume = previewBgmVolume;
+      void bgmElement.play().catch(() => undefined);
+    } else if (bgmElement) {
+      bgmElement.pause();
+    }
+  }, [activeNarrationClip, backgroundTrackBounds, effectiveBackgroundTrackBounds, effectivePreviewSceneIndex, isPlaying, playheadMs, previewBgmSrc, previewBgmVolume, previewNarrationSrc, previewNarrationVolume]);
 
   useEffect(() => {
     const handleGlobalKeyDown = (event: KeyboardEvent) => {
-      if (event.code !== 'Space') return;
-      if (event.altKey || event.ctrlKey || event.metaKey) return;
       if (isEditableKeyboardTarget(event.target)) return;
+
+      if (event.code === 'Space') {
+        if (event.altKey || event.ctrlKey || event.metaKey) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (event.repeat) return;
+        setIsPlaying((current) => !current);
+        return;
+      }
+
+      if (event.code !== 'ArrowLeft' && event.code !== 'ArrowRight') return;
+      if (event.ctrlKey || event.metaKey) return;
       event.preventDefault();
       event.stopPropagation();
-      if (event.repeat) return;
-      setIsPlaying((current) => !current);
+
+      const direction = event.code === 'ArrowRight' ? 1 : -1;
+      const { data: currentData, displayTotalDurationMs: currentDisplayTotalDurationMs, onSceneReorder: currentOnSceneReorder, projectId: currentProjectId, selectedSceneIndices: currentSelectedSceneIndices } = keyboardStateRef.current;
+
+      if (event.altKey && currentSelectedSceneIndices.length && areIndicesContiguous(currentSelectedSceneIndices) && currentOnSceneReorder && currentData.length > 1) {
+        const orderedSelection = [...currentSelectedSceneIndices].sort((a, b) => a - b);
+        const blockStart = orderedSelection[0];
+        const blockEnd = orderedSelection[orderedSelection.length - 1];
+        if ((direction < 0 && blockStart <= 0) || (direction > 0 && blockEnd >= currentData.length - 1)) return;
+
+        const currentOrder = currentData.map((_, index) => index);
+        const nextOrder = direction < 0
+          ? [
+              ...currentOrder.slice(0, blockStart - 1),
+              ...currentOrder.slice(blockStart, blockEnd + 1),
+              currentOrder[blockStart - 1],
+              ...currentOrder.slice(blockEnd + 1),
+            ]
+          : [
+              ...currentOrder.slice(0, blockStart),
+              currentOrder[blockEnd + 1],
+              ...currentOrder.slice(blockStart, blockEnd + 1),
+              ...currentOrder.slice(blockEnd + 2),
+            ];
+
+        let workingOrder = currentOrder;
+        nextOrder.forEach((sceneIndex, desiredIndex) => {
+          const currentIndex = workingOrder.indexOf(sceneIndex);
+          if (currentIndex !== desiredIndex) {
+            currentOnSceneReorder(currentIndex, desiredIndex);
+            workingOrder = arrayMove(workingOrder, currentIndex, desiredIndex);
+          }
+        });
+        setSelectedSceneIndices(orderedSelection.map((index) => index + direction));
+        appendEditorTelemetry(currentProjectId || null, 'timeline-nudge-scene-order', {
+          direction: direction < 0 ? 'previous' : 'next',
+          count: orderedSelection.length,
+        });
+        setTelemetryTick((current) => current + 1);
+        return;
+      }
+
+      const stepMs = event.shiftKey ? 1000 : FRAME_STEP_MS;
+      setPlayheadMs((current) => clamp(current + (direction * stepMs), 0, currentDisplayTotalDurationMs));
     };
 
     const handleGlobalKeyUp = (event: KeyboardEvent) => {
-      if (event.code !== 'Space') return;
-      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.code !== 'Space' && event.code !== 'ArrowLeft' && event.code !== 'ArrowRight') return;
+      if (event.ctrlKey || event.metaKey) return;
       if (isEditableKeyboardTarget(event.target)) return;
       event.preventDefault();
       event.stopPropagation();
@@ -701,15 +1255,33 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
       const viewport = viewportRef.current;
       if (!viewport) return;
       const rect = viewport.getBoundingClientRect();
-      const dx = event.clientX - interaction.startClientX;
+      if (interaction.kind === 'move' || interaction.kind === 'resize-left' || interaction.kind === 'resize-right') {
+        const edgeThresholdPx = 72;
+        const maxScrollLeft = Math.max(0, viewport.scrollWidth - viewport.clientWidth);
+        if (maxScrollLeft > 0) {
+          let scrollDeltaPx = 0;
+          if (event.clientX > rect.right - edgeThresholdPx) {
+            scrollDeltaPx = Math.min(28, rect.right - event.clientX + edgeThresholdPx);
+          } else if (event.clientX < rect.left + edgeThresholdPx) {
+            scrollDeltaPx = -Math.min(28, event.clientX - rect.left + edgeThresholdPx);
+          }
+          if (scrollDeltaPx !== 0) {
+            viewport.scrollLeft = clamp(viewport.scrollLeft + scrollDeltaPx, 0, maxScrollLeft);
+          }
+        }
+      }
+      const scrollDeltaX = viewport.scrollLeft - interaction.originScrollLeft;
+      const dx = interaction.kind === 'pan'
+        ? event.clientX - interaction.startClientX
+        : (event.clientX - interaction.startClientX) + scrollDeltaX;
       const dy = event.clientY - interaction.startClientY;
       const movedEnough = Math.abs(dx) >= DRAG_THRESHOLD_PX || Math.abs(dy) >= DRAG_THRESHOLD_PX;
-      const baseSceneSpans = interaction.originSceneSpans.length ? interaction.originSceneSpans : sceneSpans;
+      const baseSceneSpans = interaction.originSceneSpans.length ? interaction.originSceneSpans : sceneTimelineSpans;
       const baseTotalDurationMs = baseSceneSpans.length ? baseSceneSpans[baseSceneSpans.length - 1].endMs : totalDurationMs;
 
       if (interaction.kind === 'scrub') {
         const x = event.clientX - rect.left + viewport.scrollLeft - TRACK_LABEL_WIDTH;
-        setPlayheadMs(clamp(pxToMs(x, zoomLevel), 0, totalDurationMs));
+        setPlayheadMs(clamp(pxToMs(x, zoomLevel), 0, displayTotalDurationMs));
         setSnapGuideMs(null);
         if (interaction.phase === 'pending' && movedEnough) {
           setInteraction((current) => current ? { ...current, phase: 'active' } : current);
@@ -741,6 +1313,35 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
       }
 
       if (interaction.kind === 'move') {
+        if (interaction.trackKey === 'bgm' && interaction.clipId && interaction.originBgmBounds) {
+          if (interaction.phase === 'pending' && !movedEnough) return;
+          if (interaction.phase === 'pending') {
+            setInteraction((current) => current ? { ...current, phase: 'active', moveDeltaPx: dx } : current);
+          } else {
+            setInteraction((current) => current ? { ...current, moveDeltaPx: dx } : current);
+          }
+          const maxBgmEndMs = Math.max(totalDurationMs, Math.round((backgroundMusicTracks[0]?.duration || totalDurationMs / 1000 || 1) * 1000));
+          const durationMs = Math.max(MIN_BGM_DURATION_MS, interaction.originBgmBounds.endMs - interaction.originBgmBounds.startMs);
+          const maxStartMs = Math.max(0, maxBgmEndMs - durationMs);
+          const rawStartMs = clamp(interaction.originBgmBounds.startMs + pxToMs(dx, zoomLevel), 0, maxStartMs);
+          const snapTargets = omitSnapTargets(
+            buildSnapTargets(maxBgmEndMs, baseSceneSpans, [], snapMode, playheadMs, [0, totalDurationMs, interaction.originBgmBounds.endMs]),
+            [interaction.originBgmBounds.startMs, interaction.originBgmBounds.endMs],
+          );
+          const snappedStartMs = clamp(applySnap(rawStartMs, snapTargets, snapMode), 0, maxStartMs);
+          setSnapGuideMs(Math.abs(snappedStartMs - rawStartMs) > 1 ? snappedStartMs : null);
+          commitTrimPreview({
+            kind: 'resize-right',
+            sceneIndex: -1,
+            trackKey: 'bgm',
+            clipId: interaction.clipId,
+            backgroundTrackBounds: {
+              startMs: snappedStartMs,
+              endMs: snappedStartMs + durationMs,
+            },
+          });
+          return;
+        }
         if (interaction.trackKey && interaction.trackKey !== 'scene' && interaction.clipId && typeof interaction.originClipStartMs === 'number' && typeof interaction.originClipEndMs === 'number') {
           if (interaction.phase === 'pending' && !movedEnough) return;
           if (interaction.phase === 'pending') {
@@ -748,9 +1349,13 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
           } else {
             setInteraction((current) => current ? { ...current, moveDeltaPx: dx } : current);
           }
-          const durationMs = Math.max(TIMELINE_MIN_CLIP_MS, interaction.originClipEndMs - interaction.originClipStartMs);
+          const minDurationMs = MIN_TIMELINE_EDIT_DURATION_MS;
+          const durationMs = Math.max(minDurationMs, interaction.originClipEndMs - interaction.originClipStartMs);
           const rawStartMs = Math.max(0, interaction.originClipStartMs + pxToMs(dx, zoomLevel));
-          const snapTargets = buildSnapTargets(Math.max(baseTotalDurationMs, interaction.originClipEndMs + 120000), baseSceneSpans, [], snapMode, playheadMs, [interaction.originClipEndMs]);
+          const snapTargets = omitSnapTargets(
+            buildSnapTargets(Math.max(baseTotalDurationMs, interaction.originClipEndMs + 120000), baseSceneSpans, [], snapMode, playheadMs, [interaction.originClipEndMs]),
+            [interaction.originClipStartMs, interaction.originClipEndMs],
+          );
           const snappedStartMs = Math.max(0, applySnap(rawStartMs, snapTargets, snapMode));
           setSnapGuideMs(Math.abs(snappedStartMs - rawStartMs) > 1 ? snappedStartMs : null);
           commitTrimPreview({
@@ -758,12 +1363,10 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
             sceneIndex: interaction.sceneIndex ?? -1,
             trackKey: interaction.trackKey,
             clipId: interaction.clipId,
-            clipBounds: {
-              [interaction.clipId]: {
-                startMs: snappedStartMs,
-                endMs: snappedStartMs + durationMs,
-              },
-            },
+            clipBounds: buildIndependentClipBounds(interaction.clipId, {
+              startMs: snappedStartMs,
+              endMs: snappedStartMs + durationMs,
+            }, minDurationMs),
           });
           return;
         }
@@ -777,6 +1380,46 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
         } else {
           setInteraction((current) => current ? { ...current, moveDeltaPx: dx } : current);
         }
+
+        if (activeIndices.length === 1 && interaction.clipId) {
+          const durationMs = Math.max(MIN_SCENE_DURATION_MS, (interaction.originClipEndMs || 0) - (interaction.originClipStartMs || 0));
+          const rawStartMs = Math.max(0, (interaction.originClipStartMs || 0) + pxToMs(dx, zoomLevel));
+          const snapTargets = omitSnapTargets(
+            buildSnapTargets(
+              Math.max(baseTotalDurationMs, (interaction.originClipEndMs || 0) + 120000),
+              baseSceneSpans,
+              interaction.sceneIndex !== null ? [interaction.sceneIndex] : [],
+              snapMode,
+              playheadMs,
+            ),
+            [interaction.originClipStartMs, interaction.originClipEndMs],
+          );
+          const snappedStartMs = Math.max(0, applySnap(rawStartMs, snapTargets, snapMode));
+          setSnapGuideMs(Math.abs(snappedStartMs - rawStartMs) > 1 ? snappedStartMs : null);
+          commitDragPreview(null);
+          commitTrimPreview({
+            kind: 'move',
+            sceneIndex: interaction.sceneIndex ?? -1,
+            trackKey: 'scene',
+            clipId: interaction.clipId,
+            clipBounds: buildRippleSceneClipBounds(
+              baseSceneSpans.map((item) => ({
+                id: `scene-${item.index}`,
+                startMs: item.startMs,
+                endMs: item.endMs,
+                sceneIndex: item.index,
+              })) as RenderClip[],
+              interaction.clipId,
+              {
+                startMs: snappedStartMs,
+                endMs: snappedStartMs + durationMs,
+              },
+              MIN_SCENE_DURATION_MS,
+            ),
+          });
+          return;
+        }
+
         const firstIndex = activeIndices[0];
         const lastIndex = activeIndices[activeIndices.length - 1];
         const firstSpan = baseSceneSpans[firstIndex];
@@ -805,6 +1448,7 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
           insertIndex,
           selectedIndices: activeIndices,
         } satisfies DragPreview;
+        commitTrimPreview(null);
         commitDragPreview(nextDragPreview);
         return;
       }
@@ -816,7 +1460,10 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
         }
         const maxBgmEndMs = Math.max(totalDurationMs, Math.round((backgroundMusicTracks[0]?.duration || totalDurationMs / 1000 || 1) * 1000));
         const rawEndMs = interaction.originBgmBounds.endMs + pxToMs(dx, zoomLevel);
-        const snapTargets = buildSnapTargets(maxBgmEndMs, baseSceneSpans, [], snapMode, playheadMs, [interaction.originBgmBounds.startMs, totalDurationMs]);
+        const snapTargets = omitSnapTargets(
+          buildSnapTargets(maxBgmEndMs, baseSceneSpans, [], snapMode, playheadMs, [interaction.originBgmBounds.startMs, totalDurationMs]),
+          [interaction.originBgmBounds.startMs, interaction.originBgmBounds.endMs],
+        );
         const snappedEndMs = clamp(applySnap(rawEndMs, snapTargets, snapMode), interaction.originBgmBounds.startMs + MIN_BGM_DURATION_MS, maxBgmEndMs);
         setSnapGuideMs(Math.abs(snappedEndMs - rawEndMs) > 1 ? snappedEndMs : null);
         commitTrimPreview({
@@ -836,7 +1483,10 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
         }
         const rawStartMs = interaction.originBgmBounds.startMs + pxToMs(dx, zoomLevel);
         const maxStartMs = interaction.originBgmBounds.endMs - MIN_BGM_DURATION_MS;
-        const snapTargets = buildSnapTargets(Math.max(totalDurationMs, interaction.originBgmBounds.endMs), baseSceneSpans, [], snapMode, playheadMs, [0, totalDurationMs, interaction.originBgmBounds.endMs]);
+        const snapTargets = omitSnapTargets(
+          buildSnapTargets(Math.max(totalDurationMs, interaction.originBgmBounds.endMs), baseSceneSpans, [], snapMode, playheadMs, [0, totalDurationMs, interaction.originBgmBounds.endMs]),
+          [interaction.originBgmBounds.startMs, interaction.originBgmBounds.endMs],
+        );
         const snappedStartMs = clamp(applySnap(rawStartMs, snapTargets, snapMode), 0, maxStartMs);
         setSnapGuideMs(Math.abs(snappedStartMs - rawStartMs) > 1 ? snappedStartMs : null);
         commitTrimPreview({
@@ -854,31 +1504,45 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
         if (interaction.phase === 'pending') {
           setInteraction((current) => current ? { ...current, phase: 'active' } : current);
         }
-        const minDurationMs = Math.max(TIMELINE_MIN_CLIP_MS, 320);
+        const minDurationMs = MIN_TIMELINE_EDIT_DURATION_MS;
         let nextStartMs = interaction.originClipStartMs;
         let nextEndMs = interaction.originClipEndMs;
         if (interaction.kind === 'resize-right') {
           const rawEndMs = interaction.originClipEndMs + pxToMs(dx, zoomLevel);
-          const snapTargets = buildSnapTargets(Math.max(baseTotalDurationMs, interaction.originClipEndMs + 120000), baseSceneSpans, [], snapMode, playheadMs, [interaction.originClipStartMs]);
+          const snapTargets = omitSnapTargets(
+            buildSnapTargets(Math.max(baseTotalDurationMs, interaction.originClipEndMs + 120000), baseSceneSpans, [], snapMode, playheadMs, [interaction.originClipStartMs]),
+            [interaction.originClipStartMs, interaction.originClipEndMs],
+          );
           nextEndMs = Math.max(interaction.originClipStartMs + minDurationMs, applySnap(rawEndMs, snapTargets, snapMode));
           setSnapGuideMs(Math.abs(nextEndMs - rawEndMs) > 1 ? nextEndMs : null);
-        } else {
-          const rawStartMs = interaction.originClipStartMs + pxToMs(dx, zoomLevel);
-          const snapTargets = buildSnapTargets(Math.max(baseTotalDurationMs, interaction.originClipEndMs + 120000), baseSceneSpans, [], snapMode, playheadMs, [0, interaction.originClipEndMs]);
-          nextStartMs = Math.max(0, Math.min(interaction.originClipEndMs - minDurationMs, applySnap(rawStartMs, snapTargets, snapMode)));
-          setSnapGuideMs(Math.abs(nextStartMs - rawStartMs) > 1 ? nextStartMs : null);
+          commitTrimPreview({
+            kind: interaction.kind,
+            sceneIndex: interaction.sceneIndex ?? -1,
+            trackKey: interaction.trackKey,
+            clipId: interaction.clipId,
+            clipBounds: buildIndependentClipBounds(interaction.clipId, {
+              startMs: nextStartMs,
+              endMs: nextEndMs,
+            }, minDurationMs),
+          });
+          return;
         }
+        const rawStartMs = interaction.originClipStartMs + pxToMs(dx, zoomLevel);
+        const snapTargets = omitSnapTargets(
+          buildSnapTargets(Math.max(baseTotalDurationMs, interaction.originClipEndMs + 120000), baseSceneSpans, [], snapMode, playheadMs, [0, interaction.originClipEndMs]),
+          [interaction.originClipStartMs, interaction.originClipEndMs],
+        );
+        nextStartMs = clamp(applySnap(rawStartMs, snapTargets, snapMode), 0, interaction.originClipEndMs - minDurationMs);
+        setSnapGuideMs(Math.abs(nextStartMs - rawStartMs) > 1 ? nextStartMs : null);
         commitTrimPreview({
           kind: interaction.kind,
           sceneIndex: interaction.sceneIndex ?? -1,
           trackKey: interaction.trackKey,
           clipId: interaction.clipId,
-          clipBounds: {
-            [interaction.clipId]: {
-              startMs: nextStartMs,
-              endMs: nextEndMs,
-            },
-          },
+          clipBounds: buildIndependentClipBounds(interaction.clipId, {
+            startMs: nextStartMs,
+            endMs: nextEndMs,
+          }, minDurationMs),
         });
         return;
       }
@@ -888,19 +1552,37 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
         if (interaction.phase === 'pending') {
           setInteraction((current) => current ? { ...current, phase: 'active' } : current);
         }
-        const span = baseSceneSpans[interaction.sceneIndex];
-        if (!span) return;
-        const rawEndMs = span.endMs + pxToMs(dx, zoomLevel);
-        const snapTargets = buildSnapTargets(baseTotalDurationMs + 120000, baseSceneSpans, [interaction.sceneIndex], snapMode, playheadMs);
-        const snappedEndMs = applySnap(rawEndMs, snapTargets, snapMode);
-        const nextDurationMs = Math.max(MIN_SCENE_DURATION_MS, snappedEndMs - span.startMs);
+        const span = baseSceneSpans.find((item) => item.index === interaction.sceneIndex) || baseSceneSpans[interaction.sceneIndex];
+        const startMs = typeof interaction.originClipStartMs === 'number' ? interaction.originClipStartMs : span?.startMs ?? 0;
+        const endMs = typeof interaction.originClipEndMs === 'number' ? interaction.originClipEndMs : span?.endMs ?? (startMs + MIN_SCENE_DURATION_MS);
+        const rawEndMs = endMs + pxToMs(dx, zoomLevel);
+        const sceneResizeSnapIndices = [interaction.sceneIndex, interaction.sceneIndex + 1].filter((index) => index >= 0 && index < baseSceneSpans.length);
+        const snapTargets = omitSnapTargets(
+          buildSnapTargets(Math.max(baseTotalDurationMs, endMs + 120000), baseSceneSpans, sceneResizeSnapIndices, snapMode, playheadMs, [startMs]),
+          [startMs, endMs],
+        );
+        const snappedEndMs = Math.max(startMs + MIN_SCENE_DURATION_MS, applySnap(rawEndMs, snapTargets, snapMode));
         setSnapGuideMs(Math.abs(snappedEndMs - rawEndMs) > 1 ? snappedEndMs : null);
+        const targetClipId = interaction.clipId || `scene-${interaction.sceneIndex}`;
+        const preview = buildSceneBoundaryTrimPreview(
+          baseSceneSpans.map((item) => ({
+            id: `scene-${item.index}`,
+            startMs: item.startMs,
+            endMs: item.endMs,
+            sceneIndex: item.index,
+          })) as RenderClip[],
+          targetClipId,
+          'right',
+          snappedEndMs,
+          MIN_SCENE_DURATION_MS,
+        );
         const nextTrimPreview = {
           kind: 'resize-right',
           sceneIndex: interaction.sceneIndex,
           trackKey: 'scene',
-          clipId: interaction.clipId || `scene-${interaction.sceneIndex}`,
-          nextDurations: { [interaction.sceneIndex]: Number((nextDurationMs / 1000).toFixed(1)) },
+          clipId: targetClipId,
+          nextDurations: preview.nextDurations,
+          clipBounds: preview.clipBounds,
         } satisfies TrimPreview;
         commitTrimPreview(nextTrimPreview);
         return;
@@ -911,24 +1593,37 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
         if (interaction.phase === 'pending') {
           setInteraction((current) => current ? { ...current, phase: 'active' } : current);
         }
-        if (interaction.sceneIndex === 0) return;
-        const previousSpan = baseSceneSpans[interaction.sceneIndex - 1];
-        const currentSpan = baseSceneSpans[interaction.sceneIndex];
-        if (!previousSpan || !currentSpan) return;
-        const rawBoundary = currentSpan.startMs + pxToMs(dx, zoomLevel);
-        const snapTargets = buildSnapTargets(baseTotalDurationMs, baseSceneSpans, [interaction.sceneIndex - 1, interaction.sceneIndex], snapMode, playheadMs);
-        const snappedBoundary = applySnap(rawBoundary, snapTargets, snapMode);
-        const boundedBoundary = clamp(snappedBoundary, previousSpan.startMs + MIN_SCENE_DURATION_MS, currentSpan.endMs - MIN_SCENE_DURATION_MS);
-        setSnapGuideMs(Math.abs(boundedBoundary - rawBoundary) > 1 ? boundedBoundary : null);
+        const span = baseSceneSpans.find((item) => item.index === interaction.sceneIndex) || baseSceneSpans[interaction.sceneIndex];
+        const startMs = typeof interaction.originClipStartMs === 'number' ? interaction.originClipStartMs : span?.startMs ?? 0;
+        const endMs = typeof interaction.originClipEndMs === 'number' ? interaction.originClipEndMs : span?.endMs ?? (startMs + MIN_SCENE_DURATION_MS);
+        const rawStartMs = startMs + pxToMs(dx, zoomLevel);
+        const sceneResizeSnapIndices = [interaction.sceneIndex - 1, interaction.sceneIndex].filter((index) => index >= 0 && index < baseSceneSpans.length);
+        const snapTargets = omitSnapTargets(
+          buildSnapTargets(Math.max(baseTotalDurationMs, endMs), baseSceneSpans, sceneResizeSnapIndices, snapMode, playheadMs, [0, endMs]),
+          [startMs, endMs],
+        );
+        const snappedStartMs = clamp(applySnap(rawStartMs, snapTargets, snapMode), 0, endMs - MIN_SCENE_DURATION_MS);
+        setSnapGuideMs(Math.abs(snappedStartMs - rawStartMs) > 1 ? snappedStartMs : null);
+        const targetClipId = interaction.clipId || `scene-${interaction.sceneIndex}`;
+        const preview = buildSceneBoundaryTrimPreview(
+          baseSceneSpans.map((item) => ({
+            id: `scene-${item.index}`,
+            startMs: item.startMs,
+            endMs: item.endMs,
+            sceneIndex: item.index,
+          })) as RenderClip[],
+          targetClipId,
+          'left',
+          snappedStartMs,
+          MIN_SCENE_DURATION_MS,
+        );
         const nextTrimPreview = {
           kind: 'resize-left',
           sceneIndex: interaction.sceneIndex,
           trackKey: 'scene',
-          clipId: interaction.clipId || `scene-${interaction.sceneIndex}`,
-          nextDurations: {
-            [interaction.sceneIndex - 1]: Number(((boundedBoundary - previousSpan.startMs) / 1000).toFixed(1)),
-            [interaction.sceneIndex]: Number(((currentSpan.endMs - boundedBoundary) / 1000).toFixed(1)),
-          },
+          clipId: targetClipId,
+          nextDurations: preview.nextDurations,
+          clipBounds: preview.clipBounds,
         } satisfies TrimPreview;
         commitTrimPreview(nextTrimPreview);
       }
@@ -952,9 +1647,20 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
       const currentTrimPreview = trimPreviewRef.current;
 
       if (interaction.kind === 'move' && interaction.phase === 'active') {
-        if (interaction.trackKey && interaction.trackKey !== 'scene' && interaction.clipId && currentTrimPreview?.clipBounds?.[interaction.clipId]) {
-          const nextBounds = currentTrimPreview.clipBounds[interaction.clipId];
-          setClipOverrides((current) => ({ ...current, [interaction.clipId as string]: nextBounds }));
+        if (interaction.trackKey === 'bgm' && currentTrimPreview?.backgroundTrackBounds && backgroundMusicTracks[0]) {
+          setBackgroundTrackBounds(currentTrimPreview.backgroundTrackBounds);
+          onBackgroundTrackTimelineChange?.(backgroundMusicTracks[0].id, {
+            timelineStartSeconds: Number((currentTrimPreview.backgroundTrackBounds.startMs / 1000).toFixed(3)),
+            timelineEndSeconds: Number((currentTrimPreview.backgroundTrackBounds.endMs / 1000).toFixed(3)),
+          });
+          appendEditorTelemetry(projectId || null, 'timeline-move-bgm', { trackId: backgroundMusicTracks[0].id });
+          setTelemetryTick((current) => current + 1);
+        } else if (interaction.trackKey === 'scene' && currentTrimPreview?.clipBounds) {
+          setClipOverrides((current) => mergeSceneMasterClipOverrides(current, currentTrimPreview.clipBounds || {}));
+          appendEditorTelemetry(projectId || null, 'timeline-move-scene', { clipId: interaction.clipId, count: Object.keys(currentTrimPreview.clipBounds || {}).length || 1 });
+          setTelemetryTick((current) => current + 1);
+        } else if (interaction.trackKey && interaction.trackKey !== 'scene' && interaction.clipId && currentTrimPreview?.clipBounds?.[interaction.clipId]) {
+          setClipOverrides((current) => ({ ...current, ...currentTrimPreview.clipBounds }));
           appendEditorTelemetry(projectId || null, 'timeline-move-clip', { clipId: interaction.clipId, trackKey: interaction.trackKey });
           setTelemetryTick((current) => current + 1);
         } else if (currentDragPreview && onSceneReorder) {
@@ -972,6 +1678,25 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
               workingOrder = arrayMove(workingOrder, currentIndex, desiredIndex);
             }
           });
+          const remapClipOverrideKey = (key: string, indexMap: Map<number, number>) => {
+            const sceneMatch = key.match(/^(scene|narration)-(\d+)$/);
+            if (sceneMatch) {
+              const nextIndex = indexMap.get(Number(sceneMatch[2]));
+              return typeof nextIndex === 'number' ? `${sceneMatch[1]}-${nextIndex}` : key;
+            }
+            const subtitleMatch = key.match(/^subtitle-(\d+)-(\d+)$/);
+            if (subtitleMatch) {
+              const nextIndex = indexMap.get(Number(subtitleMatch[1]));
+              return typeof nextIndex === 'number' ? `subtitle-${nextIndex}-${subtitleMatch[2]}` : key;
+            }
+            return key;
+          };
+          const indexMap = new Map<number, number>();
+          nextOrder.forEach((sceneIndex, nextIndex) => indexMap.set(sceneIndex, nextIndex));
+          setClipOverrides((current) => Object.entries(current).reduce<Record<string, { startMs: number; endMs: number }>>((acc, [key, bounds]) => {
+            acc[remapClipOverrideKey(key, indexMap)] = bounds as { startMs: number; endMs: number };
+            return acc;
+          }, {}));
           const remappedSelection = movedBlock.map((sceneIndex) => nextOrder.indexOf(sceneIndex)).sort((a, b) => a - b);
           setSelectedSceneIndices(remappedSelection);
           appendEditorTelemetry(projectId || null, 'timeline-move-scenes', { count: selected.length, insertIndex: currentDragPreview.insertIndex });
@@ -988,9 +1713,28 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
           });
           appendEditorTelemetry(projectId || null, 'timeline-trim-bgm', { kind: interaction.kind });
           setTelemetryTick((current) => current + 1);
-        } else if (currentTrimPreview.trackKey && currentTrimPreview.trackKey !== 'scene' && currentTrimPreview.clipId && currentTrimPreview.clipBounds?.[currentTrimPreview.clipId]) {
-          const nextBounds = currentTrimPreview.clipBounds[currentTrimPreview.clipId];
-          setClipOverrides((current) => ({ ...current, [currentTrimPreview.clipId as string]: nextBounds }));
+        } else if (currentTrimPreview.trackKey === 'scene' && currentTrimPreview.sceneIndex >= 0) {
+          const changedEntries = Object.entries(currentTrimPreview.nextDurations || {});
+          if (changedEntries.length) {
+            changedEntries.forEach(([key, value]) => {
+              const index = Number(key);
+              if (!Number.isFinite(index)) return;
+              onDurationChange?.(index, Number(value));
+            });
+          } else {
+            const nextBounds = currentTrimPreview.clipId && currentTrimPreview.clipBounds?.[currentTrimPreview.clipId]
+              ? currentTrimPreview.clipBounds[currentTrimPreview.clipId]
+              : null;
+            if (nextBounds) {
+              const nextDurationSeconds = Number(((nextBounds.endMs - nextBounds.startMs) / 1000).toFixed(1));
+              onDurationChange?.(currentTrimPreview.sceneIndex, nextDurationSeconds);
+            }
+          }
+          setClipOverrides((current) => mergeSceneMasterClipOverrides(current, currentTrimPreview.clipBounds || {}));
+          appendEditorTelemetry(projectId || null, interaction.kind === 'move' ? 'timeline-move-scene' : 'timeline-trim-scene', { clipId: currentTrimPreview.clipId, kind: interaction.kind, count: changedEntries.length || 1 });
+          setTelemetryTick((current) => current + 1);
+        } else if (currentTrimPreview.trackKey && currentTrimPreview.trackKey !== 'scene' && currentTrimPreview.clipBounds) {
+          setClipOverrides((current) => ({ ...current, ...currentTrimPreview.clipBounds }));
           appendEditorTelemetry(projectId || null, 'timeline-trim-clip', { clipId: currentTrimPreview.clipId, kind: interaction.kind, trackKey: currentTrimPreview.trackKey });
           setTelemetryTick((current) => current + 1);
         } else {
@@ -1012,7 +1756,7 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
         const maxX = Math.max(marqueeRect.x1, marqueeRect.x2) - TRACK_LABEL_WIDTH;
         const minY = Math.min(marqueeRect.y1, marqueeRect.y2);
         const maxY = Math.max(marqueeRect.y1, marqueeRect.y2);
-        const selection = sceneSpans.filter((span) => {
+        const selection = sceneTimelineSpans.filter((span) => {
           const left = msToPx(span.startMs, zoomLevel);
           const right = msToPx(span.endMs, zoomLevel);
           const sceneTrackTop = getTrackTop(0);
@@ -1049,7 +1793,7 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
       }
       pendingPointerEventRef.current = null;
     };
-  }, [backgroundMusicTracks, data, interaction, marqueeRect, onBackgroundTrackTimelineChange, onDurationChange, onSceneReorder, playheadMs, projectId, sceneSpans, snapMode, totalDurationMs, zoomLevel]);
+  }, [backgroundMusicTracks, data, displayTotalDurationMs, interaction, marqueeRect, onBackgroundTrackTimelineChange, onDurationChange, onSceneReorder, playheadMs, projectId, sceneTimelineSpans, snapMode, totalDurationMs, trackClipCollections, zoomLevel]);
 
   const handleSelectScene = (sceneIndex: number, event?: React.MouseEvent) => {
     setContextMenu(null);
@@ -1073,7 +1817,7 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
     if (!viewportRef.current) return;
     const rect = viewportRef.current.getBoundingClientRect();
     const x = event.clientX - rect.left + viewportRef.current.scrollLeft - TRACK_LABEL_WIDTH;
-    setPlayheadMs(clamp(pxToMs(x, zoomLevel), 0, totalDurationMs));
+    setPlayheadMs(clamp(pxToMs(x, zoomLevel), 0, displayTotalDurationMs));
     setInteraction({
       kind: 'scrub',
       phase: 'pending',
@@ -1085,7 +1829,7 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
       originPlayheadMs: playheadMs,
       originScrollLeft: viewportRef.current.scrollLeft,
       trackKey: null,
-      originSceneSpans: sceneSpans,
+      originSceneSpans: sceneTimelineSpansByIndex,
       moveDeltaPx: 0,
     });
   };
@@ -1107,12 +1851,12 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
     ensureVisibleAtMs(playheadMs);
   }, [playheadMs]);
 
-  const handleContextAction = (action: 'split' | 'pin' | 'range-preview') => {
+  const handleContextAction = (action: 'split' | 'pin') => {
     if (!contextMenu) return;
     const sceneIndex = contextMenu.sceneIndex;
     setContextMenu(null);
     handleSelectScene(sceneIndex);
-    const span = sceneSpans[sceneIndex];
+    const span = sceneTimelineSpanMap.get(sceneIndex) || sceneSpans[sceneIndex];
     if (!span) return;
 
     if (action === 'split' && onSplitScene) {
@@ -1131,9 +1875,6 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
       return;
     }
 
-    if (action === 'range-preview') {
-      onPreviewRange?.({ startIndex: sceneIndex, endIndex: sceneIndex });
-    }
   };
 
   const previewRangeLabel = rangeIndices
@@ -1167,18 +1908,19 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
 
       <div className="border-b border-slate-800 px-5 py-5">
         <div className="overflow-hidden rounded-[26px] border border-slate-800 bg-black">
-          <div className="flex min-h-[340px] items-center justify-center bg-[radial-gradient(circle_at_center,rgba(15,23,42,0.75),rgba(2,6,23,0.92))] px-6 py-6">
-            <div className="w-full max-w-[660px]">
+          <div className="flex min-h-[640px] items-center justify-center bg-[radial-gradient(circle_at_center,rgba(15,23,42,0.75),rgba(2,6,23,0.92))] px-6 py-6">
+            <div className="w-full max-w-[1200px]">
               <div className="mb-3 flex items-center justify-between text-xs font-black text-slate-400">
                 <span>PREVIEW</span>
-                <span>Scene {previewSceneAsset?.sceneNumber || effectivePreviewSceneIndex + 1}</span>
+                <span>{previewSceneAsset ? `Scene ${previewSceneAsset.sceneNumber || ((effectivePreviewSceneIndex ?? 0) + 1)}` : '빈 구간'}</span>
               </div>
-              <div className="relative overflow-hidden rounded-[24px] border border-slate-800 bg-[#020617] shadow-[0_26px_60px_-30px_rgba(0,0,0,0.9)]" style={{ aspectRatio: PREVIEW_ASPECT_BY_RATIO[previewSceneAsset?.aspectRatio || '16:9'] }}>
+              <div className="relative h-[600px] w-full overflow-hidden rounded-[24px] border border-slate-800 bg-[#020617] shadow-[0_26px_60px_-30px_rgba(0,0,0,0.9)]">
                 {previewVideoSrc ? (
                   <video
-                    key={previewVideoSrc}
+                    key={`${effectivePreviewSceneIndex ?? 'gap'}-${previewVideoSrc}`}
+                    ref={previewVideoRef}
                     src={previewVideoSrc}
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain"
                     preload="metadata"
                     playsInline
                     muted
@@ -1189,9 +1931,11 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                   />
                 ) : previewImageSrc ? (
                   <img
+                    key={`${effectivePreviewSceneIndex ?? 'gap'}-${previewImageSrc}`}
                     src={previewImageSrc}
-                    alt={`Scene ${previewSceneAsset?.sceneNumber || effectivePreviewSceneIndex + 1}`}
-                    className="h-full w-full object-cover"
+                    alt={previewSceneAsset ? `Scene ${previewSceneAsset.sceneNumber || ((effectivePreviewSceneIndex ?? 0) + 1)}` : '빈 구간'}
+                    className="h-full w-full object-contain will-change-transform"
+                    style={{ transform: `scale(${previewImageScale.toFixed(4)})`, transformOrigin: 'center center' }}
                     draggable={false}
                     loading="lazy"
                     onLoad={() => setPreviewMediaLoading(false)}
@@ -1210,9 +1954,11 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                 ) : null}
                 {previewVideoSrc ? <div className="absolute right-3 top-3 rounded-full bg-violet-500/90 px-3 py-1 text-[11px] font-black text-white">VIDEO</div> : null}
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent px-6 pb-5 pt-16">
-                  <div className="text-center text-[18px] font-black text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.9)]">{previewSceneAsset?.narration || '현재 선택한 씬의 나레이션이 여기에 표시됩니다.'}</div>
+                  <div className="text-center text-[18px] font-black text-white drop-shadow-[0_4px_18px_rgba(0,0,0,0.9)]">{previewSubtitleText}</div>
                 </div>
               </div>
+              <audio ref={narrationAudioRef} preload="auto" hidden />
+              <audio ref={bgmAudioRef} preload="auto" hidden loop />
             </div>
           </div>
 
@@ -1226,8 +1972,10 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                 <span>{isPlaying ? '⏸' : '▶'}</span>
                 <span>{isPlaying ? '일시정지' : '재생'}</span>
               </button>
-              <button type="button" onClick={() => setPlayheadMs((current) => clamp(current - 1000, 0, totalDurationMs))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-black text-slate-200 hover:bg-slate-800">-1s</button>
-              <button type="button" onClick={() => setPlayheadMs((current) => clamp(current + 1000, 0, totalDurationMs))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-black text-slate-200 hover:bg-slate-800">+1s</button>
+              <button type="button" onClick={() => setPlayheadMs((current) => clamp(current - FRAME_STEP_MS, 0, displayTotalDurationMs))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-black text-slate-200 hover:bg-slate-800">-1f</button>
+              <button type="button" onClick={() => setPlayheadMs((current) => clamp(current + FRAME_STEP_MS, 0, displayTotalDurationMs))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-black text-slate-200 hover:bg-slate-800">+1f</button>
+              <button type="button" onClick={() => setPlayheadMs((current) => clamp(current - 1000, 0, displayTotalDurationMs))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-black text-slate-200 hover:bg-slate-800">-1s</button>
+              <button type="button" onClick={() => setPlayheadMs((current) => clamp(current + 1000, 0, displayTotalDurationMs))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-xs font-black text-slate-200 hover:bg-slate-800">+1s</button>
               <div className="rounded-full border border-slate-800 bg-[#090f1b] px-4 py-2 text-sm font-black text-cyan-300">{formatTimelineTime(playheadMs)} / {formatTimelineTime(trimPreview ? displayTotalDurationMs : totalDurationMs)}</div>
             </div>
 
@@ -1240,14 +1988,7 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
               <button type="button" onClick={() => setSubtitleEnabled((current) => !current)} className={`rounded-full border px-3 py-2 text-[11px] font-black ${subtitleEnabled ? 'border-amber-500/40 bg-amber-500/12 text-amber-200' : 'border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-800'}`}>자막 {subtitleEnabled ? 'ON' : 'OFF'}</button>
               <button type="button" onClick={() => setZoomLevel((current) => clampTimelineZoom(current - 0.12))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-[11px] font-black text-slate-200 hover:bg-slate-800">축소</button>
               <button type="button" onClick={() => setZoomLevel((current) => clampTimelineZoom(current + 0.12))} className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 text-[11px] font-black text-slate-200 hover:bg-slate-800">확대</button>
-              <button type="button" onClick={() => {
-                if (rangeIndices) {
-                  onPreviewRange?.(rangeIndices);
-                  return;
-                }
-                const fallbackRange = getSceneRangeFromSelection(selectedSceneIndices, data.length);
-                if (fallbackRange) onPreviewRange?.(fallbackRange);
-              }} className="rounded-full bg-violet-600 px-4 py-2 text-[11px] font-black text-white hover:bg-violet-500">범위 미리보기</button>
+              <button type="button" onClick={() => onUndoTimelineChange?.()} disabled={!canUndoTimelineChange} className="rounded-full border border-slate-700 bg-slate-900 px-4 py-2 text-[11px] font-black text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500">되돌리기</button>
               <button type="button" onClick={() => {
                 if (!selectedScene || !onSplitScene) return;
                 const splitMs = clamp(playheadMs, selectedScene.startMs + TIMELINE_MIN_CLIP_MS, selectedScene.endMs - TIMELINE_MIN_CLIP_MS);
@@ -1342,7 +2083,7 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                             originPlayheadMs: playheadMs,
                             originScrollLeft: viewportRef.current.scrollLeft,
                             trackKey: track.key,
-                            originSceneSpans: sceneSpans,
+                            originSceneSpans: sceneTimelineSpansByIndex,
                             moveDeltaPx: 0,
                           });
                         }}
@@ -1351,7 +2092,7 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,transparent,rgba(255,255,255,0.01),transparent)]" />
 
                         {track.key === 'scene' && dragPreview ? (() => {
-                          const remainder = sceneSpans.filter((span) => !dragPreview.selectedIndices.includes(span.index));
+                          const remainder = sceneTimelineSpans.filter((span) => !dragPreview.selectedIndices.includes(span.index));
                           const insertBefore = remainder[dragPreview.insertIndex] ?? null;
                           const insertAfter = dragPreview.insertIndex > 0 ? remainder[dragPreview.insertIndex - 1] : null;
                           const insertionMs = insertBefore ? insertBefore.startMs : insertAfter ? insertAfter.endMs : dragPreview.startMs;
@@ -1366,10 +2107,10 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                         {rowClips.map((clip) => {
                           const isSelected = clip.sceneIndex >= 0 && selectedSceneIndices.includes(clip.sceneIndex);
                           const isPinned = selectedThumbnailId === `scene-${clip.sceneIndex}` || selectedThumbnailId === `scene-${data[clip.sceneIndex]?.sceneNumber}`;
-                          const visualSpan = track.key === 'scene' && clip.sceneIndex >= 0 ? displaySceneSpanMap.get(clip.sceneIndex) : null;
+                          const visualSpan = track.key === 'scene' && clip.sceneIndex >= 0 ? sceneTimelineSpanMap.get(clip.sceneIndex) : null;
                           const clipStartMs = visualSpan?.startMs ?? clip.startMs;
                           const clipEndMs = visualSpan?.endMs ?? clip.endMs;
-                          const width = Math.max(track.key === 'subtitle' ? 66 : 88, msToPx(clipEndMs - clipStartMs, zoomLevel));
+                          const width = Math.max(track.key === 'subtitle' ? 54 : 48, msToPx(clipEndMs - clipStartMs, zoomLevel));
                           const left = msToPx(clipStartMs, zoomLevel);
                           const isActivelyMoving = Boolean(
                             interaction?.kind === 'move'
@@ -1380,7 +2121,7 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                             )
                           );
                           const activeBlockFirstIndex = dragPreview?.selectedIndices?.[0] ?? -1;
-                          const activeBlockFirstSpan = activeBlockFirstIndex >= 0 ? sceneSpanMap.get(activeBlockFirstIndex) : null;
+                          const activeBlockFirstSpan = activeBlockFirstIndex >= 0 ? sceneTimelineSpanMap.get(activeBlockFirstIndex) : null;
                           const activeBlockDeltaPx = track.key === 'scene'
                             ? (dragPreview && activeBlockFirstSpan ? msToPx(dragPreview.startMs - activeBlockFirstSpan.startMs, zoomLevel) : 0)
                             : (interaction?.kind === 'move' && interaction.clipId === clip.id ? interaction.moveDeltaPx : 0);
@@ -1403,23 +2144,36 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                                 if (event.button !== 0) return;
                                 event.preventDefault();
                                 event.stopPropagation();
-                                if (clip.sceneIndex >= 0) {
+                                const preserveSceneSelection = track.key === 'scene'
+                                  && clip.sceneIndex >= 0
+                                  && selectedSceneIndices.length > 1
+                                  && selectedSceneIndices.includes(clip.sceneIndex)
+                                  && !event.shiftKey
+                                  && !event.metaKey
+                                  && !event.ctrlKey;
+                                if (clip.sceneIndex >= 0 && !preserveSceneSelection) {
                                   handleSelectScene(clip.sceneIndex, event);
                                 }
+                                commitDragPreview(null);
+                                commitTrimPreview(null);
+                                setSnapGuideMs(null);
                                 setInteraction({
                                   kind: 'move',
                                   phase: 'pending',
                                   sceneIndex: clip.sceneIndex,
-                                  selectedIndices: track.key === 'scene' ? (selectedSceneIndices.includes(clip.sceneIndex) ? selectedSceneIndices : [clip.sceneIndex]) : [],
+                                  selectedIndices: track.key === 'scene'
+                                    ? (preserveSceneSelection ? [...selectedSceneIndices].sort((a, b) => a - b) : [clip.sceneIndex])
+                                    : [],
                                   startClientX: event.clientX,
                                   startClientY: event.clientY,
                                   originDurationMs: clipEndMs - clipStartMs,
                                   originPlayheadMs: playheadMs,
                                   originScrollLeft: viewportRef.current?.scrollLeft || 0,
                                   trackKey: track.key,
-                                  originSceneSpans: sceneSpans,
+                                  originSceneSpans: sceneTimelineSpansByIndex,
                                   moveDeltaPx: 0,
                                   clipId: clip.id,
+                                  originBgmBounds: track.key === 'bgm' ? { startMs: clipStartMs, endMs: clipEndMs } : null,
                                   originClipStartMs: clipStartMs,
                                   originClipEndMs: clipEndMs,
                                 });
@@ -1444,12 +2198,14 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                                   draggable={false}
                                   className={`pointer-events-none absolute inset-y-0 left-0 z-10 w-3 cursor-ew-resize opacity-0 transition group-hover:pointer-events-auto group-hover:opacity-100 ${track.key === 'bgm' ? 'bg-emerald-400/70' : track.key === 'subtitle' ? 'bg-amber-400/70' : track.key === 'narration' ? 'bg-violet-400/70' : 'bg-cyan-400/70'}`}
                                   onMouseDown={(event) => {
-                                    if (track.key === 'scene' && clip.sceneIndex <= 0) return;
                                     event.preventDefault();
                                     event.stopPropagation();
                                     if (clip.sceneIndex >= 0) {
                                       handleSelectScene(clip.sceneIndex, event as unknown as React.MouseEvent);
                                     }
+                                    commitDragPreview(null);
+                                    commitTrimPreview(null);
+                                    setSnapGuideMs(null);
                                     setInteraction({
                                       kind: 'resize-left',
                                       phase: 'pending',
@@ -1461,7 +2217,7 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                                       originPlayheadMs: playheadMs,
                                       originScrollLeft: viewportRef.current?.scrollLeft || 0,
                                       trackKey: track.key,
-                                      originSceneSpans: sceneSpans,
+                                      originSceneSpans: sceneTimelineSpansByIndex,
                                       moveDeltaPx: 0,
                                       clipId: clip.id,
                                       originBgmBounds: track.key === 'bgm' ? { startMs: clipStartMs, endMs: clipEndMs } : null,
@@ -1472,6 +2228,17 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                                 />
                               ) : null}
                               <div className="pointer-events-none flex h-full items-center gap-2 px-3">
+                                {track.key === 'bgm' && bgmWaveform.length ? (
+                                  <div className="absolute inset-x-3 inset-y-2 flex items-center gap-[2px] opacity-55">
+                                    {bgmWaveform.map((value, waveIndex) => (
+                                      <span
+                                        key={`${clip.id}-wave-${waveIndex}`}
+                                        className="block flex-1 rounded-full bg-emerald-300/80"
+                                        style={{ height: `${Math.max(16, Math.round(value * 34))}%` }}
+                                      />
+                                    ))}
+                                  </div>
+                                ) : null}
                                 <div className={`h-7 w-7 shrink-0 rounded-xl ${track.key === 'scene' ? 'bg-cyan-500/18 text-cyan-200' : track.key === 'narration' ? 'bg-violet-500/18 text-violet-200' : track.key === 'subtitle' ? 'bg-amber-500/18 text-amber-200' : 'bg-emerald-500/18 text-emerald-200'} flex items-center justify-center text-[11px] font-black`}>
                                   {track.badge}
                                 </div>
@@ -1496,6 +2263,9 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                                     if (clip.sceneIndex >= 0) {
                                       handleSelectScene(clip.sceneIndex, event as unknown as React.MouseEvent);
                                     }
+                                    commitDragPreview(null);
+                                    commitTrimPreview(null);
+                                    setSnapGuideMs(null);
                                     setInteraction({
                                       kind: 'resize-right',
                                       phase: 'pending',
@@ -1507,7 +2277,7 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                                       originPlayheadMs: playheadMs,
                                       originScrollLeft: viewportRef.current?.scrollLeft || 0,
                                       trackKey: track.key,
-                                      originSceneSpans: sceneSpans,
+                                      originSceneSpans: sceneTimelineSpansByIndex,
                                       moveDeltaPx: 0,
                                       clipId: clip.id,
                                       originBgmBounds: track.key === 'bgm' ? { startMs: clipStartMs, endMs: clipEndMs } : null,
@@ -1578,6 +2348,13 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                     <div className="mt-2 text-sm leading-6 text-slate-200">{selectedAsset?.narration || '나레이션이 없습니다.'}</div>
                   </div>
                   <div className="rounded-[18px] border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-slate-300">
+                    <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-500">TTS</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 font-black text-violet-200">{narrationLabel || '기본 TTS 설정'}</span>
+                      <span className="rounded-full border border-slate-800 bg-slate-900 px-3 py-1.5 font-black text-slate-300">씬 {selectedAsset?.sceneNumber || selectedSceneIndex + 1} 내레이션</span>
+                    </div>
+                  </div>
+                  <div className="rounded-[18px] border border-slate-800 bg-slate-950 px-4 py-3 text-xs text-slate-300">
                     <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
@@ -1591,13 +2368,19 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
                       </button>
                       <button
                         type="button"
-                        onClick={() => {
-                          const range = getSceneRangeFromSelection(selectedSceneIndices, data.length);
-                          if (range) onPreviewRange?.(range);
-                        }}
-                        className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 font-black text-slate-200 hover:bg-slate-800"
+                        onClick={() => onSceneReorder?.(selectedSceneIndex, Math.max(0, selectedSceneIndex - 1))}
+                        disabled={selectedSceneIndex <= 0 || !onSceneReorder}
+                        className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 font-black text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500"
                       >
-                        선택 범위 미리보기
+                        앞으로 이동
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onSceneReorder?.(selectedSceneIndex, Math.min(data.length - 1, selectedSceneIndex + 1))}
+                        disabled={selectedSceneIndex >= data.length - 1 || !onSceneReorder}
+                        className="rounded-full border border-slate-700 bg-slate-900 px-3 py-2 font-black text-slate-200 hover:bg-slate-800 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500"
+                      >
+                        뒤로 이동
                       </button>
                     </div>
                   </div>
@@ -1683,9 +2466,8 @@ const TimelineWorkbench: React.FC<TimelineWorkbenchProps> = ({
           {[
             ['split', '플레이헤드에서 분할'],
             ['pin', '썸네일 핀 지정'],
-            ['range-preview', '이 씬만 미리보기'],
           ].map(([key, label]) => (
-            <button key={key} type="button" onClick={() => handleContextAction(key as 'split' | 'pin' | 'range-preview')} className="block w-full border-b border-slate-800 px-4 py-3 text-left text-sm font-bold text-slate-200 last:border-b-0 hover:bg-slate-900">{label}</button>
+            <button key={key} type="button" onClick={() => handleContextAction(key as 'split' | 'pin')} className="block w-full border-b border-slate-800 px-4 py-3 text-left text-sm font-bold text-slate-200 last:border-b-0 hover:bg-slate-900">{label}</button>
           ))}
         </div>
       ) : null}
